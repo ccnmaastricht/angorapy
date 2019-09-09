@@ -31,7 +31,7 @@ class REINFORCEAgent(_PolicyGradientAgent):
 
         # TRAINING PARAMETERS
         self.discount = 0.99
-        self.learning_rate = 0.0001
+        self.learning_rate = 0.005
 
         # MODEL
         self.model = self._build_model()
@@ -72,14 +72,16 @@ class BaselinedREINFORCEAgent(REINFORCEAgent):
         return model
 
 
-
 class TRPOAgent(_PolicyGradientAgent):
 
     def __init__(self):
-        pass
+        super().__init__()
+        raise NotImplementedError
 
 
 class PPOAgent(_PolicyGradientAgent):
 
     def __init__(self):
-        pass
+        super().__init__()
+        raise NotImplementedError
+
