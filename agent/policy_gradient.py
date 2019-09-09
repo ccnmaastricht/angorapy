@@ -1,26 +1,10 @@
-import math
-from abc import ABC
-from typing import List, Any, Tuple
-
 import numpy
-
-from agent.core import _RLAgent
 
 import tensorflow as tf
 from tensorflow import keras
 
-from datatypes import Experience
 
-
-class _PolicyGradientAgent:
-
-    def __init__(self):
-        pass
-
-
-# IMPLEMENTATIONS for specific ALGORITHM
-
-class REINFORCEAgent(_PolicyGradientAgent):
+class REINFORCEAgent:
 
     def __init__(self, state_dimensionality, n_actions):
         super().__init__()
@@ -79,16 +63,16 @@ class ActorCriticREINFORCEAgent(REINFORCEAgent):
     def judge_state_value(self, state):
         return self.critic(state)
 
-class TRPOAgent(_PolicyGradientAgent):
+
+class TRPOAgent:
 
     def __init__(self):
         super().__init__()
         raise NotImplementedError
 
 
-class PPOAgent(_PolicyGradientAgent):
+class PPOAgent:
 
     def __init__(self):
         super().__init__()
         raise NotImplementedError
-

@@ -2,14 +2,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import random
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Union
 
 import numpy
-from sklearn.linear_model import SGDRegressor
 from tensorflow import keras
 
 from agent.core import _RLAgent
-from datatypes import Experience
 
 
 class _QLearningAgent(_RLAgent, ABC):
