@@ -1,8 +1,4 @@
-import math
 import os
-
-from learn.exploration import EpsilonGreedyExplorer
-from learn.train_eval import evaluate
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -12,59 +8,68 @@ import gym
 import numpy
 
 from datatypes import Experience
-from agent.q_learning import DeepQLearningAgent, LinearQLearningAgent
-import environments
+from agent.policy_gradient import REINFORCEAgent
+
+import tensorflow as tf
+
+# activate eager execution to get rid of bullshit staticness
+tf.compat.v1.enable_eager_execution()
+tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # SETTINGS
-total_iterations = 100000
-batch_size = 64
+TOTAL_EPISODES = 100000
 
-print_every = 1000
-avg_over = 20
-
+# ENVIRONMENT
 env = gym.make("CartPole-v1")
-
 number_of_actions = env.action_space.n
 state_dimensionality = env.observation_space.shape[0]
 
-agent = DeepQLearningAgent(state_dimensionality, number_of_actions)
-explorer = EpsilonGreedyExplorer(eps_decay=0.9999)
+# AGENT
+agent = REINFORCEAgent(state_dimensionality, number_of_actions)
 
-episode_rewards = [0]
+# TRAINING
+episode_reward_history = []
+for episode in range(TOTAL_EPISODES):
+    partial_episode_gradients = []
+    reward_trajectory = []
 
-state = numpy.reshape(env.reset(), [1, -1])
-for iteration in range(total_iterations):
-    # choose an action and make a step in the environment, based on the agents current knowledge
-    action = agent.act(numpy.array(state), explorer=explorer)
-    observation, reward, done, info = env.step(action)
-    episode_rewards[-1] += reward
+    state = numpy.reshape(env.reset(), [1, -1])
+    done = False
+    while not done:
+        if episode % 100 == 0:
+            env.render()
 
-    reward = reward if not done else -10
-    observation = numpy.reshape(observation, [1, -1])
+        # choose action and calculate partial loss (not yet weighted on future reward)
+        with tf.GradientTape() as tape:
+            action, action_probability = agent.act(state)
+            partial_loss = agent.loss(action_probability)
 
-    # remember experience made during the step in the agents memory
-    agent.remember(Experience(state, action, reward, observation), done)
+        # get and remember unweighted gradient
+        partial_episode_gradients.append(tape.gradient(partial_loss, agent.model.trainable_variables))
 
-    if iteration % print_every == 0:
-        print(f"Iteration {iteration:10d}/{total_iterations} [{round(iteration/total_iterations * 100, 0)}%]"
-              f" | {len(episode_rewards) - 1:4d} episodes done"
-              f" | last {min(avg_over, len(episode_rewards)):2d}: "
-              f"mean {0 if len(episode_rewards) <= 1 else statistics.mean(episode_rewards[-avg_over:-1]):5.2f}; "
-              f"max {0 if len(episode_rewards) <= 1 else max(episode_rewards[-avg_over:-1]):5.2f}; "
-              f"min {0 if len(episode_rewards) <= 1 else min(episode_rewards[-avg_over:-1]):5.2f}"
-              f" | epsilon: {explorer.epsilon}")
+        # actually apply the chosen action
+        observation, reward, done, _ = env.step(action)
+        observation = numpy.reshape(observation, [1, -1])
+        reward_trajectory.append(reward)
 
-    if done:
-        state = env.reset()
-        episode_rewards.append(0)
+        if not done:
+            # next state is observation after executing the action
+            state = observation
 
-    # learn from memory
-    if len(agent.memory) > batch_size:
-        agent.learn(batch_size)
-        explorer.update()
+    # gather future rewards and apply them to partial gradients
+    discounted_future_rewards = [agent.discount**t * sum(reward_trajectory[t:]) for t in range(len(reward_trajectory))]
+    full_gradients = [
+        [gradient_tensor * discounted_future_rewards[t]
+         for gradient_tensor in partial_episode_gradients[t]] for t in range(len(discounted_future_rewards))
+    ]
 
-    # go to next state
-    state = observation
+    # optimize the policy based on all time steps
+    for t in range(len(full_gradients)):
+        agent.optimizer.apply_gradients(zip(full_gradients[t], agent.model.trainable_variables))
 
+    episode_reward_history.append(sum(reward_trajectory))
+
+    if episode % 30 == 0 and len(episode_reward_history) > 0:
+        print(f"Episode {episode:10d}/{TOTAL_EPISODES} | Mean over last 30: {statistics.mean(episode_reward_history[-30:]):4.2f}")
 
 env.close()
