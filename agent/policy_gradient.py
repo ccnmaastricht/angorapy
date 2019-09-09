@@ -56,12 +56,14 @@ class REINFORCEAgent(_PolicyGradientAgent):
         return action, probabilities[0][action]
 
 
-class BaselinedREINFORCEAgent(REINFORCEAgent):
+class ActorCriticREINFORCEAgent(REINFORCEAgent):
 
     def __init__(self, state_dimensionality, n_actions):
         super().__init__(state_dimensionality, n_actions)
 
-        self.value_network = self._build_value_model()
+        self.critic_lr = 0.001
+        self.critic = self._build_value_model()
+        self.critic_optimizer = keras.optimizers.Adam(lr=self.critic_lr)
 
     def _build_value_model(self):
         model = keras.Sequential()
@@ -71,6 +73,11 @@ class BaselinedREINFORCEAgent(REINFORCEAgent):
 
         return model
 
+    def critic_loss(self, value_prediction, future_reward):
+        return future_reward - value_prediction
+
+    def judge_state_value(self, state):
+        return self.critic(state)
 
 class TRPOAgent(_PolicyGradientAgent):
 
