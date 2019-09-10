@@ -1,11 +1,11 @@
 import os
 
 import gym
+import tensorflow as tf
 
 from agent.policy_gradient import ActorCriticREINFORCEAgent
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import tensorflow as tf
 
 # activate eager execution to get rid of bullshit static graphs
 tf.compat.v1.enable_eager_execution()

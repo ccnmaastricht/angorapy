@@ -23,7 +23,7 @@ class REINFORCEAgent(_RLAgent):
 
         # TRAINING PARAMETERS
         self.discount = 0.99
-        self.learning_rate = 0.01
+        self.learning_rate = 0.001
 
         # MODEL
         self.actor = self._build_model()

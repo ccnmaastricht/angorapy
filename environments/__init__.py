@@ -1,3 +1,5 @@
+"""Module for additional environments as well as registering modified environments."""
+
 # MODIFIED ENVIRONMENTS
 import gym
 
