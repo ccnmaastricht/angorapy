@@ -9,8 +9,10 @@ import numpy
 
 import tensorflow as tf
 
+from agent.core import _RLAgent
 
-class REINFORCEAgent:
+
+class REINFORCEAgent(_RLAgent):
 
     def __init__(self, state_dimensionality, n_actions):
         super().__init__()

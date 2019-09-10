@@ -1,9 +1,6 @@
 import os
 
-import statistics
-
 import gym
-import numpy
 
 from agent.policy_gradient import REINFORCEAgent
 

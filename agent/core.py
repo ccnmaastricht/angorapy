@@ -15,10 +15,6 @@ class _RLAgent(ABC):
         pass
 
     @abstractmethod
-    def learn(self, batch_size: int):
-        pass
-
-    @abstractmethod
     def drill(self, **kwargs):
         """Train the agent on a given environment."""
         pass
