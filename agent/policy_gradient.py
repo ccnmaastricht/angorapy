@@ -262,7 +262,7 @@ class PPOAgent(_RLAgent):
         """
         pass
 
-    def clipping_loss(self, old_action_prob, action_prob, advantage):
+    def actor_objective(self, old_action_prob, action_prob, advantage):
         r = (action_prob / old_action_prob)
         return tf.minimum(
             r * advantage,
@@ -277,12 +277,13 @@ class PPOAgent(_RLAgent):
         pass
 
     def drill(self, env, epochs, N):
-        for epoch in range(epochs):
+        for iteration in range(epochs):
             # run simulations
             state_trajectories, reward_trajectories, action_trajectories, action_prob_trajectories \
                 = self.gather_experience(env, N)
 
-            print(f"Epoch {epoch}: Average reward of {statistics.mean([sum(rt) for rt in reward_trajectories])}")
+            print(
+                f"Iteration {iteration}: Average reward of {statistics.mean([sum(rt) for rt in reward_trajectories])}")
 
             discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
                                   reward_trajectories]
@@ -302,10 +303,10 @@ class PPOAgent(_RLAgent):
 
                         action_probabilities, state_value = self.model(state)
 
-                        total_loss = self.critic_loss(state_value, discounted_return) \
-                                     - self.clipping_loss(old_action_prob,
-                                                          action_probabilities[0][action],
-                                                          advantage)
+                        # loss needs to be negated since the original objective from the PPO paper is for maximization
+                        total_loss = - (self.actor_objective(old_action_prob, action_probabilities[0][action],
+                                                             advantage) - self.critic_loss(state_value,
+                                                                                           discounted_return))
 
                     gradients = tape.gradient(total_loss, self.model.trainable_variables)
                     self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
