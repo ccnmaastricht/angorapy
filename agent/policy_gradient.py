@@ -12,7 +12,7 @@ import tensorflow as tf
 
 from agent.core import _RLAgent
 from policy_networks.fully_connected import PPOActorCriticNetwork
-
+tf.keras.backend.set_floatx("float64")
 
 def get_discounted_returns(reward_trajectory, discount_factor):
     return [sum([discount_factor ** k * r for k, r in enumerate(reward_trajectory[t:])]) for t in
@@ -189,8 +189,14 @@ class ActorCriticREINFORCEAgent(REINFORCEAgent):
 
 
 class PPOAgent(_RLAgent):
+    """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
     def __init__(self, state_dimensionality, n_actions):
+        """Initialize the Agent.
+
+        :param state_dimensionality:    number of dimensions in the states that the agent has to process
+        :param n_actions:               number of actions the agent can choose from
+        """
         super().__init__()
 
         self.state_dimensionality = state_dimensionality

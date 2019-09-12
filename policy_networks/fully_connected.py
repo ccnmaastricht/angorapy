@@ -2,6 +2,7 @@
 """Collection of fully connected policy networks."""
 
 import tensorflow as tf
+tf.keras.backend.set_floatx("float64")
 
 
 class PPOActorCriticNetwork(tf.keras.Model):
@@ -20,16 +21,16 @@ class PPOActorCriticNetwork(tf.keras.Model):
         self.n_actions = n_actions
 
         # shared base net
-        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="relu")
-        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="relu")
-        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="relu")
+        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="relu", dtype=tf.float64)
+        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="relu", dtype=tf.float64)
+        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="relu", dtype=tf.float64)
 
         # role specific heads
-        self.fc_critic_a = tf.keras.layers.Dense(12, input_dim=12, activation="relu")
-        self.fc_critic_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear")
+        self.fc_critic_a = tf.keras.layers.Dense(12, input_dim=12, activation="relu", dtype=tf.float64)
+        self.fc_critic_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear", dtype=tf.float64)
 
-        self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="relu")
-        self.fc_actor_out = tf.keras.layers.Dense(self.n_actions, input_dim=12, activation="softmax")
+        self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="relu", dtype=tf.float64)
+        self.fc_actor_out = tf.keras.layers.Dense(self.n_actions, input_dim=12, activation="softmax", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)

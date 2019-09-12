@@ -7,6 +7,8 @@ from agent.policy_gradient import ActorCriticREINFORCEAgent, PPOAgent
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
+import environments
+
 # activate eager execution to get rid of bullshit static graphs
 tf.compat.v1.enable_eager_execution()
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
@@ -21,6 +23,10 @@ print(f"{state_dimensionality}-dimensional states and {number_of_actions} action
 
 # AGENT
 agent = PPOAgent(state_dimensionality, number_of_actions)
-agent.drill(env, 1000, 32)
+agent.drill(env=env,
+            iterations=1000,
+            agents=32,
+            epochs=3,
+            batch_size=32)
 
 env.close()
