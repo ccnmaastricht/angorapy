@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import List
 
 import numpy
@@ -17,3 +18,6 @@ class Experience:
 
     def has_next_action(self):
         return self.next_action is not None
+
+
+PPODataPoint = namedtuple("PPONamedTuple", ["state", "action", "action_prob", "discounted_return", "advantage"])

@@ -3,6 +3,7 @@
 
 Currently including REINFORCE and Actor Critic REINFORCE.
 """
+import itertools
 import statistics
 from typing import Tuple, List
 
@@ -201,12 +202,8 @@ class PPOAgent(_RLAgent):
         self.epsilon_clip = 0.2
 
         # Models
-        self.model = self._build_model()
+        self.model = PPOActorCriticNetwork(self.state_dimensionality, self.n_actions)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-
-    def _build_model(self):
-        model = PPOActorCriticNetwork(self.state_dimensionality, self.n_actions)
-        return model
 
     def act(self, state) -> Tuple[int, float]:
         probabilities, _ = self.model(state)
@@ -229,14 +226,16 @@ class PPOAgent(_RLAgent):
             done = False
             state = tf.reshape(env.reset(), [1, -1])
             while not done:
-                state_trajectory.append(state)  # does not incorporate the state inducing DONE
-
                 action, action_probability = self.act(state)
                 observation, reward, done, _ = env.step(action)
+
+                # remember experience
+                state_trajectory.append(tf.reshape(state, [-1]))  # does not incorporate the state inducing DONE
                 reward_trajectory.append(reward)
                 action_trajectory.append(action)
                 action_probability_trajectory.append(action_probability)
 
+                # next state
                 state = tf.reshape(observation, [1, -1])
 
             state_trajectories.append(state_trajectory)
@@ -246,23 +245,7 @@ class PPOAgent(_RLAgent):
 
         return state_trajectories, reward_trajectories, action_trajectories, action_probability_trajectories
 
-    def train_actor(self, states, advantages):
-        """Train the actor network.
-
-        Optimization is performed given a batch of state trajectories and the corresponding batch of advantage
-        estimations.
-        """
-        pass
-
-    def train_critic(self, states, advantages):
-        """Train the critic network.
-
-        Optimization is performed given a batch of state trajectories and the corresponding batch of advantage
-        estimations.
-        """
-        pass
-
-    def actor_objective(self, old_action_prob, action_prob, advantage):
+    def _actor_objective(self, old_action_prob, action_prob, advantage):
         r = (action_prob / old_action_prob)
         return tf.minimum(
             r * advantage,
@@ -270,43 +253,53 @@ class PPOAgent(_RLAgent):
         )
 
     @staticmethod
-    def critic_loss(prediction, target):
+    def _critic_loss(prediction, target):
         return tf.square(prediction - target)
 
     def entropy_bonus(self):
+        """TODO add entropy bonus for objective"""
         pass
 
-    def drill(self, env, epochs, N):
-        for iteration in range(epochs):
+    def drill(self, env, iterations, epochs, agents):
+        for iteration in range(iterations):
             # run simulations
-            state_trajectories, reward_trajectories, action_trajectories, action_prob_trajectories \
-                = self.gather_experience(env, N)
+            s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories = self.gather_experience(env, agents)
 
-            print(
-                f"Iteration {iteration}: Average reward of {statistics.mean([sum(rt) for rt in reward_trajectories])}")
+            print(f"Iteration {iteration}: Average reward of {statistics.mean([sum(r) for r in r_trajectories])}")
 
-            discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
-                                  reward_trajectories]
-            state_value_predictions = [[self.model.predict(state)[1][0][0] for state in trajectory] for trajectory in
-                                       state_trajectories]
+            discounted_returns = [tf.dtypes.cast(get_discounted_returns(reward_trajectory, self.discount), tf.float64)
+                                  for reward_trajectory in
+                                  r_trajectories]
+            state_value_predictions = [[self.model.predict(tf.reshape(state, [1, -1]))[1][0][0] for state in trajectory]
+                                       for trajectory in
+                                       s_trajectories]
             advantages = [tf.dtypes.cast(tf.subtract(disco_traj, value_traj), tf.float64) for disco_traj, value_traj in
                           zip(discounted_returns, state_value_predictions)]
 
-            for trajectory_id in range(len(state_trajectories)):
-                for t in range(len(state_trajectories[trajectory_id])):
-                    with tf.GradientTape() as tape:
-                        state = state_trajectories[trajectory_id][t]
-                        discounted_return = discounted_returns[trajectory_id][t]
-                        advantage = advantages[trajectory_id][t]
-                        action = action_trajectories[trajectory_id][t]
-                        old_action_prob = action_prob_trajectories[trajectory_id][t]
+            # make tensorflow data set for faster data access during training
+            dataset = tf.data.Dataset.from_tensor_slices({
+                "state": list(itertools.chain(*s_trajectories)),
+                "action": list(itertools.chain(*a_trajectories)),
+                "action_prob": list(itertools.chain(*a_prob_trajectories)),
+                "return": list(itertools.chain(*discounted_returns)),
+                "advantage": list(itertools.chain(*advantages))
+            })
 
-                        action_probabilities, state_value = self.model(state)
+            for epoch in range(3):
+                shuffled_dataset = dataset.shuffle(
+                    1000)  # TODO determine appropriate buffer size based on number of datapoints
+                batched_dataset = shuffled_dataset.batch(8)
+
+                for batch in batched_dataset:
+                    with tf.GradientTape() as tape:
+                        action_probabilities, state_value = self.model(batch["state"], training=True)
 
                         # loss needs to be negated since the original objective from the PPO paper is for maximization
-                        total_loss = - (self.actor_objective(old_action_prob, action_probabilities[0][action],
-                                                             advantage) - self.critic_loss(state_value,
-                                                                                           discounted_return))
+                        loss = - (self._actor_objective(batch["action_prob"],
+                                                        [action_probabilities[i][a] for i, a in
+                                                         enumerate(batch["action"])],
+                                                        batch["advantage"]) - self._critic_loss(state_value,
+                                                                                                batch["return"]))
 
-                    gradients = tape.gradient(total_loss, self.model.trainable_variables)
+                    gradients = tape.gradient(loss, self.model.trainable_variables)
                     self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
