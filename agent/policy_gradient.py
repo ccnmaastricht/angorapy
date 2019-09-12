@@ -212,6 +212,13 @@ class PPOAgent(_RLAgent):
         return action, probabilities[0][action]
 
     def gather_experience(self, env, n_trajectories: int) -> Tuple[List, List, List, List]:
+        """Gather experience in an environment for n trajectories.
+
+        :param env:                 the environment in which the trajectories will be produced
+        :param n_trajectories:      the number of desired trajectories
+
+        :return:                    a 4-tuple where each element is a list of trajectories of s, r, a and p(a)
+        """
         state_trajectories = []
         reward_trajectories = []
         action_trajectories = []
@@ -260,7 +267,46 @@ class PPOAgent(_RLAgent):
         """TODO add entropy bonus for objective"""
         pass
 
-    def drill(self, env, iterations, epochs, agents):
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
+        """Optimize the agents policy/value network based on a given dataset.
+
+        :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
+        :param epochs:          number of epochs to train on this dataset
+        :param batch_size:      batch size with which the dataset is sampled
+        """
+        for epoch in range(epochs):
+            # for each epoch, dataset first should be shuffled to break bias, then divided into batches
+            shuffled_dataset = dataset.shuffle(1000)  # TODO appropriate buffer size based on number of datapoints
+            batched_dataset = shuffled_dataset.batch(batch_size)
+
+            for batch in batched_dataset:
+                with tf.GradientTape() as tape:
+                    action_probabilities, state_value = self.model(batch["state"], training=True)
+
+                    # loss needs to be negated since the original objective from the PPO paper is for maximization
+                    loss = - (self._actor_objective(batch["action_prob"],
+                                                    [action_probabilities[i][a] for i, a in
+                                                     enumerate(batch["action"])],
+                                                    batch["advantage"]) - self._critic_loss(state_value,
+                                                                                            batch["return"]))
+
+                # calculate and apply gradients
+                gradients = tape.gradient(loss, self.model.trainable_variables)
+                self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+
+    def drill(self, env, iterations: int, epochs: int, agents: int, batch_size: int):
+        """Main training loop of the agent.
+
+        Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
+
+        :param env:             the environment on which the agent should be drilled
+        :param iterations:      the number of experience-optimization cycles that shall be run
+        :param epochs:          the number of epochs for which the model is optimized on the same experience data
+        :param agents:          the number of trajectories generated during the experience gathering
+        :param batch_size       batch size for the optimization
+
+        :return:                self
+        """
         for iteration in range(iterations):
             # run simulations
             s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories = self.gather_experience(env, agents)
@@ -285,21 +331,7 @@ class PPOAgent(_RLAgent):
                 "advantage": list(itertools.chain(*advantages))
             })
 
-            for epoch in range(3):
-                shuffled_dataset = dataset.shuffle(
-                    1000)  # TODO determine appropriate buffer size based on number of datapoints
-                batched_dataset = shuffled_dataset.batch(8)
+            # use the dataset to optimize the model
+            self.optimize_model(dataset, epochs, batch_size)
 
-                for batch in batched_dataset:
-                    with tf.GradientTape() as tape:
-                        action_probabilities, state_value = self.model(batch["state"], training=True)
-
-                        # loss needs to be negated since the original objective from the PPO paper is for maximization
-                        loss = - (self._actor_objective(batch["action_prob"],
-                                                        [action_probabilities[i][a] for i, a in
-                                                         enumerate(batch["action"])],
-                                                        batch["advantage"]) - self._critic_loss(state_value,
-                                                                                                batch["return"]))
-
-                    gradients = tape.gradient(loss, self.model.trainable_variables)
-                    self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+        return self
