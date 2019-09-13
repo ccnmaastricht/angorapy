@@ -3,7 +3,7 @@ import os
 import gym
 import tensorflow as tf
 
-from agent.policy_gradient import ActorCriticREINFORCEAgent, PPOAgent
+from agent.policy_gradient import PPOAgent
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -25,7 +25,7 @@ print(f"{state_dimensionality}-dimensional states and {number_of_actions} action
 agent = PPOAgent(state_dimensionality, number_of_actions)
 agent.drill(env=env,
             iterations=1000,
-            agents=32,
+            agents=64,
             epochs=3,
             batch_size=32)
 

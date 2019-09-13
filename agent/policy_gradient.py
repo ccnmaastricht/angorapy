@@ -5,6 +5,7 @@ Currently including REINFORCE and Actor Critic REINFORCE.
 """
 import itertools
 import statistics
+import time
 from typing import Tuple, List
 
 import numpy
@@ -12,11 +13,15 @@ import tensorflow as tf
 
 from agent.core import _RLAgent
 from policy_networks.fully_connected import PPOActorCriticNetwork
+
 tf.keras.backend.set_floatx("float64")
 
-def get_discounted_returns(reward_trajectory, discount_factor):
-    return [sum([discount_factor ** k * r for k, r in enumerate(reward_trajectory[t:])]) for t in
-            range(len(reward_trajectory))]
+
+def get_discounted_returns(reward_trajectory, discount_factor: tf.Tensor):
+    # TODO make native tf
+    return [tf.math.reduce_sum([tf.math.pow(discount_factor, k) * r for k, r in enumerate(reward_trajectory[t:])]) for t
+            in
+            tf.range(len(reward_trajectory))]
 
 
 class REINFORCEAgent:
@@ -30,6 +35,7 @@ class REINFORCEAgent:
 
         # TRAINING PARAMETERS
         self.learning_rate = 0.001
+        self.discount_factor = tf.constant(0.999, dtype=tf.float64)
 
         # MODEL
         self.actor = self._build_model()
@@ -50,17 +56,19 @@ class REINFORCEAgent:
 
     def act(self, state):
         probabilities = self.actor(state)
-        action = numpy.random.choice(list(range(self.n_actions)), p=probabilities[0])
+        action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
 
         return action, probabilities[0][action]
 
     def drill(self, env, n_episodes):
+        t_start = time.time()
+
         episode_reward_history = []
         for episode in range(n_episodes):
             partial_episode_gradients = []
             reward_trajectory = []
 
-            state = numpy.reshape(env.reset(), [1, -1])
+            state = tf.reshape(env.reset(), [1, -1])
             done = False
             while not done:
                 # choose action and calculate partial loss (not yet weighted on future reward)
@@ -72,8 +80,9 @@ class REINFORCEAgent:
                 partial_episode_gradients.append(tape.gradient(partial_loss, self.actor.trainable_variables))
 
                 # actually apply the chosen action
-                observation, reward, done, _ = env.step(action)
-                observation = numpy.reshape(observation, [1, -1])
+                observation, reward, done, _ = env.step(action.numpy())
+                observation = tf.reshape(observation, [1, -1])
+
                 reward_trajectory.append(reward)
 
                 if not done:
@@ -81,22 +90,24 @@ class REINFORCEAgent:
                     state = observation
 
             # gather future rewards and apply them to partial gradients
-            discounted_returns = self._get_discounted_returns(reward_trajectory)
-            full_gradients = [[gradient_tensor * discounted_returns[t]
+            discounted_returns = get_discounted_returns(reward_trajectory, self.discount_factor)
+            full_gradients = [[tf.math.scalar_mul(discounted_returns[t], gradient_tensor)
                                for gradient_tensor in partial_episode_gradients[t]] for t in
                               range(len(discounted_returns))]
 
             # sum gradients over time steps and optimize the policy based on all time steps
             accumulated_gradients = [
-                tf.add_n([full_gradients[t][i_grad]
-                          for t in range(len(full_gradients))]) for i_grad in range(len(full_gradients[0]))]
+                tf.math.add_n([full_gradients[t][i_grad]
+                               for t in range(len(full_gradients))]) for i_grad in range(len(full_gradients[0]))]
             self.optimizer.apply_gradients(zip(accumulated_gradients, self.actor.trainable_variables))
 
             # report performance
             episode_reward_history.append(sum(reward_trajectory))
             if episode % 30 == 0 and len(episode_reward_history) > 0:
                 print(f"Episode {episode:10d}/{n_episodes}"
-                      f" | Mean over last 30: {statistics.mean(episode_reward_history[-30:]):4.2f}")
+                      f" | Mean over last 30: {statistics.mean(episode_reward_history[-30:]):4.2f}"
+                      f" | ExecTime: {round(time.time() - t_start, 2)}")
+                t_start = time.time()
 
 
 class ActorCriticREINFORCEAgent(REINFORCEAgent):
@@ -107,6 +118,8 @@ class ActorCriticREINFORCEAgent(REINFORCEAgent):
         self.critic_lr = 0.001
         self.critic = self._build_value_model()
         self.critic_optimizer = tf.keras.optimizers.Adam(lr=self.critic_lr)
+
+        self.discount_factor = 0.999
 
     def _build_value_model(self):
         model = tf.keras.Sequential()
@@ -163,7 +176,7 @@ class ActorCriticREINFORCEAgent(REINFORCEAgent):
                 critic_gradients.append(tape.gradient(loss, self.critic.trainable_variables))
 
             # gather future rewards and calculate advantages
-            discounted_returns = self._get_discounted_returns(reward_trajectory)
+            discounted_returns = get_discounted_returns(reward_trajectory, self.discount_factor)
             advantages = numpy.subtract(discounted_returns, state_value_predictions)
 
             full_gradients = [[gradient_tensor * advantages[t]
@@ -203,9 +216,9 @@ class PPOAgent(_RLAgent):
         self.n_actions = n_actions
 
         # learning parameters
-        self.discount = 0.99
+        self.discount = tf.constant(0.99, dtype=tf.float64)
         self.learning_rate = 0.001
-        self.epsilon_clip = 0.2
+        self.epsilon_clip = tf.constant(0.2, dtype=tf.float64)
 
         # Models
         self.model = PPOActorCriticNetwork(self.state_dimensionality, self.n_actions)
@@ -258,11 +271,11 @@ class PPOAgent(_RLAgent):
 
         return state_trajectories, reward_trajectories, action_trajectories, action_probability_trajectories
 
-    def _actor_objective(self, old_action_prob, action_prob, advantage):
-        r = (action_prob / old_action_prob)
+    def _actor_objective(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor):
+        r = tf.math.divide(action_prob, old_action_prob)
         return tf.minimum(
-            r * advantage,
-            tf.clip_by_value(r, 1 - self.epsilon_clip, 1 + self.epsilon_clip) * advantage
+            tf.math.multiply(r, advantage),
+            tf.math.multiply(tf.clip_by_value(r, 1 - self.epsilon_clip, 1 + self.epsilon_clip), advantage)
         )
 
     @staticmethod
@@ -276,29 +289,38 @@ class PPOAgent(_RLAgent):
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agents policy/value network based on a given dataset.
 
+        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
+        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
+        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
+        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
+        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
+        not. Even more so this applies with running simulations on the cluster.
+
         :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
         :param epochs:          number of epochs to train on this dataset
         :param batch_size:      batch size with which the dataset is sampled
         """
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break bias, then divided into batches
-            shuffled_dataset = dataset.shuffle(1000)  # TODO appropriate buffer size based on number of datapoints
+            shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
             batched_dataset = shuffled_dataset.batch(batch_size)
 
             for batch in batched_dataset:
-                with tf.GradientTape() as tape:
-                    action_probabilities, state_value = self.model(batch["state"], training=True)
+                # use the dataset to optimize the model
+                with tf.device("GPU:0"):
+                    with tf.GradientTape() as tape:
+                        action_probabilities, state_value = self.model(batch["state"], training=True)
 
-                    # loss needs to be negated since the original objective from the PPO paper is for maximization
-                    loss = - (self._actor_objective(batch["action_prob"],
-                                                    [action_probabilities[i][a] for i, a in
-                                                     enumerate(batch["action"])],
-                                                    batch["advantage"]) - self._critic_loss(state_value,
-                                                                                            batch["return"]))
+                        # loss needs to be negated since the original objective from the PPO paper is for maximization
+                        loss = - (self._actor_objective(batch["action_prob"],
+                                                        [action_probabilities[i][a] for i, a in
+                                                         enumerate(batch["action"])],
+                                                        batch["advantage"]) - self._critic_loss(state_value,
+                                                                                                batch["return"]))
 
-                # calculate and apply gradients
-                gradients = tape.gradient(loss, self.model.trainable_variables)
-                self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+                    # calculate and apply gradients
+                    gradients = tape.gradient(loss, self.model.trainable_variables)
+                    self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
     def drill(self, env, iterations: int, epochs: int, agents: int, batch_size: int):
         """Main training loop of the agent.
@@ -319,8 +341,7 @@ class PPOAgent(_RLAgent):
 
             print(f"Iteration {iteration}: Average reward of {statistics.mean([sum(r) for r in r_trajectories])}")
 
-            discounted_returns = [tf.dtypes.cast(get_discounted_returns(reward_trajectory, self.discount), tf.float64)
-                                  for reward_trajectory in
+            discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
                                   r_trajectories]
             state_value_predictions = [[self.model.predict(tf.reshape(state, [1, -1]))[1][0][0] for state in trajectory]
                                        for trajectory in
@@ -337,7 +358,6 @@ class PPOAgent(_RLAgent):
                 "advantage": list(itertools.chain(*advantages))
             })
 
-            # use the dataset to optimize the model
             self.optimize_model(dataset, epochs, batch_size)
 
         return self

@@ -23,7 +23,8 @@ print(env.spec._env_name)
 print(f"{state_dimensionality}-dimensional states and {number_of_actions} actions.")
 
 # AGENT
-agent = ActorCriticREINFORCEAgent(state_dimensionality, number_of_actions)
-agent.drill(env, TOTAL_EPISODES)
+with tf.device("GPU:0"):
+    agent = ActorCriticREINFORCEAgent(state_dimensionality, number_of_actions)
+    agent.drill(env, TOTAL_EPISODES)
 
 env.close()

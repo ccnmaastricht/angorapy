@@ -19,7 +19,8 @@ env = gym.make("CartPole-v0")
 number_of_actions = env.action_space.n
 state_dimensionality = env.observation_space.shape[0]
 
-agent = REINFORCEAgent(state_dimensionality, number_of_actions)
-agent.drill(env, TOTAL_EPISODES)
+with tf.device("GPU:0"):
+    agent = REINFORCEAgent(state_dimensionality, number_of_actions)
+    agent.drill(env, TOTAL_EPISODES)
 
 env.close()
