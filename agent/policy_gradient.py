@@ -8,6 +8,7 @@ import statistics
 import time
 from typing import Tuple, List
 
+import gym
 import numpy
 import tensorflow as tf
 
@@ -204,7 +205,7 @@ class ActorCriticREINFORCEAgent(REINFORCEAgent):
 class PPOAgent(_RLAgent):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
-    def __init__(self, state_dimensionality, n_actions):
+    def __init__(self, state_dimensionality, n_actions, learning_rate: float, discount: float, epsilon_clip: float):
         """Initialize the Agent.
 
         :param state_dimensionality:    number of dimensions in the states that the agent has to process
@@ -216,9 +217,9 @@ class PPOAgent(_RLAgent):
         self.n_actions = n_actions
 
         # learning parameters
-        self.discount = tf.constant(0.99, dtype=tf.float64)
-        self.learning_rate = 0.001
-        self.epsilon_clip = tf.constant(0.2, dtype=tf.float64)
+        self.discount = tf.constant(discount, dtype=tf.float64)
+        self.learning_rate = learning_rate
+        self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
 
         # Models
         self.model = PPOActorCriticNetwork(self.state_dimensionality, self.n_actions)
@@ -313,8 +314,9 @@ class PPOAgent(_RLAgent):
 
                         # loss needs to be negated since the original objective from the PPO paper is for maximization
                         loss = - (self._actor_objective(batch["action_prob"],
-                                                        [action_probabilities[i][a] for i, a in
-                                                         enumerate(batch["action"])],
+                                                        tf.convert_to_tensor([action_probabilities[i][a] for i, a
+                                                                              in enumerate(batch["action"])],
+                                                                             dtype=tf.float64),
                                                         batch["advantage"]) - self._critic_loss(state_value,
                                                                                                 batch["return"]))
 
@@ -322,7 +324,7 @@ class PPOAgent(_RLAgent):
                     gradients = tape.gradient(loss, self.model.trainable_variables)
                     self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
-    def drill(self, env, iterations: int, epochs: int, agents: int, batch_size: int):
+    def drill(self, env: gym.Env, iterations: int, epochs: int, agents: int, batch_size: int):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
@@ -340,6 +342,8 @@ class PPOAgent(_RLAgent):
             s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories = self.gather_experience(env, agents)
 
             print(f"Iteration {iteration}: Average reward of {statistics.mean([sum(r) for r in r_trajectories])}")
+            if iteration > 10:
+                self.evaluate(env, 1, True)
 
             discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
                                   r_trajectories]
@@ -361,3 +365,22 @@ class PPOAgent(_RLAgent):
             self.optimize_model(dataset, epochs, batch_size)
 
         return self
+
+    def evaluate(self, env: gym.Env, n: int, render: bool=False) -> List[int]:
+        rewards = []
+        for episode in range(n):
+            done = False
+            reward_trajectory = []
+            state = tf.reshape(env.reset(), [1, -1])
+            while not done:
+                if render:
+                    env.render()
+
+                action, action_probability = self.act(state)
+                observation, reward, done, _ = env.step(action)
+                state = tf.reshape(observation, [1, -1])
+                reward_trajectory.append(reward)
+
+            rewards.append(sum(reward_trajectory))
+
+        return rewards
