@@ -61,7 +61,7 @@ class PPOActorNetwork(tf.keras.Model):
         x = self.fc_a(input_tensor)
         x = self.fc_b(x)
         x = self.fc_c(x)
-        action_probabilities = self.fc_actor_out(x)
+        action_probabilities = self.fc_out(x)
 
         return action_probabilities
 

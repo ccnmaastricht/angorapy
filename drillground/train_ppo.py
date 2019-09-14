@@ -3,7 +3,7 @@ import os
 import gym
 import tensorflow as tf
 
-from agent.ppo import PPOAgent
+from agent.ppo import PPOAgent, PPOAgentDual
 from configs.env import CONFIG
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -23,7 +23,7 @@ print(env_name)
 print(f"{state_dimensionality}-dimensional states and {number_of_actions} actions.")
 
 # AGENT
-agent = PPOAgent(state_dimensionality,
+agent = PPOAgentDual(state_dimensionality,
                  number_of_actions,
                  learning_rate=CONFIG["PPO"][env_name]["BEST"]["LEARNING_RATE"],
                  discount=CONFIG["PPO"][env_name]["BEST"]["DISCOUNT_FACTOR"],
