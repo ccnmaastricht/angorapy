@@ -1,8 +1,5 @@
-import platform
-
-import gym
-import numpy
 import matplotlib.pyplot as plt
+import numpy
 
 from environments import *
 
@@ -74,12 +71,3 @@ if __name__ == "__main__":
     while not done:
         env.render()
         observation, reward, done, _ = env.step(2)
-    # env.step(1)
-    # observation, reward, done, _ = env.step(2)
-    # print('Observation:', type(observation), 'size:', observation.shape)
-    # print('Reward:', type(reward), 'reward-value:', reward)
-
-    plt.imshow(env.track, cmap="binary", origin="upper")
-    plt.gca().axes.get_xaxis().set_visible(False)
-    plt.gca().axes.get_yaxis().set_visible(False)
-    plt.show()
