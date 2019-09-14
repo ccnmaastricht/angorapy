@@ -22,10 +22,10 @@ CONFIG = {
             "BEST": {
                 "ITERATIONS": 1000,
                 "AGENTS": 32,
-                "EPOCHS": 3,
+                "EPOCHS": 6,
                 "BATCH_SIZE": 32,
 
-                "LEARNING_RATE": 0.005,
+                "LEARNING_RATE": 0.01,
                 "DISCOUNT_FACTOR": 0.99,
                 "EPSILON_CLIP": 0.2
             }

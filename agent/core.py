@@ -2,6 +2,7 @@ import random
 from abc import ABC, abstractmethod
 
 import numpy
+import tensorflow as tf
 
 
 class _RLAgent(ABC):
@@ -32,3 +33,10 @@ class RandomAgent(_RLAgent):
 
     def drill(self, **kwargs):
         pass
+
+
+def get_discounted_returns(reward_trajectory, discount_factor: tf.Tensor):
+    # TODO make native tf
+    return [tf.math.reduce_sum([tf.math.pow(discount_factor, k) * r for k, r in enumerate(reward_trajectory[t:])]) for t
+            in
+            tf.range(len(reward_trajectory))]

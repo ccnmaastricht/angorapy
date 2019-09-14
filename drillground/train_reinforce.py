@@ -3,7 +3,7 @@ import os
 import gym
 import tensorflow as tf
 
-from agent.policy_gradient import REINFORCEAgent
+from agent.reinforce import REINFORCEAgent
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
