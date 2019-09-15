@@ -5,7 +5,7 @@ import gym
 
 from environments.evasion import Evasion
 from environments.race import Race
-from environments.tunnel import Tunnel
+from environments.tunnel import Tunnel, TunnelRAM
 from environments.evasionwalls import EvasionWalls
 
 gym.envs.register(
@@ -33,6 +33,13 @@ gym.envs.register(
     entry_point='environments:Tunnel',
     kwargs={'width':30, 'height':30},
 )
+
+gym.envs.register(
+    id='TunnelRAM-v0',
+    entry_point='environments:TunnelRAM',
+    kwargs={'width':30, 'height':30},
+)
+
 gym.envs.register(
     id='EvasionWalls-v0',
     entry_point='environments:EvasionWalls',

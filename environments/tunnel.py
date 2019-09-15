@@ -46,11 +46,12 @@ class Tunnel(gym.Env):
     def reset(self):
         self.steps = 0
         self.dungeon, self.pos_agent = self._init_dungeon()
-        return self.dungeon
+        return self.make_state_representation()
 
     def step(self, action):
         self.steps += 1
         done = self.steps >= self.max_steps
+
         # Straight does not change position of agent
         if action == 0:  # UP
             self.pos_agent = max(0, self.pos_agent - 1)
@@ -60,9 +61,9 @@ class Tunnel(gym.Env):
         # if agent crashed into obstacle --> over
         if self.dungeon[self.pos_agent, 1] != 0:
             done = True
-            reward = 0
+            reward = - 10
         else:
-            reward = 10
+            reward = 1
 
         new_row = numpy.empty((self.height, 1))
         new_row.fill(Tunnel.OBSTACLE_PIXEL)
@@ -76,7 +77,10 @@ class Tunnel(gym.Env):
         self.dungeon = numpy.concatenate((self.dungeon[:, 1:], new_row), 1)
         self.dungeon[self.pos_agent, 0] = Tunnel.AGENT_PIXEL
 
-        return self.dungeon, reward, done, None
+        return self.make_state_representation(), reward, done, None
+
+    def make_state_representation(self):
+        return self.dungeon
 
     def render(self, mode='human', close=False):
         img = self.dungeon
@@ -88,12 +92,25 @@ class Tunnel(gym.Env):
         plt.pause(0.001)
 
 
+class TunnelRAM(Tunnel):
+
+    def __init__(self, width: int = 30, height: int = 30):
+        super().__init__(width, height)
+
+    def make_state_representation(self):
+        empty_pixels = numpy.argwhere(self.dungeon[:, 1] != self.OBSTACLE_PIXEL)
+        top_boundary, bottom_boundary = numpy.max(empty_pixels), numpy.min(empty_pixels)
+        observation = numpy.array([self.pos_agent, top_boundary.item(), bottom_boundary.item()])
+
+        return observation
+
+
 if __name__ == "__main__":
-    env = gym.make("Tunnel-v0")
-    # env = gym.make('Evasion-v0')
+    env = gym.make("TunnelRAM-v0")
     for _ in range(5):
         env.reset()
         done = False
         while not done:
             env.render()
-            observation, reward, done, _ = env.step(2)
+            observation, r, done, _ = env.step(2)
+            print(observation)

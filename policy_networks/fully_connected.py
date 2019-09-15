@@ -21,15 +21,15 @@ class PPOActorCriticNetwork(tf.keras.Model):
         self.n_actions = n_actions
 
         # shared base net
-        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="relu", dtype=tf.float64)
-        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="relu", dtype=tf.float64)
-        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="relu", dtype=tf.float64)
+        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
+        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="tanh", dtype=tf.float64)
+        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="tanh", dtype=tf.float64)
 
         # role specific heads
-        self.fc_critic_a = tf.keras.layers.Dense(12, input_dim=12, activation="relu", dtype=tf.float64)
+        self.fc_critic_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh", dtype=tf.float64)
         self.fc_critic_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear", dtype=tf.float64)
 
-        self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="relu", dtype=tf.float64)
+        self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh", dtype=tf.float64)
         self.fc_actor_out = tf.keras.layers.Dense(self.n_actions, input_dim=12, activation="softmax", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
@@ -52,9 +52,9 @@ class PPOActorNetwork(tf.keras.Model):
         self.state_dimensionality = state_dimensionality
         self.n_actions = n_actions
 
-        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="relu", dtype=tf.float64)
-        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="relu", dtype=tf.float64)
-        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="relu", dtype=tf.float64)
+        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
+        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="tanh", dtype=tf.float64)
+        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="tanh", dtype=tf.float64)
         self.fc_out = tf.keras.layers.Dense(self.n_actions, input_dim=12, activation="softmax", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
@@ -76,9 +76,9 @@ class PPOCriticNetwork(tf.keras.Model):
         self.n_actions = n_actions
 
         # shared base net
-        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="relu", dtype=tf.float64)
-        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="relu", dtype=tf.float64)
-        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="relu", dtype=tf.float64)
+        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
+        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="tanh", dtype=tf.float64)
+        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="tanh", dtype=tf.float64)
         self.fc_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):

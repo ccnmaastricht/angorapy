@@ -32,7 +32,7 @@ class PPOAgent(_RLAgent):
         self.discount = tf.constant(discount, dtype=tf.float64)
         self.learning_rate = learning_rate
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
-        self.c_entropy = tf.constant(0.01, dtype=tf.float64)
+        self.c_entropy = tf.constant(0, dtype=tf.float64)
 
         # Models
         self._build_models()

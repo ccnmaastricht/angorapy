@@ -1,10 +1,10 @@
 import os
 
-import gym
 import tensorflow as tf
 
 from agent.ppo import PPOAgentDual
 from configs.env import CONFIG
+from environments import *
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -14,7 +14,9 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # ENVIRONMENT
 # env = gym.make("LunarLander-v2")
-env = gym.make("CartPole-v0")
+# env = gym.make("CartPole-v0")
+env = gym.make("TunnelRAM-v0")
+
 number_of_actions = env.action_space.n
 state_dimensionality = env.observation_space.shape[0]
 env_name = env.spec._env_name
