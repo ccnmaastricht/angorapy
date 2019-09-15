@@ -3,7 +3,7 @@ import os
 import gym
 import tensorflow as tf
 
-from agent.ppo import PPOAgent, PPOAgentDual
+from agent.ppo import PPOAgentDual
 from configs.env import CONFIG
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -24,10 +24,10 @@ print(f"{state_dimensionality}-dimensional states and {number_of_actions} action
 
 # AGENT
 agent = PPOAgentDual(state_dimensionality,
-                 number_of_actions,
-                 learning_rate=CONFIG["PPO"][env_name]["BEST"]["LEARNING_RATE"],
-                 discount=CONFIG["PPO"][env_name]["BEST"]["DISCOUNT_FACTOR"],
-                 epsilon_clip=CONFIG["PPO"][env_name]["BEST"]["EPSILON_CLIP"])
+                     number_of_actions,
+                     learning_rate=CONFIG["PPO"][env_name]["BEST"]["LEARNING_RATE"],
+                     discount=CONFIG["PPO"][env_name]["BEST"]["DISCOUNT_FACTOR"],
+                     epsilon_clip=CONFIG["PPO"][env_name]["BEST"]["EPSILON_CLIP"])
 
 agent.set_gpu(False)
 agent.drill(env=env,

@@ -32,7 +32,7 @@ class PPOAgent(_RLAgent):
         self.discount = tf.constant(discount, dtype=tf.float64)
         self.learning_rate = learning_rate
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
-        self.entropy_coefficient = tf.constant(0.01, dtype=tf.float64)
+        self.c_entropy = tf.constant(0.01, dtype=tf.float64)
 
         # Models
         self._build_models()
@@ -66,7 +66,7 @@ class PPOAgent(_RLAgent):
 
     # OBJECTIVES
 
-    def _actor_objective(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
+    def actor_objective(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper.
         The objective is to be maximized (as given in the paper)!
 
@@ -84,7 +84,7 @@ class PPOAgent(_RLAgent):
         )
 
     @staticmethod
-    def _critic_loss(prediction: tf.Tensor, target: tf.Tensor) -> tf.Tensor:
+    def critic_loss(prediction: tf.Tensor, target: tf.Tensor) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
         :param prediction:      prediction that the critic network made
@@ -97,14 +97,14 @@ class PPOAgent(_RLAgent):
     @staticmethod
     def entropy_bonus(action_probs):
         """Entropy of policy output acting as regularization by preventing dominance of on action."""
-        return -tf.reduce_sum(action_probs * tf.log(action_probs), 1)
+        return -tf.reduce_sum(action_probs * tf.math.log(action_probs), 1)
 
     def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
                             prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs):
         # loss needs to be negated since the original objective from the PPO paper is for maximization
-        return - (self._actor_objective(old_action_prob, action_prob, advantage)
-                  - self._critic_loss(prediction, discounted_return)
-                  + self.entropy_coefficient * self.entropy_bonus(action_probs))
+        return - (self.actor_objective(old_action_prob, action_prob, advantage)
+                  - self.critic_loss(prediction, discounted_return)
+                  + self.c_entropy * self.entropy_bonus(action_probs))
 
     def gather_experience(self, env: gym.Env, n_trajectories: int) -> Tuple[List, List, List, List]:
         """Gather experience in an environment for n trajectories.
@@ -209,9 +209,10 @@ class PPOAgent(_RLAgent):
 
             discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
                                   r_trajectories]
-            state_value_predictions = [[self.critic_prediction(tf.reshape(state, [1, -1]))[0][0] for state in trajectory]
-                                       for trajectory in
-                                       s_trajectories]
+            state_value_predictions = [
+                [self.critic_prediction(tf.reshape(state, [1, -1]))[0][0] for state in trajectory]
+                for trajectory in
+                s_trajectories]
             advantages = [tf.dtypes.cast(tf.subtract(disco_traj, value_traj), tf.float64) for disco_traj, value_traj in
                           zip(discounted_returns, state_value_predictions)]
 
@@ -316,17 +317,18 @@ class PPOAgentDual(PPOAgent):
                         chosen_action_probabilities = tf.convert_to_tensor(
                             [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
-                        actor_loss = - self._actor_objective(
+                        actor_loss = - self.actor_objective(
                             old_action_prob=batch["action_prob"],
                             action_prob=chosen_action_probabilities,
-                            advantage=batch["advantage"])
+                            advantage=batch["advantage"]) + self.c_entropy * self.entropy_bonus(
+                            action_probabilities)
 
                     actor_gradients = tape.gradient(actor_loss, self.actor_model.trainable_variables)
                     self.actor_optimizer.apply_gradients(zip(actor_gradients, self.actor_model.trainable_variables))
 
                     # optimize the critic
                     with tf.GradientTape() as tape:
-                        critic_loss = self._critic_loss(
+                        critic_loss = self.critic_loss(
                             prediction=self.critic_prediction(batch["state"], training=True),
                             target=batch["return"])
 
