@@ -7,10 +7,21 @@ CONFIG = {
     "PPO": {
         "CartPole": {
             "BEST": {
-                "ITERATIONS": 1000,
+                "ITERATIONS": 20,
                 "AGENTS": 32,
                 "EPOCHS": 6,
                 "BATCH_SIZE": 32,
+
+                "LEARNING_RATE": 0.005,
+                "DISCOUNT_FACTOR": 0.99,
+                "EPSILON_CLIP": 0.2
+            },
+
+            "DEBUG": {
+                "ITERATIONS": 10,
+                "AGENTS": 3,
+                "EPOCHS": 2,
+                "BATCH_SIZE": 8,
 
                 "LEARNING_RATE": 0.005,
                 "DISCOUNT_FACTOR": 0.99,
@@ -19,6 +30,32 @@ CONFIG = {
         },
 
         "LunarLander": {
+            "BEST": {
+                "ITERATIONS": 1000,
+                "AGENTS": 32,
+                "EPOCHS": 6,
+                "BATCH_SIZE": 32,
+
+                "LEARNING_RATE": 0.01,
+                "DISCOUNT_FACTOR": 0.99,
+                "EPSILON_CLIP": 0.2
+            }
+        },
+
+        "Pendulum": {
+            "BEST": {
+                "ITERATIONS": 1000,
+                "AGENTS": 32,
+                "EPOCHS": 6,
+                "BATCH_SIZE": 32,
+
+                "LEARNING_RATE": 0.01,
+                "DISCOUNT_FACTOR": 0.99,
+                "EPSILON_CLIP": 0.2
+            }
+        },
+
+        "Acrobot": {
             "BEST": {
                 "ITERATIONS": 1000,
                 "AGENTS": 32,

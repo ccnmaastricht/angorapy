@@ -9,6 +9,7 @@ import tensorflow as tf
 
 from agent.core import _RLAgent, get_discounted_returns
 from policy_networks.fully_connected import PPOActorCriticNetwork, PPOCriticNetwork, PPOActorNetwork
+from visualization.performance import plot_performance_over_episodes
 
 
 class PPOAgent(_RLAgent):
@@ -97,10 +98,10 @@ class PPOAgent(_RLAgent):
     @staticmethod
     def entropy_bonus(action_probs):
         """Entropy of policy output acting as regularization by preventing dominance of on action."""
-        return -tf.reduce_sum(action_probs * tf.math.log(action_probs), 1)
+        return - tf.reduce_sum(action_probs * tf.math.log(action_probs), 1)
 
     def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
-                            prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs):
+                            prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs) -> tf.Tensor:
         # loss needs to be negated since the original objective from the PPO paper is for maximization
         return - (self.actor_objective(old_action_prob, action_prob, advantage)
                   - self.critic_loss(prediction, discounted_return)
@@ -147,7 +148,7 @@ class PPOAgent(_RLAgent):
 
         return state_trajectories, reward_trajectories, action_trajectories, action_probability_trajectories
 
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[float]:
         """Optimize the agents policy/value network based on a given dataset.
 
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
@@ -161,6 +162,7 @@ class PPOAgent(_RLAgent):
         :param epochs:          number of epochs to train on this dataset
         :param batch_size:      batch size with which the dataset is sampled
         """
+        loss_history = []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break bias, then divided into batches
             shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
@@ -181,9 +183,13 @@ class PPOAgent(_RLAgent):
                                                         batch["return"],
                                                         action_probs=action_probabilities)
 
+                        loss_history.append(loss.numpy().item())
+
                     # calculate and apply gradients
                     gradients = tape.gradient(loss, self.model.trainable_variables)
                     self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+
+        return loss_history
 
     def drill(self, env: gym.Env, iterations: int, epochs: int, agents: int, batch_size: int):
         """Main training loop of the agent.
@@ -198,14 +204,17 @@ class PPOAgent(_RLAgent):
 
         :return:                self
         """
+        performance_trace = []
+        episodes_seen = [0]
         for iteration in range(iterations):
             # run simulations
             s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories = self.gather_experience(env, agents)
-
-            print(f"Iteration {iteration}: Average reward of over {len(r_trajectories)} episodes: "
-                  f"{statistics.mean([sum(r) for r in r_trajectories])}")
-            if iteration > 10:
-                self.evaluate(env, 1, True)
+            mean_performance = statistics.mean([sum(r) for r in r_trajectories])
+            performance_trace.append(mean_performance)
+            if iteration != iterations - 1:
+                episodes_seen.append(episodes_seen[-1] + len(s_trajectories))
+            print(f"Iteration {iteration}: Average reward over {len(r_trajectories)} episodes: "
+                  f"{mean_performance}")
 
             discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
                                   r_trajectories]
@@ -225,8 +234,12 @@ class PPOAgent(_RLAgent):
                 "advantage": list(itertools.chain(*advantages))
             })
 
-            self.optimize_model(dataset, epochs, batch_size)
+            optimization_loss = self.optimize_model(dataset, epochs, batch_size)
+            # print(f"\tOptimization Loss Development: "
+            #       f"\n\t\t{[t[0] for t in optimization_loss]}"
+            #       f"\n\t\t{[t[1] for t in optimization_loss]}")
 
+        plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
         return self
 
     def evaluate(self, env: gym.Env, n: int, render: bool = False) -> List[int]:
@@ -296,18 +309,21 @@ class PPOAgentDual(PPOAgent):
         """Wrapper to allow for shared and non-shared models."""
         return self.actor_model(state, training=training)
 
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
         """Optimize the agent's policy and value network based on a given dataset.
 
         :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
         :param epochs:          number of epochs to train on this dataset
         :param batch_size:      batch size with which the dataset is sampled
         """
+        loss_history = []
+        global_step = tf.Variable(0)
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break bias, then divided into batches
             shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
             batched_dataset = shuffled_dataset.batch(batch_size)
 
+            epoch_losses = []
             for batch in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
@@ -317,20 +333,27 @@ class PPOAgentDual(PPOAgent):
                         chosen_action_probabilities = tf.convert_to_tensor(
                             [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
-                        actor_loss = - self.actor_objective(
+                        actor_loss = tf.reduce_mean(-self.actor_objective(
                             old_action_prob=batch["action_prob"],
                             action_prob=chosen_action_probabilities,
-                            advantage=batch["advantage"]) + self.c_entropy * self.entropy_bonus(
-                            action_probabilities)
+                            advantage=batch["advantage"]))  # + self.c_entropy * self.entropy_bonus(action_probabilities)
 
                     actor_gradients = tape.gradient(actor_loss, self.actor_model.trainable_variables)
-                    self.actor_optimizer.apply_gradients(zip(actor_gradients, self.actor_model.trainable_variables))
+                    self.actor_optimizer.apply_gradients(zip(actor_gradients, self.actor_model.trainable_variables), global_step)
 
                     # optimize the critic
                     with tf.GradientTape() as tape:
-                        critic_loss = self.critic_loss(
+                        critic_loss = tf.reduce_mean(self.critic_loss(
                             prediction=self.critic_prediction(batch["state"], training=True),
-                            target=batch["return"])
+                            target=batch["return"]))
 
                     critic_gradients = tape.gradient(critic_loss, self.critic_model.trainable_variables)
                     self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic_model.trainable_variables))
+
+                    epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
+
+            loss_history.append(
+                tf.reduce_mean(epoch_losses, 0).numpy().round(2).tolist()
+            )
+
+        return loss_history

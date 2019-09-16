@@ -15,7 +15,11 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 # ENVIRONMENT
 # env = gym.make("LunarLander-v2")
 # env = gym.make("CartPole-v0")
-env = gym.make("TunnelRAM-v0")
+env = gym.make("Acrobot-v1")
+# env = gym.make("Pendulum-v0")
+# env = gym.make("TunnelRAM-v0")
+
+setting_id = "BEST"
 
 number_of_actions = env.action_space.n
 state_dimensionality = env.observation_space.shape[0]
@@ -27,15 +31,15 @@ print(f"{state_dimensionality}-dimensional states and {number_of_actions} action
 # AGENT
 agent = PPOAgentDual(state_dimensionality,
                      number_of_actions,
-                     learning_rate=CONFIG["PPO"][env_name]["BEST"]["LEARNING_RATE"],
-                     discount=CONFIG["PPO"][env_name]["BEST"]["DISCOUNT_FACTOR"],
-                     epsilon_clip=CONFIG["PPO"][env_name]["BEST"]["EPSILON_CLIP"])
+                     learning_rate=CONFIG["PPO"][env_name][setting_id]["LEARNING_RATE"],
+                     discount=CONFIG["PPO"][env_name][setting_id]["DISCOUNT_FACTOR"],
+                     epsilon_clip=CONFIG["PPO"][env_name][setting_id]["EPSILON_CLIP"])
 
 agent.set_gpu(False)
 agent.drill(env=env,
-            iterations=CONFIG["PPO"][env_name]["BEST"]["ITERATIONS"],
-            agents=CONFIG["PPO"][env_name]["BEST"]["AGENTS"],
-            epochs=CONFIG["PPO"][env_name]["BEST"]["EPOCHS"],
-            batch_size=CONFIG["PPO"][env_name]["BEST"]["BATCH_SIZE"])
+            iterations=CONFIG["PPO"][env_name][setting_id]["ITERATIONS"],
+            agents=CONFIG["PPO"][env_name][setting_id]["AGENTS"],
+            epochs=CONFIG["PPO"][env_name][setting_id]["EPOCHS"],
+            batch_size=CONFIG["PPO"][env_name][setting_id]["BATCH_SIZE"])
 
 env.close()

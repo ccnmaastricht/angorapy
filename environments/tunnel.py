@@ -61,9 +61,9 @@ class Tunnel(gym.Env):
         # if agent crashed into obstacle --> over
         if self.dungeon[self.pos_agent, 1] != 0:
             done = True
-            reward = - 10
+            reward = 0
         else:
-            reward = 1
+            reward = 10
 
         new_row = numpy.empty((self.height, 1))
         new_row.fill(Tunnel.OBSTACLE_PIXEL)
