@@ -2,6 +2,7 @@
 """Proximal Policy Optimization Implementation."""
 import itertools
 import statistics
+from abc import abstractmethod
 from typing import Tuple, List
 
 import gym
@@ -10,13 +11,15 @@ import tensorflow as tf
 from agent.core import _RLAgent, get_discounted_returns
 from agent.gathering import _Gatherer
 from policy_networks.fully_connected import PPOActorCriticNetwork, PPOCriticNetwork, PPOActorNetwork
+from util import flat_print
 from visualization.performance import plot_performance_over_episodes
 
 
-class PPOBase(_RLAgent):
+class _PPOBase(_RLAgent):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
-    def __init__(self, state_dimensionality, n_actions, gatherer: _Gatherer, learning_rate: float, discount: float, epsilon_clip: float):
+    def __init__(self, state_dimensionality, n_actions, gatherer: _Gatherer, learning_rate: float, discount: float,
+                 epsilon_clip: float):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
@@ -44,8 +47,9 @@ class PPOBase(_RLAgent):
 
         self.device = "CPU:0"
 
+    @abstractmethod
     def _build_models(self):
-        raise NotImplementedError("PPOAgents need to Implement this abstract method.")
+        pass
 
     def set_gpu(self, activated: bool) -> None:
         self.device = "GPU:0" if activated else "CPU:0"
@@ -56,17 +60,20 @@ class PPOBase(_RLAgent):
 
         return action, probabilities[0][action]
 
+    @abstractmethod
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        raise NotImplementedError("PPOAgents need to Implement this abstract method.")
+        pass
 
+    @abstractmethod
     def critic_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        raise NotImplementedError("PPOAgents need to Implement this abstract method.")
+        pass
 
+    @abstractmethod
     def actor_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        raise NotImplementedError("PPOAgents need to Implement this abstract method.")
+        pass
 
     # OBJECTIVES
 
@@ -110,8 +117,9 @@ class PPOBase(_RLAgent):
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    def optimize_model(self, **kwargs):
-        raise NotImplementedError("Needs to be implemented by Agent.")
+    @abstractmethod
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int):
+        pass
 
     def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int):
         """Main training loop of the agent.
@@ -130,27 +138,23 @@ class PPOBase(_RLAgent):
         episodes_seen = [0]
         for iteration in range(iterations):
             # run simulations
-            print("Gathering...")
+            flat_print("Gathering...")
             s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories = self.gatherer.gather(self)
             mean_performance = statistics.mean([sum(r) for r in r_trajectories])
             performance_trace.append(mean_performance)
             if iteration != iterations - 1:
                 episodes_seen.append(episodes_seen[-1] + len(s_trajectories))
 
-            print("Preprocessing...")
-            print("disco")
+            flat_print("Preprocessing...")
             discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
                                   r_trajectories]
-            print("state values")
             state_value_predictions = [
                 [self.critic_prediction(tf.reshape(state, [1, -1]))[0][0] for state in trajectory]
                 for trajectory in
                 s_trajectories]
-            print("advantages")
             advantages = [tf.dtypes.cast(tf.subtract(disco_traj, value_traj), tf.float64) for disco_traj, value_traj in
                           zip(discounted_returns, state_value_predictions)]
 
-            print("dataset")
             # make tensorflow data set for faster data access during training
             dataset = tf.data.Dataset.from_tensor_slices({
                 "state": list(itertools.chain(*s_trajectories)),
@@ -160,11 +164,8 @@ class PPOBase(_RLAgent):
                 "advantage": list(itertools.chain(*advantages))
             })
 
-            print("Optimizing...")
+            flat_print("Optimizing...")
             optimization_loss = self.optimize_model(dataset, epochs, batch_size)
-            # print(f"\tOptimization Loss Development: "
-            #       f"\n\t\t{[t[0] for t in optimization_loss]}"
-            #       f"\n\t\t{[t[1] for t in optimization_loss]}")
 
             print(f"Iteration {iteration}: Average reward over {len(r_trajectories)} episodes: "
                   f"{mean_performance}")
@@ -204,7 +205,8 @@ class PPOBase(_RLAgent):
 class PPOAgentJoint(PPOBase):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
-    def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float, epsilon_clip: float):
+    def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float,
+                 epsilon_clip: float):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
@@ -299,7 +301,8 @@ class PPOAgentDual(PPOBase):
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float, epsilon_clip: float):
+    def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float,
+                 epsilon_clip: float):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
