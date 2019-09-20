@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import numpy
 import tensorflow as tf
 
+from itertools import accumulate
 
 class _RLAgent(ABC):
 
@@ -35,8 +36,6 @@ class RandomAgent(_RLAgent):
         pass
 
 
-def get_discounted_returns(reward_trajectory, discount_factor: tf.Tensor):
-    # TODO make native tf
-    return [tf.math.reduce_sum([tf.math.pow(discount_factor, k) * r for k, r in enumerate(reward_trajectory[t:])]) for t
-            in
-            tf.range(len(reward_trajectory))]
+def get_discounted_returns(reward_trajectory, discount_factor: float):
+    """Discounted future rewards calculation using itertools. Way faster than list comprehension."""
+    return list(accumulate(reward_trajectory[::-1], lambda previous, x: previous * discount_factor + x))[::-1]

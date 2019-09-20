@@ -32,8 +32,8 @@ CONFIG = {
         "LunarLander": {
             "BEST": {
                 "ITERATIONS": 1000,
-                "AGENTS": 32,
-                "EPOCHS": 6,
+                "AGENTS": 16,
+                "EPOCHS": 10,
                 "BATCH_SIZE": 32,
 
                 "LEARNING_RATE": 0.01,
