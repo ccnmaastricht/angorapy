@@ -51,15 +51,6 @@ class _PPOBase(_RLAgent):
     def _build_models(self):
         pass
 
-    def set_gpu(self, activated: bool) -> None:
-        self.device = "GPU:0" if activated else "CPU:0"
-
-    def act(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        probabilities = self.actor_prediction(state)
-        action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
-
-        return action, probabilities[0][action]
-
     @abstractmethod
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
@@ -75,7 +66,20 @@ class _PPOBase(_RLAgent):
         """Wrapper to allow for shared and non-shared models."""
         pass
 
-    # OBJECTIVES
+    @abstractmethod
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int):
+        pass
+
+    def set_gpu(self, activated: bool) -> None:
+        self.device = "GPU:0" if activated else "CPU:0"
+
+    def act(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+        probabilities = self.actor_prediction(state)
+        action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
+
+        return action, probabilities[0][action]
+
+    # LOSS
 
     def actor_loss(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
@@ -117,9 +121,7 @@ class _PPOBase(_RLAgent):
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    @abstractmethod
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int):
-        pass
+    # TRAIN
 
     def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int):
         """Main training loop of the agent.
@@ -167,8 +169,10 @@ class _PPOBase(_RLAgent):
             flat_print("Optimizing...")
             optimization_loss = self.optimize_model(dataset, epochs, batch_size)
 
-            print(f"Iteration {iteration}: Average reward over {len(r_trajectories)} episodes: "
-                  f"{mean_performance}")
+            flat_print(f"Iteration {iteration:6d}: "
+                       f"Epi. Mean Perf.: {round(mean_performance, 2):8.2f}; "
+                       f"Epi. Mean Length: {round(statistics.mean([len(trace) for trace in r_trajectories]), 2):8.2f}; "
+                       f"Total Timesteps: {sum([len(trace) for trace in r_trajectories]):6d}\n")
 
         plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
         return self
@@ -202,7 +206,7 @@ class _PPOBase(_RLAgent):
         return rewards
 
 
-class PPOAgentJoint(PPOBase):
+class PPOAgentJoint(_PPOBase):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
     def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float,
@@ -283,7 +287,7 @@ class PPOAgentJoint(PPOBase):
                                                         batch["return"],
                                                         action_probs=action_probabilities)
 
-                        loss_history.append(loss.numpy().item())
+                    loss_history.append(loss.numpy().item())
 
                     # calculate and apply gradients
                     gradients = tape.gradient(loss, self.model.trainable_variables)
@@ -292,7 +296,7 @@ class PPOAgentJoint(PPOBase):
         return loss_history
 
 
-class PPOAgentDual(PPOBase):
+class PPOAgentDual(_PPOBase):
     """PPO implementation using two independent models for the critic and the actor.
 
     This is of course more expensive than using shared parameters because we need two forward and backward calculations
@@ -357,10 +361,10 @@ class PPOAgentDual(PPOBase):
                         chosen_action_probabilities = tf.convert_to_tensor(
                             [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
-                        actor_loss = tf.reduce_mean(self.actor_loss(
-                            old_action_prob=batch["action_prob"],
-                            action_prob=chosen_action_probabilities,
-                            advantage=batch["advantage"])) + self.c_entropy * self.entropy_bonus(action_probabilities)
+                        actor_loss = self.actor_loss(old_action_prob=batch["action_prob"],
+                                                     action_prob=chosen_action_probabilities,
+                                                     advantage=batch["advantage"]) \
+                                     + self.c_entropy * self.entropy_bonus(action_probabilities)
 
                     actor_gradients = tape.gradient(actor_loss, self.actor_model.trainable_variables)
                     self.actor_optimizer.apply_gradients(
@@ -369,9 +373,8 @@ class PPOAgentDual(PPOBase):
 
                     # optimize the critic
                     with tf.GradientTape() as tape:
-                        critic_loss = tf.reduce_mean(self.critic_loss(
-                            prediction=self.critic_prediction(batch["state"], training=True),
-                            target=batch["return"]))
+                        critic_loss = self.critic_loss(prediction=self.critic_prediction(batch["state"], training=True),
+                                                       target=batch["return"])
 
                     critic_gradients = tape.gradient(critic_loss, self.critic_model.trainable_variables)
                     self.critic_optimizer.apply_gradients(

@@ -33,7 +33,7 @@ CONFIG = {
             "BEST": {
                 "ITERATIONS": 1000,
                 "AGENTS": 16,
-                "EPOCHS": 6,
+                "EPOCHS": 10,
                 "BATCH_SIZE": 32,
 
                 "LEARNING_RATE": 0.01,

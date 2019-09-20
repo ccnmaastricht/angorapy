@@ -3,11 +3,11 @@ import os
 import tensorflow as tf
 
 from agent.gathering import EpisodicGatherer, ContinuousGatherer
-from agent.ppo import PPOAgentDual
+from agent.ppo import PPOAgentDual, _PPOBase
 from configs.env import CONFIG
 from environments import *
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # activate eager execution to get rid of bullshit static graphs
 tf.compat.v1.enable_eager_execution()
@@ -30,11 +30,11 @@ print(env_name)
 print(f"{state_dimensionality}-dimensional states and {number_of_actions} actions.")
 
 # AGENT
-gatherer = ContinuousGatherer(
-    env,
-    n_trajectories=CONFIG["PPO"][env_name][setting_id]["AGENTS"],
-    T=200
-)
+# gatherer = ContinuousGatherer(environment=env,
+#                               n_trajectories=CONFIG["PPO"][env_name][setting_id]["AGENTS"],
+#                               T=200)
+gatherer = EpisodicGatherer(environment=env,
+                            n_trajectories=CONFIG["PPO"][env_name][setting_id]["AGENTS"])
 agent = PPOAgentDual(state_dimensionality,
                      number_of_actions,
                      gatherer,
@@ -42,7 +42,7 @@ agent = PPOAgentDual(state_dimensionality,
                      discount=CONFIG["PPO"][env_name][setting_id]["DISCOUNT_FACTOR"],
                      epsilon_clip=CONFIG["PPO"][env_name][setting_id]["EPSILON_CLIP"])
 
-agent.set_gpu(False)
+agent.set_gpu(True)
 agent.drill(env=env,
             iterations=CONFIG["PPO"][env_name][setting_id]["ITERATIONS"],
             epochs=CONFIG["PPO"][env_name][setting_id]["EPOCHS"],

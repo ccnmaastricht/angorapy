@@ -12,13 +12,13 @@ from agent.core import _RLAgent
 
 class _Gatherer(ABC):
 
-    def __init__(self, env: gym.Env, n_trajectories: int):
+    def __init__(self, environment: gym.Env, n_trajectories: int):
         """Gatherer base class.
 
-        :param env:
+        :param environment:
         :param n_trajectories:      the number of desired trajectories
         """
-        self.env = env
+        self.env = environment
         self.n_trajectories = n_trajectories
 
     @abstractmethod
@@ -71,15 +71,15 @@ class EpisodicGatherer(_Gatherer):
 
 class ContinuousGatherer(_Gatherer):
 
-    def __init__(self, env: gym.Env, n_trajectories: int, T: int):
+    def __init__(self, environment: gym.Env, n_trajectories: int, horizon: int):
         """Continuous gatherer. Each trajectory goes until a fixed horizon.
 
-        :param env:
+        :param environment:
         :param n_trajectories:
-        :param T:                   the number of timesteps gathered
+        :param horizon:                   the number of timesteps gathered
         """
-        super().__init__(env, n_trajectories)
-        self.T = T
+        super().__init__(environment, n_trajectories)
+        self.horizon = horizon
 
     def gather(self, agent) -> Tuple[List, List, List, List]:
         """Gather experience in an environment for n timesteps.
@@ -100,7 +100,7 @@ class ContinuousGatherer(_Gatherer):
             action_probability_trajectory = []
 
             state = tf.reshape(self.env.reset(), [1, -1])
-            for t in range(self.T):
+            for t in range(self.horizon):
                 action, action_probability = agent.act(state)
                 observation, reward, done, _ = self.env.step(action.numpy())
 
