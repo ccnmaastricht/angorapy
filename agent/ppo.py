@@ -8,9 +8,8 @@ from typing import Tuple, List
 import gym
 import tensorflow as tf
 
-from agent.core import _RLAgent, get_discounted_returns
+from agent.core import _RLAgent, generalized_advantage_estimator
 from agent.gathering import _Gatherer
-from policy_networks.fully_connected import PPOActorCriticNetwork, PPOCriticNetwork, PPOActorNetwork
 from util import flat_print
 from visualization.performance import plot_performance_over_episodes
 
@@ -139,21 +138,24 @@ class _PPOBase(_RLAgent):
                 episodes_seen.append(episodes_seen[-1] + len(s_trajectories))
 
             flat_print("Preprocessing...")
-            discounted_returns = [get_discounted_returns(reward_trajectory, self.discount) for reward_trajectory in
-                                  r_trajectories]
             state_value_predictions = [
                 [self.critic_prediction(tf.reshape(state, [1, -1]))[0][0] for state in trajectory]
                 for trajectory in
                 s_trajectories]
+            return_estimation = [generalized_advantage_estimator(reward_trajectory, value_predictions,
+                                                                 discount_factor=self.discount, gae_lambda=0.95, k=4)
+                                 for reward_trajectory, value_predictions in
+                                 zip(r_trajectories, state_value_predictions)]
+
             advantages = [tf.dtypes.cast(tf.subtract(disco_traj, value_traj), tf.float64) for disco_traj, value_traj in
-                          zip(discounted_returns, state_value_predictions)]
+                          zip(return_estimation, state_value_predictions)]
 
             # make tensorflow data set for faster data access during training
             dataset = tf.data.Dataset.from_tensor_slices({
                 "state": list(itertools.chain(*s_trajectories)),
                 "action": list(itertools.chain(*a_trajectories)),
                 "action_prob": list(itertools.chain(*a_prob_trajectories)),
-                "return": list(itertools.chain(*discounted_returns)),
+                "return": list(itertools.chain(*return_estimation)),
                 "advantage": list(itertools.chain(*advantages))
             })
 
@@ -288,7 +290,8 @@ class PPOAgentDual(_PPOBase):
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer: _Gatherer, learning_rate: float, discount: float,
+    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer: _Gatherer, learning_rate: float,
+                 discount: float,
                  epsilon_clip: float):
         """Initialize the Agent.
 

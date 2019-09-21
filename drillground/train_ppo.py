@@ -18,7 +18,7 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 
 # SETTINGS
-TASK = "CartPole-v0"            # the environment in which the agent learns
+TASK = "LunarLander-v2"            # the environment in which the agent learns
 HP_CONFIG = "BEST"              # configuration of hyper parameters in configs/env.py
 JOINT_NETWORK = False           # if true, uses one network with two heads for policy and critic
 GATHERING = ["epi", "cont"][0]     # epi runs n episodes until termination, cont collects specific number of experiences
