@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 """Collection of fully connected policy networks."""
-
+import gym
 import tensorflow as tf
+
+from util import env_extract_dims
+
 tf.keras.backend.set_floatx("float64")
 
 
@@ -14,11 +17,10 @@ class PPOActorCriticNetwork(tf.keras.Model):
     analytical part is specific to the role.
     """
 
-    def __init__(self, state_dimensionality, n_actions):
+    def __init__(self, env: gym.Env):
         super().__init__()
 
-        self.state_dimensionality = state_dimensionality
-        self.n_actions = n_actions
+        self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         # shared base net
         self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
@@ -46,11 +48,10 @@ class PPOActorCriticNetwork(tf.keras.Model):
 class PPOActorNetwork(tf.keras.Model):
     """Fully-connected network taking the role of an actor."""
 
-    def __init__(self, state_dimensionality, n_actions):
+    def __init__(self, env):
         super().__init__()
 
-        self.state_dimensionality = state_dimensionality
-        self.n_actions = n_actions
+        self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
         self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh", dtype=tf.float64)
@@ -67,11 +68,10 @@ class PPOActorNetwork(tf.keras.Model):
 class PPOCriticNetwork(tf.keras.Model):
     """Fully-connected network taking the role of the critic."""
 
-    def __init__(self, state_dimensionality, n_actions):
+    def __init__(self, env):
         super().__init__()
 
-        self.state_dimensionality = state_dimensionality
-        self.n_actions = n_actions
+        self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         # shared base net
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)

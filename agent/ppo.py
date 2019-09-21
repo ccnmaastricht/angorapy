@@ -18,7 +18,7 @@ from visualization.performance import plot_performance_over_episodes
 class _PPOBase(_RLAgent):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
-    def __init__(self, state_dimensionality, n_actions, gatherer: _Gatherer, learning_rate: float, discount: float,
+    def __init__(self, gatherer: _Gatherer, learning_rate: float, discount: float,
                  epsilon_clip: float):
         """Initialize the Agent.
 
@@ -30,9 +30,6 @@ class _PPOBase(_RLAgent):
         """
         super().__init__()
 
-        self.state_dimensionality = state_dimensionality
-        self.n_actions = n_actions
-
         self.gatherer = gatherer
 
         # learning parameters
@@ -41,15 +38,9 @@ class _PPOBase(_RLAgent):
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
         self.c_entropy = tf.constant(0, dtype=tf.float64)
 
-        # Models
-        self._build_models()
+        # Misc
         self.global_step = tf.Variable(0)
-
         self.device = "CPU:0"
-
-    @abstractmethod
-    def _build_models(self):
-        pass
 
     @abstractmethod
     def full_prediction(self, state, training=False):
@@ -172,7 +163,8 @@ class _PPOBase(_RLAgent):
             flat_print(f"Iteration {iteration:6d}: "
                        f"Epi. Mean Perf.: {round(mean_performance, 2):8.2f}; "
                        f"Epi. Mean Length: {round(statistics.mean([len(trace) for trace in r_trajectories]), 2):8.2f}; "
-                       f"Total Timesteps: {sum([len(trace) for trace in r_trajectories]):6d}\n")
+                       f"Epi. Steps: {sum([len(trace) for trace in r_trajectories]):6d}; "
+                       f"Total Policy Updates: {self.global_step.numpy().item()}\n")
 
         plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
         return self
@@ -209,7 +201,7 @@ class _PPOBase(_RLAgent):
 class PPOAgentJoint(_PPOBase):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
-    def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float,
+    def __init__(self, policy: tf.keras.Model, gatherer, learning_rate: float, discount: float,
                  epsilon_clip: float):
         """Initialize the Agent.
 
@@ -219,10 +211,7 @@ class PPOAgentJoint(_PPOBase):
         :param state_dimensionality:    number of dimensions in the states that the agent has to process
         :param n_actions:               number of actions the agent can choose from
         """
-        super().__init__(state_dimensionality, n_actions, gatherer, learning_rate, discount, epsilon_clip)
-
-        self.state_dimensionality = state_dimensionality
-        self.n_actions = n_actions
+        super().__init__(gatherer, learning_rate, discount, epsilon_clip)
 
         # learning parameters
         self.discount = tf.constant(discount, dtype=tf.float64)
@@ -231,13 +220,7 @@ class PPOAgentJoint(_PPOBase):
         self.c_entropy = tf.constant(0, dtype=tf.float64)
 
         # Models
-        self._build_models()
-        self.global_step = tf.Variable(0)
-
-        self.device = "CPU:0"
-
-    def _build_models(self):
-        self.model = PPOActorCriticNetwork(self.state_dimensionality, self.n_actions)
+        self.model = policy
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
 
     def full_prediction(self, state, training=False):
@@ -305,7 +288,7 @@ class PPOAgentDual(_PPOBase):
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, state_dimensionality, n_actions, gatherer, learning_rate: float, discount: float,
+    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer: _Gatherer, learning_rate: float, discount: float,
                  epsilon_clip: float):
         """Initialize the Agent.
 
@@ -315,16 +298,15 @@ class PPOAgentDual(_PPOBase):
         :param state_dimensionality:    number of dimensions in the states that the agent has to process
         :param n_actions:               number of actions the agent can choose from
         """
-        super().__init__(state_dimensionality, n_actions, gatherer, learning_rate, discount, epsilon_clip)
+        super().__init__(gatherer, learning_rate, discount, epsilon_clip)
 
-        self.actor_global_step = tf.Variable(0)
-        self.critic_global_step = tf.Variable(0)
+        self.actor_model = policy
+        self.critic_model = critic
 
-    def _build_models(self):
-        self.actor_model = PPOActorNetwork(self.state_dimensionality, self.n_actions)
-        self.critic_model = PPOCriticNetwork(self.state_dimensionality, self.n_actions)
         self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
         self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+
+        self.critic_global_step = tf.Variable(0)
 
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
@@ -368,8 +350,7 @@ class PPOAgentDual(_PPOBase):
 
                     actor_gradients = tape.gradient(actor_loss, self.actor_model.trainable_variables)
                     self.actor_optimizer.apply_gradients(
-                        zip(actor_gradients, self.actor_model.trainable_variables),
-                        self.actor_global_step)
+                        zip(actor_gradients, self.actor_model.trainable_variables), self.global_step)
 
                     # optimize the critic
                     with tf.GradientTape() as tape:
@@ -378,8 +359,7 @@ class PPOAgentDual(_PPOBase):
 
                     critic_gradients = tape.gradient(critic_loss, self.critic_model.trainable_variables)
                     self.critic_optimizer.apply_gradients(
-                        zip(critic_gradients, self.critic_model.trainable_variables),
-                        self.critic_global_step)
+                        zip(critic_gradients, self.critic_model.trainable_variables), self.critic_global_step)
 
                     epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
 

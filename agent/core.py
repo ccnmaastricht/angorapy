@@ -1,10 +1,9 @@
 import random
 from abc import ABC, abstractmethod
+from itertools import accumulate
 
 import numpy
-import tensorflow as tf
 
-from itertools import accumulate
 
 class _RLAgent(ABC):
 
