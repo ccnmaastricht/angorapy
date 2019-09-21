@@ -31,7 +31,7 @@ state_dimensionality, number_of_actions = env_extract_dims(env)
 env_name = env.spec._env_name
 print(f"Learning the Task: {env_name}\n"
       f"{state_dimensionality}-dimensional states and {number_of_actions} actions.\n"
-      f"---------------------------------------------------")
+      f"-----------------------------------------\n\n")
 
 if GATHERING == "cont":
     gatherer = ContinuousGatherer(environment=env,

@@ -164,7 +164,7 @@ class _PPOBase(_RLAgent):
                        f"Epi. Mean Perf.: {round(mean_performance, 2):8.2f}; "
                        f"Epi. Mean Length: {round(statistics.mean([len(trace) for trace in r_trajectories]), 2):8.2f}; "
                        f"Epi. Steps: {sum([len(trace) for trace in r_trajectories]):6d}; "
-                       f"Total Policy Updates: {self.global_step.numpy().item()}\n")
+                       f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item()}\n")
 
         plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
         return self
@@ -220,20 +220,20 @@ class PPOAgentJoint(_PPOBase):
         self.c_entropy = tf.constant(0, dtype=tf.float64)
 
         # Models
-        self.model = policy
+        self.policy = policy
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
 
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        return self.model(state, training=training)
+        return self.policy(state, training=training)
 
     def critic_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        return self.model(state, training=training)[1]
+        return self.policy(state, training=training)[1]
 
     def actor_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        return self.model(state, training=training)[0]
+        return self.policy(state, training=training)[0]
 
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[float]:
         """Optimize the agents policy/value network based on a given dataset.
@@ -273,8 +273,8 @@ class PPOAgentJoint(_PPOBase):
                     loss_history.append(loss.numpy().item())
 
                     # calculate and apply gradients
-                    gradients = tape.gradient(loss, self.model.trainable_variables)
-                    self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+                    gradients = tape.gradient(loss, self.policy.trainable_variables)
+                    self.optimizer.apply_gradients(zip(gradients, self.policy.trainable_variables))
 
         return loss_history
 
@@ -300,25 +300,23 @@ class PPOAgentDual(_PPOBase):
         """
         super().__init__(gatherer, learning_rate, discount, epsilon_clip)
 
-        self.actor_model = policy
-        self.critic_model = critic
+        self.policy = policy
+        self.critic = critic
 
-        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.policy_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
         self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-
-        self.critic_global_step = tf.Variable(0)
 
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        return self.actor_model(state, training=training), self.critic_model(state, training=training)
+        return self.policy(state, training=training), self.critic(state, training=training)
 
     def critic_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        return self.critic_model(state, training=training)
+        return self.critic(state, training=training)
 
     def actor_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
-        return self.actor_model(state, training=training)
+        return self.policy(state, training=training)
 
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -348,18 +346,17 @@ class PPOAgentDual(_PPOBase):
                                                      advantage=batch["advantage"]) \
                                      + self.c_entropy * self.entropy_bonus(action_probabilities)
 
-                    actor_gradients = tape.gradient(actor_loss, self.actor_model.trainable_variables)
-                    self.actor_optimizer.apply_gradients(
-                        zip(actor_gradients, self.actor_model.trainable_variables), self.global_step)
+                    actor_gradients = tape.gradient(actor_loss, self.policy.trainable_variables)
+                    self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
                     with tf.GradientTape() as tape:
                         critic_loss = self.critic_loss(prediction=self.critic_prediction(batch["state"], training=True),
                                                        target=batch["return"])
 
-                    critic_gradients = tape.gradient(critic_loss, self.critic_model.trainable_variables)
+                    critic_gradients = tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic_optimizer.apply_gradients(
-                        zip(critic_gradients, self.critic_model.trainable_variables), self.critic_global_step)
+                        zip(critic_gradients, self.critic.trainable_variables))
 
                     epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
 
