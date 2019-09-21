@@ -9,7 +9,7 @@ from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
 from util import env_extract_dims
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
 
 
 # INITIALIZATION

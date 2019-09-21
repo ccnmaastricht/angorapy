@@ -31,7 +31,7 @@ CONFIG = {
 
         "LunarLander": {
             "BEST": {
-                "ITERATIONS": 1000,
+                "ITERATIONS": 100,
                 "AGENTS": 16,
                 "EPOCHS": 10,
                 "BATCH_SIZE": 32,
@@ -44,7 +44,7 @@ CONFIG = {
 
         "Pendulum": {
             "BEST": {
-                "ITERATIONS": 1000,
+                "ITERATIONS": 30,
                 "AGENTS": 32,
                 "EPOCHS": 6,
                 "BATCH_SIZE": 32,
@@ -57,7 +57,7 @@ CONFIG = {
 
         "Acrobot": {
             "BEST": {
-                "ITERATIONS": 1000,
+                "ITERATIONS": 30,
                 "AGENTS": 32,
                 "EPOCHS": 6,
                 "BATCH_SIZE": 32,
@@ -70,7 +70,7 @@ CONFIG = {
 
         "TunnelRAM": {
             "BEST": {
-                "ITERATIONS": 1000,
+                "ITERATIONS": 30,
                 "AGENTS": 32,
                 "EPOCHS": 12,
                 "BATCH_SIZE": 32,

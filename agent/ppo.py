@@ -6,6 +6,7 @@ from abc import abstractmethod
 from typing import Tuple, List
 
 import gym
+import numpy
 import tensorflow as tf
 
 from agent.core import _RLAgent, generalized_advantage_estimator
@@ -142,20 +143,17 @@ class _PPOBase(_RLAgent):
                 [self.critic_prediction(tf.reshape(state, [1, -1]))[0][0] for state in trajectory]
                 for trajectory in
                 s_trajectories]
-            return_estimation = [generalized_advantage_estimator(reward_trajectory, value_predictions,
-                                                                 discount_factor=self.discount, gae_lambda=0.95, k=4)
-                                 for reward_trajectory, value_predictions in
-                                 zip(r_trajectories, state_value_predictions)]
-
-            advantages = [tf.dtypes.cast(tf.subtract(disco_traj, value_traj), tf.float64) for disco_traj, value_traj in
-                          zip(return_estimation, state_value_predictions)]
+            advantages = [generalized_advantage_estimator(reward_trajectory, value_predictions,
+                                                          gamma=self.discount, gae_lambda=0.95)
+                          for reward_trajectory, value_predictions in zip(r_trajectories, state_value_predictions)]
+            returns = numpy.add(advantages, state_value_predictions)
 
             # make tensorflow data set for faster data access during training
             dataset = tf.data.Dataset.from_tensor_slices({
                 "state": list(itertools.chain(*s_trajectories)),
                 "action": list(itertools.chain(*a_trajectories)),
                 "action_prob": list(itertools.chain(*a_prob_trajectories)),
-                "return": list(itertools.chain(*return_estimation)),
+                "return": list(itertools.chain(*returns)),
                 "advantage": list(itertools.chain(*advantages))
             })
 
@@ -165,7 +163,7 @@ class _PPOBase(_RLAgent):
             flat_print(f"Iteration {iteration:6d}: "
                        f"Epi. Mean Perf.: {round(mean_performance, 2):8.2f}; "
                        f"Epi. Mean Length: {round(statistics.mean([len(trace) for trace in r_trajectories]), 2):8.2f}; "
-                       f"Epi. Steps: {sum([len(trace) for trace in r_trajectories]):6d}; "
+                       f"It. Steps: {sum([len(trace) for trace in r_trajectories]):6d}; "
                        f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item()}\n")
 
         plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
