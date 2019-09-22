@@ -9,7 +9,7 @@ import gym
 import numpy
 import tensorflow as tf
 
-from agent.core import _RLAgent, generalized_advantage_estimator
+from agent.core import _RLAgent, generalized_advantage_estimator, get_discounted_returns
 from agent.gathering import _Gatherer
 from util import flat_print
 from visualization.performance import plot_performance_over_episodes
@@ -132,7 +132,7 @@ class _PPOBase(_RLAgent):
         for iteration in range(iterations):
             # run simulations
             flat_print("Gathering...")
-            s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories = self.gatherer.gather(self)
+            s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories, terminal_states = self.gatherer.gather(self)
             mean_performance = statistics.mean([sum(r) for r in r_trajectories])
             performance_trace.append(mean_performance)
             if iteration != iterations - 1:
@@ -158,12 +158,13 @@ class _PPOBase(_RLAgent):
             })
 
             flat_print("Optimizing...")
-            optimization_loss = self.optimize_model(dataset, epochs, batch_size)
+            self.optimize_model(dataset, epochs, batch_size)
 
+            episode_lengths = [len(trace) for trace in r_trajectories]
             flat_print(f"Iteration {iteration:6d}: "
-                       f"Epi. Mean Perf.: {round(mean_performance, 2):8.2f}; "
-                       f"Epi. Mean Length: {round(statistics.mean([len(trace) for trace in r_trajectories]), 2):8.2f}; "
-                       f"It. Steps: {sum([len(trace) for trace in r_trajectories]):6d}; "
+                       f"Mean Epi. Perf.: {round(mean_performance, 2):8.2f}; "
+                       f"Mean Epi. Length: {round(statistics.mean(episode_lengths), 2):8.2f}; "
+                       f"It. Steps: {sum(episode_lengths):6d}; "
                        f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item()}\n")
 
         plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
@@ -208,8 +209,6 @@ class PPOAgentJoint(_PPOBase):
         :param learning_rate:           the agents learning rate
         :param discount:                discount factor applied to future rewards
         :param epsilon_clip:            clipping range for the actor's objective
-        :param state_dimensionality:    number of dimensions in the states that the agent has to process
-        :param n_actions:               number of actions the agent can choose from
         """
         super().__init__(gatherer, learning_rate, discount, epsilon_clip)
 
@@ -221,7 +220,7 @@ class PPOAgentJoint(_PPOBase):
 
         # Models
         self.policy = policy
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.policy_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
 
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
@@ -274,7 +273,7 @@ class PPOAgentJoint(_PPOBase):
 
                     # calculate and apply gradients
                     gradients = tape.gradient(loss, self.policy.trainable_variables)
-                    self.optimizer.apply_gradients(zip(gradients, self.policy.trainable_variables))
+                    self.policy_optimizer.apply_gradients(zip(gradients, self.policy.trainable_variables))
 
         return loss_history
 
@@ -356,8 +355,7 @@ class PPOAgentDual(_PPOBase):
                                                        target=batch["return"])
 
                     critic_gradients = tape.gradient(critic_loss, self.critic.trainable_variables)
-                    self.critic_optimizer.apply_gradients(
-                        zip(critic_gradients, self.critic.trainable_variables))
+                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
 
                     epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
 

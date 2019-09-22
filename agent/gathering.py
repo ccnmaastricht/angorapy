@@ -28,7 +28,7 @@ class _Gatherer(ABC):
 
 class EpisodicGatherer(_Gatherer):
 
-    def gather(self, agent) -> Tuple[List, List, List, List]:
+    def gather(self, agent) -> Tuple[List, List, List, List, List]:
         """Gather experience in an environment for n trajectories.
 
         :param agent:               the agent who is to be set into the environment
@@ -66,56 +66,50 @@ class EpisodicGatherer(_Gatherer):
             action_probability_trajectories.append(action_probability_trajectory)
             action_trajectories.append(action_trajectory)
 
-        return state_trajectories, reward_trajectories, action_trajectories, action_probability_trajectories
+        return state_trajectories, reward_trajectories, action_trajectories, action_probability_trajectories, []
 
 
 class ContinuousGatherer(_Gatherer):
 
-    def __init__(self, environment: gym.Env, n_trajectories: int, horizon: int):
+    def __init__(self, environment: gym.Env, horizon: int):
         """Continuous gatherer. Each trajectory goes until a fixed horizon.
 
         :param environment:
-        :param n_trajectories:
         :param horizon:                   the number of timesteps gathered
         """
-        super().__init__(environment, n_trajectories)
+        super().__init__(environment, 0)
         self.horizon = horizon
 
-    def gather(self, agent) -> Tuple[List, List, List, List]:
+    def gather(self, agent) -> Tuple[List, List, List, List, List]:
         """Gather experience in an environment for n timesteps.
 
         :param agent:               the agent who is to be set into the environment
 
         :return:                    a 4-tuple where each element is a list of trajectories of s, r, a and p(a)
         """
-        state_trajectories = []
-        reward_trajectories = []
-        action_trajectories = []
-        action_probability_trajectories = []
+        state_trajectory = []
+        reward_trajectory = []
+        action_trajectory = []
+        action_probability_trajectory = []
+        terminal_state_indices = []
 
-        for trajectory in range(self.n_trajectories):
-            state_trajectory = []
-            reward_trajectory = []
-            action_trajectory = []
-            action_probability_trajectory = []
+        state = tf.reshape(self.env.reset(), [1, -1])
+        for t in range(self.horizon):
+            action, action_probability = agent.act(state)
+            observation, reward, done, _ = self.env.step(action.numpy())
 
-            state = tf.reshape(self.env.reset(), [1, -1])
-            for t in range(self.horizon):
-                action, action_probability = agent.act(state)
-                observation, reward, done, _ = self.env.step(action.numpy())
+            # remember experience
+            state_trajectory.append(tf.reshape(state, [-1]))
+            reward_trajectory.append(reward)
+            action_trajectory.append(action)
+            action_probability_trajectory.append(action_probability)
 
-                # remember experience
-                state_trajectory.append(tf.reshape(state, [-1]))
-                reward_trajectory.append(reward)
-                action_trajectory.append(action)
-                action_probability_trajectory.append(action_probability)
-
-                # next state
+            # next state
+            if done:
+                terminal_state_indices.append(t)
+                state = tf.reshape(self.env.reset(), [1, -1])
+            else:
                 state = tf.reshape(observation, [1, -1])
 
-            state_trajectories.append(state_trajectory)
-            reward_trajectories.append(reward_trajectory)
-            action_probability_trajectories.append(action_probability_trajectory)
-            action_trajectories.append(action_trajectory)
-
-        return state_trajectories, reward_trajectories, action_trajectories, action_probability_trajectories
+        return [state_trajectory], [reward_trajectory], [action_trajectory], [action_probability_trajectory], \
+               [terminal_state_indices]

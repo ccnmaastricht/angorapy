@@ -65,7 +65,7 @@ def generalized_advantage_estimator(rewards: numpy.ndarray, values: numpy.ndarra
 
 if __name__ == "__main__":
     rewards = numpy.array(list(range(1, 10)))
-    values = numpy.array(get_discounted_returns(rewards, 1))
+    values = numpy.array(get_discounted_returns(rewards, 0.99))
     advs = generalized_advantage_estimator(
         rewards,
         values,
