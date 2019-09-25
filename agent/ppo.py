@@ -1,18 +1,14 @@
 #!/usr/bin/env python
 """Proximal Policy Optimization Implementation."""
-import itertools
-import statistics
 from abc import abstractmethod
 from typing import Tuple, List
 
 import gym
-import numpy
 import tensorflow as tf
 
-from agent.core import _RLAgent, generalized_advantage_estimator, get_discounted_returns
-from agent.gathering import _Gatherer
+from agent.core import _RLAgent
+from agent.gather import _Gatherer
 from util import flat_print
-from visualization.performance import plot_performance_over_episodes
 
 
 class _PPOBase(_RLAgent):
@@ -25,8 +21,6 @@ class _PPOBase(_RLAgent):
         :param learning_rate:           the agents learning rate
         :param discount:                discount factor applied to future rewards
         :param epsilon_clip:            clipping range for the actor's objective
-        :param state_dimensionality:    number of dimensions in the states that the agent has to process
-        :param n_actions:               number of actions the agent can choose from
         """
         super().__init__()
 
@@ -36,7 +30,7 @@ class _PPOBase(_RLAgent):
         self.discount = tf.constant(discount, dtype=tf.float64)
         self.learning_rate = learning_rate
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
-        self.c_entropy = tf.constant(0, dtype=tf.float64)
+        self.c_entropy = tf.constant(0.01, dtype=tf.float64)
 
         # Misc
         self.global_step = tf.Variable(0)
@@ -72,7 +66,7 @@ class _PPOBase(_RLAgent):
 
     # LOSS
 
-    def actor_loss(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
+    def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
         (as given in the paper), but this is the negated objective to be minimized!
 
@@ -90,35 +84,36 @@ class _PPOBase(_RLAgent):
         )
 
     @staticmethod
-    def critic_loss(prediction: tf.Tensor, target: tf.Tensor) -> tf.Tensor:
+    def critic_loss(prediction: tf.Tensor, v_GAE: tf.Tensor) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
         :param prediction:      prediction that the critic network made
-        :param target:          discounted return
+        :param v_GAE:           discounted return estimated by GAE
 
         :return:                squared error between prediction and return
         """
-        return tf.square(prediction - target)
+        return tf.square(prediction - v_GAE)
 
     @staticmethod
     def entropy_bonus(action_probs):
-        """Entropy of policy output acting as regularization by preventing dominance of on action."""
+        """Entropy of policy output acting as regularization by preventing dominance of one action."""
         return - tf.reduce_sum(action_probs * tf.math.log(action_probs), 1)
 
     def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
                             prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs) -> tf.Tensor:
         # loss needs to be negated since the original objective from the PPO paper is for maximization
-        return self.actor_loss(old_action_prob, action_prob, advantage) \
+        return self.actor_loss(action_prob, old_action_prob, advantage) \
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
     # TRAIN
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int):
+    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, evaluate_every=10):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
 
+        :param evaluate_every:
         :param env:             the environment on which the agent should be drilled
         :param iterations:      the number of experience-optimization cycles that shall be run
         :param epochs:          the number of epochs for which the model is optimized on the same experience data
@@ -127,47 +122,17 @@ class _PPOBase(_RLAgent):
 
         :return:                self
         """
-        performance_trace = []
-        episodes_seen = [0]
-        for iteration in range(iterations):
+        for self.iteration in range(iterations):
             # run simulations
             flat_print("Gathering...")
-            s_trajectories, r_trajectories, a_trajectories, a_prob_trajectories, terminal_states = self.gatherer.gather(self)
-            mean_performance = statistics.mean([sum(r) for r in r_trajectories])
-            performance_trace.append(mean_performance)
-            if iteration != iterations - 1:
-                episodes_seen.append(episodes_seen[-1] + len(s_trajectories))
-
-            flat_print("Preprocessing...")
-            state_value_predictions = [
-                [self.critic_prediction(tf.reshape(state, [1, -1]))[0][0] for state in trajectory]
-                for trajectory in
-                s_trajectories]
-            advantages = [generalized_advantage_estimator(reward_trajectory, value_predictions,
-                                                          gamma=self.discount, gae_lambda=0.95)
-                          for reward_trajectory, value_predictions in zip(r_trajectories, state_value_predictions)]
-            returns = numpy.add(advantages, state_value_predictions)
-
-            # make tensorflow data set for faster data access during training
-            dataset = tf.data.Dataset.from_tensor_slices({
-                "state": list(itertools.chain(*s_trajectories)),
-                "action": list(itertools.chain(*a_trajectories)),
-                "action_prob": list(itertools.chain(*a_prob_trajectories)),
-                "return": list(itertools.chain(*returns)),
-                "advantage": list(itertools.chain(*advantages))
-            })
+            dataset = self.gatherer.gather(self)
 
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
 
-            episode_lengths = [len(trace) for trace in r_trajectories]
-            flat_print(f"Iteration {iteration:6d}: "
-                       f"Mean Epi. Perf.: {round(mean_performance, 2):8.2f}; "
-                       f"Mean Epi. Length: {round(statistics.mean(episode_lengths), 2):8.2f}; "
-                       f"It. Steps: {sum(episode_lengths):6d}; "
-                       f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item()}\n")
+            if evaluate_every is not None and (self.iteration + 1) % evaluate_every == 0:
+                self.evaluate(env, 3, render=True)
 
-        plot_performance_over_episodes([episodes_seen], [performance_trace], ["PPO"])
         return self
 
     def evaluate(self, env: gym.Env, n: int, render: bool = False) -> List[int]:
@@ -295,8 +260,6 @@ class PPOAgentDual(_PPOBase):
         :param learning_rate:           the agents learning rate
         :param discount:                discount factor applied to future rewards
         :param epsilon_clip:            clipping range for the actor's objective
-        :param state_dimensionality:    number of dimensions in the states that the agent has to process
-        :param n_actions:               number of actions the agent can choose from
         """
         super().__init__(gatherer, learning_rate, discount, epsilon_clip)
 
@@ -336,25 +299,25 @@ class PPOAgentDual(_PPOBase):
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     # optimize the actor
-                    with tf.GradientTape() as tape:
+                    with tf.GradientTape() as actor_tape:
                         action_probabilities = self.actor_prediction(batch["state"], training=True)
                         chosen_action_probabilities = tf.convert_to_tensor(
                             [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
-                        actor_loss = self.actor_loss(old_action_prob=batch["action_prob"],
-                                                     action_prob=chosen_action_probabilities,
+                        actor_loss = self.actor_loss(action_prob=chosen_action_probabilities,
+                                                     old_action_prob=batch["action_prob"],
                                                      advantage=batch["advantage"]) \
                                      + self.c_entropy * self.entropy_bonus(action_probabilities)
 
-                    actor_gradients = tape.gradient(actor_loss, self.policy.trainable_variables)
+                    actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
                     self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
-                    with tf.GradientTape() as tape:
+                    with tf.GradientTape() as critic_tape:
                         critic_loss = self.critic_loss(prediction=self.critic_prediction(batch["state"], training=True),
-                                                       target=batch["return"])
+                                                       v_GAE=batch["return"])
 
-                    critic_gradients = tape.gradient(critic_loss, self.critic.trainable_variables)
+                    critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
 
                     epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])

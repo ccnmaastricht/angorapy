@@ -9,6 +9,7 @@ CONFIG = {
             "BEST": {
                 "ITERATIONS": 20,
                 "AGENTS": 32,
+                "HORIZON": 2048,
                 "EPOCHS": 6,
                 "BATCH_SIZE": 32,
 
@@ -33,10 +34,11 @@ CONFIG = {
             "BEST": {
                 "ITERATIONS": 100,
                 "AGENTS": 16,
-                "EPOCHS": 10,
+                "HORIZON": 2048,
+                "EPOCHS": 6,
                 "BATCH_SIZE": 32,
 
-                "LEARNING_RATE": 0.01,
+                "LEARNING_RATE": 0.0005,
                 "DISCOUNT_FACTOR": 0.99,
                 "EPSILON_CLIP": 0.2
             }
@@ -70,13 +72,28 @@ CONFIG = {
 
         "TunnelRAM": {
             "BEST": {
-                "ITERATIONS": 30,
+                "ITERATIONS": 100,
                 "AGENTS": 32,
-                "EPOCHS": 12,
-                "BATCH_SIZE": 32,
+                "HORIZON": 2048,
+                "EPOCHS": 6,
+                "BATCH_SIZE": 64,
 
                 "LEARNING_RATE": 0.01,
-                "DISCOUNT_FACTOR": 0.99,
+                "DISCOUNT_FACTOR": 0.995,
+                "EPSILON_CLIP": 0.2
+            }
+        },
+
+        "Pong-ram": {
+            "BEST": {
+                "ITERATIONS": 1000,
+                "AGENTS": 32,
+                "HORIZON": 2048,
+                "EPOCHS": 6,
+                "BATCH_SIZE": 64,
+
+                "LEARNING_RATE": 0.0005,
+                "DISCOUNT_FACTOR": 0.995,
                 "EPSILON_CLIP": 0.2
             }
         },

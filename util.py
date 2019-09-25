@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Helper functions."""
-import sys
 from typing import Tuple
 
 import gym

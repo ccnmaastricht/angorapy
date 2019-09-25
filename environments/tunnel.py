@@ -97,6 +97,9 @@ class TunnelRAM(Tunnel):
     def __init__(self, width: int = 30, height: int = 30):
         super().__init__(width, height)
 
+        self.observation_space = gym.spaces.Discrete(3)
+        pass
+
     def make_state_representation(self):
         empty_pixels = numpy.argwhere(self.dungeon[:, 1] != self.OBSTACLE_PIXEL)
         top_boundary, bottom_boundary = numpy.max(empty_pixels), numpy.min(empty_pixels)

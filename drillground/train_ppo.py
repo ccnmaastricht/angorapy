@@ -1,8 +1,9 @@
 import os
+import statistics
 
 import tensorflow as tf
 
-from agent.gathering import EpisodicGatherer, ContinuousGatherer
+from agent.gather import EpisodicGatherer, ContinuousGatherer
 from agent.ppo import PPOAgentDual
 from configs.env import CONFIG
 from environments import *
@@ -16,10 +17,10 @@ tf.compat.v1.enable_eager_execution()
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # SETTINGS
-TASK = "CartPole-v0"  # the environment in which the agent learns
+TASK = "LunarLander-v2"  # the environment in which the agent learns
 HP_CONFIG = "BEST"  # configuration of hyper parameters in configs/env.py
 JOINT_NETWORK = False  # if true, uses one network with two heads for policy and critic
-GATHERING = ["epi", "cont"][0]  # epi runs n episodes until termination, cont collects specific number of experiences
+GATHERING = ["epi", "cont"][1]  # epi runs n episodes until termination, cont collects specific number of experiences
 
 # SETUP
 env = gym.make(TASK)
@@ -28,12 +29,11 @@ state_dimensionality, number_of_actions = env_extract_dims(env)
 env_name = env.spec._env_name
 print(f"Learning the Task: {env_name}\n"
       f"{state_dimensionality}-dimensional states and {number_of_actions} actions.\n"
-      f"-----------------------------------------\n\n")
+      f"-----------------------------------------\n")
 
 if GATHERING == "cont":
     gatherer = ContinuousGatherer(environment=env,
-                                  n_trajectories=CONFIG["PPO"][env_name][HP_CONFIG]["AGENTS"],
-                                  T=200)
+                                  horizon=CONFIG["PPO"][env_name][HP_CONFIG]["HORIZON"])
 else:
     gatherer = EpisodicGatherer(environment=env,
                                 n_trajectories=CONFIG["PPO"][env_name][HP_CONFIG]["AGENTS"])
@@ -54,7 +54,10 @@ agent.set_gpu(True)
 agent.drill(env=env,
             iterations=CONFIG["PPO"][env_name][HP_CONFIG]["ITERATIONS"],
             epochs=CONFIG["PPO"][env_name][HP_CONFIG]["EPOCHS"],
-            batch_size=CONFIG["PPO"][env_name][HP_CONFIG]["BATCH_SIZE"])
-print(agent.evaluate(env, 1, render=True))
+            batch_size=CONFIG["PPO"][env_name][HP_CONFIG]["BATCH_SIZE"],
+            evaluate_every=10)
+
+evaluation_results = agent.evaluate(env, 10, render=True)
+print(f"Average Performance {statistics.mean(evaluation_results)}: {evaluation_results}.")
 
 env.close()
