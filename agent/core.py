@@ -64,7 +64,7 @@ def generalized_advantage_estimator(rewards: numpy.ndarray, values: numpy.ndarra
 
 
 def horizoned_generalized_advantage_estimator(rewards: numpy.ndarray, values: numpy.ndarray,
-                                              t_is_terminal: List, gamma: float, gae_lambda: float):
+                                              t_is_terminal: List, gamma: float, gae_lambda: float) -> numpy.ndarray:
     """K-Step return Estimator for Generalized Advantage Estimation.
     From: HIGH-DIMENSIONAL CONTINUOUS CONTROL USING GENERALIZED ADVANTAGE ESTIMATION. (Schulman et. al., 2018)
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Proximal Policy Optimization Implementation."""
+import statistics
 from abc import abstractmethod
 from typing import Tuple, List
 
@@ -33,8 +34,10 @@ class _PPOBase(_RLAgent):
         self.c_entropy = tf.constant(0.01, dtype=tf.float64)
 
         # Misc
-        self.global_step = tf.Variable(0)
+        self.iteration = 0
         self.device = "CPU:0"
+
+        self.policy_optimizer: tf.keras.optimizers.Optimizer = None
 
     @abstractmethod
     def full_prediction(self, state, training=False):
@@ -130,6 +133,8 @@ class _PPOBase(_RLAgent):
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
 
+            self.report()
+
             if evaluate_every is not None and (self.iteration + 1) % evaluate_every == 0:
                 self.evaluate(env, 3, render=True)
 
@@ -162,6 +167,18 @@ class _PPOBase(_RLAgent):
             rewards.append(sum(reward_trajectory))
 
         return rewards
+
+    def report(self):
+        mean_perf = statistics.mean(self.gatherer.episode_reward_history[-self.gatherer.last_episodes_completed:])
+        mean_episode_length = statistics.mean(
+            self.gatherer.episode_length_history[-self.gatherer.last_episodes_completed:])
+
+        flat_print(f"Iteration {self.iteration:6d}: "
+                   f"Mean Epi. Perf.: {round(mean_perf, 2):8.2f}; "
+                   f"Mean Epi. Length: {round(mean_episode_length, 2):8.2f}; "
+                   f"It. Steps: {self.gatherer.steps_during_last_gather:6d}; "
+                   f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item()}; "
+                   f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3)}k\n")
 
 
 class PPOAgentJoint(_PPOBase):
