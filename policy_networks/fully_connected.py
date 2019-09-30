@@ -11,7 +11,7 @@ tf.keras.backend.set_floatx("float64")
 class PPOActorNetwork(tf.keras.Model):
     """Fully-connected network taking the role of an actor."""
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env, continuous: bool):
         super().__init__()
 
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
@@ -19,7 +19,8 @@ class PPOActorNetwork(tf.keras.Model):
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
         self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh", dtype=tf.float64)
         self.fc_c = tf.keras.layers.Dense(32, input_dim=64, activation="tanh", dtype=tf.float64)
-        self.fc_out = tf.keras.layers.Dense(self.n_actions, input_dim=32, activation="softmax", dtype=tf.float64)
+        self.fc_out = tf.keras.layers.Dense(self.n_actions, input_dim=32,
+                                            activation="softmax" if not continuous else "linear", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
@@ -62,7 +63,7 @@ class PPOActorCriticNetwork(tf.keras.Model):
     analytical part is specific to the role.
     """
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gym.Env, continuous: bool):
         super().__init__()
 
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
@@ -77,7 +78,8 @@ class PPOActorCriticNetwork(tf.keras.Model):
         self.fc_critic_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear", dtype=tf.float64)
 
         self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh", dtype=tf.float64)
-        self.fc_actor_out = tf.keras.layers.Dense(self.n_actions, input_dim=12, activation="softmax", dtype=tf.float64)
+        self.fc_actor_out = tf.keras.layers.Dense(self.n_actions, input_dim=12,
+                                                  activation="softmax" if not continuous else "linear", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)

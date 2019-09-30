@@ -14,10 +14,10 @@ class _RLAgent(ABC):
     def __init__(self):
         self.iteration = 0
 
-    @abstractmethod
-    def act(self, state: numpy.ndarray):
-        """Agent determines a favourable action following his policy, given a state."""
-        pass
+    # @abstractmethod
+    # def act(self, state: numpy.ndarray):
+    #     """Agent determines a favourable action following his policy, given a state."""
+    #     pass
 
     @abstractmethod
     def drill(self, **kwargs):

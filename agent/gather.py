@@ -82,7 +82,7 @@ class ContinuousGatherer(_Gatherer):
             self.steps_during_last_gather += 1
 
             action, action_probability = agent.act(state)
-            observation, reward, done, _ = self.env.step(action.numpy())
+            observation, reward, done, _ = self.env.step(numpy.atleast_1d(action.numpy()))
 
             # remember experience
             state_trajectory.append(tf.reshape(state, [-1]))

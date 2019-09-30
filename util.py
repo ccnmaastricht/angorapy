@@ -3,6 +3,7 @@
 from typing import Tuple
 
 import gym
+from gym.spaces import Discrete, Box
 
 
 def flat_print(string: str):
@@ -12,4 +13,12 @@ def flat_print(string: str):
 
 def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
     """Returns state and (discrete) action space dimensionality for given environment."""
-    return env.observation_space.shape[0], env.action_space.n
+    obs_dim = env.observation_space.shape[0]
+    if isinstance(env.action_space, Discrete):
+        act_dim = env.action_space.n
+    elif isinstance(env.action_space, Box):
+        act_dim = env.action_space.shape[0]
+    else:
+        raise NotImplementedError(f"Environment has unknown Action Space Typ: {env.action_space}")
+
+    return obs_dim, act_dim

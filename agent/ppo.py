@@ -6,6 +6,7 @@ from typing import Tuple, List
 
 import gym
 import tensorflow as tf
+from gym.spaces import Discrete, Box
 
 from agent.core import _RLAgent
 from agent.gather import _Gatherer
@@ -40,6 +41,16 @@ class _PPOBase(_RLAgent):
 
         self.policy_optimizer: tf.keras.optimizers.Optimizer = None
 
+        # prepare for environment type
+        if isinstance(gatherer.env.action_space, Discrete):
+            self.act = self.act_discrete
+            self.is_continuous_actions = False
+        elif isinstance(gatherer.env.action_space, Box):
+            self.act = self.act_continuous
+            self.is_continuous_actions = True
+        else:
+            raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {gatherer.env.action_space}")
+
     @abstractmethod
     def full_prediction(self, state, training=False):
         """Wrapper to allow for shared and non-shared models."""
@@ -62,11 +73,17 @@ class _PPOBase(_RLAgent):
     def set_gpu(self, activated: bool) -> None:
         self.device = "GPU:0" if activated else "CPU:0"
 
-    def act(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    def act_discrete(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         probabilities = self.actor_prediction(state)
         action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
 
         return action, probabilities[0][action]
+
+    def act_continuous(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+        means = self.actor_prediction(state)
+        actions = tf.distributions.Normal(means, tf.ones(means.shape, means.dtype)).sample()
+
+        return tf.reshape(tf.squeeze(actions), [-1]), tf.squeeze(means)
 
     # LOSS
 
@@ -74,14 +91,14 @@ class _PPOBase(_RLAgent):
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
         (as given in the paper), but this is the negated objective to be minimized!
 
-        :param old_action_prob:         the probability of the action taken given by the old policy during the episode
         :param action_prob:             the probability of the action for the state under the current policy
                                         (from here the gradients go backwards)
+        :param old_action_prob:         the probability of the action taken given by the old policy during the episode
         :param advantage:               the advantage that taking the action gives over the estimated state value
 
         :return:                        the value of the objective function
         """
-        r = tf.math.divide(action_prob, old_action_prob)
+        r = tf.reduce_mean(tf.math.divide(action_prob, old_action_prob), axis=1)
         return - tf.minimum(
             tf.math.multiply(r, advantage),
             tf.math.multiply(tf.clip_by_value(r, 1 - self.epsilon_clip, 1 + self.epsilon_clip), advantage)
@@ -117,11 +134,9 @@ class _PPOBase(_RLAgent):
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
 
-        :param update_story_every:
         :param env:             the environment on which the agent should be drilled
         :param iterations:      the number of experience-optimization cycles that shall be run
         :param epochs:          the number of epochs for which the model is optimized on the same experience data
-        :param agents:          the number of trajectories generated during the experience gathering
         :param batch_size       batch size for the optimization
 
         :return:                self
@@ -184,79 +199,6 @@ class _PPOBase(_RLAgent):
                    f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3)}k\n")
 
 
-@DeprecationWarning
-class PPOAgentJoint(_PPOBase):
-    """Agent using the Proximal Policy Optimization Algorithm for learning."""
-
-    def __init__(self, policy: tf.keras.Model, gatherer, learning_rate: float, discount: float,
-                 epsilon_clip: float):
-        """Initialize the Agent.
-
-        :param learning_rate:           the agents learning rate
-        :param discount:                discount factor applied to future rewards
-        :param epsilon_clip:            clipping range for the actor's objective
-        """
-        super().__init__(gatherer, learning_rate, discount, epsilon_clip)
-
-        # learning parameters
-        self.discount = tf.constant(discount, dtype=tf.float64)
-        self.learning_rate = learning_rate
-        self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
-        self.c_entropy = tf.constant(0, dtype=tf.float64)
-
-        # Models
-        self.policy = policy
-        self.policy_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-
-    def full_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training)
-
-    def critic_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training)[1]
-
-    def actor_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training)[0]
-
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[float]:
-        """Optimize the agents policy/value network based on a given dataset.
-
-        :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
-        :param epochs:          number of epochs to train on this dataset
-        :param batch_size:      batch size with which the dataset is sampled
-        """
-        loss_history = []
-        for epoch in range(epochs):
-            # for each epoch, dataset first should be shuffled to break bias, then divided into batches
-            shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
-            batched_dataset = shuffled_dataset.batch(batch_size)
-
-            for batch in batched_dataset:
-                # use the dataset to optimize the model
-                with tf.device(self.device):
-                    with tf.GradientTape() as tape:
-                        action_probabilities, state_value = self.full_prediction(batch["state"], training=True)
-
-                        loss = self.joint_loss_function(batch["action_prob"],
-                                                        tf.convert_to_tensor([action_probabilities[i][a] for i, a
-                                                                              in enumerate(batch["action"])],
-                                                                             dtype=tf.float64),
-                                                        batch["advantage"],
-                                                        state_value,
-                                                        batch["return"],
-                                                        action_probs=action_probabilities)
-
-                    loss_history.append(loss.numpy().item())
-
-                    # calculate and apply gradients
-                    gradients = tape.gradient(loss, self.policy.trainable_variables)
-                    self.policy_optimizer.apply_gradients(zip(gradients, self.policy.trainable_variables))
-
-        return loss_history
-
-
 class PPOAgentDual(_PPOBase):
     """PPO implementation using two independent models for the critic and the actor.
 
@@ -316,13 +258,21 @@ class PPOAgentDual(_PPOBase):
                     # optimize the actor
                     with tf.GradientTape() as actor_tape:
                         action_probabilities = self.actor_prediction(batch["state"], training=True)
-                        chosen_action_probabilities = tf.convert_to_tensor(
-                            [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
+                        # if the action space is discrete, extract the probabilities of actions actually chosen
+                        chosen_action_probabilities = action_probabilities
+                        if not self.is_continuous_actions:
+                            chosen_action_probabilities = tf.convert_to_tensor(
+                                [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
+
+                        # calculate the clipped loss
                         actor_loss = self.actor_loss(action_prob=chosen_action_probabilities,
                                                      old_action_prob=batch["action_prob"],
-                                                     advantage=batch["advantage"]) \
-                                     + self.c_entropy * self.entropy_bonus(action_probabilities)
+                                                     advantage=batch["advantage"])
+
+                        # only add entropy bonus for discrete action spaces  TODO: Add continuous entropy
+                        if not self.is_continuous_actions:
+                            actor_loss += self.c_entropy * self.entropy_bonus(action_probabilities)
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
                     self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
