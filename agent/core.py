@@ -5,11 +5,14 @@ from typing import List
 
 import numpy
 
+import tensorflow as tf
+from util import env_extract_dims
+
 
 class _RLAgent(ABC):
 
     def __init__(self):
-        pass
+        self.iteration = 0
 
     @abstractmethod
     def act(self, state: numpy.ndarray):
@@ -24,13 +27,12 @@ class _RLAgent(ABC):
 
 class RandomAgent(_RLAgent):
 
-    def __init__(self, state_dimensionality, n_actions):
+    def __init__(self, env):
         super().__init__()
-        self.n_actions = n_actions
-        self.state_dimensionality = state_dimensionality
+        self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
     def act(self, state: numpy.ndarray):
-        return random.randrange(self.n_actions)
+        return tf.convert_to_tensor(random.randrange(self.n_actions)), 1/self.n_actions
 
     def drill(self, **kwargs):
         pass

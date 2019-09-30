@@ -10,6 +10,7 @@ import tensorflow as tf
 from agent.core import _RLAgent
 from agent.gather import _Gatherer
 from util import flat_print
+from visualization.story import StoryTeller
 
 
 class _PPOBase(_RLAgent):
@@ -33,7 +34,7 @@ class _PPOBase(_RLAgent):
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
         self.c_entropy = tf.constant(0.01, dtype=tf.float64)
 
-        # Misc
+        # misc
         self.iteration = 0
         self.device = "CPU:0"
 
@@ -111,12 +112,12 @@ class _PPOBase(_RLAgent):
 
     # TRAIN
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, evaluate_every=10):
+    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller: StoryTeller=None):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
 
-        :param evaluate_every:
+        :param update_story_every:
         :param env:             the environment on which the agent should be drilled
         :param iterations:      the number of experience-optimization cycles that shall be run
         :param epochs:          the number of epochs for which the model is optimized on the same experience data
@@ -135,8 +136,10 @@ class _PPOBase(_RLAgent):
 
             self.report()
 
-            if evaluate_every is not None and (self.iteration + 1) % evaluate_every == 0:
-                self.evaluate(env, 3, render=True)
+            if story_teller is not None and (self.iteration + 1) % story_teller.frequency == 0:
+                story_teller.update_reward_graph()
+                story_teller.create_episode_gif(n=3)
+                story_teller.update_story()
 
         return self
 

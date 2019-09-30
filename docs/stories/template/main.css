@@ -1,0 +1,22 @@
+body {
+
+}
+
+.iteration-block {
+    margin: 0 auto;
+    text-align: center;
+}
+
+.plot-block {
+    margin: 0 auto;
+    text-align: center;
+}
+
+h3 {
+    margin-bottom: 0;
+}
+
+h5 {
+    margin-top: 5px;
+    font-weight: normal;
+}

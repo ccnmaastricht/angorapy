@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Gatherer classes."""
 import itertools
+import statistics
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
@@ -28,6 +29,9 @@ class _Gatherer(ABC):
         self.episode_length_history = []
         self.last_episodes_completed = 0
         self.steps_during_last_gather = 0
+
+        self.mean_episode_reward_per_gathering = []
+        self.stdev_episode_reward_per_gathering = []
 
         self.normalize: bool = normalize
 
@@ -100,6 +104,9 @@ class ContinuousGatherer(_Gatherer):
             else:
                 state = tf.reshape(observation, [1, -1])
                 timestep += 1
+
+        self.mean_episode_reward_per_gathering.append(statistics.mean(self.episode_reward_history[-self.last_episodes_completed:]))
+        self.stdev_episode_reward_per_gathering.append(statistics.stdev(self.episode_reward_history[-self.last_episodes_completed:]))
 
         # value prediction needs to include last state that was not included too, in order to make GAE possible
         state_trajectory.append(state)

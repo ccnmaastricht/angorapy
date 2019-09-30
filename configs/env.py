@@ -5,7 +5,7 @@ Format is ALGORITHM -> ENV -> ID -> SETTINGS.
 
 CONFIG = {
     "PPO": {
-        "CartPole": {
+        "CartPole-v1": {
             "BEST": {
                 "ITERATIONS": 20,
                 "AGENTS": 32,
@@ -22,7 +22,8 @@ CONFIG = {
                 "ITERATIONS": 10,
                 "AGENTS": 3,
                 "EPOCHS": 2,
-                "BATCH_SIZE": 8,
+                "BATCH_SIZE": 128,
+                "HORIZON": 500,
 
                 "LEARNING_RATE": 0.005,
                 "DISCOUNT_FACTOR": 0.99,
@@ -30,7 +31,7 @@ CONFIG = {
             }
         },
 
-        "LunarLander": {
+        "LunarLander-v2": {
             "BEST": {
                 "ITERATIONS": 1000,
                 "AGENTS": 16,
