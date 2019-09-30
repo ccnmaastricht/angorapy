@@ -18,10 +18,20 @@ tf.compat.v1.enable_eager_execution()
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # SETTINGS
-TASK = "LunarLander-v2"         # the environment in which the agent learns
-HP_CONFIG = "BEST"              # configuration of hyper parameters in configs/env.py
+TASK = "CartPole-v1"         # the environment in which the agent learns
 JOINT_NETWORK = False           # if true, uses one network with two heads for policy and critic
 GATHERING = ["epi", "cont"][1]  # epi runs n episodes until termination, cont collects specific number of experiences
+
+ITERATIONS = 20
+AGENTS = 32
+HORIZON = 2048
+EPOCHS = 6
+BATCH_SIZE = 32
+
+LEARNING_RATE = 0.005
+DISCOUNT_FACTOR = 0.99
+EPSILON_CLIP = 0.2
+C_ENTROPY = 0.01
 
 # SETUP
 env = gym.make(TASK)
@@ -34,19 +44,20 @@ print(f"Learning the Task: {env_name}\n"
 
 if GATHERING == "cont":
     gatherer = ContinuousGatherer(environment=env,
-                                  horizon=CONFIG["PPO"][env_name][HP_CONFIG]["HORIZON"])
+                                  horizon=HORIZON)
 else:
     gatherer = EpisodicGatherer(environment=env,
-                                n_trajectories=CONFIG["PPO"][env_name][HP_CONFIG]["AGENTS"])
+                                n_trajectories=AGENTS)
 
 if not JOINT_NETWORK:
     policy = PPOActorNetwork(env)
     critic = PPOCriticNetwork(env)
 
     agent = PPOAgentDual(policy, critic, gatherer,
-                         learning_rate=CONFIG["PPO"][env_name][HP_CONFIG]["LEARNING_RATE"],
-                         discount=CONFIG["PPO"][env_name][HP_CONFIG]["DISCOUNT_FACTOR"],
-                         epsilon_clip=CONFIG["PPO"][env_name][HP_CONFIG]["EPSILON_CLIP"])
+                         learning_rate=LEARNING_RATE,
+                         discount=DISCOUNT_FACTOR,
+                         epsilon_clip=EPSILON_CLIP,
+                         c_entropy=C_ENTROPY)
 else:
     raise NotImplementedError("Implemented but currently not used.")
 agent.set_gpu(True)
@@ -55,9 +66,9 @@ teller = StoryTeller(agent, env, frequency=3)
 
 # TRAIN
 agent.drill(env=env,
-            iterations=CONFIG["PPO"][env_name][HP_CONFIG]["ITERATIONS"],
-            epochs=CONFIG["PPO"][env_name][HP_CONFIG]["EPOCHS"],
-            batch_size=CONFIG["PPO"][env_name][HP_CONFIG]["BATCH_SIZE"],
+            iterations=ITERATIONS,
+            epochs=EPOCHS,
+            batch_size=BATCH_SIZE,
             story_teller=teller)
 
 evaluation_results = agent.evaluate(env, 10, render=True)

@@ -16,8 +16,8 @@ from visualization.story import StoryTeller
 class _PPOBase(_RLAgent):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
-    def __init__(self, gatherer: _Gatherer, learning_rate: float, discount: float,
-                 epsilon_clip: float):
+    def __init__(self, gatherer: _Gatherer, learning_rate: float, discount: float = 0.99, epsilon_clip: float = 0.2,
+                 c_entropy: float = 0.01):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
@@ -32,7 +32,7 @@ class _PPOBase(_RLAgent):
         self.discount = tf.constant(discount, dtype=tf.float64)
         self.learning_rate = learning_rate
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
-        self.c_entropy = tf.constant(0.01, dtype=tf.float64)
+        self.c_entropy = tf.constant(c_entropy, dtype=tf.float64)
 
         # misc
         self.iteration = 0
@@ -112,7 +112,7 @@ class _PPOBase(_RLAgent):
 
     # TRAIN
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller: StoryTeller=None):
+    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller: StoryTeller = None):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
@@ -184,6 +184,7 @@ class _PPOBase(_RLAgent):
                    f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3)}k\n")
 
 
+@DeprecationWarning
 class PPOAgentJoint(_PPOBase):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
@@ -221,13 +222,6 @@ class PPOAgentJoint(_PPOBase):
 
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[float]:
         """Optimize the agents policy/value network based on a given dataset.
-
-        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
-        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
-        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
-        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
-        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
-        not. Even more so this applies with running simulations on the cluster.
 
         :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
         :param epochs:          number of epochs to train on this dataset
@@ -273,15 +267,9 @@ class PPOAgentDual(_PPOBase):
     """
 
     def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer: _Gatherer, learning_rate: float,
-                 discount: float,
-                 epsilon_clip: float):
-        """Initialize the Agent.
-
-        :param learning_rate:           the agents learning rate
-        :param discount:                discount factor applied to future rewards
-        :param epsilon_clip:            clipping range for the actor's objective
-        """
-        super().__init__(gatherer, learning_rate, discount, epsilon_clip)
+                 discount: float, epsilon_clip: float, c_entropy: float):
+        super().__init__(gatherer, learning_rate=learning_rate, discount=discount, epsilon_clip=epsilon_clip,
+                         c_entropy=c_entropy)
 
         self.policy = policy
         self.critic = critic
@@ -303,6 +291,13 @@ class PPOAgentDual(_PPOBase):
 
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
         """Optimize the agent's policy and value network based on a given dataset.
+
+        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
+        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
+        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
+        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
+        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
+        not. Even more so this applies with running simulations on the cluster.
 
         :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
         :param epochs:          number of epochs to train on this dataset
