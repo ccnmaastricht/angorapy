@@ -11,7 +11,7 @@ from tensorflow import keras
 
 from agent.core import RLAgent
 
-from datatypes import Experience
+from utilities.datatypes import Experience
 
 
 class _QLearningAgent(RLAgent, ABC):

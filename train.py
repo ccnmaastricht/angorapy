@@ -9,7 +9,7 @@ from agent.ppo import PPOAgentDual
 from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
 from util import env_extract_dims
-from visualization.story import StoryTeller
+from utilities.visualization.story import StoryTeller
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
 
