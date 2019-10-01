@@ -10,14 +10,16 @@ from matplotlib import animation
 
 import tensorflow as tf
 
-from agent.core import RandomAgent, _RLAgent
+from agent.core import RandomAgent
+from agent.ppo import PPOBase
 
 PATH_TO_STORIES = "../docs/stories/"
+TEMPLATE_PATH = PATH_TO_STORIES + "/template/"
 
 
 class StoryTeller:
 
-    def __init__(self, agent: _RLAgent, env: gym.Env, frequency: int, id=None):
+    def __init__(self, agent: PPOBase, env: gym.Env, frequency: int, id=None):
         self.agent = agent
         self.env = env
 
@@ -68,8 +70,23 @@ class StoryTeller:
         pass
 
     def make_hp_box(self):
-        # TODO
-        pass
+        with open(TEMPLATE_PATH + "hp_box.html") as f:
+            tpl = f.read()
+
+        relevant_hps = [
+            ("CONTINUOUS", self.agent.is_continuous_actions),
+            ("LEARNING RATE", self.agent.learning_rate),
+            ("EPSILON CLIP", self.agent.epsilon_clip),
+            ("ENTROPY COEFFICIENT", self.agent.c_entropy),
+        ]
+
+        hplist = ""
+        for p, v in relevant_hps:
+            hplist += f"<div class='hp-element'>{p}: {v}</div>\n"
+
+        box = re.sub("%HPS%", hplist, tpl)
+
+        return box
 
     def update_reward_graph(self):
         fig, ax = plt.subplots()
@@ -97,6 +114,9 @@ class StoryTeller:
 
         # main title
         story += f"<h1 align='center'>A Story About {self.agent.gatherer.env.unwrapped.spec.id}</h1>\n\n"
+
+        # hyperparameters
+        story += self.make_hp_box()
 
         # reward plot
         reward_plot_path = self.story_directory + "/reward_plot.svg"

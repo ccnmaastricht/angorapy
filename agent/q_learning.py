@@ -9,12 +9,12 @@ from abc import ABC, abstractmethod
 import numpy
 from tensorflow import keras
 
-from agent.core import _RLAgent
+from agent.core import RLAgent
 
 from datatypes import Experience
 
 
-class _QLearningAgent(_RLAgent, ABC):
+class _QLearningAgent(RLAgent, ABC):
     """Base Class for Q Learning Agents.
     Contains most functionality s.t. implementations only need to add model building.
     """

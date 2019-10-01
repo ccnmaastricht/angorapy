@@ -18,13 +18,16 @@ tf.compat.v1.enable_eager_execution()
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # SETTINGS
+
+DEBUG = False
+
 TASK = "Pendulum-v0"  # the environment in which the agent learns
 JOINT_NETWORK = False  # if true, uses one network with two heads for policy and critic
 GATHERING = ["epi", "cont"][1]  # epi runs n episodes until termination, cont collects specific number of experiences
 
-ITERATIONS = 20
+ITERATIONS = 1000
 AGENTS = 32
-HORIZON = 2048
+HORIZON = 4096 if not DEBUG else 128
 EPOCHS = 6
 BATCH_SIZE = 32
 
@@ -57,7 +60,7 @@ agent = PPOAgentDual(policy, critic, gatherer,
                      c_entropy=C_ENTROPY)
 agent.set_gpu(True)
 
-teller = StoryTeller(agent, env, frequency=3)
+teller = StoryTeller(agent, env, frequency=10)
 
 # TRAIN
 agent.drill(env=env,

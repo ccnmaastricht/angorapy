@@ -12,6 +12,33 @@ body {
     text-align: center;
 }
 
+.hp-box {
+    margin: 0 auto;
+
+    background-color: white;
+    border: 1px solid black;
+    border-radius: 15px;
+    padding: 20px;
+
+    width: 60%;
+}
+
+.hp-element-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-content: space-around;
+    align-items: flex-start;
+    flex-direction: row;
+}
+
+.hp-element {
+    background-color: cornflowerblue;
+    border-radius: 15px;
+    color: white;
+    padding: 10px;
+}
+
 h3 {
     margin-bottom: 0;
 }

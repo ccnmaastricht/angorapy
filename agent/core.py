@@ -9,7 +9,7 @@ import tensorflow as tf
 from util import env_extract_dims
 
 
-class _RLAgent(ABC):
+class RLAgent(ABC):
 
     def __init__(self):
         self.iteration = 0
@@ -25,7 +25,7 @@ class _RLAgent(ABC):
         pass
 
 
-class RandomAgent(_RLAgent):
+class RandomAgent(RLAgent):
 
     def __init__(self, env):
         super().__init__()

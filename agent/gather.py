@@ -8,8 +8,9 @@ from typing import List, Tuple
 import gym
 import numpy
 import tensorflow as tf
+from gym.spaces import Box
 
-from agent.core import _RLAgent, generalized_advantage_estimator, horizoned_generalized_advantage_estimator
+from agent.core import RLAgent, generalized_advantage_estimator, horizoned_generalized_advantage_estimator
 
 
 class _Gatherer(ABC):
@@ -21,6 +22,7 @@ class _Gatherer(ABC):
         :param n_trajectories:      the number of desired trajectories
         """
         self.env = environment
+        self.env_is_continuous = isinstance(self.env.action_space, Box)
         self.n_trajectories = n_trajectories
 
         # statistics
@@ -36,7 +38,7 @@ class _Gatherer(ABC):
         self.normalize: bool = normalize
 
     @abstractmethod
-    def gather(self, agent: _RLAgent):
+    def gather(self, agent: RLAgent):
         pass
 
     def normalize_advantages(self, advantages: numpy.ndarray) -> numpy.ndarray:
@@ -57,7 +59,7 @@ class ContinuousGatherer(_Gatherer):
         super().__init__(environment, 0)
         self.horizon = horizon
 
-    def gather(self, agent: _RLAgent) -> tf.data.Dataset:
+    def gather(self, agent: RLAgent) -> tf.data.Dataset:
         """Gather experience in an environment for n timesteps.
 
         :param agent:               the agent who is to be set into the environment
@@ -82,7 +84,9 @@ class ContinuousGatherer(_Gatherer):
             self.steps_during_last_gather += 1
 
             action, action_probability = agent.act(state)
-            observation, reward, done, _ = self.env.step(numpy.atleast_1d(action.numpy()))
+            observation, reward, done, _ = self.env.step(
+                numpy.atleast_1d(action.numpy()) if self.env_is_continuous else action.numpy()
+            )
 
             # remember experience
             state_trajectory.append(tf.reshape(state, [-1]))
@@ -105,8 +109,10 @@ class ContinuousGatherer(_Gatherer):
                 state = tf.reshape(observation, [1, -1])
                 timestep += 1
 
-        self.mean_episode_reward_per_gathering.append(statistics.mean(self.episode_reward_history[-self.last_episodes_completed:]))
-        self.stdev_episode_reward_per_gathering.append(statistics.stdev(self.episode_reward_history[-self.last_episodes_completed:]))
+        self.mean_episode_reward_per_gathering.append(0 if self.last_episodes_completed < 1 else statistics.mean(
+            self.episode_reward_history[-self.last_episodes_completed:]))
+        self.stdev_episode_reward_per_gathering.append(0 if self.last_episodes_completed <= 1 else statistics.stdev(
+            self.episode_reward_history[-self.last_episodes_completed:]))
 
         # value prediction needs to include last state that was not included too, in order to make GAE possible
         state_trajectory.append(state)

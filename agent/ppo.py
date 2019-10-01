@@ -8,13 +8,12 @@ import gym
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 
-from agent.core import _RLAgent
+from agent.core import RLAgent
 from agent.gather import _Gatherer
-from util import flat_print
-from visualization.story import StoryTeller
+from util import flat_print, env_extract_dims
 
 
-class _PPOBase(_RLAgent):
+class PPOBase(RLAgent):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
     def __init__(self, gatherer: _Gatherer, learning_rate: float, discount: float = 0.99, epsilon_clip: float = 0.2,
@@ -28,6 +27,7 @@ class _PPOBase(_RLAgent):
         super().__init__()
 
         self.gatherer = gatherer
+        self.state_dim, self.n_actions = env_extract_dims(self.gatherer.env)
 
         # learning parameters
         self.discount = tf.constant(discount, dtype=tf.float64)
@@ -80,12 +80,13 @@ class _PPOBase(_RLAgent):
         return action, probabilities[0][action]
 
     def act_continuous(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        means = self.actor_prediction(state)
-        actions = tf.distributions.Normal(means, tf.ones(means.shape, means.dtype)).sample()
+        multivariates = self.actor_prediction(state)
+        means = multivariates[:, :self.n_actions]
+        stdevs = multivariates[:, self.n_actions:]
+        distro = tf.distributions.Normal(means, stdevs)
+        actions = distro.sample()
 
-        return tf.reshape(tf.squeeze(actions), [-1]), tf.squeeze(means)
-
-    # LOSS
+        return tf.reshape(tf.squeeze(actions), [-1]), distro.prob(actions)
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
@@ -98,27 +99,31 @@ class _PPOBase(_RLAgent):
 
         :return:                        the value of the objective function
         """
-        r = tf.reduce_mean(tf.math.divide(action_prob, old_action_prob), axis=1)
+        r = tf.math.divide(action_prob, old_action_prob)
         return - tf.minimum(
             tf.math.multiply(r, advantage),
             tf.math.multiply(tf.clip_by_value(r, 1 - self.epsilon_clip, 1 + self.epsilon_clip), advantage)
         )
 
     @staticmethod
-    def critic_loss(prediction: tf.Tensor, v_GAE: tf.Tensor) -> tf.Tensor:
+    def critic_loss(critic_output: tf.Tensor, v_GAE: tf.Tensor) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
-        :param prediction:      prediction that the critic network made
+        :param critic_output:      prediction that the critic network made
         :param v_GAE:           discounted return estimated by GAE
 
         :return:                squared error between prediction and return
         """
-        return tf.square(prediction - v_GAE)
+        return tf.square(critic_output - v_GAE)
 
-    @staticmethod
-    def entropy_bonus(action_probs):
+    def entropy_bonus(self, policy_output):
         """Entropy of policy output acting as regularization by preventing dominance of one action."""
-        return - tf.reduce_sum(action_probs * tf.math.log(action_probs), 1)
+        if self.is_continuous_actions:
+            means = policy_output[:, :self.n_actions]
+            stdevs = policy_output[:, self.n_actions:]
+            return tf.distributions.Normal(means, stdevs).entropy()
+        else:
+            return - tf.reduce_sum(policy_output * tf.math.log(policy_output), 1)
 
     def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
                             prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs) -> tf.Tensor:
@@ -129,7 +134,7 @@ class _PPOBase(_RLAgent):
 
     # TRAIN
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller: StoryTeller = None):
+    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller=None):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
@@ -187,8 +192,8 @@ class _PPOBase(_RLAgent):
         return rewards
 
     def report(self):
-        mean_perf = statistics.mean(self.gatherer.episode_reward_history[-self.gatherer.last_episodes_completed:])
-        mean_episode_length = statistics.mean(
+        mean_perf = self.gatherer.mean_episode_reward_per_gathering[-1]
+        mean_episode_length = 0 if self.gatherer.last_episodes_completed == 0 else statistics.mean(
             self.gatherer.episode_length_history[-self.gatherer.last_episodes_completed:])
 
         flat_print(f"Iteration {self.iteration:6d}: "
@@ -199,7 +204,7 @@ class _PPOBase(_RLAgent):
                    f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3)}k\n")
 
 
-class PPOAgentDual(_PPOBase):
+class PPOAgentDual(PPOBase):
     """PPO implementation using two independent models for the critic and the actor.
 
     This is of course more expensive than using shared parameters because we need two forward and backward calculations
@@ -259,9 +264,14 @@ class PPOAgentDual(_PPOBase):
                     with tf.GradientTape() as actor_tape:
                         action_probabilities = self.actor_prediction(batch["state"], training=True)
 
-                        # if the action space is discrete, extract the probabilities of actions actually chosen
-                        chosen_action_probabilities = action_probabilities
-                        if not self.is_continuous_actions:
+                        if self.is_continuous_actions:
+                            # if action space is continuous, calculate PDF at chosen action value
+                            p_distr = tf.distributions.Normal(action_probabilities[:, :self.n_actions],
+                                                              action_probabilities[:, self.n_actions:])
+                            chosen_action_probabilities = tf.convert_to_tensor(
+                                [p_distr.prob(a) for a in batch["action"]], dtype=tf.float64)
+                        else:
+                            # if the action space is discrete, extract the probabilities of actions actually chosen
                             chosen_action_probabilities = tf.convert_to_tensor(
                                 [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
@@ -270,17 +280,16 @@ class PPOAgentDual(_PPOBase):
                                                      old_action_prob=batch["action_prob"],
                                                      advantage=batch["advantage"])
 
-                        # only add entropy bonus for discrete action spaces  TODO: Add continuous entropy
-                        if not self.is_continuous_actions:
-                            actor_loss += self.c_entropy * self.entropy_bonus(action_probabilities)
+                        actor_loss += self.c_entropy * self.entropy_bonus(action_probabilities)
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
                     self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
-                        critic_loss = self.critic_loss(prediction=self.critic_prediction(batch["state"], training=True),
-                                                       v_GAE=batch["return"])
+                        critic_loss = self.critic_loss(
+                            critic_output=self.critic_prediction(batch["state"], training=True),
+                            v_GAE=batch["return"])
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))

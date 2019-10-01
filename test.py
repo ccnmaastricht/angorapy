@@ -1,15 +1,7 @@
 #!/usr/bin/env python
-import random
+import tensorflow as tf
 
-import gym
-from gym.wrappers import Monitor
+tf.enable_eager_execution()
 
-env = gym.make("CartPole-v1")
-env = Monitor(env, "./docs/", video_callable=lambda episode_id: True, force = True)
-
-s = env.reset()
-done = False
-while not done:
-    s, r, done, _ = env.step(random.choice(list(range(2))))
-
-env.close()
+a = tf.distributions.Normal(tf.convert_to_tensor([[2, 2, 2], [3, 3, 3]], dtype=tf.float64), tf.convert_to_tensor([[0.1, 0.1, 0.1], [0.1, 0.1, 0.1]], dtype=tf.float64))
+print(a.sample())

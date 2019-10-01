@@ -4,11 +4,11 @@ from typing import List
 
 import tensorflow as tf
 
-from agent.ppo import _PPOBase
+from agent.ppo import PPOBase
 
 
 @DeprecationWarning
-class PPOAgentJoint(_PPOBase):
+class PPOAgentJoint(PPOBase):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
     def __init__(self, policy: tf.keras.Model, gatherer, learning_rate: float, discount: float,
