@@ -3,7 +3,7 @@
 import gym
 import tensorflow as tf
 
-from util import env_extract_dims
+from utilities.util import env_extract_dims
 
 tf.keras.backend.set_floatx("float64")
 

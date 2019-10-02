@@ -8,20 +8,19 @@ from agent.gather import EpisodicGatherer, ContinuousGatherer
 from agent.ppo import PPOAgentDual
 from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
-from util import env_extract_dims
+from utilities.util import env_extract_dims
 from utilities.visualization.story import StoryTeller
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # INITIALIZATION
-tf.compat.v1.enable_eager_execution()
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # SETTINGS
 
 DEBUG = False
 
-TASK = "Pendulum-v0"  # the environment in which the agent learns
+TASK = "CartPole-v1"  # the environment in which the agent learns
 JOINT_NETWORK = False  # if true, uses one network with two heads for policy and critic
 GATHERING = ["epi", "cont"][1]  # epi runs n episodes until termination, cont collects specific number of experiences
 

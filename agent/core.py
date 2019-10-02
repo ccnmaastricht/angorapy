@@ -6,7 +6,7 @@ from typing import List
 import numpy
 
 import tensorflow as tf
-from util import env_extract_dims
+from utilities.util import env_extract_dims
 
 
 class RLAgent(ABC):

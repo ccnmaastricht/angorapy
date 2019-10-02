@@ -5,12 +5,13 @@ from abc import abstractmethod
 from typing import Tuple, List
 
 import gym
-import tensorflow as tf
 from gym.spaces import Discrete, Box
+import tensorflow as tf
+import tensorflow_probability as tfp
 
 from agent.core import RLAgent
 from agent.gather import _Gatherer
-from util import flat_print, env_extract_dims
+from utilities.util import flat_print, env_extract_dims
 
 
 class PPOBase(RLAgent):
@@ -83,7 +84,7 @@ class PPOBase(RLAgent):
         multivariates = self.actor_prediction(state)
         means = multivariates[:, :self.n_actions]
         stdevs = multivariates[:, self.n_actions:]
-        distro = tf.distributions.Normal(means, stdevs)
+        distro = tfp.distributions.Normal(means, stdevs)
         actions = distro.sample()
 
         return tf.reshape(tf.squeeze(actions), [-1]), distro.prob(actions)
@@ -121,7 +122,7 @@ class PPOBase(RLAgent):
         if self.is_continuous_actions:
             means = policy_output[:, :self.n_actions]
             stdevs = policy_output[:, self.n_actions:]
-            return tf.distributions.Normal(means, stdevs).entropy()
+            return tfp.distributions.Normal(means, stdevs).entropy()
         else:
             return - tf.reduce_sum(policy_output * tf.math.log(policy_output), 1)
 
@@ -266,7 +267,7 @@ class PPOAgentDual(PPOBase):
 
                         if self.is_continuous_actions:
                             # if action space is continuous, calculate PDF at chosen action value
-                            p_distr = tf.distributions.Normal(action_probabilities[:, :self.n_actions],
+                            p_distr = tfp.distributions.Normal(action_probabilities[:, :self.n_actions],
                                                               action_probabilities[:, self.n_actions:])
                             chosen_action_probabilities = tf.convert_to_tensor(
                                 [p_distr.prob(a) for a in batch["action"]], dtype=tf.float64)
