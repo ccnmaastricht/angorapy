@@ -6,20 +6,18 @@ import time
 
 import gym
 import matplotlib.pyplot as plt
+import tensorflow as tf
 from matplotlib import animation
 
-import tensorflow as tf
+from agent.ppo import PPOAgent
 
-from agent.core import RandomAgent
-from agent.ppo import PPOBase
-
-PATH_TO_STORIES = "../docs/stories/"
+PATH_TO_STORIES = "stories/"
 TEMPLATE_PATH = PATH_TO_STORIES + "/template/"
 
 
 class StoryTeller:
 
-    def __init__(self, agent: PPOBase, env: gym.Env, frequency: int, id=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
         self.agent = agent
         self.env = env
 
@@ -61,7 +59,8 @@ class StoryTeller:
                 patch.set_data(frames[i])
 
             anim = animation.FuncAnimation(plt.gcf(), animate, frames=len(frames), interval=50)
-            anim.save(f"{self.story_directory}/iteration_{self.agent.iteration}_{episode_letter}.gif", writer='imagemagick', fps=30)
+            anim.save(f"{self.story_directory}/iteration_{self.agent.iteration}_{episode_letter}.gif",
+                      writer='imagemagick', fps=30)
 
             plt.close()
 
@@ -108,7 +107,7 @@ class StoryTeller:
     def update_story(self):
         story = ""
 
-        with open(f"{PATH_TO_STORIES}/template/head.html") as f:
+        with open(f"{TEMPLATE_PATH}/head.html") as f:
             story += f.read()
             story += "\n\n"
 
@@ -143,7 +142,7 @@ class StoryTeller:
                          f"\t<h5>&mu; = {round(self.agent.gatherer.mean_episode_reward_per_gathering[gif_iteration], 2)}, " \
                          f"&sigma; = {round(self.agent.gatherer.stdev_episode_reward_per_gathering[gif_iteration], 2)}</h5>"
 
-            story += f"\t<img src={gif_filepath} />\n" \
+            story += f"\t<img src={gif_filepath} />\n"
 
             last_gif_iteration = gif_iteration
         story += "</div>\n\n"
@@ -153,19 +152,3 @@ class StoryTeller:
 
         with open(f"{self.story_directory}/story.html", "w") as f:
             f.write(story)
-
-
-if __name__ == "__main__":
-    tf.enable_eager_execution()
-
-    env = gym.make("LunarLander-v2")
-    agent = RandomAgent(env)
-
-    teller = StoryTeller(agent, env, frequency=3)
-
-    for i in range(3):
-        teller.create_episode_gif(3)
-        agent.iteration += 1
-
-    teller.update_reward_graph()
-    teller.update_story()

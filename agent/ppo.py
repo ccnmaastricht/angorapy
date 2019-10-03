@@ -1,24 +1,31 @@
 #!/usr/bin/env python
 """Proximal Policy Optimization Implementation."""
 import statistics
-from abc import abstractmethod
+import time
 from typing import Tuple, List
 
 import gym
-from gym.spaces import Discrete, Box
 import tensorflow as tf
 import tensorflow_probability as tfp
+from gym.spaces import Discrete, Box
+from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import RLAgent
-from agent.gather import _Gatherer
 from utilities.util import flat_print, env_extract_dims
 
 
-class PPOBase(RLAgent):
-    """Agent using the Proximal Policy Optimization Algorithm for learning."""
+class PPOAgent(RLAgent):
+    """Agent using the Proximal Policy Optimization Algorithm for learning.
 
-    def __init__(self, gatherer: _Gatherer, learning_rate: float, discount: float = 0.99, epsilon_clip: float = 0.2,
-                 c_entropy: float = 0.01):
+    The default is an implementation using two independent models for the critic and the actor. This is of course more
+    expensive than using shared parameters because we need two forward and backward calculations
+    per batch however this is what is used in the original paper and most implementations. During development this also
+    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
+    to make any significant progress in more difficult environments such as LunarLander.
+    """
+
+    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer, learning_rate: float,
+                 discount: float = 0.99, epsilon_clip: float = 0.2, c_entropy: float = 0.01):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
@@ -36,11 +43,17 @@ class PPOBase(RLAgent):
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
         self.c_entropy = tf.constant(c_entropy, dtype=tf.float64)
 
+        # models and optimizers
+        self.policy = policy
+        self.critic = critic
+
+        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+
         # misc
         self.iteration = 0
+        self.current_fps = 0
         self.device = "CPU:0"
-
-        self.policy_optimizer: tf.keras.optimizers.Optimizer = None
 
         # prepare for environment type
         if isinstance(gatherer.env.action_space, Discrete):
@@ -52,27 +65,20 @@ class PPOBase(RLAgent):
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {gatherer.env.action_space}")
 
-    @abstractmethod
-    def full_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        pass
-
-    @abstractmethod
-    def critic_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        pass
-
-    @abstractmethod
-    def actor_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        pass
-
-    @abstractmethod
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int):
-        pass
-
     def set_gpu(self, activated: bool) -> None:
         self.device = "GPU:0" if activated else "CPU:0"
+
+    def full_prediction(self, state, training=False):
+        """Wrapper to allow for shared and non-shared models."""
+        return self.policy(state, training=training), self.critic(state, training=training)
+
+    def critic_prediction(self, state, training=False):
+        """Wrapper to allow for shared and non-shared models."""
+        return self.critic(state, training=training)
+
+    def actor_prediction(self, state, training=False):
+        """Wrapper to allow for shared and non-shared models."""
+        return self.policy(state, training=training)
 
     def act_discrete(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         probabilities = self.actor_prediction(state)
@@ -84,10 +90,10 @@ class PPOBase(RLAgent):
         multivariates = self.actor_prediction(state)
         means = multivariates[:, :self.n_actions]
         stdevs = multivariates[:, self.n_actions:]
-        distro = tfp.distributions.Normal(means, stdevs)
-        actions = distro.sample()
+        distribution = tfp.distributions.Normal(means, stdevs)
+        actions = distribution.sample()
 
-        return tf.reshape(tf.squeeze(actions), [-1]), distro.prob(actions)
+        return tf.reshape(tf.squeeze(actions), [-1]), distribution.prob(actions)
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
@@ -107,15 +113,15 @@ class PPOBase(RLAgent):
         )
 
     @staticmethod
-    def critic_loss(critic_output: tf.Tensor, v_GAE: tf.Tensor) -> tf.Tensor:
+    def critic_loss(critic_output: tf.Tensor, v_gae: tf.Tensor) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
         :param critic_output:      prediction that the critic network made
-        :param v_GAE:           discounted return estimated by GAE
+        :param v_gae:           discounted return estimated by GAE
 
         :return:                squared error between prediction and return
         """
-        return tf.square(critic_output - v_GAE)
+        return tf.square(critic_output - v_gae)
 
     def entropy_bonus(self, policy_output):
         """Entropy of policy output acting as regularization by preventing dominance of one action."""
@@ -133,7 +139,71 @@ class PPOBase(RLAgent):
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    # TRAIN
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
+        """Optimize the agent's policy and value network based on a given dataset.
+
+        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
+        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
+        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
+        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
+        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
+        not. Even more so this applies with running simulations on the cluster.
+
+        :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
+        :param epochs:          number of epochs to train on this dataset
+        :param batch_size:      batch size with which the dataset is sampled
+        """
+        loss_history = []
+        for epoch in range(epochs):
+            # for each epoch, dataset first should be shuffled to break bias, then divided into batches
+            shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
+            batched_dataset = shuffled_dataset.batch(batch_size)
+
+            epoch_losses = []
+            for batch in batched_dataset:
+                # use the dataset to optimize the model
+                with tf.device(self.device):
+                    # optimize the actor
+                    with tf.GradientTape() as actor_tape:
+                        action_probabilities = self.actor_prediction(batch["state"], training=True)
+
+                        if self.is_continuous_actions:
+                            # if action space is continuous, calculate PDF at chosen action value
+                            p_distr = tfp.distributions.Normal(action_probabilities[:, :self.n_actions],
+                                                               action_probabilities[:, self.n_actions:])
+                            chosen_action_probabilities = tf.convert_to_tensor(
+                                [p_distr.prob(a) for a in batch["action"]], dtype=tf.float64)
+                        else:
+                            # if the action space is discrete, extract the probabilities of actions actually chosen
+                            chosen_action_probabilities = tf.convert_to_tensor(
+                                [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
+
+                        # calculate the clipped loss
+                        actor_loss = self.actor_loss(action_prob=chosen_action_probabilities,
+                                                     old_action_prob=batch["action_prob"],
+                                                     advantage=batch["advantage"])
+
+                        actor_loss += self.c_entropy * self.entropy_bonus(action_probabilities)
+
+                    actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
+                    self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
+
+                    # optimize the critic
+                    with tf.GradientTape() as critic_tape:
+                        critic_loss = self.critic_loss(
+                            critic_output=self.critic_prediction(batch["state"], training=True),
+                            v_gae=batch["return"])
+
+                    critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
+                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
+
+                    epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
+
+            loss_history.append(
+                tf.reduce_mean(epoch_losses, 0).numpy().round(2).tolist()
+            )
+
+        return loss_history
 
     def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller=None):
         """Main training loop of the agent.
@@ -148,12 +218,17 @@ class PPOBase(RLAgent):
         :return:                self
         """
         for self.iteration in range(iterations):
+            iteration_start = time.time()
+
             # run simulations
             flat_print("Gathering...")
             dataset = self.gatherer.gather(self)
 
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
+
+            iteration_end = time.time()
+            self.current_fps = self.gatherer.steps_during_last_gather / (iteration_end - iteration_start)
 
             self.report()
 
@@ -201,104 +276,6 @@ class PPOBase(RLAgent):
                    f"Mean Epi. Perf.: {round(mean_perf, 2):8.2f}; "
                    f"Mean Epi. Length: {round(mean_episode_length, 2):8.2f}; "
                    f"It. Steps: {self.gatherer.steps_during_last_gather:6d}; "
-                   f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item()}; "
-                   f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3)}k\n")
-
-
-class PPOAgentDual(PPOBase):
-    """PPO implementation using two independent models for the critic and the actor.
-
-    This is of course more expensive than using shared parameters because we need two forward and backward calculations
-    per batch however this is what is used in the original paper and most implementations. During development this also
-    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
-    to make any significant progress in more difficult environments such as LunarLander.
-    """
-
-    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer: _Gatherer, learning_rate: float,
-                 discount: float, epsilon_clip: float, c_entropy: float):
-        super().__init__(gatherer, learning_rate=learning_rate, discount=discount, epsilon_clip=epsilon_clip,
-                         c_entropy=c_entropy)
-
-        self.policy = policy
-        self.critic = critic
-
-        self.policy_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-
-    def full_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training), self.critic(state, training=training)
-
-    def critic_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.critic(state, training=training)
-
-    def actor_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training)
-
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
-        """Optimize the agent's policy and value network based on a given dataset.
-
-        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
-        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
-        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
-        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
-        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
-        not. Even more so this applies with running simulations on the cluster.
-
-        :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
-        :param epochs:          number of epochs to train on this dataset
-        :param batch_size:      batch size with which the dataset is sampled
-        """
-        loss_history = []
-        for epoch in range(epochs):
-            # for each epoch, dataset first should be shuffled to break bias, then divided into batches
-            shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
-            batched_dataset = shuffled_dataset.batch(batch_size)
-
-            epoch_losses = []
-            for batch in batched_dataset:
-                # use the dataset to optimize the model
-                with tf.device(self.device):
-                    # optimize the actor
-                    with tf.GradientTape() as actor_tape:
-                        action_probabilities = self.actor_prediction(batch["state"], training=True)
-
-                        if self.is_continuous_actions:
-                            # if action space is continuous, calculate PDF at chosen action value
-                            p_distr = tfp.distributions.Normal(action_probabilities[:, :self.n_actions],
-                                                              action_probabilities[:, self.n_actions:])
-                            chosen_action_probabilities = tf.convert_to_tensor(
-                                [p_distr.prob(a) for a in batch["action"]], dtype=tf.float64)
-                        else:
-                            # if the action space is discrete, extract the probabilities of actions actually chosen
-                            chosen_action_probabilities = tf.convert_to_tensor(
-                                [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
-
-                        # calculate the clipped loss
-                        actor_loss = self.actor_loss(action_prob=chosen_action_probabilities,
-                                                     old_action_prob=batch["action_prob"],
-                                                     advantage=batch["advantage"])
-
-                        actor_loss += self.c_entropy * self.entropy_bonus(action_probabilities)
-
-                    actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
-                    self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
-
-                    # optimize the critic
-                    with tf.GradientTape() as critic_tape:
-                        critic_loss = self.critic_loss(
-                            critic_output=self.critic_prediction(batch["state"], training=True),
-                            v_GAE=batch["return"])
-
-                    critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
-                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
-
-                    epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
-
-            loss_history.append(
-                tf.reduce_mean(epoch_losses, 0).numpy().round(2).tolist()
-            )
-
-        return loss_history
+                   f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
+                   f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3):6.3f}k; "
+                   f"Exec. Speed: {self.current_fps:6.2f}fps\n")

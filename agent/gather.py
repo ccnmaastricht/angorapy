@@ -13,7 +13,7 @@ from gym.spaces import Box
 from agent.core import RLAgent, generalized_advantage_estimator, horizoned_generalized_advantage_estimator
 
 
-class _Gatherer(ABC):
+class Gatherer(ABC):
 
     def __init__(self, environment: gym.Env, n_trajectories: int, normalize: bool = True):
         """Gatherer base class.
@@ -48,7 +48,7 @@ class _Gatherer(ABC):
         return advantages
 
 
-class ContinuousGatherer(_Gatherer):
+class ContinuousGatherer(Gatherer):
 
     def __init__(self, environment: gym.Env, horizon: int):
         """Continuous gatherer. Each trajectory goes until a fixed horizon.
@@ -133,7 +133,7 @@ class ContinuousGatherer(_Gatherer):
 
 
 @DeprecationWarning
-class EpisodicGatherer(_Gatherer):
+class EpisodicGatherer(Gatherer):
 
     def gather(self, agent) -> Tuple[List, List, List, List, List]:
         """Gather experience in an environment for n trajectories.
