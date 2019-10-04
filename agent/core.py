@@ -4,6 +4,7 @@ from itertools import accumulate
 from typing import List
 
 import numpy
+import scipy.signal
 
 import tensorflow as tf
 from utilities.util import env_extract_dims
@@ -43,31 +44,9 @@ def get_discounted_returns(reward_trajectory, discount_factor: float):
     return list(accumulate(reward_trajectory[::-1], lambda previous, x: previous * discount_factor + x))[::-1]
 
 
-@DeprecationWarning
-def generalized_advantage_estimator(rewards: numpy.ndarray, values: numpy.ndarray, gamma: float, gae_lambda: float):
-    """K-Step return Estimator for Generalized Advantage Estimation.
-    From: HIGH-DIMENSIONAL CONTINUOUS CONTROL USING GENERALIZED ADVANTAGE ESTIMATION. (Schulman et. al., 2018)
-
-    Using the raw discounted future reward suffers from high variance and hence could hinder learning. Using a k-step
-    return estimator introduces some bias but reduces variance, yielding a beneficial trade-off."""
-    total_steps = len(rewards)
-    return_estimations = numpy.ndarray((total_steps,))
-
-    previous = 0
-    for t in reversed(range(total_steps)):
-        if t == total_steps - 1:
-            delta = rewards[t] + (gamma * values[t + 1]) - values[t]
-        else:
-            delta = rewards[t] - values[t]
-        previous = delta + gamma * gae_lambda * previous
-        return_estimations[t] = previous
-
-    return return_estimations
-
-
-def horizoned_generalized_advantage_estimator(rewards: numpy.ndarray, values: numpy.ndarray,
-                                              t_is_terminal: List, gamma: float, gae_lambda: float) -> numpy.ndarray:
-    """K-Step return Estimator for Generalized Advantage Estimation.
+def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
+                       t_is_terminal: List, gamma: float, gae_lambda: float) -> numpy.ndarray:
+    """K-Step return estimator for Generalized Advantage Estimation.
     From: HIGH-DIMENSIONAL CONTINUOUS CONTROL USING GENERALIZED ADVANTAGE ESTIMATION. (Schulman et. al., 2018)
 
     Using the raw discounted future reward suffers from high variance and hence could hinder learning. Using a k-step
@@ -87,13 +66,13 @@ def horizoned_generalized_advantage_estimator(rewards: numpy.ndarray, values: nu
 
     :return:                    the estimations about the returns of a trajectory
     """
-    if len(rewards) - len(values) != -1:
+    if numpy.size(rewards, 0) - numpy.size(values, 0) != -1:
         raise ValueError(
             "For horizoned GAE the values need also to include a prediction for the very last state observed, however "
             "the given values list is not one element longer than the given rewards list.")
 
-    total_steps = len(rewards)
-    return_estimations = numpy.ndarray((total_steps,))
+    total_steps = numpy.size(rewards, 0)
+    return_estimations = numpy.ndarray(shape=(total_steps,))
 
     previous = 0
     for t in reversed(range(total_steps)):
@@ -111,24 +90,38 @@ def horizoned_generalized_advantage_estimator(rewards: numpy.ndarray, values: nu
     return return_estimations
 
 
+def pdf_normal(x, mu, log_std):
+    pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + 1e-8)) ** 2 + 2 * log_std + numpy.log(2 * numpy.pi))
+    return tf.reduce_sum(pre_sum, axis=1)
+
+
+def entropy_normal(x, mu, log_std):
+    pass
+
+
+
 if __name__ == "__main__":
     one_episode = numpy.array(list(range(1, 10)))
     ep_values = numpy.array(get_discounted_returns(one_episode, 0.99))
 
     ep_dones = ([False] * (len(one_episode) - 1) + [True])
 
-    rewards = numpy.concatenate((one_episode, one_episode))
-    values = numpy.concatenate((ep_values, ep_values, [0]))
-    dones = 2 * ep_dones
+    rewards = one_episode
+    values = numpy.concatenate((ep_values, [0]))
+    dones = ep_dones
 
     rewards = rewards[:-2]
     values = values[:-2]
     dones = dones[:-2]
 
-    advs = horizoned_generalized_advantage_estimator(rewards,
-                                                     values,
-                                                     dones,
-                                                     gamma=0.99,
-                                                     gae_lambda=0.95)
+    advs = estimate_advantage(rewards,
+                              values,
+                              dones,
+                              gamma=0.99,
+                              gae_lambda=0.95)
+
+    # values = values[:-1]
+    # deltas = rewards[:-1] + 0.99 * values[1:] - values[:-1]
+    # oai_advs = discount_cumsum(deltas, 0.99 * 0.95)
 
     print(advs)

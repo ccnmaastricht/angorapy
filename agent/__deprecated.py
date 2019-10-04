@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 """TODO Module Docstring."""
-from typing import List
+import itertools
+from typing import List, Tuple
 
+import numpy
 import tensorflow as tf
 
+from agent.gather import Gatherer
 from agent.ppo import PPOAgent
 
 
@@ -78,3 +81,65 @@ class PPOAgentJoint(PPOAgent):
                     self.policy_optimizer.apply_gradients(zip(gradients, self.policy.trainable_variables))
 
         return loss_history
+
+
+@DeprecationWarning
+class EpisodicGatherer(Gatherer):
+
+    def gather(self, agent) -> Tuple[List, List, List, List, List]:
+        """Gather experience in an environment for n trajectories.
+
+        :param agent:               the agent who is to be set into the environment
+
+        :return:                    a 4-tuple where each element is a list of trajectories of s, r, a and p(a)
+        """
+        self.last_episodes_completed = 0
+
+        state_trajectories = []
+        reward_trajectories = []
+        action_trajectories = []
+        action_probability_trajectories = []
+
+        for episode in range(self.n_trajectories):
+            state_trajectory = []
+            reward_trajectory = []
+            action_trajectory = []
+            action_probability_trajectory = []
+
+            done = False
+            state = tf.reshape(self.env.reset(), [1, -1])
+            while not done:
+                action, action_probability = agent.act(state)
+                observation, reward, done, _ = self.env.step(action.numpy())
+
+                # remember experience
+                state_trajectory.append(tf.reshape(state, [-1]))  # does not incorporate the state inducing DONE
+                reward_trajectory.append(reward)
+                action_trajectory.append(action)
+                action_probability_trajectory.append(action_probability)
+
+                # next state
+                state = tf.reshape(observation, [1, -1])
+
+            self.last_episodes_completed += 1
+
+            state_trajectories.append(state_trajectory)
+            reward_trajectories.append(reward_trajectory)
+            action_probability_trajectories.append(action_probability_trajectory)
+            action_trajectories.append(action_trajectory)
+
+        state_value_predictions = [[agent.critic_prediction(tf.reshape(state, [1, -1]))[0][0]
+                                    for state in trajectory] for trajectory in state_trajectories]
+        advantages = [generalized_advantage_estimator(reward_trajectory, value_predictions,
+                                                      gamma=agent.discount, gae_lambda=0.95)
+                      for reward_trajectory, value_predictions in zip(reward_trajectories, state_value_predictions)]
+        returns = numpy.add(advantages, state_value_predictions)
+
+        # create the tensorflow dataset
+        return tf.data.Dataset.from_tensor_slices({
+            "state": list(itertools.chain(*state_trajectories)),
+            "action": list(itertools.chain(*action_trajectories)),
+            "action_prob": list(itertools.chain(*action_probability_trajectories)),
+            "return": list(itertools.chain(*returns)),
+            "advantage": list(itertools.chain(*advantages))
+        })

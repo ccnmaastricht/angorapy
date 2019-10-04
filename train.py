@@ -4,7 +4,8 @@ import statistics
 import tensorflow as tf
 from gym.spaces import Box
 
-from agent.gather import EpisodicGatherer, ContinuousGatherer
+from agent.gather import ContinuousGatherer
+from agent.__deprecated import EpisodicGatherer
 from agent.ppo import PPOAgent
 from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
@@ -18,19 +19,22 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
 # SETTINGS
 DEBUG = False
+GPU = False
 
-TASK = "CartPole-v1"  # the environment in which the agent learns
+TASK = "LunarLanderContinuous-v2"  # the environment in which the agent learns
 JOINT_NETWORK = False  # if true, uses one network with two heads for policy and critic
 GATHERING = ["epi", "cont"][1]  # epi runs n episodes until termination, cont collects specific number of experiences
 
 ITERATIONS = 1000
 AGENTS = 32
-HORIZON = 2048 if not DEBUG else 128
+HORIZON = 2048 * 2 if not DEBUG else 128
 EPOCHS = 6
 BATCH_SIZE = 32
 
-LEARNING_RATE = 0.005
+LEARNING_RATE_POLICY = 3e-4
+LEARNING_RATE_CRITIC = 1e-3
 DISCOUNT_FACTOR = 0.99
+GAE_LAMBDA = 0.97
 EPSILON_CLIP = 0.2
 C_ENTROPY = 0.01
 
@@ -51,17 +55,19 @@ gatherer = ContinuousGatherer(environment=env, horizon=HORIZON) if GATHERING == 
     else EpisodicGatherer(environment=env, n_trajectories=AGENTS)
 
 # policy and critics networks
-policy = PPOActorNetwork(env, continuous=env_action_space_type == "continuous")
+policy = PPOActorNetwork(env, continuous_control=env_action_space_type == "continuous")
 critic = PPOCriticNetwork(env)
 
 # set up the agent and a reporting module
 agent = PPOAgent(policy, critic, gatherer,
-                 learning_rate=LEARNING_RATE,
+                 learning_rate_pi=LEARNING_RATE_POLICY,
+                 learning_rate_v=LEARNING_RATE_CRITIC,
                  discount=DISCOUNT_FACTOR,
                  epsilon_clip=EPSILON_CLIP,
-                 c_entropy=C_ENTROPY)
-agent.set_gpu(True)
-teller = StoryTeller(agent, env, frequency=1)
+                 c_entropy=C_ENTROPY,
+                 lam=GAE_LAMBDA)
+agent.set_gpu(GPU)
+teller = StoryTeller(agent, env, frequency=5)
 
 # train
 agent.drill(env=env,

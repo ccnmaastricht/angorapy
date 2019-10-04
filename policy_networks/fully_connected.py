@@ -11,41 +11,39 @@ tf.keras.backend.set_floatx("float64")
 class PPOActorNetwork(tf.keras.Model):
     """Fully-connected network taking the role of an actor."""
 
-    def __init__(self, env: gym.Env, continuous: bool):
+    def __init__(self, env: gym.Env, continuous_control: bool):
         """
 
         :param env:
-        :param continuous:      whether the action space predicted is continuous or not; if continuous, then the output
+        :param continuous_control:      whether the action space predicted is continuous or not; if continuous, then the output
                                 is not activated (linear) and the first n dimensions refer to the means and the last n
                                 refer to the standard deviations where n is the number of actions.
         """
         super().__init__()
 
-        self.continuous = continuous
+        self.continuous_control = continuous_control
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
         self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh", dtype=tf.float64)
-        self.fc_c = tf.keras.layers.Dense(32, input_dim=64, activation="tanh", dtype=tf.float64)
 
         self.fc_out = tf.keras.layers.Dense(self.n_actions,
-                                            input_dim=32,
-                                            activation="softmax" if not continuous else "linear",
+                                            input_dim=64,
+                                            activation="softmax" if not continuous_control else "linear",
                                             dtype=tf.float64)
 
         self.fc_stdev = tf.keras.layers.Dense(self.n_actions,
-                                              input_dim=32,
-                                              activation="relu",
+                                              input_dim=64,
+                                              activation="softplus",
                                               dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
         x = self.fc_b(x)
-        x = self.fc_c(x)
 
         out = self.fc_out(x)
-        if self.continuous:
-            stdev = self.fc_stdev(x) + 1e-10
+        if self.continuous_control:
+            stdev = self.fc_stdev(x)
             out = tf.concat((out, stdev), axis=1)
 
         return out
@@ -62,13 +60,11 @@ class PPOCriticNetwork(tf.keras.Model):
         # shared base net
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
         self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh", dtype=tf.float64)
-        self.fc_c = tf.keras.layers.Dense(32, input_dim=64, activation="tanh", dtype=tf.float64)
-        self.fc_out = tf.keras.layers.Dense(1, input_dim=32, activation="linear", dtype=tf.float64)
+        self.fc_out = tf.keras.layers.Dense(1, input_dim=64, activation="linear", dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
         x = self.fc_b(x)
-        x = self.fc_c(x)
         state_value = self.fc_out(x)
 
         return state_value

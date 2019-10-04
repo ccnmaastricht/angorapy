@@ -5,6 +5,7 @@ import time
 from typing import Tuple, List
 
 import gym
+import scipy.stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 from gym.spaces import Discrete, Box
@@ -24,8 +25,9 @@ class PPOAgent(RLAgent):
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer, learning_rate: float,
-                 discount: float = 0.99, epsilon_clip: float = 0.2, c_entropy: float = 0.01):
+    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer, learning_rate_pi: float,
+                 learning_rate_v: float, discount: float = 0.99, lam: float = 0.95, epsilon_clip: float = 0.2,
+                 c_entropy: float = 0.01):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
@@ -39,16 +41,18 @@ class PPOAgent(RLAgent):
 
         # learning parameters
         self.discount = tf.constant(discount, dtype=tf.float64)
-        self.learning_rate = learning_rate
+        self.learning_rate_pi = learning_rate_pi
+        self.learning_rate_v = learning_rate_v
         self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
         self.c_entropy = tf.constant(c_entropy, dtype=tf.float64)
+        self.lam = tf.constant(lam, dtype=tf.float64)
 
         # models and optimizers
         self.policy = policy
         self.critic = critic
 
-        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-        self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi)
+        self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v)
 
         # misc
         self.iteration = 0
@@ -58,10 +62,10 @@ class PPOAgent(RLAgent):
         # prepare for environment type
         if isinstance(gatherer.env.action_space, Discrete):
             self.act = self.act_discrete
-            self.is_continuous_actions = False
+            self.continuous_control = False
         elif isinstance(gatherer.env.action_space, Box):
             self.act = self.act_continuous
-            self.is_continuous_actions = True
+            self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {gatherer.env.action_space}")
 
@@ -80,7 +84,7 @@ class PPOAgent(RLAgent):
         """Wrapper to allow for shared and non-shared models."""
         return self.policy(state, training=training)
 
-    def act_discrete(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    def act_discrete(self, state: tf.Tensor, exploration=False) -> Tuple[tf.Tensor, tf.Tensor]:
         probabilities = self.actor_prediction(state)
         action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
 
@@ -90,10 +94,11 @@ class PPOAgent(RLAgent):
         multivariates = self.actor_prediction(state)
         means = multivariates[:, :self.n_actions]
         stdevs = multivariates[:, self.n_actions:]
-        distribution = tfp.distributions.Normal(means, stdevs)
-        actions = distribution.sample()
 
-        return tf.reshape(tf.squeeze(actions), [-1]), distribution.prob(actions)
+        actions = tf.random.normal([state.shape[0], self.n_actions], means, stdevs, dtype=tf.float64)
+        probabilities = scipy.stats.norm.pdf(actions, loc=means, scale=stdevs)
+
+        return tf.reshape(actions, [-1]), tf.reduce_sum(probabilities, axis=1)
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
@@ -123,12 +128,20 @@ class PPOAgent(RLAgent):
         """
         return tf.square(critic_output - v_gae)
 
-    def entropy_bonus(self, policy_output):
-        """Entropy of policy output acting as regularization by preventing dominance of one action."""
-        if self.is_continuous_actions:
+    def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
+        """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
+        entropy, the less probability mass lies on a single action, which would hinder exploration. We hence reduce
+        the loss by the (scaled by c_entropy) entropy to encourage a certain degree of exploration.
+
+        :param policy_output:   a tensor containing (batches of) probabilities for actions in the case of discrete
+                                actions or (batches of) means and standard deviations for continuous control.
+
+        :return:                (batch of) entropy bonus(es)
+        """
+        if self.continuous_control:
             means = policy_output[:, :self.n_actions]
             stdevs = policy_output[:, self.n_actions:]
-            return tfp.distributions.Normal(means, stdevs).entropy()
+            return tfp.distributions.MultivariateNormalDiag(loc=means, scale_diag=stdevs).entropy()
         else:
             return - tf.reduce_sum(policy_output * tf.math.log(policy_output), 1)
 
@@ -165,25 +178,26 @@ class PPOAgent(RLAgent):
                 with tf.device(self.device):
                     # optimize the actor
                     with tf.GradientTape() as actor_tape:
-                        action_probabilities = self.actor_prediction(batch["state"], training=True)
+                        policy_output = self.actor_prediction(batch["state"], training=True)
 
-                        if self.is_continuous_actions:
+                        if self.continuous_control:
                             # if action space is continuous, calculate PDF at chosen action value
-                            p_distr = tfp.distributions.Normal(action_probabilities[:, :self.n_actions],
-                                                               action_probabilities[:, self.n_actions:])
-                            chosen_action_probabilities = tf.convert_to_tensor(
-                                [p_distr.prob(a) for a in batch["action"]], dtype=tf.float64)
+                            chosen_action_probabilities = tf.reduce_sum(
+                                scipy.stats.norm.pdf(batch["action"],
+                                                     loc=policy_output[:, :self.n_actions],
+                                                     scale=policy_output[:, self.n_actions:]),
+                                axis=1)
                         else:
                             # if the action space is discrete, extract the probabilities of actions actually chosen
                             chosen_action_probabilities = tf.convert_to_tensor(
-                                [action_probabilities[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
+                                [policy_output[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
                         # calculate the clipped loss
                         actor_loss = self.actor_loss(action_prob=chosen_action_probabilities,
                                                      old_action_prob=batch["action_prob"],
                                                      advantage=batch["advantage"])
 
-                        actor_loss += self.c_entropy * self.entropy_bonus(action_probabilities)
+                        actor_loss -= self.c_entropy * self.entropy_bonus(policy_output)
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
                     self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
@@ -275,7 +289,7 @@ class PPOAgent(RLAgent):
         flat_print(f"Iteration {self.iteration:6d}: "
                    f"Mean Epi. Perf.: {round(mean_perf, 2):8.2f}; "
                    f"Mean Epi. Length: {round(mean_episode_length, 2):8.2f}; "
-                   f"It. Steps: {self.gatherer.steps_during_last_gather:6d}; "
+                   f"Total Episodes: {len(self.gatherer.episode_length_history):5d}; "
                    f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
                    f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3):6.3f}k; "
                    f"Exec. Speed: {self.current_fps:6.2f}fps\n")

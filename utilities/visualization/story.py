@@ -42,13 +42,13 @@ class StoryTeller:
             # collect an episode
             done = False
             frames = []
-            state = tf.reshape(self.env.reset(), [1, -1])
+            state = tf.cast(tf.reshape(self.env.reset(), [1, -1]), dtype=tf.float64)
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
                 action, _ = self.agent.act(state)
                 observation, reward, done, _ = self.env.step(action.numpy())
-                state = tf.reshape(observation, [1, -1])
+                state = tf.cast(tf.reshape(observation, [1, -1]), dtype=tf.float64)
 
             # the figure
             plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
@@ -73,8 +73,8 @@ class StoryTeller:
             tpl = f.read()
 
         relevant_hps = [
-            ("CONTINUOUS", self.agent.is_continuous_actions),
-            ("LEARNING RATE", self.agent.learning_rate),
+            ("CONTINUOUS", self.agent.continuous_control),
+            ("LEARNING RATE", self.agent.learning_rate_pi),
             ("EPSILON CLIP", self.agent.epsilon_clip),
             ("ENTROPY COEFFICIENT", self.agent.c_entropy),
         ]
