@@ -1,3 +1,4 @@
+import math
 import random
 from abc import ABC, abstractmethod
 from itertools import accumulate
@@ -5,8 +6,9 @@ from typing import List
 
 import numpy
 import scipy.signal
-
+import scipy.stats
 import tensorflow as tf
+
 from utilities.util import env_extract_dims
 
 
@@ -33,7 +35,7 @@ class RandomAgent(RLAgent):
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
     def act(self, state: numpy.ndarray):
-        return tf.convert_to_tensor(random.randrange(self.n_actions)), 1/self.n_actions
+        return tf.convert_to_tensor(random.randrange(self.n_actions)), 1 / self.n_actions
 
     def drill(self, **kwargs):
         pass
@@ -90,38 +92,45 @@ def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
     return return_estimations
 
 
-def pdf_normal(x, mu, log_std):
-    pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + 1e-8)) ** 2 + 2 * log_std + numpy.log(2 * numpy.pi))
-    return tf.reduce_sum(pre_sum, axis=1)
+def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
+    samples_transformed = (samples - means) / stdevs
+    pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.cast(tf.sqrt(2 * math.pi), dtype=tf.float64)) / stdevs
+    return tf.reduce_sum(pdf, axis=1)
 
 
-def entropy_normal(x, mu, log_std):
-    pass
-
+def gaussian_entropy(stdevs: tf.Tensor):
+    entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
+    return tf.reduce_sum(entropy, axis=1)
 
 
 if __name__ == "__main__":
-    one_episode = numpy.array(list(range(1, 10)))
-    ep_values = numpy.array(get_discounted_returns(one_episode, 0.99))
+    gaussian_pdf(tf.convert_to_tensor([[2, 3]], dtype=tf.float64),
+                 tf.convert_to_tensor([[2, 3]], dtype=tf.float64),
+                 tf.convert_to_tensor([[1, 1]], dtype=tf.float64))
 
-    ep_dones = ([False] * (len(one_episode) - 1) + [True])
+    gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float64))
 
-    rewards = one_episode
-    values = numpy.concatenate((ep_values, [0]))
-    dones = ep_dones
-
-    rewards = rewards[:-2]
-    values = values[:-2]
-    dones = dones[:-2]
-
-    advs = estimate_advantage(rewards,
-                              values,
-                              dones,
-                              gamma=0.99,
-                              gae_lambda=0.95)
-
-    # values = values[:-1]
-    # deltas = rewards[:-1] + 0.99 * values[1:] - values[:-1]
-    # oai_advs = discount_cumsum(deltas, 0.99 * 0.95)
-
-    print(advs)
+    # one_episode = numpy.array(list(range(1, 10)))
+    # ep_values = numpy.array(get_discounted_returns(one_episode, 0.99))
+    #
+    # ep_dones = ([False] * (len(one_episode) - 1) + [True])
+    #
+    # rewards = one_episode
+    # values = numpy.concatenate((ep_values, [0]))
+    # dones = ep_dones
+    #
+    # rewards = rewards[:-2]
+    # values = values[:-2]
+    # dones = dones[:-2]
+    #
+    # advs = estimate_advantage(rewards,
+    #                           values,
+    #                           dones,
+    #                           gamma=0.99,
+    #                           gae_lambda=0.95)
+    #
+    # # values = values[:-1]
+    # # deltas = rewards[:-1] + 0.99 * values[1:] - values[:-1]
+    # # oai_advs = discount_cumsum(deltas, 0.99 * 0.95)
+    #
+    # print(advs)

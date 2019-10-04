@@ -5,13 +5,11 @@ import time
 from typing import Tuple, List
 
 import gym
-import scipy.stats
 import tensorflow as tf
-import tensorflow_probability as tfp
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
-from agent.core import RLAgent
+from agent.core import RLAgent, gaussian_pdf, gaussian_entropy
 from utilities.util import flat_print, env_extract_dims
 
 
@@ -96,9 +94,9 @@ class PPOAgent(RLAgent):
         stdevs = multivariates[:, self.n_actions:]
 
         actions = tf.random.normal([state.shape[0], self.n_actions], means, stdevs, dtype=tf.float64)
-        probabilities = scipy.stats.norm.pdf(actions, loc=means, scale=stdevs)
+        probabilities = gaussian_pdf(actions, means=means, stdevs=stdevs)
 
-        return tf.reshape(actions, [-1]), tf.reduce_sum(probabilities, axis=1)
+        return tf.reshape(actions, [-1]), tf.squeeze(probabilities)
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
@@ -139,9 +137,7 @@ class PPOAgent(RLAgent):
         :return:                (batch of) entropy bonus(es)
         """
         if self.continuous_control:
-            means = policy_output[:, :self.n_actions]
-            stdevs = policy_output[:, self.n_actions:]
-            return tfp.distributions.MultivariateNormalDiag(loc=means, scale_diag=stdevs).entropy()
+            return gaussian_entropy(stdevs=policy_output[:, self.n_actions:])
         else:
             return - tf.reduce_sum(policy_output * tf.math.log(policy_output), 1)
 
@@ -182,11 +178,9 @@ class PPOAgent(RLAgent):
 
                         if self.continuous_control:
                             # if action space is continuous, calculate PDF at chosen action value
-                            chosen_action_probabilities = tf.reduce_sum(
-                                scipy.stats.norm.pdf(batch["action"],
-                                                     loc=policy_output[:, :self.n_actions],
-                                                     scale=policy_output[:, self.n_actions:]),
-                                axis=1)
+                            chosen_action_probabilities = gaussian_pdf(batch["action"],
+                                                                       means=policy_output[:, :self.n_actions],
+                                                                       stdevs=policy_output[:, self.n_actions:])
                         else:
                             # if the action space is discrete, extract the probabilities of actions actually chosen
                             chosen_action_probabilities = tf.convert_to_tensor(
