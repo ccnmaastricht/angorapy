@@ -5,7 +5,6 @@ import tensorflow as tf
 from gym.spaces import Box
 
 from agent.gather import ContinuousGatherer
-from agent.__deprecated import EpisodicGatherer
 from agent.ppo import PPOAgent
 from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
@@ -21,12 +20,9 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 DEBUG = False
 GPU = False
 
-TASK = "LunarLanderContinuous-v2"  # the environment in which the agent learns
-JOINT_NETWORK = False  # if true, uses one network with two heads for policy and critic
-GATHERING = ["epi", "cont"][1]  # epi runs n episodes until termination, cont collects specific number of experiences
+TASK = "BipedalWalker-v2"  # the environment in which the agent learns
 
 ITERATIONS = 1000
-AGENTS = 32
 HORIZON = 2048 * 2 if not DEBUG else 128
 EPOCHS = 6
 BATCH_SIZE = 32
@@ -51,8 +47,7 @@ print(f"-----------------------------------------\n"
       f"-----------------------------------------\n")
 
 # initialise gathering module that either explores environment for n episodes or up to a horizon
-gatherer = ContinuousGatherer(environment=env, horizon=HORIZON) if GATHERING == "cont" \
-    else EpisodicGatherer(environment=env, n_trajectories=AGENTS)
+gatherer = ContinuousGatherer(environment=env, horizon=HORIZON)
 
 # policy and critics networks
 policy = PPOActorNetwork(env, continuous_control=env_action_space_type == "continuous")

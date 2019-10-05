@@ -103,6 +103,10 @@ def gaussian_entropy(stdevs: tf.Tensor):
     return tf.reduce_sum(entropy, axis=1)
 
 
+def categorical_entropy(pmf: tf.Tensor):
+    return - tf.reduce_sum(pmf * tf.math.log(pmf), 1)
+
+
 if __name__ == "__main__":
     gaussian_pdf(tf.convert_to_tensor([[2, 3]], dtype=tf.float64),
                  tf.convert_to_tensor([[2, 3]], dtype=tf.float64),

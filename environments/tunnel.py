@@ -97,7 +97,7 @@ class TunnelRAM(Tunnel):
     def __init__(self, width: int = 30, height: int = 30):
         super().__init__(width, height)
 
-        self.observation_space = gym.spaces.Discrete(3)
+        self.observation_space = gym.spaces.Box(low=0, high=32, shape=(3,))
         pass
 
     def make_state_representation(self):

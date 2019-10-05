@@ -9,7 +9,7 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
-from agent.core import RLAgent, gaussian_pdf, gaussian_entropy
+from agent.core import RLAgent, gaussian_pdf, gaussian_entropy, categorical_entropy
 from utilities.util import flat_print, env_extract_dims
 
 
@@ -139,7 +139,7 @@ class PPOAgent(RLAgent):
         if self.continuous_control:
             return gaussian_entropy(stdevs=policy_output[:, self.n_actions:])
         else:
-            return - tf.reduce_sum(policy_output * tf.math.log(policy_output), 1)
+            return categorical_entropy(policy_output)
 
     def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
                             prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs) -> tf.Tensor:
@@ -178,16 +178,16 @@ class PPOAgent(RLAgent):
 
                         if self.continuous_control:
                             # if action space is continuous, calculate PDF at chosen action value
-                            chosen_action_probabilities = gaussian_pdf(batch["action"],
-                                                                       means=policy_output[:, :self.n_actions],
-                                                                       stdevs=policy_output[:, self.n_actions:])
+                            action_probabilities = gaussian_pdf(batch["action"],
+                                                                means=policy_output[:, :self.n_actions],
+                                                                stdevs=policy_output[:, self.n_actions:])
                         else:
                             # if the action space is discrete, extract the probabilities of actions actually chosen
-                            chosen_action_probabilities = tf.convert_to_tensor(
+                            action_probabilities = tf.convert_to_tensor(
                                 [policy_output[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
 
                         # calculate the clipped loss
-                        actor_loss = self.actor_loss(action_prob=chosen_action_probabilities,
+                        actor_loss = self.actor_loss(action_prob=action_probabilities,
                                                      old_action_prob=batch["action_prob"],
                                                      advantage=batch["advantage"])
 
