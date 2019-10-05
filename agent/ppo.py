@@ -70,26 +70,14 @@ class PPOAgent(RLAgent):
     def set_gpu(self, activated: bool) -> None:
         self.device = "GPU:0" if activated else "CPU:0"
 
-    def full_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training), self.critic(state, training=training)
-
-    def critic_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.critic(state, training=training)
-
-    def actor_prediction(self, state, training=False):
-        """Wrapper to allow for shared and non-shared models."""
-        return self.policy(state, training=training)
-
-    def act_discrete(self, state: tf.Tensor, exploration=False) -> Tuple[tf.Tensor, tf.Tensor]:
-        probabilities = self.actor_prediction(state)
+    def act_discrete(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+        probabilities = self.policy(state, training=False)
         action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
 
         return action, probabilities[0][action]
 
     def act_continuous(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        multivariates = self.actor_prediction(state)
+        multivariates = self.policy(state, training=False)
         means = multivariates[:, :self.n_actions]
         stdevs = multivariates[:, self.n_actions:]
 
@@ -174,7 +162,7 @@ class PPOAgent(RLAgent):
                 with tf.device(self.device):
                     # optimize the actor
                     with tf.GradientTape() as actor_tape:
-                        policy_output = self.actor_prediction(batch["state"], training=True)
+                        policy_output = self.policy(batch["state"], training=True)
 
                         if self.continuous_control:
                             # if action space is continuous, calculate PDF at chosen action value
@@ -199,7 +187,7 @@ class PPOAgent(RLAgent):
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
                         critic_loss = self.critic_loss(
-                            critic_output=self.critic_prediction(batch["state"], training=True),
+                            critic_output=self.critic(batch["state"], training=True),
                             v_gae=batch["return"])
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)

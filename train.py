@@ -20,10 +20,10 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 DEBUG = False
 GPU = False
 
-TASK = "BipedalWalker-v2"  # the environment in which the agent learns
+TASK = "CartPole-v1"  # the environment in which the agent learns
 
 ITERATIONS = 1000
-HORIZON = 2048 * 2 if not DEBUG else 128
+HORIZON = 2048 if not DEBUG else 128
 EPOCHS = 6
 BATCH_SIZE = 32
 

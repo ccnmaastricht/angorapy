@@ -114,9 +114,9 @@ class ContinuousGatherer(Gatherer):
 
         # value prediction needs to include last state that was not included too, in order to make GAE possible
         state_trajectory.append(state)
-        value_predictions = [agent.critic_prediction(tf.reshape(s, [1, -1]))[0][0] for s in state_trajectory]
+        value_predictions = [agent.critic(tf.reshape(s, [1, -1]))[0][0] for s in state_trajectory]
         advantages = estimate_advantage(reward_trajectory, value_predictions, t_is_terminal,
-                                        gamma=agent.discount, gae_lambda=agent.lam)
+                                        gamma=agent.discount, lam=agent.lam)
         returns = numpy.add(advantages, value_predictions[:-1])
 
         advantages = self.normalize_advantages(advantages)

@@ -5,8 +5,6 @@ from itertools import accumulate
 from typing import List
 
 import numpy
-import scipy.signal
-import scipy.stats
 import tensorflow as tf
 
 from utilities.util import env_extract_dims
@@ -47,7 +45,7 @@ def get_discounted_returns(reward_trajectory, discount_factor: float):
 
 
 def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
-                       t_is_terminal: List, gamma: float, gae_lambda: float) -> numpy.ndarray:
+                       t_is_terminal: List, gamma: float, lam: float) -> numpy.ndarray:
     """K-Step return estimator for Generalized Advantage Estimation.
     From: HIGH-DIMENSIONAL CONTINUOUS CONTROL USING GENERALIZED ADVANTAGE ESTIMATION. (Schulman et. al., 2018)
 
@@ -63,15 +61,13 @@ def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
                                 Hence if t is terminal, this is not the last state observed but the last in which
                                 experience can be collected through taking an action.
     :param gamma:               a discount factor weighting the importance of future rewards
-    :param gae_lambda:          GAE's lambda parameter compromising between bias and variance. High lambda results in
+    :param lam:          GAE's lambda parameter compromising between bias and variance. High lambda results in
                                 less bias but more variance. 0 < Lambda < 1
 
     :return:                    the estimations about the returns of a trajectory
     """
     if numpy.size(rewards, 0) - numpy.size(values, 0) != -1:
-        raise ValueError(
-            "For horizoned GAE the values need also to include a prediction for the very last state observed, however "
-            "the given values list is not one element longer than the given rewards list.")
+        raise ValueError("Values must include one more prediction than there are states.")
 
     total_steps = numpy.size(rewards, 0)
     return_estimations = numpy.ndarray(shape=(total_steps,))
@@ -81,11 +77,10 @@ def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
         if t_is_terminal[t]:
             previous = 0
 
-        if t_is_terminal[t]:
-            delta = rewards[t] - values[t]
-        else:
-            delta = rewards[t] + (gamma * values[t + 1]) - values[t]
-        previous = delta + gamma * gae_lambda * previous
+        delta = rewards[t] - values[t]
+        if not t_is_terminal[t]:
+            delta += (gamma * values[t + 1])
+        previous = delta + gamma * lam * previous
 
         return_estimations[t] = previous
 
