@@ -4,7 +4,7 @@ import statistics
 import tensorflow as tf
 from gym.spaces import Box
 
-from agent.gather import ContinuousGatherer
+from agent.gather import Gatherer
 from agent.ppo import PPOAgent
 from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
@@ -20,9 +20,10 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 DEBUG = False
 GPU = False
 
-TASK = "CartPole-v1"  # the environment in which the agent learns
+TASK = "CartPole-v1"
 
 ITERATIONS = 1000
+WORKERS = 4
 HORIZON = 2048 if not DEBUG else 128
 EPOCHS = 6
 BATCH_SIZE = 32
@@ -47,7 +48,7 @@ print(f"-----------------------------------------\n"
       f"-----------------------------------------\n")
 
 # initialise gathering module that either explores environment for n episodes or up to a horizon
-gatherer = ContinuousGatherer(environment=env, horizon=HORIZON)
+gatherer = Gatherer(environment=env, workers=WORKERS, horizon=HORIZON)
 
 # policy and critics networks
 policy = PPOActorNetwork(env, continuous_control=env_action_space_type == "continuous")
@@ -71,7 +72,7 @@ agent.drill(env=env,
             batch_size=BATCH_SIZE,
             story_teller=teller)
 
-evaluation_results = agent.evaluate(env, 2, render=True)
+evaluation_results = agent.evaluate(env, 20, render=False)
 print(f"Average Performance {statistics.mean(evaluation_results)}: {evaluation_results}.")
 
 env.close()

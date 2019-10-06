@@ -26,7 +26,7 @@ class RLAgent(ABC):
         pass
 
 
-class RandomAgent(RLAgent):
+class RandomAgent:
 
     def __init__(self, env):
         super().__init__()

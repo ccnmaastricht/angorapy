@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Proximal Policy Optimization Implementation."""
+"""Proximal Policy Optimization."""
 import statistics
 import time
 from typing import Tuple, List
@@ -67,7 +67,7 @@ class PPOAgent(RLAgent):
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {gatherer.env.action_space}")
 
-    def set_gpu(self, activated: bool) -> None:
+    def set_gpu(self, activated: bool):
         self.device = "GPU:0" if activated else "CPU:0"
 
     def act_discrete(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
