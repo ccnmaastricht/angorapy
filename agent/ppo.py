@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 """Proximal Policy Optimization."""
+import multiprocessing
 import statistics
 import time
 from typing import Tuple, List
 
 import gym
+import numpy
+import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import RLAgent, gaussian_pdf, gaussian_entropy, categorical_entropy
+from agent.gather import collect, condense_buffer_queue
 from utilities.util import flat_print, env_extract_dims
 
 
@@ -23,21 +27,23 @@ class PPOAgent(RLAgent):
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, gatherer, learning_rate_pi: float,
-                 learning_rate_v: float, discount: float = 0.99, lam: float = 0.95, epsilon_clip: float = 0.2,
-                 c_entropy: float = 0.01):
+    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, environment: gym.Env, horizon: int, workers: int,
+                 learning_rate_pi: float, learning_rate_v: float, discount: float = 0.99, lam: float = 0.95,
+                 epsilon_clip: float = 0.2, c_entropy: float = 0.01):
         """Initialize the Agent.
 
-        :param learning_rate:           the agents learning rate
         :param discount:                discount factor applied to future rewards
         :param epsilon_clip:            clipping range for the actor's objective
         """
         super().__init__()
 
-        self.gatherer = gatherer
-        self.state_dim, self.n_actions = env_extract_dims(self.gatherer.env)
+        self.env = environment
+        self.env_name = self.env.unwrapped.spec.id
+        self.state_dim, self.n_actions = env_extract_dims(self.env)
 
         # learning parameters
+        self.horizon = horizon
+        self.workers = workers
         self.discount = tf.constant(discount, dtype=tf.float64)
         self.learning_rate_pi = learning_rate_pi
         self.learning_rate_v = learning_rate_v
@@ -57,26 +63,33 @@ class PPOAgent(RLAgent):
         self.current_fps = 0
         self.device = "CPU:0"
 
+        # statistics
+        self.total_frames_seen = 0
+        self.episode_reward_history = []
+        self.episode_length_history = []
+        self.cycle_reward_history = []
+        self.cycle_length_history = []
+
         # prepare for environment type
-        if isinstance(gatherer.env.action_space, Discrete):
+        if isinstance(self.env.action_space, Discrete):
             self.act = self.act_discrete
             self.continuous_control = False
-        elif isinstance(gatherer.env.action_space, Box):
+        elif isinstance(self.env.action_space, Box):
             self.act = self.act_continuous
             self.continuous_control = True
         else:
-            raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {gatherer.env.action_space}")
+            raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
 
     def set_gpu(self, activated: bool):
         self.device = "GPU:0" if activated else "CPU:0"
 
-    def act_discrete(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    def act_discrete(self, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
         probabilities = self.policy(state, training=False)
         action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
 
-        return action, probabilities[0][action]
+        return action.numpy(), probabilities[0][action].numpy()
 
-    def act_continuous(self, state: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    def act_continuous(self, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
         multivariates = self.policy(state, training=False)
         means = multivariates[:, :self.n_actions]
         stdevs = multivariates[:, self.n_actions:]
@@ -84,14 +97,13 @@ class PPOAgent(RLAgent):
         actions = tf.random.normal([state.shape[0], self.n_actions], means, stdevs, dtype=tf.float64)
         probabilities = gaussian_pdf(actions, means=means, stdevs=stdevs)
 
-        return tf.reshape(actions, [-1]), tf.squeeze(probabilities)
+        return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
         (as given in the paper), but this is the negated objective to be minimized!
 
         :param action_prob:             the probability of the action for the state under the current policy
-                                        (from here the gradients go backwards)
         :param old_action_prob:         the probability of the action taken given by the old policy during the episode
         :param advantage:               the advantage that taking the action gives over the estimated state value
 
@@ -135,6 +147,62 @@ class PPOAgent(RLAgent):
         return self.actor_loss(action_prob, old_action_prob, advantage) \
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
+
+    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller=None):
+        """Main training loop of the agent.
+
+        Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
+
+        :param env:             the environment on which the agent should be drilled
+        :param iterations:      the number of experience-optimization cycles that shall be run
+        :param epochs:          the number of epochs for which the model is optimized on the same experience data
+        :param batch_size       batch size for the optimization
+
+        :return:                self
+        """
+        n_processes = min(multiprocessing.cpu_count(), self.workers)
+        print(f"Parallelize Over {n_processes} Threads.\n" if n_processes > 1 else "Running on Single CPU.")
+        for self.iteration in range(iterations):
+            iteration_start = time.time()
+
+            # run simulations in parallel
+            flat_print("Gathering...")
+            # out_q = multiprocessing.Queue()
+            # processes = [multiprocessing.Process(target=collect, args=(self, out_q, self.horizon, self.env_name))
+            #              for _ in range(n_processes)]
+            # [p.start() for p in processes]
+            # for p in processes:
+            #     p.join()
+            #     print("finished")
+            ray.init()
+            out_q = [collect.remote(self, self.horizon, self.env_name) for _ in range(n_processes)]
+            dataset, stats = condense_buffer_queue([ray.get(o) for o in out_q])
+            # out_q.close()
+            # out_q.join_thread()
+
+            # process stats from actors
+            self.total_frames_seen += stats.numb_processed_frames
+            self.episode_length_history.extend(stats.episode_lengths)
+            self.episode_reward_history.extend(stats.episode_rewards)
+            self.cycle_length_history.extend([None] if stats.numb_completed_episodes == 0
+                                             else statistics.mean(stats.episode_lengths))
+            self.cycle_reward_history.extend([None] if stats.numb_completed_episodes == 0
+                                             else statistics.mean(stats.episode_rewards))
+
+            flat_print("Optimizing...")
+            self.optimize_model(dataset, epochs, batch_size)
+
+            iteration_end = time.time()
+            self.current_fps = stats.numb_processed_frames / (iteration_end - iteration_start)
+
+            self.report()
+
+            if story_teller is not None and (self.iteration + 1) % story_teller.frequency == 0:
+                story_teller.update_reward_graph()
+                story_teller.create_episode_gif(n=3)
+                story_teller.update_story()
+
+        return self
 
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -201,40 +269,6 @@ class PPOAgent(RLAgent):
 
         return loss_history
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller=None):
-        """Main training loop of the agent.
-
-        Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
-
-        :param env:             the environment on which the agent should be drilled
-        :param iterations:      the number of experience-optimization cycles that shall be run
-        :param epochs:          the number of epochs for which the model is optimized on the same experience data
-        :param batch_size       batch size for the optimization
-
-        :return:                self
-        """
-        for self.iteration in range(iterations):
-            iteration_start = time.time()
-
-            # run simulations
-            flat_print("Gathering...")
-            dataset = self.gatherer.gather(self)
-
-            flat_print("Optimizing...")
-            self.optimize_model(dataset, epochs, batch_size)
-
-            iteration_end = time.time()
-            self.current_fps = self.gatherer.steps_during_last_gather / (iteration_end - iteration_start)
-
-            self.report()
-
-            if story_teller is not None and (self.iteration + 1) % story_teller.frequency == 0:
-                story_teller.update_reward_graph()
-                story_teller.create_episode_gif(n=3)
-                story_teller.update_story()
-
-        return self
-
     def evaluate(self, env: gym.Env, n: int, render: bool = False) -> List[int]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
@@ -264,14 +298,10 @@ class PPOAgent(RLAgent):
         return rewards
 
     def report(self):
-        mean_perf = self.gatherer.mean_episode_reward_per_gathering[-1]
-        mean_episode_length = 0 if self.gatherer.last_episodes_completed == 0 else statistics.mean(
-            self.gatherer.episode_length_history[-self.gatherer.last_episodes_completed:])
-
         flat_print(f"Iteration {self.iteration:6d}: "
-                   f"Mean Epi. Perf.: {round(mean_perf, 2):8.2f}; "
-                   f"Mean Epi. Length: {round(mean_episode_length, 2):8.2f}; "
-                   f"Total Episodes: {len(self.gatherer.episode_length_history):5d}; "
+                   f"Mean Epi. Perf.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
+                   f"Mean Epi. Length: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
+                   f"Total Episodes: {len(self.episode_length_history):5d}; "
                    f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
-                   f"Total Frames: {round(self.gatherer.total_frames / 1e3, 3):6.3f}k; "
+                   f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
                    f"Exec. Speed: {self.current_fps:6.2f}fps\n")

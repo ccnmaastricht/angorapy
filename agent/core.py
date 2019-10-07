@@ -87,6 +87,12 @@ def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
     return return_estimations
 
 
+def normalize_advantages(advantages: numpy.ndarray) -> numpy.ndarray:
+    """Z-score standardization of advantages if activated."""
+    return (advantages - advantages.mean()) / advantages.std()
+
+
+
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     samples_transformed = (samples - means) / stdevs
     pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.cast(tf.sqrt(2 * math.pi), dtype=tf.float64)) / stdevs

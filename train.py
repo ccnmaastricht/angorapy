@@ -4,7 +4,6 @@ import statistics
 import tensorflow as tf
 from gym.spaces import Box
 
-from agent.gather import Gatherer
 from agent.ppo import PPOAgent
 from environments import *
 from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
@@ -12,7 +11,7 @@ from utilities.util import env_extract_dims
 from utilities.visualization.story import StoryTeller
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 # INITIALIZATION
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
@@ -24,7 +23,7 @@ TASK = "CartPole-v1"
 
 ITERATIONS = 1000
 WORKERS = 4
-HORIZON = 2048 if not DEBUG else 128
+HORIZON = 128 if not DEBUG else 128
 EPOCHS = 6
 BATCH_SIZE = 32
 
@@ -47,15 +46,14 @@ print(f"-----------------------------------------\n"
       f"and {number_of_actions} actions ({env_action_space_type}).\n"
       f"-----------------------------------------\n")
 
-# initialise gathering module that either explores environment for n episodes or up to a horizon
-gatherer = Gatherer(environment=env, workers=WORKERS, horizon=HORIZON)
-
 # policy and critics networks
 policy = PPOActorNetwork(env, continuous_control=env_action_space_type == "continuous")
 critic = PPOCriticNetwork(env)
 
 # set up the agent and a reporting module
-agent = PPOAgent(policy, critic, gatherer,
+agent = PPOAgent(policy, critic, env,
+                 horizon=HORIZON,
+                 workers=WORKERS,
                  learning_rate_pi=LEARNING_RATE_POLICY,
                  learning_rate_v=LEARNING_RATE_CRITIC,
                  discount=DISCOUNT_FACTOR,

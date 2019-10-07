@@ -90,8 +90,8 @@ class StoryTeller:
     def update_reward_graph(self):
         fig, ax = plt.subplots()
 
-        ax.plot(self.agent.gatherer.mean_episode_reward_per_gathering, label="Average Reward")
-        ax.plot(self.agent.gatherer.stdev_episode_reward_per_gathering, label="Standard Deviation")
+        ax.plot(self.agent.cycle_reward_history, label="Average Reward")
+        ax.plot(self.agent.cycle_length_history, label="Standard Deviation")
 
         ax.set_xticks(list(range(self.agent.iteration)))
 
@@ -112,7 +112,7 @@ class StoryTeller:
             story += "\n\n"
 
         # main title
-        story += f"<h1 align='center'>A Story About {self.agent.gatherer.env.unwrapped.spec.id}</h1>\n\n"
+        story += f"<h1 align='center'>A Story About {self.agent.env.unwrapped.spec.id}</h1>\n\n"
 
         # hyperparameters
         story += self.make_hp_box()
@@ -139,8 +139,8 @@ class StoryTeller:
 
                 story += f"<div class='iteration-block'>\n" \
                          f"\t<h3>Iteration {gif_iteration}</h3>\n" \
-                         f"\t<h5>&mu; = {round(self.agent.gatherer.mean_episode_reward_per_gathering[gif_iteration], 2)}, " \
-                         f"&sigma; = {round(self.agent.gatherer.stdev_episode_reward_per_gathering[gif_iteration], 2)}</h5>"
+                         f"\t<h5>&mu; = {round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
+                         f"&sigma; = {round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
 
             story += f"\t<img src={gif_filepath} />\n"
 
