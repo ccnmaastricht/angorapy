@@ -47,7 +47,7 @@ class StoryTeller:
                 frames.append(self.env.render(mode="rgb_array"))
 
                 action, _ = self.agent.act(state)
-                observation, reward, done, _ = self.env.step(action.numpy())
+                observation, reward, done, _ = self.env.step(action)
                 state = tf.cast(tf.reshape(observation, [1, -1]), dtype=tf.float64)
 
             # the figure

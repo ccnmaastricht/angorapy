@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """Proximal Policy Optimization."""
 import multiprocessing
+import shutil
 import statistics
 import time
 from typing import Tuple, List
 
 import gym
 import numpy
-import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import RLAgent, gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, condense_buffer_queue
+from agent.gather import collect, condense_worker_outputs
 from utilities.util import flat_print, env_extract_dims
 
 
@@ -148,7 +148,7 @@ class PPOAgent(RLAgent):
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, story_teller=None):
+    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, worker_pool, story_teller=None):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
@@ -160,33 +160,33 @@ class PPOAgent(RLAgent):
 
         :return:                self
         """
-        n_processes = min(multiprocessing.cpu_count(), self.workers)
-        print(f"Parallelize Over {n_processes} Threads.\n" if n_processes > 1 else "Running on Single CPU.")
+        print(f"Parallelize Over {multiprocessing.cpu_count()} Threads.\n")
+
         for self.iteration in range(iterations):
             iteration_start = time.time()
 
             # run simulations in parallel
             flat_print("Gathering...")
-            # out_q = multiprocessing.Queue()
-            # processes = [multiprocessing.Process(target=collect, args=(self, out_q, self.horizon, self.env_name))
-            #              for _ in range(n_processes)]
-            # [p.start() for p in processes]
-            # for p in processes:
-            #     p.join()
-            #     print("finished")
-            ray.init()
-            out_q = [collect.remote(self, self.horizon, self.env_name) for _ in range(n_processes)]
-            dataset, stats = condense_buffer_queue([ray.get(o) for o in out_q])
-            # out_q.close()
-            # out_q.join_thread()
+
+            # export the current state of the policy and value network under unique (-enough) key
+            name_key = round(time.time())
+            self.policy.save(f"saved_models/{name_key}/policy")
+            self.critic.save(f"saved_models/{name_key}/value")
+
+            results = [worker_pool.apply(collect, args=(name_key, self.horizon, self.env_name, self.discount, self.lam))
+                       for _ in range(self.workers)]
+            dataset, stats = condense_worker_outputs(results)
+
+            # clean up the saved models
+            shutil.rmtree(f"saved_models/{name_key}")
 
             # process stats from actors
             self.total_frames_seen += stats.numb_processed_frames
             self.episode_length_history.extend(stats.episode_lengths)
             self.episode_reward_history.extend(stats.episode_rewards)
-            self.cycle_length_history.extend([None] if stats.numb_completed_episodes == 0
+            self.cycle_length_history.append(None if stats.numb_completed_episodes == 0
                                              else statistics.mean(stats.episode_lengths))
-            self.cycle_reward_history.extend([None] if stats.numb_completed_episodes == 0
+            self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
                                              else statistics.mean(stats.episode_rewards))
 
             flat_print("Optimizing...")

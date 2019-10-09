@@ -44,8 +44,7 @@ def get_discounted_returns(reward_trajectory, discount_factor: float):
     return list(accumulate(reward_trajectory[::-1], lambda previous, x: previous * discount_factor + x))[::-1]
 
 
-def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
-                       t_is_terminal: List, gamma: float, lam: float) -> numpy.ndarray:
+def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: float, lam: float) -> numpy.ndarray:
     """K-Step return estimator for Generalized Advantage Estimation.
     From: HIGH-DIMENSIONAL CONTINUOUS CONTROL USING GENERALIZED ADVANTAGE ESTIMATION. (Schulman et. al., 2018)
 
@@ -90,7 +89,6 @@ def estimate_advantage(rewards: numpy.ndarray, values: numpy.ndarray,
 def normalize_advantages(advantages: numpy.ndarray) -> numpy.ndarray:
     """Z-score standardization of advantages if activated."""
     return (advantages - advantages.mean()) / advantages.std()
-
 
 
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):

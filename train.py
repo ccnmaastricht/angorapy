@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 import statistics
 
@@ -12,6 +13,7 @@ from utilities.visualization.story import StoryTeller
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 # INITIALIZATION
 tf.keras.backend.set_floatx("float64")  # prevent precision issues
 
@@ -19,20 +21,20 @@ tf.keras.backend.set_floatx("float64")  # prevent precision issues
 DEBUG = False
 GPU = False
 
-TASK = "CartPole-v1"
+TASK = "LunarLanderContinuous-v2"
 
 ITERATIONS = 1000
-WORKERS = 4
-HORIZON = 128 if not DEBUG else 128
+WORKERS = 8
+HORIZON = 1024 if not DEBUG else 128
 EPOCHS = 6
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 
 LEARNING_RATE_POLICY = 3e-4
 LEARNING_RATE_CRITIC = 1e-3
 DISCOUNT_FACTOR = 0.99
 GAE_LAMBDA = 0.97
 EPSILON_CLIP = 0.2
-C_ENTROPY = 0.01
+C_ENTROPY = 0.05
 
 # setup environment and extract and report information
 env = gym.make(TASK)
@@ -46,9 +48,16 @@ print(f"-----------------------------------------\n"
       f"and {number_of_actions} actions ({env_action_space_type}).\n"
       f"-----------------------------------------\n")
 
+pool = multiprocessing.Pool(multiprocessing.cpu_count())
+
 # policy and critics networks
-policy = PPOActorNetwork(env, continuous_control=env_action_space_type == "continuous")
+policy = PPOActorNetwork(env)
 critic = PPOCriticNetwork(env)
+
+# set computation graph to allow for saving
+example_input = env.reset().reshape([1, -1])
+policy.predict(example_input)
+critic.predict(example_input)
 
 # set up the agent and a reporting module
 agent = PPOAgent(policy, critic, env,
@@ -68,6 +77,7 @@ agent.drill(env=env,
             iterations=ITERATIONS,
             epochs=EPOCHS,
             batch_size=BATCH_SIZE,
+            worker_pool=pool,
             story_teller=teller)
 
 evaluation_results = agent.evaluate(env, 20, render=False)

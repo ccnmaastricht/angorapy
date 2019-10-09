@@ -2,6 +2,7 @@
 """Collection of fully connected policy networks."""
 import gym
 import tensorflow as tf
+from gym.spaces import Box
 
 from utilities.util import env_extract_dims
 
@@ -11,17 +12,10 @@ tf.keras.backend.set_floatx("float64")
 class PPOActorNetwork(tf.keras.Model):
     """Fully-connected network taking the role of an actor."""
 
-    def __init__(self, env: gym.Env, continuous_control: bool):
-        """
-
-        :param env:
-        :param continuous_control:      whether the action space predicted is continuous or not; if continuous, then the output
-                                is not activated (linear) and the first n dimensions refer to the means and the last n
-                                refer to the standard deviations where n is the number of actions.
-        """
+    def __init__(self, env: gym.Env):
         super().__init__()
 
-        self.continuous_control = continuous_control
+        self.continuous_control = isinstance(env.action_space, Box)
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
@@ -29,13 +23,14 @@ class PPOActorNetwork(tf.keras.Model):
 
         self.fc_out = tf.keras.layers.Dense(self.n_actions,
                                             input_dim=64,
-                                            activation="softmax" if not continuous_control else "linear",
+                                            activation="softmax" if not self.continuous_control else "linear",
                                             dtype=tf.float64)
 
-        self.fc_stdev = tf.keras.layers.Dense(self.n_actions,
-                                              input_dim=64,
-                                              activation="softplus",
-                                              dtype=tf.float64)
+        if self.continuous_control:
+            self.fc_stdev = tf.keras.layers.Dense(self.n_actions,
+                                                  input_dim=64,
+                                                  activation="softplus",
+                                                  dtype=tf.float64)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
