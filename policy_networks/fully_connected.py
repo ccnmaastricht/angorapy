@@ -6,8 +6,6 @@ from gym.spaces import Box
 
 from utilities.util import env_extract_dims
 
-tf.keras.backend.set_floatx("float64")
-
 
 class PPOActorNetwork(tf.keras.Model):
     """Fully-connected network taking the role of an actor."""
@@ -18,19 +16,17 @@ class PPOActorNetwork(tf.keras.Model):
         self.continuous_control = isinstance(env.action_space, Box)
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
-        self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
-        self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh", dtype=tf.float64)
+        self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh")
+        self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh")
 
         self.fc_out = tf.keras.layers.Dense(self.n_actions,
                                             input_dim=64,
-                                            activation="softmax" if not self.continuous_control else "linear",
-                                            dtype=tf.float64)
+                                            activation="softmax" if not self.continuous_control else "linear")
 
         if self.continuous_control:
             self.fc_stdev = tf.keras.layers.Dense(self.n_actions,
                                                   input_dim=64,
-                                                  activation="softplus",
-                                                  dtype=tf.float64)
+                                                  activation="softplus")
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
@@ -53,9 +49,9 @@ class PPOCriticNetwork(tf.keras.Model):
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         # shared base net
-        self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
-        self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh", dtype=tf.float64)
-        self.fc_out = tf.keras.layers.Dense(1, input_dim=64, activation="linear", dtype=tf.float64)
+        self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh")
+        self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh")
+        self.fc_out = tf.keras.layers.Dense(1, input_dim=64, activation="linear")
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
@@ -80,18 +76,17 @@ class PPOActorCriticNetwork(tf.keras.Model):
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
 
         # shared base net
-        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="tanh", dtype=tf.float64)
-        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="tanh", dtype=tf.float64)
-        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="tanh", dtype=tf.float64)
+        self.fc_a = tf.keras.layers.Dense(16, input_dim=self.state_dimensionality, activation="tanh")
+        self.fc_b = tf.keras.layers.Dense(32, input_dim=16, activation="tanh")
+        self.fc_c = tf.keras.layers.Dense(12, input_dim=32, activation="tanh")
 
         # role specific heads
-        self.fc_critic_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh", dtype=tf.float64)
-        self.fc_critic_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear", dtype=tf.float64)
+        self.fc_critic_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh")
+        self.fc_critic_out = tf.keras.layers.Dense(1, input_dim=12, activation="linear")
 
-        self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh", dtype=tf.float64)
+        self.fc_actor_a = tf.keras.layers.Dense(12, input_dim=12, activation="tanh")
         self.fc_actor_out = tf.keras.layers.Dense(self.n_actions, input_dim=12,
-                                                  activation="softmax" if not continuous else "linear",
-                                                  dtype=tf.float64)
+                                                  activation="softmax" if not continuous else "linear")
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)

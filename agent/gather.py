@@ -36,7 +36,7 @@ def collect(name_key, horizon: int, env_name: str, discount: float, lam: float):
     for t in range(horizon):
         # choose action and step
         act = act_continuous if env_is_continuous else act_discrete
-        action, action_probability = act(policy, numpy.reshape(state, [1, -1]).astype(numpy.float64))
+        action, action_probability = act(policy, numpy.reshape(state, [1, -1]))
         observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
 
         # remember experience

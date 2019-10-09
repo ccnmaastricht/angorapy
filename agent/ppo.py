@@ -44,12 +44,12 @@ class PPOAgent(RLAgent):
         # learning parameters
         self.horizon = horizon
         self.workers = workers
-        self.discount = tf.constant(discount, dtype=tf.float64)
+        self.discount = tf.constant(discount)
         self.learning_rate_pi = learning_rate_pi
         self.learning_rate_v = learning_rate_v
-        self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
-        self.c_entropy = tf.constant(c_entropy, dtype=tf.float64)
-        self.lam = tf.constant(lam, dtype=tf.float64)
+        self.epsilon_clip = tf.constant(epsilon_clip)
+        self.c_entropy = tf.constant(c_entropy)
+        self.lam = tf.constant(lam)
 
         # models and optimizers
         self.policy = policy
@@ -94,7 +94,7 @@ class PPOAgent(RLAgent):
         means = multivariates[:, :self.n_actions]
         stdevs = multivariates[:, self.n_actions:]
 
-        actions = tf.random.normal([state.shape[0], self.n_actions], means, stdevs, dtype=tf.float64)
+        actions = tf.random.normal([state.shape[0], self.n_actions], means, stdevs)
         probabilities = gaussian_pdf(actions, means=means, stdevs=stdevs)
 
         return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
@@ -240,7 +240,7 @@ class PPOAgent(RLAgent):
                         else:
                             # if the action space is discrete, extract the probabilities of actions actually chosen
                             action_probabilities = tf.convert_to_tensor(
-                                [policy_output[i][a] for i, a in enumerate(batch["action"])], dtype=tf.float64)
+                                [policy_output[i][a] for i, a in enumerate(batch["action"])])
 
                         # calculate the clipped loss
                         actor_loss = self.actor_loss(action_prob=action_probabilities,

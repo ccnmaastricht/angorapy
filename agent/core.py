@@ -93,7 +93,7 @@ def normalize_advantages(advantages: numpy.ndarray) -> numpy.ndarray:
 
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     samples_transformed = (samples - means) / stdevs
-    pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.cast(tf.sqrt(2 * math.pi), dtype=tf.float64)) / stdevs
+    pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.sqrt(2 * math.pi)) / stdevs
     return tf.reduce_sum(pdf, axis=1)
 
 
@@ -107,11 +107,11 @@ def categorical_entropy(pmf: tf.Tensor):
 
 
 if __name__ == "__main__":
-    gaussian_pdf(tf.convert_to_tensor([[2, 3]], dtype=tf.float64),
-                 tf.convert_to_tensor([[2, 3]], dtype=tf.float64),
-                 tf.convert_to_tensor([[1, 1]], dtype=tf.float64))
+    gaussian_pdf(tf.convert_to_tensor([[2, 3]]),
+                 tf.convert_to_tensor([[2, 3]]),
+                 tf.convert_to_tensor([[1, 1]]))
 
-    gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float64))
+    gaussian_entropy(tf.convert_to_tensor([[1, 2]]))
 
     # one_episode = numpy.array(list(range(1, 10)))
     # ep_values = numpy.array(get_discounted_returns(one_episode, 0.99))

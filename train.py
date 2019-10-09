@@ -14,14 +14,11 @@ from utilities.visualization.story import StoryTeller
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-# INITIALIZATION
-tf.keras.backend.set_floatx("float64")  # prevent precision issues
-
 # SETTINGS
 DEBUG = False
 GPU = False
 
-TASK = "LunarLanderContinuous-v2"
+TASK = "CartPole-v1"
 
 ITERATIONS = 1000
 WORKERS = 8
