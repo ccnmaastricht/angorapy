@@ -29,11 +29,11 @@ class PPOAgent:
 
     def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, environment: gym.Env, horizon: int, workers: int,
                  learning_rate_pi: float, learning_rate_v: float, discount: float = 0.99, lam: float = 0.95,
-                 epsilon_clip: float = 0.2, c_entropy: float = 0.01):
+                 clip: float = 0.2, c_entropy: float = 0.01):
         """Initialize the Agent.
 
         :param discount:                discount factor applied to future rewards
-        :param epsilon_clip:            clipping range for the actor's objective
+        :param clip:            clipping range for the actor's objective
         """
         super().__init__()
 
@@ -47,7 +47,7 @@ class PPOAgent:
         self.discount = tf.constant(discount)
         self.learning_rate_pi = learning_rate_pi
         self.learning_rate_v = learning_rate_v
-        self.epsilon_clip = tf.constant(epsilon_clip)
+        self.clip = tf.constant(clip)
         self.c_entropy = tf.constant(c_entropy)
         self.lam = tf.constant(lam)
 
@@ -96,18 +96,27 @@ class PPOAgent:
         r = tf.math.divide(action_prob, old_action_prob)
         return - tf.minimum(
             tf.math.multiply(r, advantage),
-            tf.math.multiply(tf.clip_by_value(r, 1 - self.epsilon_clip, 1 + self.epsilon_clip), advantage)
+            tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
         )
 
-    def critic_loss(self, critic_output: tf.Tensor, v_gae: tf.Tensor) -> tf.Tensor:
+    def critic_loss(self, values: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor, clip=True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
-        :param critic_output:      prediction that the critic network made
-        :param v_gae:           discounted return estimated by GAE
+        :param values:              value prediction by the current critic network
+        :param old_values:          value prediction by the old critic network during gathering
+        :param returns:             discounted return estimation
 
-        :return:                squared error between prediction and return
+        :return:                    squared error between prediction and return
         """
-        return tf.square(critic_output - v_gae)
+        error = tf.square(values - returns)
+        if clip:
+            # clips value error to reduce variance
+            clipped_values = old_values + tf.clip_by_value(values - old_values, -self.clip, self.clip)
+            clipped_error = tf.square(clipped_values - returns)
+
+            return tf.maximum(clipped_error, error) / 2
+
+        return error
 
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
         """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
@@ -238,9 +247,13 @@ class PPOAgent:
 
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
+                        old_values = batch["return"] - batch["advantage"]
+                        new_values = self.critic(batch["state"], training=True)
                         critic_loss = self.critic_loss(
-                            critic_output=self.critic(batch["state"], training=True),
-                            v_gae=batch["return"])
+                            values=new_values,
+                            old_values=old_values,
+                            returns=batch["return"],
+                        )
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))

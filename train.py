@@ -3,7 +3,6 @@ import os
 import statistics
 
 import numpy
-import tensorflow as tf
 from gym.spaces import Box
 
 from agent.ppo import PPOAgent
@@ -18,7 +17,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 DEBUG = False
 GPU = False
 
-TASK = "LunarLanderContinuous-v2"
+TASK = "LunarLander-v2"
 
 ITERATIONS = 1000
 WORKERS = 8
@@ -64,7 +63,7 @@ agent = PPOAgent(policy, critic, env,
                  learning_rate_pi=LEARNING_RATE_POLICY,
                  learning_rate_v=LEARNING_RATE_CRITIC,
                  discount=DISCOUNT_FACTOR,
-                 epsilon_clip=EPSILON_CLIP,
+                 clip=EPSILON_CLIP,
                  c_entropy=C_ENTROPY,
                  lam=GAE_LAMBDA)
 agent.set_gpu(GPU)

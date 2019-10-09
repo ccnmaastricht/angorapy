@@ -81,7 +81,7 @@ class StoryTeller:
         relevant_hps = [
             ("CONTINUOUS", self.agent.continuous_control),
             ("LEARNING RATE", self.agent.learning_rate_pi),
-            ("EPSILON CLIP", self.agent.epsilon_clip),
+            ("EPSILON CLIP", self.agent.clip),
             ("ENTROPY COEFFICIENT", self.agent.c_entropy),
         ]
 

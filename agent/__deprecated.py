@@ -23,19 +23,19 @@ class PPOAgentJoint(PPOAgent):
     """Agent using the Proximal Policy Optimization Algorithm for learning."""
 
     def __init__(self, policy: tf.keras.Model, gatherer, learning_rate: float, discount: float,
-                 epsilon_clip: float):
+                 clip: float):
         """Initialize the Agent.
 
         :param learning_rate:           the agents learning rate
         :param discount:                discount factor applied to future rewards
-        :param epsilon_clip:            clipping range for the actor's objective
+        :param clip:            clipping range for the actor's objective
         """
-        super().__init__(gatherer, learning_rate, discount, epsilon_clip)
+        super().__init__(gatherer, learning_rate, discount, clip)
 
         # learning parameters
         self.discount = tf.constant(discount, dtype=tf.float64)
         self.learning_rate = learning_rate
-        self.epsilon_clip = tf.constant(epsilon_clip, dtype=tf.float64)
+        self.epsilon_clip = tf.constant(clip, dtype=tf.float64)
         self.c_entropy = tf.constant(0, dtype=tf.float64)
 
         # Models
