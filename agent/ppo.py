@@ -12,12 +12,12 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
-from agent.core import RLAgent, gaussian_pdf, gaussian_entropy, categorical_entropy
+from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, condense_worker_outputs
 from utilities.util import flat_print, env_extract_dims
 
 
-class PPOAgent(RLAgent):
+class PPOAgent:
     """Agent using the Proximal Policy Optimization Algorithm for learning.
 
     The default is an implementation using two independent models for the critic and the actor. This is of course more
@@ -99,8 +99,7 @@ class PPOAgent(RLAgent):
             tf.math.multiply(tf.clip_by_value(r, 1 - self.epsilon_clip, 1 + self.epsilon_clip), advantage)
         )
 
-    @staticmethod
-    def critic_loss(critic_output: tf.Tensor, v_gae: tf.Tensor) -> tf.Tensor:
+    def critic_loss(self, critic_output: tf.Tensor, v_gae: tf.Tensor) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
         :param critic_output:      prediction that the critic network made
@@ -132,7 +131,7 @@ class PPOAgent(RLAgent):
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    def drill(self, env: gym.Env, iterations: int, epochs: int, batch_size: int, worker_pool, story_teller=None):
+    def drill(self, iterations: int, epochs: int, batch_size: int, worker_pool, story_teller=None):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.

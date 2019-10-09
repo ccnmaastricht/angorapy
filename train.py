@@ -71,8 +71,7 @@ agent.set_gpu(GPU)
 teller = StoryTeller(agent, env, frequency=5)
 
 # train
-agent.drill(env=env,
-            iterations=ITERATIONS,
+agent.drill(iterations=ITERATIONS,
             epochs=EPOCHS,
             batch_size=BATCH_SIZE,
             worker_pool=pool,

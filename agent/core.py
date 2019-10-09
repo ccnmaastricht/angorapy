@@ -1,34 +1,9 @@
 import math
-import random
-from abc import ABC, abstractmethod
 from itertools import accumulate
 from typing import List
 
 import numpy
 import tensorflow as tf
-
-from utilities.util import env_extract_dims
-
-
-class RLAgent(ABC):
-
-    def __init__(self):
-        self.iteration = 0
-
-    @abstractmethod
-    def drill(self, **kwargs):
-        """Train the agent on a given environment."""
-        pass
-
-
-class RandomAgent:
-
-    def __init__(self, env):
-        super().__init__()
-        self.state_dimensionality, self.n_actions = env_extract_dims(env)
-
-    def drill(self, **kwargs):
-        pass
 
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):
@@ -104,28 +79,3 @@ if __name__ == "__main__":
                  tf.convert_to_tensor([[1, 1]]))
 
     gaussian_entropy(tf.convert_to_tensor([[1, 2]]))
-
-    # one_episode = numpy.array(list(range(1, 10)))
-    # ep_values = numpy.array(get_discounted_returns(one_episode, 0.99))
-    #
-    # ep_dones = ([False] * (len(one_episode) - 1) + [True])
-    #
-    # rewards = one_episode
-    # values = numpy.concatenate((ep_values, [0]))
-    # dones = ep_dones
-    #
-    # rewards = rewards[:-2]
-    # values = values[:-2]
-    # dones = dones[:-2]
-    #
-    # advs = estimate_advantage(rewards,
-    #                           values,
-    #                           dones,
-    #                           gamma=0.99,
-    #                           gae_lambda=0.95)
-    #
-    # # values = values[:-1]
-    # # deltas = rewards[:-1] + 0.99 * values[1:] - values[:-1]
-    # # oai_advs = discount_cumsum(deltas, 0.99 * 0.95)
-    #
-    # print(advs)

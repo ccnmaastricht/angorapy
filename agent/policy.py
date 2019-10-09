@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Policy Wrappers."""
+"""Policy methods."""
 from typing import Tuple
 
 import numpy
