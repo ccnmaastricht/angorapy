@@ -6,9 +6,12 @@ import time
 
 import gym
 import matplotlib.pyplot as plt
+import numpy
 import tensorflow as tf
+from gym.spaces import Box
 from matplotlib import animation
 
+from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
 
 PATH_TO_STORIES = "stories/"
@@ -22,6 +25,7 @@ class StoryTeller:
         self.env = env
 
         self.frequency = frequency
+        self.continuous_control = isinstance(self.env.action_space, Box)
 
         if id is None:
             self.story_id = round(time.time())
@@ -36,19 +40,21 @@ class StoryTeller:
         self.make_metadata()
 
     def create_episode_gif(self, n: int):
+        act = act_continuous if self.continuous_control else act_discrete
+
         for i in range(n):
             episode_letter = chr(97 + i)
 
             # collect an episode
             done = False
             frames = []
-            state = tf.cast(tf.reshape(self.env.reset(), [1, -1]), dtype=tf.float64)
+            state = tf.reshape(self.env.reset(), [1, -1]).astype(numpy.float32)
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
-                action, _ = self.agent.act(state)
+                action, _ = act(self.agent.policy, state)
                 observation, reward, done, _ = self.env.step(action)
-                state = tf.cast(tf.reshape(observation, [1, -1]), dtype=tf.float64)
+                state = tf.reshape(observation, [1, -1]).astype(numpy.float32)
 
             # the figure
             plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)

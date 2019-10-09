@@ -72,32 +72,14 @@ class PPOAgent(RLAgent):
 
         # prepare for environment type
         if isinstance(self.env.action_space, Discrete):
-            self.act = self.act_discrete
             self.continuous_control = False
         elif isinstance(self.env.action_space, Box):
-            self.act = self.act_continuous
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
 
     def set_gpu(self, activated: bool):
         self.device = "GPU:0" if activated else "CPU:0"
-
-    def act_discrete(self, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
-        probabilities = self.policy(state, training=False)
-        action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
-
-        return action.numpy(), probabilities[0][action].numpy()
-
-    def act_continuous(self, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
-        multivariates = self.policy(state, training=False)
-        means = multivariates[:, :self.n_actions]
-        stdevs = multivariates[:, self.n_actions:]
-
-        actions = tf.random.normal([state.shape[0], self.n_actions], means, stdevs)
-        probabilities = gaussian_pdf(actions, means=means, stdevs=stdevs)
-
-        return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized

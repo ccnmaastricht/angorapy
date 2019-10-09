@@ -2,6 +2,7 @@ import multiprocessing
 import os
 import statistics
 
+import numpy
 import tensorflow as tf
 from gym.spaces import Box
 
@@ -52,7 +53,7 @@ policy = PPOActorNetwork(env)
 critic = PPOCriticNetwork(env)
 
 # set computation graph to allow for saving
-example_input = env.reset().reshape([1, -1])
+example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
 policy.predict(example_input)
 critic.predict(example_input)
 

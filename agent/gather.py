@@ -32,7 +32,7 @@ def collect(name_key, horizon: int, env_name: str, discount: float, lam: float):
 
     # go for it
     states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
-    state = env.reset()
+    state = env.reset().astype(numpy.float32)
     for t in range(horizon):
         # choose action and step
         act = act_continuous if env_is_continuous else act_discrete
@@ -49,14 +49,14 @@ def collect(name_key, horizon: int, env_name: str, discount: float, lam: float):
 
         # next state
         if done:
-            state = env.reset()
+            state = env.reset().astype(numpy.float32)
             episode_lengths.append(episode_steps)
             episode_rewards.append(current_episode_return)
             episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
         else:
-            state = observation
+            state = observation.astype(numpy.float32)
             episode_steps += 1
 
     value_predictions = [critic(tf.reshape(s, [1, -1]))[0][0].numpy() for s in states + [state]]

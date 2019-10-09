@@ -15,11 +15,6 @@ class RLAgent(ABC):
     def __init__(self):
         self.iteration = 0
 
-    # @abstractmethod
-    # def act(self, state: numpy.ndarray):
-    #     """Agent determines a favourable action following his policy, given a state."""
-    #     pass
-
     @abstractmethod
     def drill(self, **kwargs):
         """Train the agent on a given environment."""
@@ -31,9 +26,6 @@ class RandomAgent:
     def __init__(self, env):
         super().__init__()
         self.state_dimensionality, self.n_actions = env_extract_dims(env)
-
-    def act(self, state: numpy.ndarray):
-        return tf.convert_to_tensor(random.randrange(self.n_actions)), 1 / self.n_actions
 
     def drill(self, **kwargs):
         pass
@@ -69,7 +61,7 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
         raise ValueError("Values must include one more prediction than there are states.")
 
     total_steps = numpy.size(rewards, 0)
-    return_estimations = numpy.ndarray(shape=(total_steps,))
+    return_estimations = numpy.ndarray(shape=(total_steps,)).astype(numpy.float32)
 
     previous = 0
     for t in reversed(range(total_steps)):
