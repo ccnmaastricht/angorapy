@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """Proximal Policy Optimization."""
 import multiprocessing
+import os
 import shutil
 import statistics
 import time
 from typing import Tuple, List
 
 import gym
-import numpy
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
@@ -62,6 +62,8 @@ class PPOAgent(RLAgent):
         self.iteration = 0
         self.current_fps = 0
         self.device = "CPU:0"
+        self.model_export_dir = "saved_models/exports/"
+        os.makedirs(self.model_export_dir, exist_ok=True)
 
         # statistics
         self.total_frames_seen = 0
@@ -152,15 +154,16 @@ class PPOAgent(RLAgent):
 
             # export the current state of the policy and value network under unique (-enough) key
             name_key = round(time.time())
-            self.policy.save(f"saved_models/{name_key}/policy")
-            self.critic.save(f"saved_models/{name_key}/value")
+            self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
+            self.critic.save(f"{self.model_export_dir}/{name_key}/value")
 
-            results = [worker_pool.apply(collect, args=(name_key, self.horizon, self.env_name, self.discount, self.lam))
+            results = [worker_pool.apply(collect, args=(f"{self.model_export_dir}/{name_key}/", self.horizon,
+                                                        self.env_name, self.discount, self.lam))
                        for _ in range(self.workers)]
             dataset, stats = condense_worker_outputs(results)
 
             # clean up the saved models
-            shutil.rmtree(f"saved_models/{name_key}")
+            shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
             # process stats from actors
             self.total_frames_seen += stats.numb_processed_frames

@@ -13,18 +13,17 @@ from utilities.util import env_extract_dims
 from utilities.visualization.story import StoryTeller
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # SETTINGS
 DEBUG = False
 GPU = False
 
-TASK = "CartPole-v1"
+TASK = "TunnelRAM-v0"
 
 ITERATIONS = 1000
 WORKERS = 8
 HORIZON = 1024 if not DEBUG else 128
-EPOCHS = 6
+EPOCHS = 3
 BATCH_SIZE = 64
 
 LEARNING_RATE_POLICY = 3e-4
@@ -32,7 +31,7 @@ LEARNING_RATE_CRITIC = 1e-3
 DISCOUNT_FACTOR = 0.99
 GAE_LAMBDA = 0.97
 EPSILON_CLIP = 0.2
-C_ENTROPY = 0.05
+C_ENTROPY = 0.01
 
 # setup environment and extract and report information
 env = gym.make(TASK)
@@ -45,7 +44,8 @@ print(f"-----------------------------------------\n"
       f"{state_dimensionality}-dimensional states ({env_observation_space_type}) "
       f"and {number_of_actions} actions ({env_action_space_type}).\n"
       f"-----------------------------------------\n")
-
+if not GPU:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
 # policy and critics networks

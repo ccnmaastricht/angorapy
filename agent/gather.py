@@ -17,14 +17,14 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
                                        "episode_rewards", "episode_lengths"])
 
 
-def collect(name_key, horizon: int, env_name: str, discount: float, lam: float):
+def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float):
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)
 
     # load policy
-    policy = tf.keras.models.load_model(f"saved_models/{name_key}/policy")
-    critic = tf.keras.models.load_model(f"saved_models/{name_key}/value")
+    policy = tf.keras.models.load_model(f"{model_dir}/policy")
+    critic = tf.keras.models.load_model(f"{model_dir}/value")
 
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1

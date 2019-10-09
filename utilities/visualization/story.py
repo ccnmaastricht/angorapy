@@ -48,13 +48,13 @@ class StoryTeller:
             # collect an episode
             done = False
             frames = []
-            state = tf.reshape(self.env.reset(), [1, -1]).astype(numpy.float32)
+            state = tf.reshape(self.env.reset().astype(numpy.float32), [1, -1])
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
                 action, _ = act(self.agent.policy, state)
                 observation, reward, done, _ = self.env.step(action)
-                state = tf.reshape(observation, [1, -1]).astype(numpy.float32)
+                state = tf.reshape(observation.astype(numpy.float32), [1, -1])
 
             # the figure
             plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
