@@ -59,7 +59,7 @@ def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float)
             state = observation.astype(numpy.float32)
             episode_steps += 1
 
-    value_predictions = [critic(tf.reshape(s, [1, -1]))[0][0].numpy() for s in states + [state]]
+    value_predictions = critic(numpy.concatenate((states, [state]))).numpy().reshape([-1])
     advantages = estimate_advantage(rewards, value_predictions, t_is_terminal, gamma=discount, lam=lam)
     returns = numpy.add(advantages, value_predictions[:-1])
     advantages = normalize_advantages(advantages)

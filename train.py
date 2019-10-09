@@ -18,7 +18,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 DEBUG = False
 GPU = False
 
-TASK = "TunnelRAM-v0"
+TASK = "LunarLanderContinuous-v2"
 
 ITERATIONS = 1000
 WORKERS = 8
