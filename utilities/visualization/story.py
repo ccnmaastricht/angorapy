@@ -97,9 +97,9 @@ class StoryTeller:
         fig, ax = plt.subplots()
 
         ax.plot(self.agent.cycle_reward_history, label="Average Reward")
-        ax.plot(self.agent.cycle_length_history, label="Standard Deviation")
+        # ax.plot(self.agent.cycle_length_history, label="Standard Deviation")
 
-        ax.set_xticks(list(range(self.agent.iteration)))
+        # ax.set_xticks(list(range(self.agent.iteration)))
 
         ax.set_title("Mean Rewards and their Standard Deviations for Each Training Cycle.")
         ax.set_xlabel("Iteration")
@@ -145,8 +145,8 @@ class StoryTeller:
 
                 story += f"<div class='iteration-block'>\n" \
                          f"\t<h3>Iteration {gif_iteration}</h3>\n" \
-                         f"\t<h5>&mu; = {round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
-                         f"&sigma; = {round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
+                         f"\t<h5>&mu; = {0 if self.agent.cycle_reward_history[-1] is None else round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
+                         f"&sigma; = {0 if self.agent.cycle_length_history[-1] is None else round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
 
             story += f"\t<img src={gif_filepath} />\n"
 

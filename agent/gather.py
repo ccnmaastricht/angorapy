@@ -5,6 +5,7 @@ from typing import Tuple, List
 
 import gym
 import numpy
+import ray
 import tensorflow as tf
 from gym.spaces import Box
 
@@ -17,8 +18,10 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
                                        "episode_rewards", "episode_lengths"])
 
 
+@ray.remote
 def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float):
     # build new environment for each collector to make multiprocessing possible
+    print("Hi")
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)
 
@@ -64,11 +67,13 @@ def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float)
     returns = numpy.add(advantages, value_predictions[:-1])
     advantages = normalize_advantages(advantages)
 
-    # store this worker's gathering in a experience buffer
-    buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
-                              episodes_completed, episode_rewards, episode_lengths)
+    # # store this worker's gathering in a experience buffer
+    # buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
+    #                           episodes_completed, episode_rewards, episode_lengths)
+    #
+    # return buffer
 
-    return buffer
+    return 1, 1, 1, 1
 
 
 def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.data.Dataset, StatBundle]:
