@@ -2,11 +2,11 @@
 """Functions for gathering experience."""
 from collections import namedtuple
 from typing import Tuple, List
+import tensorflow as tf
 
 import gym
 import numpy
 import ray
-import tensorflow as tf
 from gym.spaces import Box
 
 from agent.core import estimate_advantage, normalize_advantages
@@ -20,14 +20,15 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
 
 @ray.remote
 def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float):
+    import tensorflow as tfl
+
     # build new environment for each collector to make multiprocessing possible
-    print("Hi")
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)
 
     # load policy
-    policy = tf.keras.models.load_model(f"{model_dir}/policy")
-    critic = tf.keras.models.load_model(f"{model_dir}/value")
+    policy = tfl.keras.models.load_model(f"{model_dir}/policy")
+    critic = tfl.keras.models.load_model(f"{model_dir}/value")
 
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1
@@ -67,13 +68,11 @@ def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float)
     returns = numpy.add(advantages, value_predictions[:-1])
     advantages = normalize_advantages(advantages)
 
-    # # store this worker's gathering in a experience buffer
-    # buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
-    #                           episodes_completed, episode_rewards, episode_lengths)
-    #
-    # return buffer
+    # store this worker's gathering in a experience buffer
+    buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
+                              episodes_completed, episode_rewards, episode_lengths)
 
-    return 1, 1, 1, 1
+    return buffer
 
 
 def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.data.Dataset, StatBundle]:

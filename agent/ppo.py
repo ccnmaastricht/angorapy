@@ -308,5 +308,5 @@ class PPOAgent:
                    f"Mean Epi. Length: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
                    f"Total Episodes: {len(self.episode_length_history):5d}; "
                    f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
-                   f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f,}k; "
+                   f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
                    f"Exec. Speed: {self.current_fps:6.2f}fps\n")

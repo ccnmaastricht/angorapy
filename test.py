@@ -3,11 +3,12 @@
 
 import numpy as np
 import ray
-import tensorflow as tf
 from tensorflow.keras import layers
 
 
 def create_keras_model():
+    import tensorflow as tf
+
     model = tf.keras.Sequential()
     # Adds a densely-connected layer with 64 units to the model:
     model.add(layers.Dense(64, activation="relu", input_shape=(32,)))
