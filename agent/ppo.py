@@ -8,6 +8,7 @@ import time
 from typing import List
 
 import gym
+import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
@@ -44,12 +45,12 @@ class PPOAgent:
         # learning parameters
         self.horizon = horizon
         self.workers = workers
-        self.discount = tf.constant(discount)
+        self.discount = discount
         self.learning_rate_pi = learning_rate_pi
         self.learning_rate_v = learning_rate_v
         self.clip = tf.constant(clip)
         self.c_entropy = tf.constant(c_entropy)
-        self.lam = tf.constant(lam)
+        self.lam = lam
 
         # models and optimizers
         self.policy = policy
@@ -157,6 +158,7 @@ class PPOAgent:
         """
         print(f"Parallelize Over {multiprocessing.cpu_count()} Threads.\n")
 
+        ray.init()
         for self.iteration in range(iterations):
             iteration_start = time.time()
 
@@ -168,9 +170,15 @@ class PPOAgent:
             self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
             self.critic.save(f"{self.model_export_dir}/{name_key}/value")
 
-            results = [worker_pool.apply(collect, args=(f"{self.model_export_dir}/{name_key}/", self.horizon,
-                                                        self.env_name, self.discount, self.lam))
-                       for _ in range(self.workers)]
+            # parameters
+            models = ray.put(f"{self.model_export_dir}/{name_key}/")
+            horizon = ray.put(self.horizon)
+            discount = ray.put(self.discount)
+            env_name = ray.put(self.env_name)
+            lam = ray.put(self.lam)
+
+            result_object_ids = [collect.remote(models, horizon, env_name, discount, lam) for _ in range(self.workers)]
+            results = [ray.get(oi) for oi in result_object_ids]
             dataset, stats = condense_worker_outputs(results)
 
             # clean up the saved models

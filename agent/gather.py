@@ -2,10 +2,11 @@
 """Functions for gathering experience."""
 from collections import namedtuple
 from typing import Tuple, List
+import tensorflow as tf
 
 import gym
 import numpy
-import tensorflow as tf
+import ray
 from gym.spaces import Box
 
 from agent.core import estimate_advantage, normalize_advantages
@@ -17,14 +18,17 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
                                        "episode_rewards", "episode_lengths"])
 
 
+@ray.remote
 def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float):
+    import tensorflow as tfl
+
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)
 
     # load policy
-    policy = tf.keras.models.load_model(f"{model_dir}/policy")
-    critic = tf.keras.models.load_model(f"{model_dir}/value")
+    policy = tfl.keras.models.load_model(f"{model_dir}/policy")
+    critic = tfl.keras.models.load_model(f"{model_dir}/value")
 
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1

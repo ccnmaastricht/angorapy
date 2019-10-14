@@ -177,8 +177,8 @@ class StoryTeller:
 
                 story += f"<div class='iteration-block'>\n" \
                          f"\t<h3>Iteration {gif_iteration}</h3>\n" \
-                         f"\t<h5>&mu; = {round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
-                         f"&sigma; = {round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
+                         f"\t<h5>&mu; = {0 if self.agent.cycle_reward_history[-1] is None else round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
+                         f"&sigma; = {0 if self.agent.cycle_length_history[-1] is None else round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
 
             story += f"\t<img src={gif_filepath} />\n"
 
