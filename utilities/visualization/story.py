@@ -18,6 +18,10 @@ PATH_TO_STORIES = "stories/"
 TEMPLATE_PATH = PATH_TO_STORIES + "/template/"
 
 
+def scale(vector):
+    return (numpy.array(vector) - min(vector)) / (max(vector) - min(vector))
+
+
 class StoryTeller:
 
     def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
@@ -93,20 +97,41 @@ class StoryTeller:
 
         return box
 
-    def update_reward_graph(self):
+    def update_graphs(self):
+        # reward plot
         fig, ax = plt.subplots()
-
-        ax.plot(self.agent.cycle_reward_history, label="Average Reward")
-        ax.plot(self.agent.cycle_length_history, label="Standard Deviation")
-
-        ax.set_xticks(list(range(self.agent.iteration)))
-
-        ax.set_title("Mean Rewards and their Standard Deviations for Each Training Cycle.")
+        ax.set_title("Mean Rewards and Episode Lengths for Each Training Cycle.")
         ax.set_xlabel("Iteration")
-        ax.set_ylabel("Reward")
+        ax.set_ylabel("Accumulative Reward")
+        twin_ax = ax.twinx()
+        twin_ax.set_ylabel("Episode Steps")
 
-        ax.legend(loc=2)
+        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="orange")
+        l_line = twin_ax.plot(self.agent.cycle_length_history, label="Episode Length", color="blue")
+        lines = r_line + l_line
+        labels = [l.get_label() for l in lines]
+
+        ax.legend(lines, labels, loc=2)
         fig.savefig(f"{self.story_directory}/reward_plot.svg", format="svg")
+
+        plt.close(fig)
+
+        # entropy, loss plot
+        fig, ax = plt.subplots()
+        ax.set_title("Entropy and Loss.")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("Loss")
+        twin_ax = ax.twinx()
+        twin_ax.set_ylabel("Entropy")
+
+        actor_loss_line = ax.plot(scale(self.agent.actor_loss_history), label="Policy Loss (Normalized)")
+        critic_loss_line = ax.plot(scale(self.agent.critic_loss_history), label="Critic Loss (Normalized)")
+        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green")
+        lines = actor_loss_line + critic_loss_line + entropy_line
+        labels = [l.get_label() for l in lines]
+
+        ax.legend(lines, labels, loc=2)
+        fig.savefig(f"{self.story_directory}/loss_plot.svg", format="svg")
 
         plt.close(fig)
 
@@ -124,11 +149,18 @@ class StoryTeller:
         story += self.make_hp_box()
 
         # reward plot
+        story += "<div class='plot-wrapper'>"
         reward_plot_path = self.story_directory + "/reward_plot.svg"
         if os.path.isfile(reward_plot_path):
             story += f"<div class='plot-block'>\n" \
                      f"\t<img src=reward_plot.svg />\n" \
                      f"</div>\n\n"
+        loss_plot_path = self.story_directory + "/reward_plot.svg"
+        if os.path.isfile(loss_plot_path):
+            story += f"<div class='plot-block'>\n" \
+                     f"\t<img src=loss_plot.svg />\n" \
+                     f"</div>\n\n"
+        story += "</div>"
 
         gif_files = sorted([fp for fp in os.listdir(self.story_directory) if fp[-4:] == ".gif"],
                            key=lambda f: int(re.search("[0-9]+", f).group(0)))

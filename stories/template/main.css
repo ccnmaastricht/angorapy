@@ -7,8 +7,13 @@ body {
     text-align: center;
 }
 
+.plot-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
 .plot-block {
-    margin: 0 auto;
     text-align: center;
 }
 

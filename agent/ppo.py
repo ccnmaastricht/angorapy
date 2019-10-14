@@ -5,7 +5,7 @@ import os
 import shutil
 import statistics
 import time
-from typing import Tuple, List
+from typing import List
 
 import gym
 import tensorflow as tf
@@ -71,6 +71,9 @@ class PPOAgent:
         self.episode_length_history = []
         self.cycle_reward_history = []
         self.cycle_length_history = []
+        self.entropy_history = []
+        self.actor_loss_history = []
+        self.critic_loss_history = []
 
         # prepare for environment type
         if isinstance(self.env.action_space, Discrete):
@@ -191,13 +194,13 @@ class PPOAgent:
             self.report()
 
             if story_teller is not None and (self.iteration + 1) % story_teller.frequency == 0:
-                story_teller.update_reward_graph()
                 story_teller.create_episode_gif(n=3)
-                story_teller.update_story()
+            story_teller.update_graphs()
+            story_teller.update_story()
 
         return self
 
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> List[Tuple[int, int]]:
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int):
         """Optimize the agent's policy and value network based on a given dataset.
 
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
@@ -211,13 +214,17 @@ class PPOAgent:
         :param epochs:          number of epochs to train on this dataset
         :param batch_size:      batch size with which the dataset is sampled
         """
-        loss_history = []
+        actor_loss_history = []
+        critic_loss_history = []
+        entropy_history = []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break bias, then divided into batches
             shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
             batched_dataset = shuffled_dataset.batch(batch_size)
 
-            epoch_losses = []
+            actor_epoch_losses = []
+            critic_epoch_losses = []
+            entropies = []
             for batch in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
@@ -240,7 +247,9 @@ class PPOAgent:
                                                      old_action_prob=batch["action_prob"],
                                                      advantage=batch["advantage"])
 
-                        actor_loss -= self.c_entropy * self.entropy_bonus(policy_output)
+                        entropy = self.c_entropy * self.entropy_bonus(policy_output)
+                        actor_loss -= entropy
+                        entropies.append(tf.reduce_mean(entropy))
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
                     self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
@@ -258,13 +267,16 @@ class PPOAgent:
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
                     self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
 
-                    epoch_losses.append([tf.reduce_mean(actor_loss), tf.reduce_mean(critic_loss)])
+                    actor_epoch_losses.append(tf.reduce_mean(actor_loss))
+                    critic_epoch_losses.append(tf.reduce_mean(critic_loss))
 
-            loss_history.append(
-                tf.reduce_mean(epoch_losses, 0).numpy().round(2).tolist()
-            )
+            actor_loss_history.append(statistics.mean([numb.numpy().item() for numb in actor_epoch_losses]))
+            critic_loss_history.append(statistics.mean([numb.numpy().item() for numb in critic_epoch_losses]))
+            entropy_history.append(statistics.mean([numb.numpy().item() for numb in entropies]))
 
-        return loss_history
+        self.actor_loss_history.extend(actor_loss_history)
+        self.critic_loss_history.extend(critic_loss_history)
+        self.entropy_history.extend(entropy_history)
 
     def evaluate(self, env: gym.Env, n: int, render: bool = False) -> List[int]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to

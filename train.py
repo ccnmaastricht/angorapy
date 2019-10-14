@@ -67,7 +67,7 @@ agent = PPOAgent(policy, critic, env,
                  c_entropy=C_ENTROPY,
                  lam=GAE_LAMBDA)
 agent.set_gpu(GPU)
-teller = StoryTeller(agent, env, frequency=5)
+teller = StoryTeller(agent, env, frequency=10)
 
 # train
 agent.drill(iterations=ITERATIONS,
