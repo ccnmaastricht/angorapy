@@ -1,8 +1,6 @@
-import multiprocessing
 import os
 import statistics
 
-import numpy
 from gym.spaces import Box
 
 from agent.ppo import PPOAgent
@@ -16,6 +14,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # SETTINGS
 DEBUG = False
 GPU = False
+EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 
 TASK = "LunarLander-v2"
 
@@ -45,16 +44,10 @@ print(f"-----------------------------------------\n"
       f"-----------------------------------------\n")
 if not GPU:
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
 # policy and critics networks
 policy = PPOActorNetwork(env)
 critic = PPOCriticNetwork(env)
-
-# set computation graph to allow for saving
-example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
-policy.predict(example_input)
-critic.predict(example_input)
 
 # set up the agent and a reporting module
 agent = PPOAgent(policy, critic, env,
@@ -73,8 +66,8 @@ teller = StoryTeller(agent, env, frequency=10)
 agent.drill(iterations=ITERATIONS,
             epochs=EPOCHS,
             batch_size=BATCH_SIZE,
-            worker_pool=pool,
-            story_teller=teller)
+            story_teller=teller,
+            export_to_file=EXPORT_TO_FILE)
 
 evaluation_results = agent.evaluate(env, 20, render=False)
 print(f"Average Performance {statistics.mean(evaluation_results)}: {evaluation_results}.")

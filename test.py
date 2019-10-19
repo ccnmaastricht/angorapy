@@ -1,59 +1,72 @@
 #!/usr/bin/env python
-"""TODO Module Docstring."""
+"""Here I test different approaches to problems against each other in order to see which is fastest."""
+import shutil
+import time
 
-import numpy as np
-import ray
-from tensorflow.keras import layers
+import gym
+import numpy
+import scipy.stats
+import tensorflow as tf
+import tensorflow_probability as tfp
 
+from policy_networks.fully_connected import PPOActorNetwork
 
-def create_keras_model():
-    import tensorflow as tf
-
-    model = tf.keras.Sequential()
-    # Adds a densely-connected layer with 64 units to the model:
-    model.add(layers.Dense(64, activation="relu", input_shape=(32,)))
-    # Add another:
-    model.add(layers.Dense(64, activation="relu"))
-    # Add a softmax layer with 10 output units:
-    model.add(layers.Dense(10, activation="softmax"))
-
-    model.compile(
-        optimizer=tf.train.RMSPropOptimizer(0.01),
-        loss=tf.keras.losses.categorical_crossentropy,
-        metrics=[tf.keras.metrics.categorical_accuracy])
-    return model
+n = 1000
 
 
-def random_one_hot_labels(shape):
-    n, n_class = shape
-    classes = np.random.randint(0, n_class, n)
-    labels = np.zeros((n, n_class))
-    labels[np.arange(n), classes] = 1
-    return labels
+def benchmark_sampling():
+    start = time.time()
+    for _ in range(n):
+        distribution = tfp.distributions.Normal(3, 1)
+        sample = distribution.sample()
+        prob = distribution.prob(sample)
+    print(f"Distribution: {round(time.time() - start, 2)}")
+
+    start = time.time()
+    for _ in range(n):
+        sample = tf.random.normal([1], tf.cast([3], dtype=tf.float64), 1)
+        prob = scipy.stats.norm.pdf(sample, loc=3, scale=1)
+    print(f"Function: {round(time.time() - start, 2)}")
 
 
-ray.init()
+def benchmark_trajectory_filling():
+    list_length = 50000
+
+    start = time.time()
+    for _ in range(n):
+        a = numpy.ndarray()
+        for i in range(list_length):
+            a.append([2, 3, 4, 5, 6, 7, 8, 9])
+    print(f"Numpy: {round(time.time() - start, 2)}")
+
+    start = time.time()
+    for _ in range(n):
+        a = []
+        # for i in range(list_length):
+        #     a.append(numpy.array([2, 3, 4, 5, 6, 7, 8, 9]))
+        # a = numpy.array(a)
+    print(f"List: {round(time.time() - start, 2)}")
 
 
-@ray.remote
-class Network(object):
-    def __init__(self):
-        self.model = create_keras_model()
-        self.dataset = np.random.random((1000, 32))
-        self.labels = random_one_hot_labels((1000, 10))
+def benchmark_network_propagation():
+    n = 10
 
-    def train(self):
-        history = self.model.fit(self.dataset, self.labels, verbose=False)
-        return history.history
+    start = time.time()
+    for _ in range(n):
+        model = PPOActorNetwork(gym.make("CartPole-v1"))
+        model.save("saved_models/test")
+        new_model = tf.keras.models.load_model("saved_models/test")
+        shutil.rmtree("saved_models/test")
+    print(f"Saving: {round(time.time() - start, 2)}")
 
-    def get_weights(self):
-        return self.model.get_weights()
+    start = time.time()
+    for _ in range(n):
+        model = PPOActorNetwork(gym.make("CartPole-v1"))
+        weights = model.get_weights()
+        new_model = PPOActorNetwork(gym.make("CartPole-v1"))
+        new_model.set_weights(weights)
+    print(f"Serializing: {round(time.time() - start, 2)}")
 
-    def set_weights(self, weights):
-        # Note that for simplicity this does not handle the optimizer state.
-        self.model.set_weights(weights)
 
-
-NetworkActor = Network.remote()
-result_object_id = NetworkActor.train.remote()
-ray.get(result_object_id)
+if __name__ == "__main__":
+    benchmark_network_propagation()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""Proximal Policy Optimization."""
-import multiprocessing
+"""Implementation of Proximal Policy Optimization Algorithm."""
+import logging
 import os
 import shutil
 import statistics
@@ -14,7 +14,7 @@ from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, condense_worker_outputs
+from agent.gather import collect, condense_worker_outputs, ModelTuple
 from utilities.util import flat_print, env_extract_dims
 
 
@@ -48,8 +48,8 @@ class PPOAgent:
         self.discount = discount
         self.learning_rate_pi = learning_rate_pi
         self.learning_rate_v = learning_rate_v
-        self.clip = tf.constant(clip)
-        self.c_entropy = tf.constant(c_entropy)
+        self.clip = clip
+        self.c_entropy = c_entropy
         self.lam = lam
 
         # models and optimizers
@@ -144,7 +144,7 @@ class PPOAgent:
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    def drill(self, iterations: int, epochs: int, batch_size: int, worker_pool, story_teller=None):
+    def drill(self, iterations: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False):
         """Main training loop of the agent.
 
         Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
@@ -156,10 +156,11 @@ class PPOAgent:
 
         :return:                self
         """
-        print(f"Parallelize Over {multiprocessing.cpu_count()} Threads.\n")
+        ray.init(logging_level=logging.ERROR)
 
-        ray.init()
+        print(f"Parallelize Over {ray.available_resources()['CPU']} Threads.\n")
         for self.iteration in range(iterations):
+
             iteration_start = time.time()
 
             # run simulations in parallel
@@ -167,22 +168,28 @@ class PPOAgent:
 
             # export the current state of the policy and value network under unique (-enough) key
             name_key = round(time.time())
-            self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
-            self.critic.save(f"{self.model_export_dir}/{name_key}/value")
+            if export_to_file:
+                self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
+                self.critic.save(f"{self.model_export_dir}/{name_key}/value")
+                models = f"{self.model_export_dir}/{name_key}/"
+            else:
+                policy_tuple = ModelTuple(type(self.policy), self.policy.get_weights())
+                critic_tuple = ModelTuple(type(self.critic), self.critic.get_weights())
+                models = (policy_tuple, critic_tuple)
 
-            # parameters
-            models = ray.put(f"{self.model_export_dir}/{name_key}/")
-            horizon = ray.put(self.horizon)
-            discount = ray.put(self.discount)
-            env_name = ray.put(self.env_name)
-            lam = ray.put(self.lam)
+            # other parameters
+            horizon = self.horizon
+            discount = self.discount
+            env_name = self.env_name
+            lam = self.lam
 
             result_object_ids = [collect.remote(models, horizon, env_name, discount, lam) for _ in range(self.workers)]
             results = [ray.get(oi) for oi in result_object_ids]
             dataset, stats = condense_worker_outputs(results)
 
             # clean up the saved models
-            shutil.rmtree(f"{self.model_export_dir}/{name_key}")
+            if export_to_file:
+                shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
             # process stats from actors
             self.total_frames_seen += stats.numb_processed_frames
@@ -202,6 +209,7 @@ class PPOAgent:
             self.report()
 
             if story_teller is not None and (self.iteration + 1) % story_teller.frequency == 0:
+                print("Creating Episode GIFs for current state of policy...")
                 story_teller.create_episode_gif(n=3)
             story_teller.update_graphs()
             story_teller.update_story()

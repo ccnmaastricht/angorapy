@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Functions for gathering experience."""
 from collections import namedtuple
-from typing import Tuple, List
+from typing import Tuple, List, Union
 import tensorflow as tf
 
 import gym
@@ -16,10 +16,11 @@ ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths"])
+ModelTuple = namedtuple("ModelTuple", ["model_class", "weights"])
 
 
-@ray.remote
-def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float):
+@ray.remote(num_cpus=8)
+def collect(model, horizon: int, env_name: str, discount: float, lam: float):
     import tensorflow as tfl
 
     # build new environment for each collector to make multiprocessing possible
@@ -27,8 +28,16 @@ def collect(model_dir, horizon: int, env_name: str, discount: float, lam: float)
     env_is_continuous = isinstance(env.action_space, Box)
 
     # load policy
-    policy = tfl.keras.models.load_model(f"{model_dir}/policy")
-    critic = tfl.keras.models.load_model(f"{model_dir}/value")
+    if isinstance(model, str):
+        policy = tfl.keras.models.load_model(f"{model}/policy")
+        critic = tfl.keras.models.load_model(f"{model}/value")
+    elif isinstance(model, tuple):
+        policy = model[0].model_class(env)
+        policy.set_weights(model[0].weights)
+        critic = model[1].model_class(env)
+        critic.set_weights(model[1].weights)
+    else:
+        raise ValueError("Unknown input for model.")
 
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1

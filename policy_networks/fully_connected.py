@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Collection of fully connected policy networks."""
 import gym
+import numpy
 import tensorflow as tf
 from gym.spaces import Box
 
@@ -28,6 +29,10 @@ class PPOActorNetwork(tf.keras.Model):
                                                   input_dim=64,
                                                   activation="softplus")
 
+        # initialize weights though sample input
+        example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
+        self.predict(example_input)
+
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
         x = self.fc_b(x)
@@ -52,6 +57,9 @@ class PPOCriticNetwork(tf.keras.Model):
         self.fc_a = tf.keras.layers.Dense(64, input_dim=self.state_dimensionality, activation="tanh")
         self.fc_b = tf.keras.layers.Dense(64, input_dim=64, activation="tanh")
         self.fc_out = tf.keras.layers.Dense(1, input_dim=64, activation="linear")
+
+        example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
+        self.predict(example_input)
 
     def call(self, input_tensor, training=False, **kwargs):
         x = self.fc_a(input_tensor)
