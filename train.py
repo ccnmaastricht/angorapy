@@ -16,7 +16,7 @@ DEBUG = False
 GPU = False
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 
-TASK = "LunarLander-v2"
+TASK = "LunarLanderContinuous-v2"
 
 ITERATIONS = 1000
 WORKERS = 8

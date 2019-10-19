@@ -268,7 +268,8 @@ class PPOAgent:
                         entropies.append(tf.reduce_mean(entropy))
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
-                    self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
+                    clipped_actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 2)
+                    self.policy_optimizer.apply_gradients(zip(clipped_actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
@@ -281,7 +282,8 @@ class PPOAgent:
                         )
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
-                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
+                    clipped_critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 2)
+                    self.critic_optimizer.apply_gradients(zip(clipped_critic_gradients, self.critic.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(actor_loss))
                     critic_epoch_losses.append(tf.reduce_mean(critic_loss))
