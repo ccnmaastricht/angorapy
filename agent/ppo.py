@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
+import json
 import logging
 import os
+import re
 import shutil
 import statistics
 import time
 from typing import List
 
 import gym
+import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box
@@ -16,6 +19,8 @@ from tensorflow.keras.optimizers import Optimizer
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, condense_worker_outputs, ModelTuple
 from utilities.util import flat_print, env_extract_dims
+
+BASE_SAVE_PATH = "saved_models/states/"
 
 
 class PPOAgent:
@@ -29,8 +34,8 @@ class PPOAgent:
     """
 
     def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, environment: gym.Env, horizon: int, workers: int,
-                 learning_rate_pi: float, learning_rate_v: float, discount: float = 0.99, lam: float = 0.95,
-                 clip: float = 0.2, c_entropy: float = 0.01):
+                 learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
+                 lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, _make_dirs=True):
         """Initialize the Agent.
 
         :param discount:                discount factor applied to future rewards
@@ -64,7 +69,11 @@ class PPOAgent:
         self.current_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "saved_models/exports/"
-        os.makedirs(self.model_export_dir, exist_ok=True)
+        self.agent_id = round(time.time())
+        self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
+        if _make_dirs:
+            os.makedirs(self.model_export_dir, exist_ok=True)
+            os.makedirs(self.agent_directory)
 
         # statistics
         self.total_frames_seen = 0
@@ -144,22 +153,25 @@ class PPOAgent:
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    def drill(self, iterations: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False):
+    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False, save_every: int=0):
         """Main training loop of the agent.
 
-        Runs **iterations** cycles of experience gathering and optimization based on the gathered experience.
+        Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
-        :param env:             the environment on which the agent should be drilled
-        :param iterations:      the number of experience-optimization cycles that shall be run
+        :param n:               the number of experience-optimization cycles that shall be run
         :param epochs:          the number of epochs for which the model is optimized on the same experience data
         :param batch_size       batch size for the optimization
+        :param story_teller:    story telling object that creates visualizations of the training process on the fly
+        :param export_to_file:  boolean indicator for whether communication with workers is achieved through file saving
+                                or direct weight passing
+        :param save_every:      for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
 
         :return:                self
         """
         ray.init(logging_level=logging.ERROR)
 
         print(f"Parallelize Over {ray.available_resources()['CPU']} Threads.\n")
-        for self.iteration in range(iterations):
+        for self.iteration in range(self.iteration, n):
 
             iteration_start = time.time()
 
@@ -213,6 +225,10 @@ class PPOAgent:
                 story_teller.create_episode_gif(n=3)
             story_teller.update_graphs()
             story_teller.update_story()
+
+            if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                print("Saving the current state of the agent.")
+                self.save_agent_state()
 
         return self
 
@@ -268,7 +284,7 @@ class PPOAgent:
                         entropies.append(tf.reduce_mean(entropy))
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
-                    clipped_actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 2)
+                    clipped_actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 5)
                     self.policy_optimizer.apply_gradients(zip(clipped_actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
@@ -282,8 +298,9 @@ class PPOAgent:
                         )
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
-                    clipped_critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 2)
-                    self.critic_optimizer.apply_gradients(zip(clipped_critic_gradients, self.critic.trainable_variables))
+                    clipped_critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 5)
+                    self.critic_optimizer.apply_gradients(
+                        zip(clipped_critic_gradients, self.critic.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(actor_loss))
                     critic_epoch_losses.append(tf.reduce_mean(critic_loss))
@@ -332,3 +349,47 @@ class PPOAgent:
                    f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
                    f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
                    f"Exec. Speed: {self.current_fps:6.2f}fps\n")
+
+    def save_agent_state(self):
+        self.policy.save(self.agent_directory + f"/{self.iteration}/policy")
+        self.critic.save(self.agent_directory + f"/{self.iteration}/value")
+
+        with open(self.agent_directory + f"/{self.iteration}/parameters.json", "w") as f:
+            json.dump(self.get_parameters(), f)
+
+    def get_parameters(self):
+        parameters = self.__dict__.copy()
+        del parameters["env"]
+        del parameters["policy"], parameters["critic"], parameters["policy_optimizer"], parameters["critic_optimizer"]
+
+        return parameters
+
+    @staticmethod
+    def from_agent_state(agent_id: int):
+        # TODO also load the state of the optimizers
+        agent_path = BASE_SAVE_PATH + f"/{agent_id}"
+        if not os.path.isdir(agent_path):
+            raise FileNotFoundError("The given agent ID does not match any existing save history.")
+
+        if len(os.listdir(agent_path)) == 0:
+            raise FileNotFoundError("The given agent ID's save history is empty.")
+
+        latest = max([int(re.match("([0-9]+)", fn).group(0)) for fn in os.listdir(agent_path)])
+        policy = tf.keras.models.load_model(f"{agent_path}/{latest}/policy")
+        value = tf.keras.models.load_model(f"{agent_path}/{latest}/value")
+
+        with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
+            parameters = json.load(f)
+
+        env = gym.make(parameters["env_name"])
+        example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
+        value.predict(example_input)
+
+        loaded_agent = PPOAgent(policy, value, env,
+                                parameters["horizon"], parameters["workers"],
+                                _make_dirs=False)
+
+        for p, v in parameters.items():
+            loaded_agent.__dict__[p] = v
+
+        return loaded_agent

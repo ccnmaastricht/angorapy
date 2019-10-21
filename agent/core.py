@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+"""Core functionality of the module such as advantage estimation and several probabilistic calculations."""
 import math
 from itertools import accumulate
 from typing import List
@@ -27,7 +29,7 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
                                 Hence if t is terminal, this is not the last state observed but the last in which
                                 experience can be collected through taking an action.
     :param gamma:               a discount factor weighting the importance of future rewards
-    :param lam:          GAE's lambda parameter compromising between bias and variance. High lambda results in
+    :param lam:                 GAE's lambda parameter compromising between bias and variance. High lambda results in
                                 less bias but more variance. 0 < Lambda < 1
 
     :return:                    the estimations about the returns of a trajectory

@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 """Functions for gathering experience."""
 from collections import namedtuple
-from typing import Tuple, List, Union
-import tensorflow as tf
+from typing import Tuple, List
 
 import gym
 import numpy
 import ray
+import tensorflow as tf
 from gym.spaces import Box
 
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
+from policy_networks.fully_connected import PPOActorNetwork, PPOCriticNetwork
 
 ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_probabilities", "returns", "advantages",
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])
@@ -32,9 +33,11 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float):
         policy = tfl.keras.models.load_model(f"{model}/policy")
         critic = tfl.keras.models.load_model(f"{model}/value")
     elif isinstance(model, tuple):
-        policy = model[0].model_class(env)
+        # TODO in theory this should work with any network but when loading models we loose the exact class and cant
+        # recreate by type
+        policy = PPOActorNetwork(env)  # model[0].model_class(env)
         policy.set_weights(model[0].weights)
-        critic = model[1].model_class(env)
+        critic = PPOCriticNetwork(env)
         critic.set_weights(model[1].weights)
     else:
         raise ValueError("Unknown input for model.")
