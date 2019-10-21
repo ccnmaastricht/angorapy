@@ -5,8 +5,8 @@ from environments import *
 
 
 class Tunnel(gym.Env):
-    AGENT_PIXEL = 0.3
-    OBSTACLE_PIXEL = 0.6
+    AGENT_PIXEL = 100
+    OBSTACLE_PIXEL = 255
 
     def __init__(self, width: int = 30, height: int = 30):
         self.width = width
@@ -83,13 +83,13 @@ class Tunnel(gym.Env):
         return self.dungeon
 
     def render(self, mode='human', close=False):
-        img = self.dungeon
-        plt.clf()
-        plt.imshow(img, cmap="binary", origin="upper")
-        plt.gca().axes.get_xaxis().set_visible(False)
-        plt.gca().axes.get_yaxis().set_visible(False)
-        plt.draw()
-        plt.pause(0.001)
+        # img = self.dungeon
+        # plt.clf()
+        # plt.imshow(img, cmap="binary", origin="upper")
+        # plt.gca().axes.get_xaxis().set_visible(False)
+        # plt.gca().axes.get_yaxis().set_visible(False)
+
+        return self.dungeon
 
 
 class TunnelRAM(Tunnel):

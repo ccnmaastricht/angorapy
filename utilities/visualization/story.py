@@ -62,7 +62,7 @@ class StoryTeller:
 
             # the figure
             plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
-            patch = plt.imshow(frames[0])
+            patch = plt.imshow(frames[0], cmap="Greys" if len(frames[0].shape) == 2 else None)
             plt.axis('off')
 
             def animate(i):
@@ -180,7 +180,7 @@ class StoryTeller:
                          f"\t<h5>&mu; = {0 if self.agent.cycle_reward_history[-1] is None else round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
                          f"&sigma; = {0 if self.agent.cycle_length_history[-1] is None else round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
 
-            story += f"\t<img src={gif_filepath} />\n"
+            story += f"\t<img src={gif_filepath} width=320 height=320 />\n"
 
             last_gif_iteration = gif_iteration
         story += "</div>\n\n"

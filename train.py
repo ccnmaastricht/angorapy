@@ -14,9 +14,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 DEBUG = False
 GPU = False
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
-LOAD_ID = 1571649901
+LOAD_ID = None
 
-TASK = "CartPole-v1"
+TASK = "TunnelRAM-v0"
 
 ITERATIONS = 21
 WORKERS = 8
@@ -67,7 +67,7 @@ else:
     print(f"Created agent with ID {agent.agent_id}")
 
 agent.set_gpu(GPU)
-teller = StoryTeller(agent, env, frequency=10)
+teller = StoryTeller(agent, env, frequency=1)
 
 # train
 agent.drill(n=ITERATIONS,

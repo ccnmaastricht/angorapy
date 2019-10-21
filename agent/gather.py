@@ -4,6 +4,7 @@ from collections import namedtuple
 from typing import Tuple, List
 
 import gym
+from environments import *
 import numpy
 import ray
 import tensorflow as tf
