@@ -35,7 +35,8 @@ class PPOAgent:
 
     def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, environment: gym.Env, horizon: int, workers: int,
                  learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
-                 lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, _make_dirs=True):
+                 lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, gradient_clipping: bool=True,
+                 _make_dirs=True):
         """Initialize the Agent.
 
         :param discount:                discount factor applied to future rewards
@@ -56,6 +57,7 @@ class PPOAgent:
         self.clip = clip
         self.c_entropy = c_entropy
         self.lam = lam
+        self.gradient_clipping = gradient_clipping
 
         # models and optimizers
         self.policy = policy
@@ -284,8 +286,9 @@ class PPOAgent:
                         entropies.append(tf.reduce_mean(entropy))
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
-                    clipped_actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 5)
-                    self.policy_optimizer.apply_gradients(zip(clipped_actor_gradients, self.policy.trainable_variables))
+                    if self.gradient_clipping:
+                        actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 5)
+                    self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
@@ -298,9 +301,9 @@ class PPOAgent:
                         )
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
-                    clipped_critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 5)
-                    self.critic_optimizer.apply_gradients(
-                        zip(clipped_critic_gradients, self.critic.trainable_variables))
+                    if self.gradient_clipping:
+                        critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 5)
+                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(actor_loss))
                     critic_epoch_losses.append(tf.reduce_mean(critic_loss))
@@ -313,13 +316,11 @@ class PPOAgent:
         self.critic_loss_history.extend(critic_loss_history)
         self.entropy_history.extend(entropy_history)
 
-    def evaluate(self, env: gym.Env, n: int, render: bool = False) -> List[int]:
+    def evaluate(self, n: int) -> List[int]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
-        :param env:         a gym environment
         :param n:           integer value indicating the number of episodes that shall be run
-        :param render:      whether to render the episodes or not
 
         :return:            a list of length n of episode rewards
         """
@@ -327,13 +328,10 @@ class PPOAgent:
         for episode in range(n):
             done = False
             reward_trajectory = []
-            state = tf.reshape(env.reset(), [1, -1])
+            state = tf.reshape(self.env.reset(), [1, -1])
             while not done:
-                if render:
-                    env.render()
-
                 action, action_probability = self.act(state)
-                observation, reward, done, _ = env.step(action.numpy())
+                observation, reward, done, _ = self.env.step(action.numpy())
                 state = tf.reshape(observation, [1, -1])
                 reward_trajectory.append(reward)
 

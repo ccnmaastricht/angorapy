@@ -83,12 +83,6 @@ class Tunnel(gym.Env):
         return self.dungeon
 
     def render(self, mode='human', close=False):
-        # img = self.dungeon
-        # plt.clf()
-        # plt.imshow(img, cmap="binary", origin="upper")
-        # plt.gca().axes.get_xaxis().set_visible(False)
-        # plt.gca().axes.get_yaxis().set_visible(False)
-
         return self.dungeon
 
 

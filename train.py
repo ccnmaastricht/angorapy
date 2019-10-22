@@ -16,20 +16,21 @@ GPU = False
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "TunnelRAM-v0"
+TASK = "CartPole-v1"
 
-ITERATIONS = 21
+ITERATIONS = 1000
 WORKERS = 8
 HORIZON = 1024 if not DEBUG else 128
 EPOCHS = 3
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 
 LEARNING_RATE_POLICY = 3e-4
 LEARNING_RATE_CRITIC = 1e-3
 DISCOUNT_FACTOR = 0.99
-GAE_LAMBDA = 0.97
+GAE_LAMBDA = 0.95
 EPSILON_CLIP = 0.2
 C_ENTROPY = 0.01
+CLIP_GRADIENTS = False
 
 # setup environment and extract and report information
 env = gym.make(TASK)
@@ -62,12 +63,13 @@ else:
                      discount=DISCOUNT_FACTOR,
                      clip=EPSILON_CLIP,
                      c_entropy=C_ENTROPY,
-                     lam=GAE_LAMBDA)
+                     lam=GAE_LAMBDA,
+                     gradient_clipping=CLIP_GRADIENTS)
 
     print(f"Created agent with ID {agent.agent_id}")
 
 agent.set_gpu(GPU)
-teller = StoryTeller(agent, env, frequency=1)
+teller = StoryTeller(agent, env, frequency=10)
 
 # train
 agent.drill(n=ITERATIONS,
@@ -75,7 +77,7 @@ agent.drill(n=ITERATIONS,
             batch_size=BATCH_SIZE,
             story_teller=teller,
             export_to_file=EXPORT_TO_FILE,
-            save_every=3)
+            save_every=20)
 
 agent.save_agent_state()
 
