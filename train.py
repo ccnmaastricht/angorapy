@@ -6,7 +6,7 @@ from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import PPOActorFNN, PPOCriticFNN
 from utilities.util import env_extract_dims
-from utilities.visualization.story import StoryTeller
+from utilities.story import StoryTeller
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
