@@ -17,6 +17,8 @@ EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers in
 LOAD_ID = None
 
 TASK = "CartPole-v1"
+policy_network_type = PPOActorFNN
+critic_network_type = PPOCriticFNN
 
 ITERATIONS = 1000
 WORKERS = 8
@@ -51,8 +53,8 @@ if LOAD_ID is not None:
     agent = PPOAgent.from_agent_state(LOAD_ID)
 else:
     # policy and critics networks
-    policy = PPOActorFNN(env)
-    critic = PPOCriticFNN(env)
+    policy = policy_network_type(env)
+    critic = critic_network_type(env)
 
     # set up the agent and a reporting module
     agent = PPOAgent(policy, critic, env,
