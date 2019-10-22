@@ -8,7 +8,7 @@ from gym.spaces import Box
 from utilities.util import env_extract_dims
 
 
-class PPOActorNetwork(tf.keras.Model):
+class PPOActorFNN(tf.keras.Model):
     """Fully-connected network taking the role of an actor."""
 
     def __init__(self, env: gym.Env):
@@ -45,7 +45,7 @@ class PPOActorNetwork(tf.keras.Model):
         return out
 
 
-class PPOCriticNetwork(tf.keras.Model):
+class PPOCriticFNN(tf.keras.Model):
     """Fully-connected network taking the role of the critic."""
 
     def __init__(self, env):

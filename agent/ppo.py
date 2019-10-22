@@ -63,6 +63,10 @@ class PPOAgent:
         self.policy = policy
         self.critic = critic
 
+        # load persistent network types
+        self.policy_type_name = policy.__class__.__name__
+        self.critic_type_name = critic.__class__.__name__
+
         self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi)
         self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v)
 
@@ -187,8 +191,8 @@ class PPOAgent:
                 self.critic.save(f"{self.model_export_dir}/{name_key}/value")
                 models = f"{self.model_export_dir}/{name_key}/"
             else:
-                policy_tuple = ModelTuple(type(self.policy), self.policy.get_weights())
-                critic_tuple = ModelTuple(type(self.critic), self.critic.get_weights())
+                policy_tuple = ModelTuple(self.policy_type_name, self.policy.get_weights())
+                critic_tuple = ModelTuple(self.critic_type_name, self.critic.get_weights())
                 models = (policy_tuple, critic_tuple)
 
             # other parameters

@@ -80,7 +80,7 @@ class Tunnel(gym.Env):
         return self.make_state_representation(), reward, done, None
 
     def make_state_representation(self):
-        return self.dungeon
+        return numpy.expand_dims(self.dungeon, axis=-1)  # add channel dimension
 
     def render(self, mode='human', close=False):
         return self.dungeon

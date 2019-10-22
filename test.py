@@ -9,7 +9,7 @@ import scipy.stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from policy_networks.fully_connected import PPOActorNetwork
+from models.fully_connected import PPOActorFNN
 
 n = 1000
 
@@ -53,7 +53,7 @@ def benchmark_network_propagation():
 
     start = time.time()
     for _ in range(n):
-        model = PPOActorNetwork(gym.make("CartPole-v1"))
+        model = PPOActorFNN(gym.make("CartPole-v1"))
         model.save("saved_models/test")
         new_model = tf.keras.models.load_model("saved_models/test")
         shutil.rmtree("saved_models/test")
@@ -61,9 +61,9 @@ def benchmark_network_propagation():
 
     start = time.time()
     for _ in range(n):
-        model = PPOActorNetwork(gym.make("CartPole-v1"))
+        model = PPOActorFNN(gym.make("CartPole-v1"))
         weights = model.get_weights()
-        new_model = PPOActorNetwork(gym.make("CartPole-v1"))
+        new_model = PPOActorFNN(gym.make("CartPole-v1"))
         new_model.set_weights(weights)
     print(f"Serializing: {round(time.time() - start, 2)}")
 

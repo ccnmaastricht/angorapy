@@ -4,7 +4,7 @@ from gym.spaces import Box
 
 from agent.ppo import PPOAgent
 from environments import *
-from models.fully_connected import PPOActorFNN, PPOCriticFNN
+from models.convolutional import PPOActorCNN, PPOCriticCNN
 from utilities.util import env_extract_dims
 from utilities.visualization.story import StoryTeller
 
@@ -16,7 +16,7 @@ GPU = False
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "CartPole-v1"
+TASK = "Tunnel-v0"
 
 ITERATIONS = 1000
 WORKERS = 8
@@ -51,8 +51,8 @@ if LOAD_ID is not None:
     agent = PPOAgent.from_agent_state(LOAD_ID)
 else:
     # policy and critics networks
-    policy = PPOActorFNN(env)
-    critic = PPOCriticFNN(env)
+    policy = PPOActorCNN(env)
+    critic = PPOCriticCNN(env)
 
     # set up the agent and a reporting module
     agent = PPOAgent(policy, critic, env,
