@@ -160,7 +160,7 @@ class PPOAgent:
                + self.critic_loss(prediction, discounted_return) \
                - self.c_entropy * self.entropy_bonus(action_probs)
 
-    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False, save_every: int=0):
+    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False, save_every: int = 0):
         """Main training loop of the agent.
 
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.

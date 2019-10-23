@@ -21,3 +21,14 @@ class ResNetBlock(tf.keras.Model):
 
         x += input_tensor
         return tf.nn.relu(x)
+
+
+class SpatialSoftmax(tf.keras.Model):
+    """Spatial Softmax Layer."""
+
+    def __init__(self):
+        super().__init__()
+
+    def call(self, inputs, training=None, mask=None):
+        pass
+

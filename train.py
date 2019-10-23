@@ -16,7 +16,7 @@ GPU = False
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "CartPole-v1"
+TASK = "BipedalWalker-v2"
 policy_network_type = PPOActorFNN
 critic_network_type = PPOCriticFNN
 
@@ -79,7 +79,7 @@ agent.drill(n=ITERATIONS,
             batch_size=BATCH_SIZE,
             story_teller=teller,
             export_to_file=EXPORT_TO_FILE,
-            save_every=10)
+            save_every=0)
 
 agent.save_agent_state()
 
