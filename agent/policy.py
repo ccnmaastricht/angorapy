@@ -12,15 +12,7 @@ def act_discrete(policy, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray
     probabilities = policy(state, training=False)
     action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
 
-    try:
-        return action.numpy(), probabilities[0][action].numpy()
-    except Exception:
-        print(state)
-        print(probabilities)
-        print(action)
-        print("\n\n\n\n\n")
-        return action.numpy(), probabilities[0][action].numpy()
-
+    return action.numpy(), probabilities[0][action].numpy()
 
 def act_continuous(policy, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
     multivariates = policy(state, training=False)

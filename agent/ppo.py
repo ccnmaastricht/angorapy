@@ -18,6 +18,7 @@ from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, condense_worker_outputs, ModelTuple
+from agent.policy import act_discrete, act_continuous
 from utilities.util import flat_print, env_extract_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
@@ -329,14 +330,15 @@ class PPOAgent:
         :return:            a list of length n of episode rewards
         """
         rewards = []
+        policy_act = act_discrete if not self.continuous_control else act_continuous
         for episode in range(n):
             done = False
             reward_trajectory = []
-            state = tf.reshape(self.env.reset(), [1, -1])
+            state = numpy.expand_dims(self.env.reset(), axis=0).astype(numpy.float32)
             while not done:
-                action, action_probability = self.act(state)
-                observation, reward, done, _ = self.env.step(action.numpy())
-                state = tf.reshape(observation, [1, -1])
+                action, action_probability = policy_act(self.policy, state)
+                observation, reward, done, _ = self.env.step(action)
+                state = numpy.expand_dims(observation, axis=0).astype(numpy.float32)
                 reward_trajectory.append(reward)
 
             rewards.append(sum(reward_trajectory))

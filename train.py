@@ -79,7 +79,7 @@ agent.drill(n=ITERATIONS,
             batch_size=BATCH_SIZE,
             story_teller=teller,
             export_to_file=EXPORT_TO_FILE,
-            save_every=20)
+            save_every=10)
 
 agent.save_agent_state()
 
