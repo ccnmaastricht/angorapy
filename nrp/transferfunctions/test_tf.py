@@ -5,5 +5,5 @@ import geometry_msgs.msg
 def testing_tf(t):
     #log the first timestep (20ms), each couple of seconds
     if t % 2 < 0.02:
-        clientLogger.info('Time: ', t)
+        clientLogger.info('Test at t=', t)
         return geometry_msgs.msg.Twist(linear=geometry_msgs.msg.Vector3(1,2,3), angular=geometry_msgs.msg.Vector3(1,22,5))

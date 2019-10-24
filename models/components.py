@@ -29,12 +29,29 @@ class VisualComponent(tf.keras.Model):
             tf.keras.layers.Dense(32, activation="relu"),
         ])
 
-    def __call__(self, input_tensor, training=False, **kwargs):
+    def call(self, input_tensor, training=False, **kwargs):
         x = self.convolutions(input_tensor)
         x = self.res_blocks(x)
         x = self.dense(x)
 
         return x
+
+
+class NonVisualComponent(tf.keras.Model):
+    """For Proprioceptive and Somatosensory Input."""
+
+    def __init__(self, input_dimensionality, output_dimensionality):
+        super().__init__()
+
+        hidden_dimensionality = output_dimensionality + ((input_dimensionality - output_dimensionality) // 2)
+        self.fc_layers = tf.keras.Sequential([
+            tf.keras.layers.Dense(input_dimensionality, input_shape=(input_dimensionality,), activation="relu"),
+            tf.keras.layers.Dense(hidden_dimensionality, activation="relu"),
+            tf.keras.layers.Dense(output_dimensionality, activation="relu"),
+        ])
+
+    def call(self, input_tensor, training=False, **kwargs):
+        return self.fc_layers(input_tensor)
 
 
 class ResNetBlock(tf.keras.Model):

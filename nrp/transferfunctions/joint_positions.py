@@ -1,2 +1,2 @@
-#!/usr/bin/env python
-"""TODO Module Docstring."""
+def get_joint_positions():
+    pass

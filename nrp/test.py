@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """TODO Module Docstring."""
 import os
+import time
 
 from hbp_nrp_virtual_coach.virtual_coach import VirtualCoach
 
@@ -17,10 +18,11 @@ try:
         simulation.add_transfer_function(tf1)
         print("\nTransfer functions:\n__________________")
         simulation.print_transfer_functions()
+
 except Exception as e:
     # always stop simulation in the end
     print(e)
     pass
 
 print("\n\nNOW STOPPING SERVER\n----------------------")
-simulation.stop()
+# simulation.stop()
