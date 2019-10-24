@@ -18,7 +18,18 @@ autoencoder = tf.keras.Sequential([
     VisualDecoder()
 ])
 
+
+checkpoint_dir = "saved_models/pretrained_components/visual_component/"
+os.makedirs(checkpoint_dir)
+checkpoint_path = checkpoint_dir + "/weights.ckpt"
+
+# Create a callback that saves the model's weights
+cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                 save_weights_only=True,
+                                                 verbose=1)
+
+
 optimizer = tf.keras.optimizers.Adam()
 autoencoder.compile(optimizer, loss="mse")
 
-autoencoder.fit(x=images)
+autoencoder.fit(x=images, epochs=20, callbacks=[cp_callback])
