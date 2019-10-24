@@ -27,6 +27,9 @@ class ShadowBrain(tf.keras.Model):
     def get_initial_state(self, batch_size, dtype=tf.float32):
         return self.recurrent_component.get_initial_state(batch_size=batch_size, dtype=dtype)
 
+    def load_visual_component_weights(self, weights):
+        self.visual_component.set_weights(weights)
+
     def call(self, inputs, states, training=None, mask=None):
         visual, proprio, somato, goal = inputs
 

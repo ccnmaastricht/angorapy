@@ -18,8 +18,8 @@ class VisualComponent(tf.keras.Model):
 
         self.res_blocks = tf.keras.Sequential([
             # following need to be changed to ResNet Blocks
-            tf.keras.layers.Conv2D(16, 3, 3, activation="relu"),
-            tf.keras.layers.Conv2D(32, 3, 3, activation="relu"),
+            tf.keras.layers.Conv2D(64, 3, 3, activation="relu"),
+            tf.keras.layers.Conv2D(64, 3, 3, activation="relu"),
         ])
 
         self.dense = tf.keras.Sequential([
@@ -33,6 +33,39 @@ class VisualComponent(tf.keras.Model):
         x = self.convolutions(input_tensor)
         x = self.res_blocks(x)
         x = self.dense(x)
+
+        return x
+
+
+class VisualDecoder(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+
+        spatial_reshape_size = 7 * 7 * 64
+        self.expand = tf.keras.Sequential([
+            # TODO spatial softmax
+            tf.keras.layers.Dense(64, activation="relu", input_dim=32),
+            tf.keras.layers.Dense(spatial_reshape_size, activation="relu"),
+            tf.keras.layers.Reshape([7, 7, 64]),
+        ])
+
+        self.res_blocks = tf.keras.Sequential([
+            # following need to be changed to ResNet Blocks
+            tf.keras.layers.Conv2DTranspose(64, 3, 3, activation="relu"),
+            tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu"),
+        ])
+
+        self.convolutions = tf.keras.Sequential([
+            tf.keras.layers.UpSampling2D((3, 3)),
+            tf.keras.layers.Conv2DTranspose(32, 3, 1, activation="relu"),
+            tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="relu"),
+        ])
+
+    def call(self, input_tensor, training=False, **kwargs):
+        x = self.expand(input_tensor)
+
+        x = self.res_blocks(x)
+        x = self.convolutions(x)
 
         return x
 
@@ -79,5 +112,9 @@ if __name__ == "__main__":
 
     net = VisualComponent()
     tensor = tf.random.normal([4, 200, 200, 3])
+    latent = net(tensor)
+    print(f"Latent Shape: {latent.shape}")
 
-    print(net(tensor))
+    decoder = VisualDecoder()
+    reconstruction = decoder(latent)
+    print(f"Reconstruction Shape: {reconstruction.shape}")
