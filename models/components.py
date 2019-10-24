@@ -52,11 +52,11 @@ class VisualDecoder(tf.keras.Model):
         self.res_blocks = tf.keras.Sequential([
             # following need to be changed to ResNet Blocks
             tf.keras.layers.Conv2DTranspose(64, 3, 3, activation="relu"),
-            tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu"),
+            tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu", output_padding=1),
         ])
 
         self.convolutions = tf.keras.Sequential([
-            tf.keras.layers.UpSampling2D((3, 3)),
+            tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu", output_padding=2),
             tf.keras.layers.Conv2DTranspose(32, 3, 1, activation="relu"),
             tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="relu"),
         ])
