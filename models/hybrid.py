@@ -16,7 +16,6 @@ class ShadowBrain(tf.keras.Model):
 
         # visual hyperparameters taken from OpenAI paper
         self.visual_component = VisualComponent()
-
         self.proprioceptive_component = tf.keras.Sequential([
             # input shape should depend on how many angles we use
             tf.keras.layers.Dense(24, input_shape=(24,), activation="relu"),
@@ -24,8 +23,7 @@ class ShadowBrain(tf.keras.Model):
             tf.keras.layers.Dense(12, activation="relu"),
             tf.keras.layers.Dense(6, activation="relu"),
         ])
-
-        self.somatosensoric_component = tf.keras.Sequential([
+        self.somatosensory_component = tf.keras.Sequential([
             # input shape dependent on number of sensors
             tf.keras.layers.Dense(32, input_shape=(32,), activation="relu"),
             tf.keras.layers.Dense(32, activation="relu"),
@@ -34,12 +32,10 @@ class ShadowBrain(tf.keras.Model):
         ])
 
         # ABSTRACTION
-
         self.forward = tf.keras.Sequential([
             tf.keras.layers.Dense(32, input_shape=(32 + 8 + 6,)),
             tf.keras.layers.Dense(32, input_shape=(32 + 8 + 6,)),
         ])
-
         self.recurrent_component = tf.keras.layers.LSTMCell(32)
         self.output_layer = tf.keras.layers.Dense(action_space, activation="softmax")
 
@@ -51,7 +47,7 @@ class ShadowBrain(tf.keras.Model):
 
         latent_visual = self.visual_component(visual)
         latent_proprio = self.proprioceptive_component(proprio)
-        latent_somato = self.somatosensoric_component(somato)
+        latent_somato = self.somatosensory_component(somato)
 
         combined = tf.concat((latent_visual, latent_proprio, latent_somato), axis=1)
         abstracted = self.forward(combined)
@@ -73,6 +69,7 @@ if __name__ == "__main__":
                  tf.random.normal([16, 32]),
                  tf.random.normal([16, 4])) for _ in range(10)]
 
+    o = None
     for element in sequence:
         o, hidden = network(sequence[0], hidden)
     print(o)
