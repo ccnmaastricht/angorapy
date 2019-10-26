@@ -59,8 +59,7 @@ if __name__ == "__main__":
 
     o = None
     start_time = time.time()
-    for element in sequence:
-        o, hidden = network(sequence[0], hidden)
-    print(o)
-
+    for _ in range(100):
+        for element in sequence:
+            o, hidden = network(sequence[0], hidden)
     print(f"Execution Time: {time.time() - start_time}")

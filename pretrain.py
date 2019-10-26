@@ -13,21 +13,20 @@ test_train = tfds.load("cifar10", batch_size=32, shuffle_files=True)
 images = test_train["test"].concatenate(test_train["train"])
 images = images.map(lambda img: (tf.image.resize(img["image"], (200, 200)),) * 2)
 
+# model with decoder
 autoencoder = tf.keras.Sequential([
     VisualComponent(),
     VisualDecoder()
 ])
 
-
 checkpoint_dir = "saved_models/pretrained_components/visual_component/"
-os.makedirs(checkpoint_dir)
+os.makedirs(checkpoint_dir, exist_ok=True)
 checkpoint_path = checkpoint_dir + "/weights.ckpt"
 
 # Create a callback that saves the model's weights
 cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                  save_weights_only=True,
                                                  verbose=1)
-
 
 optimizer = tf.keras.optimizers.Adam()
 autoencoder.compile(optimizer, loss="mse")

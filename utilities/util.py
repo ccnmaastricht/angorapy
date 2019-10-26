@@ -22,3 +22,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
         raise NotImplementedError(f"Environment has unknown Action Space Typ: {env.action_space}")
 
     return obs_dim, act_dim
+
+
+def flatten(l):
+    return [l] if not isinstance(l, list) else [x for X in l for x in flatten(X)]

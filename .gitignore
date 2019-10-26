@@ -1,6 +1,6 @@
 stories/experiments/
 saved_models/*
-benchmark_efficiency.py
+misc/benchmark_efficiency.py
 
 ### PyCharm+all ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm
