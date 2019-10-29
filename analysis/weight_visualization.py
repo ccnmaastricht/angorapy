@@ -9,8 +9,8 @@ from typing import List
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-from models.components import VisualComponent
-
+from models.components import build_visual_component
+from utilities.util import normalize
 
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 
@@ -23,14 +23,17 @@ def plot_2d_filter_weights(filter_weights):
     plt.subplots_adjust(wspace=0.05, hspace=0.05)
 
     # normalize data
-    filter_weights = (filter_weights - filter_weights.min()) / (filter_weights.max() - filter_weights.min())
+    filter_weights = normalize(filter_weights)
 
     i = 0
     for row_of_axes in axes:
         for axis in row_of_axes:
             if i < n_filters:
                 axis.imshow(filter_weights[:, :, :, i])
-            axis.axis("off")
+            else:
+                axis.axis("off")
+            axis.set_xticks([])
+            axis.set_yticks([])
             i += 1
 
 
@@ -43,8 +46,17 @@ def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
 
 class WeightAnalyzer:
 
-    def __init__(self, network: tf.keras.Model):
+    def __init__(self, network: tf.keras.Model, mode: str = "show"):
         self.network = network
+        self.mode = "show"
+        self.set_mode(mode)
+
+        self.figure_directory = "../docs/analysis/figures/"
+        os.makedirs(self.figure_directory, exist_ok=True)
+
+    def set_mode(self, mode: str):
+        assert mode in ["show", "save"], "Illegal Analyzer Mode. Choose from show, save."
+        self.mode = mode
 
     def list_layer_names(self) -> List[str]:
         return [layer.name for layer in extract_layers(self.network)]
@@ -55,20 +67,64 @@ class WeightAnalyzer:
     def list_non_convolutional_layer_names(self) -> List[str]:
         return [layer.name for layer in extract_layers(self.network) if not isinstance(layer, CONVOLUTION_BASE_CLASS)]
 
+    def plot_model(self):
+        tf.keras.utils.plot_model(self.network, show_shapes=True)
+
     def visualize_layer_weights(self, layer_name):
+        """Plot the weights (ignoring the bias) of a convolutional layer as a tessellation of its filters."""
         assert layer_name in self.list_convolutional_layer_names()
         layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
 
         plot_2d_filter_weights(layer.get_weights()[0])
+        plt.show() if self.mode == "show" else plt.savefig(f"{self.figure_directory}/weights_{layer_name}.pdf",
+                                                           format="pdf")
+
+        plt.close()
+
+    def visualize_max_filter_respondence(self, layer_name, filter_id):
+        """Feature Maximization."""
+        input_shape = (1,) + self.network.input_shape[1:]
+        input_noise = tf.Variable(tf.random.uniform(input_shape, 128, 129))
+        layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
+        optimizer = tf.keras.optimizers.SGD()
+
+        # build model that only goes to the layer of interest
+        intermediate_model = tf.keras.Model(inputs=model.input, outputs=layer.output)
+        intermediate_model.summary()
+
+        for i in range(1000):
+            with tf.GradientTape() as tape:
+                activations = intermediate_model(input_noise)[0]
+                loss = - tf.reduce_mean(activations[:, :, filter_id])
+
+            gradient = tape.gradient(loss, input_noise)
+            optimizer.apply_gradients([(gradient, input_noise)])
+
+        final_image = normalize(tf.squeeze(input_noise).numpy())
+        plt.imshow(final_image)
         plt.show()
+
+    def visualize_activation_map(self):
+        pass
+
+    # BUILDERS
+
+    @staticmethod
+    def from_saved_model(model_path: str, mode: str = "show"):
+        assert os.path.exists(model_path), "Model Path does not exist!"
+
+        return WeightAnalyzer(tf.keras.models.load_model(model_path), mode=mode)
 
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    model = VisualComponent()
-    model.predict(tf.random.normal([1, 200, 200, 3]))
-    analyzer = WeightAnalyzer(model)
+    tf.random.set_seed(1)
+
+    model = tf.keras.models.load_model("../saved_models/pretrained_components/visual_component/pretrained_encoder.h5")
+    analyzer = WeightAnalyzer(model, mode="save")
 
     pprint(analyzer.list_convolutional_layer_names())
-    analyzer.visualize_layer_weights("conv2d")
+    # analyzer.visualize_layer_weights("conv2d")
+    analyzer.visualize_max_filter_respondence("conv2d", 6)

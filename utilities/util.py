@@ -24,5 +24,13 @@ def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
     return obs_dim, act_dim
 
 
+def normalize(x, is_img=False):
+    """Normalize a numpy array to have all values in range (0, 1)."""
+    if not is_img:
+        return (x - x.min()) / (x.max() - x.min())
+    else:
+        return x / 255
+
+
 def flatten(l):
     return [l] if not isinstance(l, list) else [x for X in l for x in flatten(X)]

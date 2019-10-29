@@ -3,88 +3,48 @@
 import os
 
 import tensorflow as tf
+from tensorflow import keras
 
 
-class VisualComponent(tf.keras.Model):
+def build_visual_component():
+    inputs = keras.Input(shape=(200, 200, 3))
+    x = keras.layers.Conv2D(32, 5, 1, activation="relu")(inputs)
+    x = tf.keras.layers.Conv2D(32, 3, 1, activation="relu")(x)
+    x = tf.keras.layers.MaxPooling2D(3, 3)(x)
+    x = tf.keras.layers.Conv2D(64, 3, 3, activation="relu")(x)
+    x = tf.keras.layers.Conv2D(64, 3, 3, activation="relu")(x)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(64, activation="relu")(x)
+    outputs = tf.keras.layers.Dense(32, activation="relu")(x)
 
-    def __init__(self):
-        super().__init__()
-
-        self.convolutions = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(32, 5, 1, input_shape=(200, 200, 3), activation="relu"),
-            tf.keras.layers.Conv2D(32, 3, 1, activation="relu"),
-            tf.keras.layers.MaxPooling2D(3, 3),
-        ])
-
-        self.res_blocks = tf.keras.Sequential([
-            # following need to be changed to ResNet Blocks
-            tf.keras.layers.Conv2D(64, 3, 3, activation="relu"),
-            tf.keras.layers.Conv2D(64, 3, 3, activation="relu"),
-        ])
-
-        self.dense = tf.keras.Sequential([
-            # TODO spatial softmax
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(64, activation="relu"),
-            tf.keras.layers.Dense(32, activation="relu"),
-        ])
-
-    def call(self, input_tensor, training=False, **kwargs):
-        x = self.convolutions(input_tensor)
-        x = self.res_blocks(x)
-        x = self.dense(x)
-
-        return x
+    return keras.Model(inputs=inputs, outputs=outputs)
 
 
-class VisualDecoder(tf.keras.Model):
-    def __init__(self):
-        super().__init__()
+def build_visual_decoder():
+    spatial_reshape_size = 7 * 7 * 64
 
-        spatial_reshape_size = 7 * 7 * 64
-        self.expand = tf.keras.Sequential([
-            # TODO spatial softmax
-            tf.keras.layers.Dense(64, activation="relu", input_dim=32),
-            tf.keras.layers.Dense(spatial_reshape_size, activation="relu"),
-            tf.keras.layers.Reshape([7, 7, 64]),
-        ])
+    inputs = keras.Input(shape=(32,))
 
-        self.res_blocks = tf.keras.Sequential([
-            # following need to be changed to ResNet Blocks
-            tf.keras.layers.Conv2DTranspose(64, 3, 3, activation="relu"),
-            tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu", output_padding=1),
-        ])
+    # TODO spatial softmax
+    x = tf.keras.layers.Dense(64, activation="relu")(inputs)
+    x = tf.keras.layers.Dense(spatial_reshape_size, activation="relu")(x)
+    x = tf.keras.layers.Reshape([7, 7, 64])(x)
+    x = tf.keras.layers.Conv2DTranspose(64, 3, 3, activation="relu")(x)
+    x = tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu", output_padding=1)(x)
+    x = tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu", output_padding=2)(x)
+    x = tf.keras.layers.Conv2DTranspose(32, 3, 1, activation="relu")(x)
+    outputs = tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="sigmoid")(x)
 
-        self.convolutions = tf.keras.Sequential([
-            tf.keras.layers.Conv2DTranspose(32, 3, 3, activation="relu", output_padding=2),
-            tf.keras.layers.Conv2DTranspose(32, 3, 1, activation="relu"),
-            tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="relu"),
-        ])
-
-    def call(self, input_tensor, training=False, **kwargs):
-        x = self.expand(input_tensor)
-
-        x = self.res_blocks(x)
-        x = self.convolutions(x)
-
-        return x
+    return keras.Model(inputs=inputs, outputs=outputs)
 
 
-class NonVisualComponent(tf.keras.Model):
-    """For Proprioceptive and Somatosensory Input."""
+def build_non_visual_component(input_dimensionality: int, hidden_dimensionality: int, output_dimensionality: int):
+    inputs = keras.Input(shape=(input_dimensionality,))
+    x = tf.keras.layers.Dense(input_dimensionality, activation="relu")(inputs)
+    x = tf.keras.layers.Dense(hidden_dimensionality, activation="relu")(x)
+    outputs = tf.keras.layers.Dense(output_dimensionality, activation="relu")(x)
 
-    def __init__(self, input_dimensionality, output_dimensionality):
-        super().__init__()
-
-        hidden_dimensionality = output_dimensionality + ((input_dimensionality - output_dimensionality) // 2)
-        self.fc_layers = tf.keras.Sequential([
-            tf.keras.layers.Dense(input_dimensionality, input_shape=(input_dimensionality,), activation="relu"),
-            tf.keras.layers.Dense(hidden_dimensionality, activation="relu"),
-            tf.keras.layers.Dense(output_dimensionality, activation="relu"),
-        ])
-
-    def call(self, input_tensor, training=False, **kwargs):
-        return self.fc_layers(input_tensor)
+    return keras.Model(inputs=inputs, outputs=outputs)
 
 
 class ResNetBlock(tf.keras.Model):
