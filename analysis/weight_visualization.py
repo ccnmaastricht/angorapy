@@ -7,10 +7,10 @@ from pprint import pprint
 from typing import List
 
 import matplotlib.pyplot as plt
+import numpy
 import tensorflow as tf
 from tqdm import tqdm
 
-from models.components import build_visual_component
 from utilities.util import normalize
 
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
@@ -31,6 +31,25 @@ def plot_2d_filter_weights(filter_weights):
         for axis in row_of_axes:
             if i < n_filters:
                 axis.imshow(filter_weights[:, :, :, i])
+            else:
+                axis.axis("off")
+            axis.set_xticks([])
+            axis.set_yticks([])
+            i += 1
+
+
+def plot_image_tiling(images: List[numpy.ndarray]):
+    # prepare subplots
+    n_filters = len(images)
+    tiles_per_row = math.ceil(math.sqrt(n_filters))
+    fig, axes = plt.subplots(tiles_per_row, tiles_per_row)
+    plt.subplots_adjust(wspace=0.05, hspace=0.05)
+
+    i = 0
+    for row_of_axes in axes:
+        for axis in row_of_axes:
+            if i < n_filters:
+                axis.imshow(images[i])
             else:
                 axis.axis("off")
             axis.set_xticks([])
@@ -76,40 +95,44 @@ class WeightAnalyzer:
         assert layer_name in self.list_convolutional_layer_names()
         layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
 
-        plot_2d_filter_weights(layer.get_weights()[0])
+        weights = normalize(layer.get_weights()[0])
+        filters = [weights[:, :, :, f] for f in range(layer.output_shape[-1])]
+        plot_image_tiling(filters)
         plt.show() if self.mode == "show" else plt.savefig(f"{self.figure_directory}/weights_{layer_name}.pdf",
                                                            format="pdf")
 
         plt.close()
 
-    def visualize_max_filter_respondence(self, layer_name, filter_id):
+    def visualize_max_filter_respondence(self, layer_name: str, filter_ids: List[int] = None):
         """Feature Maximization."""
-        input_shape = (1,) + self.network.input_shape[1:]
-        input_noise = tf.Variable(tf.random.uniform(input_shape, 0.5, 0.6), trainable=True)
-        original_image = tf.squeeze(input_noise).numpy().copy()
-
         # build model that only goes to the layer of interest
         layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
-        intermediate_model = tf.keras.Model(inputs=model.input, outputs=layer.output)
+        intermediate_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
-        for _ in tqdm(range(100), disable=True):
-            with tf.GradientTape() as tape:
-                activations = intermediate_model(input_noise)[0]
-                loss = tf.reduce_mean(activations[:, :, filter_id])
+        filter_ids = list(range(layer.output_shape[-1])) if filter_ids is None else filter_ids
 
-            print(loss.numpy().item())
-            gradient = tape.gradient(loss, input_noise)
-            # step size from https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/13_Visual_Analysis.ipynb
-            step_size = (1 / (gradient.numpy().std() + 1e-8))
-            input_noise.assign_add(gradient * step_size)
-            input_noise.assign(tf.clip_by_value(input_noise, 0, 1))
+        feature_maximizations = []
+        for filter_id in tqdm(filter_ids, desc="Feature Maximization"):
+            input_shape = (1,) + self.network.input_shape[1:]
+            input_noise = tf.Variable(tf.random.uniform(input_shape, 0, 1), trainable=True)
 
-        final_image = tf.squeeze(input_noise).numpy()
-        print(f"Non-zero differences: {tf.math.count_nonzero(original_image - final_image).numpy().item()}")
-        fig, axes = plt.subplots(1, 2)
-        axes[0].imshow(original_image)
-        axes[1].imshow(final_image)
-        plt.show()
+            for _ in range(50):
+                with tf.GradientTape() as tape:
+                    activations = intermediate_model(input_noise)
+                    loss = tf.reduce_sum(activations[:, :, :, filter_id])
+
+                gradient = tape.gradient(loss, input_noise)
+                # step size from https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/13_Visual_Analysis.ipynb
+                step_size = 100
+                input_noise.assign_add(gradient * step_size)
+                input_noise.assign(normalize(input_noise))
+
+            final_image = tf.squeeze(input_noise).numpy()
+            feature_maximizations.append(final_image)
+
+        plot_image_tiling(feature_maximizations)
+        plt.show() if self.mode == "show" else plt.savefig(f"{self.figure_directory}/feature_maximization_{layer_name}.pdf",
+                                                           format="pdf")
 
     def visualize_activation_map(self):
         pass
@@ -125,13 +148,11 @@ class WeightAnalyzer:
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     tf.random.set_seed(1)
 
-    model = tf.keras.models.load_model("../saved_models/pretrained_components/visual_component/pretrained_encoder.h5")
-    analyzer = WeightAnalyzer(model, mode="show")
-
+    model = tf.keras.models.load_model("../saved_models/pretrained_components/visual_component/classification/pretrained_encoder.h5")
+    analyzer = WeightAnalyzer(model, mode="save")
     pprint(analyzer.list_convolutional_layer_names())
     # analyzer.visualize_layer_weights("conv2d")
-    analyzer.visualize_max_filter_respondence("conv2d", 1)
+    analyzer.visualize_max_filter_respondence("conv2d")
