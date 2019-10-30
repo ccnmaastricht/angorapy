@@ -15,7 +15,7 @@ def build_visual_component():
     x = tf.keras.layers.Conv2D(64, 3, 3, activation="relu")(x)
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(64, activation="relu")(x)
-    outputs = tf.keras.layers.Dense(32, activation="relu")(x)
+    outputs = tf.keras.layers.Dense(64, activation="relu")(x)
 
     return keras.Model(inputs=inputs, outputs=outputs)
 
@@ -23,7 +23,7 @@ def build_visual_component():
 def build_visual_decoder():
     spatial_reshape_size = 7 * 7 * 64
 
-    inputs = keras.Input(shape=(32,))
+    inputs = keras.Input(shape=(64,))
 
     # TODO spatial softmax
     x = tf.keras.layers.Dense(64, activation="relu")(inputs)

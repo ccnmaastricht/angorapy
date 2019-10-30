@@ -10,7 +10,7 @@ from models.components import build_visual_component, build_visual_decoder
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-LOAD_FROM = "saved_models/pretrained_components/visual_component/weights.ckpt"
+LOAD_FROM = None  # "saved_models/pretrained_components/visual_component/weights.ckpt"
 
 # load dataset
 test_train = tfds.load("cifar10", batch_size=128, shuffle_files=True)
@@ -41,7 +41,7 @@ if LOAD_FROM is None:
     model.compile(optimizer, loss="mse")
 
     # train and save encoder
-    model.fit(x=images, epochs=20, callbacks=[cp_callback])
+    model.fit(x=images, epochs=30, callbacks=[cp_callback])
     encoder.save(checkpoint_dir + "/pretrained_encoder.h5")
 else:
     model.load_weights(LOAD_FROM)

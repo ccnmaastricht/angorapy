@@ -8,6 +8,7 @@ from typing import List
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from tqdm import tqdm
 
 from models.components import build_visual_component
 from utilities.util import normalize
@@ -84,24 +85,30 @@ class WeightAnalyzer:
     def visualize_max_filter_respondence(self, layer_name, filter_id):
         """Feature Maximization."""
         input_shape = (1,) + self.network.input_shape[1:]
-        input_noise = tf.Variable(tf.random.uniform(input_shape, 128, 129))
-        layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
-        optimizer = tf.keras.optimizers.SGD()
+        input_noise = tf.Variable(tf.random.uniform(input_shape, 0.5, 0.6), trainable=True)
+        original_image = tf.squeeze(input_noise).numpy().copy()
 
         # build model that only goes to the layer of interest
+        layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
         intermediate_model = tf.keras.Model(inputs=model.input, outputs=layer.output)
-        intermediate_model.summary()
 
-        for i in range(1000):
+        for _ in tqdm(range(100), disable=True):
             with tf.GradientTape() as tape:
                 activations = intermediate_model(input_noise)[0]
-                loss = - tf.reduce_mean(activations[:, :, filter_id])
+                loss = tf.reduce_mean(activations[:, :, filter_id])
 
+            print(loss.numpy().item())
             gradient = tape.gradient(loss, input_noise)
-            optimizer.apply_gradients([(gradient, input_noise)])
+            # step size from https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/13_Visual_Analysis.ipynb
+            step_size = (1 / (gradient.numpy().std() + 1e-8))
+            input_noise.assign_add(gradient * step_size)
+            input_noise.assign(tf.clip_by_value(input_noise, 0, 1))
 
-        final_image = normalize(tf.squeeze(input_noise).numpy())
-        plt.imshow(final_image)
+        final_image = tf.squeeze(input_noise).numpy()
+        print(f"Non-zero differences: {tf.math.count_nonzero(original_image - final_image).numpy().item()}")
+        fig, axes = plt.subplots(1, 2)
+        axes[0].imshow(original_image)
+        axes[1].imshow(final_image)
         plt.show()
 
     def visualize_activation_map(self):
@@ -123,8 +130,8 @@ if __name__ == "__main__":
     tf.random.set_seed(1)
 
     model = tf.keras.models.load_model("../saved_models/pretrained_components/visual_component/pretrained_encoder.h5")
-    analyzer = WeightAnalyzer(model, mode="save")
+    analyzer = WeightAnalyzer(model, mode="show")
 
     pprint(analyzer.list_convolutional_layer_names())
     # analyzer.visualize_layer_weights("conv2d")
-    analyzer.visualize_max_filter_respondence("conv2d", 6)
+    analyzer.visualize_max_filter_respondence("conv2d", 1)
