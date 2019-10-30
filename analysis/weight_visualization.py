@@ -85,7 +85,8 @@ class WeightAnalyzer:
         return [layer.name for layer in extract_layers(self.network) if isinstance(layer, CONVOLUTION_BASE_CLASS)]
 
     def list_non_convolutional_layer_names(self) -> List[str]:
-        return [layer.name for layer in extract_layers(self.network) if not isinstance(layer, CONVOLUTION_BASE_CLASS)]
+        return [layer.name for layer in extract_layers(self.network) if
+                not isinstance(layer, CONVOLUTION_BASE_CLASS) and not isinstance(layer, tf.keras.layers.Activation)]
 
     def plot_model(self):
         tf.keras.utils.plot_model(self.network, show_shapes=True)
@@ -103,23 +104,28 @@ class WeightAnalyzer:
 
         plt.close()
 
-    def visualize_max_filter_respondence(self, layer_name: str, filter_ids: List[int] = None):
+    def visualize_max_filter_respondence(self, layer_name: str, feature_ids: List[int] = None):
         """Feature Maximization."""
         # build model that only goes to the layer of interest
         layer = extract_layers(self.network)[self.list_layer_names().index(layer_name)]
+        print("performing feature maximization on " + (
+            "dense " if not isinstance(layer, CONVOLUTION_BASE_CLASS) else "convolutional ") + "layer")
         intermediate_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
-        filter_ids = list(range(layer.output_shape[-1])) if filter_ids is None else filter_ids
+        feature_ids = list(range(layer.output_shape[-1])) if feature_ids is None else feature_ids
 
         feature_maximizations = []
-        for filter_id in tqdm(filter_ids, desc="Feature Maximization"):
+        for feature_id in tqdm(feature_ids, desc="Feature Maximization"):
             input_shape = (1,) + self.network.input_shape[1:]
             input_noise = tf.Variable(tf.random.uniform(input_shape, 0, 1), trainable=True)
 
             for _ in range(50):
                 with tf.GradientTape() as tape:
                     activations = intermediate_model(input_noise)
-                    loss = tf.reduce_sum(activations[:, :, :, filter_id])
+                    if isinstance(layer, CONVOLUTION_BASE_CLASS):
+                        loss = tf.reduce_sum(activations[:, :, :, feature_id])
+                    else:
+                        loss = activations[:, feature_id]
 
                 gradient = tape.gradient(loss, input_noise)
                 # step size from https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/13_Visual_Analysis.ipynb
@@ -131,8 +137,9 @@ class WeightAnalyzer:
             feature_maximizations.append(final_image)
 
         plot_image_tiling(feature_maximizations)
-        plt.show() if self.mode == "show" else plt.savefig(f"{self.figure_directory}/feature_maximization_{layer_name}.pdf",
-                                                           format="pdf")
+        plt.show() if self.mode == "show" else plt.savefig(
+            f"{self.figure_directory}/feature_maximization_{layer_name}.pdf",
+            format="pdf")
 
     def visualize_activation_map(self):
         pass
@@ -151,8 +158,9 @@ if __name__ == "__main__":
 
     tf.random.set_seed(1)
 
-    model = tf.keras.models.load_model("../saved_models/pretrained_components/visual_component/classification/pretrained_encoder.h5")
+    model = tf.keras.models.load_model(
+        "../saved_models/pretrained_components/visual_component/classification/pretrained_encoder.h5")
     analyzer = WeightAnalyzer(model, mode="save")
-    pprint(analyzer.list_convolutional_layer_names())
-    # analyzer.visualize_layer_weights("conv2d")
-    analyzer.visualize_max_filter_respondence("conv2d")
+    pprint(analyzer.list_layer_names())
+
+    analyzer.visualize_max_filter_respondence("dense_1")

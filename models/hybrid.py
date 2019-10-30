@@ -5,9 +5,6 @@ import time
 
 import tensorflow as tf
 
-from models.components import VisualComponent, NonVisualComponent
-
-
 class ShadowBrain(tf.keras.Model):
 
     def __init__(self, action_space, goal_dim):
