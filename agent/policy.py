@@ -14,6 +14,7 @@ def act_discrete(policy, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray
 
     return action.numpy(), probabilities[0][action].numpy()
 
+
 def act_continuous(policy, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
     multivariates = policy(state, training=False)
     n_actions = multivariates.shape[1] // 2

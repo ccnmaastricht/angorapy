@@ -91,11 +91,11 @@ elif TASK == "classification":
                                                          save_weights_only=True,
                                                          verbose=1)
 
-        optimizer = tf.keras.optimizers.Adam()
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         model.compile(optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
 
         # train and save encoder
-        model.fit(train_images, epochs=5, callbacks=[cp_callback])
+        model.fit(train_images, epochs=100, callbacks=[cp_callback])
         encoder.save(checkpoint_dir + "/pretrained_encoder.h5")
     else:
         model.load_weights(LOAD_FROM)

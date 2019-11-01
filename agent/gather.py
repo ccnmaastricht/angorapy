@@ -3,17 +3,15 @@
 from collections import namedtuple
 from typing import Tuple, List
 
-import gym
-import models
-from environments import *
 import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Box
 
+import models
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
-from models.fully_connected import PPOActorFNN, PPOCriticFNN
+from environments import *
 
 ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_probabilities", "returns", "advantages",
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])

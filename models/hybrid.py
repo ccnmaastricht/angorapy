@@ -5,15 +5,24 @@ import time
 
 import tensorflow as tf
 
+from models.components import build_visual_component, build_non_visual_component
+
+
+def build_shadow_brain():
+    visual_component = build_visual_component()
+    proprioceptive_component = build_non_visual_component(24, 12, 8)
+    somatosensory_component = build_non_visual_component(32, 24, 8)
+
+
 class ShadowBrain(tf.keras.Model):
 
     def __init__(self, action_space, goal_dim):
         super().__init__()
 
         # sensory input
-        self.visual_component = VisualComponent()
-        self.proprioceptive_component = NonVisualComponent(24, 8)
-        self.somatosensory_component = NonVisualComponent(32, 8)
+        self.visual_component = build_visual_component()
+        self.proprioceptive_component = build_non_visual_component(24, 12, 8)
+        self.somatosensory_component = build_non_visual_component(32, 24, 8)
 
         # recurrent abstraction
         self.fc_layer = tf.keras.Sequential([tf.keras.layers.Dense(32, input_shape=(48 + goal_dim,)),
