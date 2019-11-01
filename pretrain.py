@@ -5,7 +5,6 @@ import os
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow_datasets as tfds
-from tensorflow.python.keras.utils import to_categorical
 
 from models.components import build_visual_component, build_visual_decoder
 
@@ -79,6 +78,9 @@ elif TASK == "classification":
     encoded_img = encoder(inputs)
     classifier = tf.keras.layers.Dense(10, activation="softmax")(encoded_img)
     model = tf.keras.Model(inputs=inputs, outputs=classifier)
+    print(model.layers)
+    model.summary()
+    exit()
 
     if LOAD_FROM is None:
         # model with decoder
