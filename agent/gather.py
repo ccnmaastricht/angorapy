@@ -17,7 +17,7 @@ ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths"])
-ModelTuple = namedtuple("ModelTuple", ["model_class", "weights"])
+ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
 
 
 @ray.remote(num_cpus=8)
@@ -33,10 +33,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float):
         policy = tfl.keras.models.load_model(f"{model}/policy")
         critic = tfl.keras.models.load_model(f"{model}/value")
     elif isinstance(model, tuple):
-        # recreate policy/value by type; looks a bit hacked but allows this to be any network without issues from pickle
-        policy = getattr(models, model[0].model_class)(env)
+        policy = getattr(models, model[0].model_builder)(env)
         policy.set_weights(model[0].weights)
-        critic = getattr(models, model[1].model_class)(env)
+        critic = getattr(models, model[1].model_builder)(env)
         critic.set_weights(model[1].weights)
     else:
         raise ValueError("Unknown input for model.")

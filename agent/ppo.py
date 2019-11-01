@@ -34,7 +34,7 @@ class PPOAgent:
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, policy: tf.keras.Model, critic: tf.keras.Model, environment: gym.Env, horizon: int, workers: int,
+    def __init__(self, policy_builder, critic_builder, environment: gym.Env, horizon: int, workers: int,
                  learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
                  lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, gradient_clipping: bool=True,
                  _make_dirs=True):
@@ -61,12 +61,12 @@ class PPOAgent:
         self.gradient_clipping = gradient_clipping
 
         # models and optimizers
-        self.policy = policy
-        self.critic = critic
+        self.policy = policy_builder(self.env)
+        self.critic = critic_builder(self.env)
 
         # load persistent network types
-        self.policy_type_name = policy.__class__.__name__
-        self.critic_type_name = critic.__class__.__name__
+        self.policy_type_name = policy_builder.__name__
+        self.critic_type_name = critic_builder.__name__
 
         self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi)
         self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v)
