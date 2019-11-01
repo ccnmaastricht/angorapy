@@ -1,73 +1,65 @@
 #!/usr/bin/env python
 """Convolutional Networks serving as policy or critic for agents getting visual input."""
-import numpy
 import tensorflow as tf
 from gym.spaces import Box
 
 from utilities.util import env_extract_dims
 
 
-class PPOActorCNN(tf.keras.Model):
-    """Fully-connected network taking the role of an actor."""
+def build_cnn_actor_model(env):
+    # TODO add support for continuous action space and variable frame shape
+    continuous_control = isinstance(env.action_space, Box)
+    state_dimensionality, n_actions = env_extract_dims(env)
 
-    def __init__(self, env):
-        super().__init__()
+    inputs = tf.keras.Input(shape=(30, 30, 1))
 
-        self.continuous_control = isinstance(env.action_space, Box)
-        self.state_dimensionality, self.n_actions = env_extract_dims(env)
+    # convolutions
+    x = tf.keras.layers.Conv2D(32, 8, 4, input_shape=(30, 30, 1))(inputs)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Conv2D(64, 3, 2)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ZeroPadding2D(1, data_format="channels_last")(x)
+    x = tf.keras.layers.Conv2D(128, 3, 1)(x)
+    x = tf.keras.layers.Activation("relu")(x)
 
-        self.convolver = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(32, 8, 4, input_shape=(30, 30, 1), activation="relu"),
-            tf.keras.layers.Conv2D(64, 3, 2, activation="relu"),
-            tf.keras.layers.ZeroPadding2D(1, data_format="channels_last"),
-            tf.keras.layers.Conv2D(128, 3, 1, activation="relu"),
-        ])
+    # fully connected
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Dense(64)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Dense(32)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    out = tf.keras.layers.Dense(n_actions, activation="softmax")(x)
 
-        self.forward = tf.keras.Sequential()
-        self.forward.add(tf.keras.layers.Flatten())
-        self.forward.add(tf.keras.layers.Dense(128, activation="relu"))
-        self.forward.add(tf.keras.layers.Dense(64, activation="relu"))
-        self.forward.add(tf.keras.layers.Dense(32, activation="relu"))
-        self.forward.add(tf.keras.layers.Dense(self.n_actions, activation="softmax"))
-
-        example_input = numpy.expand_dims(env.reset().astype(numpy.float32), axis=0)
-        self.predict(example_input)
-
-    def call(self, input_tensor, training=False, **kwargs):
-        convolved = self.convolver(input_tensor)
-        out = self.forward(convolved)
-
-        return out
+    return tf.keras.Model(inputs=inputs, outputs=out)
 
 
-class PPOCriticCNN(tf.keras.Model):
-    """Fully-connected network taking the role of an actor."""
+def build_cnn_critic_model(env):
+    # TODO add support for continuous action space and variable frame shape
+    # TODO way too much duplicate code, should solve this more cleverly
+    continuous_control = isinstance(env.action_space, Box)
+    state_dimensionality, n_actions = env_extract_dims(env)
 
-    def __init__(self, env):
-        super().__init__()
+    inputs = tf.keras.Input(shape=(30, 30, 1))
 
-        self.continuous_control = isinstance(env.action_space, Box)
-        self.state_dimensionality, self.n_actions = env_extract_dims(env)
+    # convolutions
+    x = tf.keras.layers.Conv2D(32, 8, 4, input_shape=(30, 30, 1))(inputs)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Conv2D(64, 3, 2)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ZeroPadding2D(1, data_format="channels_last")(x)
+    x = tf.keras.layers.Conv2D(128, 3, 1)(x)
+    x = tf.keras.layers.Activation("relu")(x)
 
-        self.convolver = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(32, 8, 4, input_shape=(30, 30, 1), activation="relu"),
-            tf.keras.layers.Conv2D(64, 3, 2, activation="relu"),
-            tf.keras.layers.ZeroPadding2D(1, data_format="channels_last"),
-            tf.keras.layers.Conv2D(128, 3, 1, activation="relu"),
-        ])
+    # fully connected
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Dense(64)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Dense(32)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+    out = tf.keras.layers.Dense(1, activation="softmax")(x)
 
-        self.forward = tf.keras.Sequential()
-        self.forward.add(tf.keras.layers.Flatten())
-        self.forward.add(tf.keras.layers.Dense(128, activation="relu"))
-        self.forward.add(tf.keras.layers.Dense(64, activation="relu"))
-        self.forward.add(tf.keras.layers.Dense(32, activation="relu"))
-        self.forward.add(tf.keras.layers.Dense(1, activation="linear"))
-
-        example_input = numpy.expand_dims(env.reset().astype(numpy.float32), axis=0)
-        self.predict(example_input)
-
-    def call(self, input_tensor, training=False, **kwargs):
-        convolved = self.convolver(input_tensor)
-        out = self.forward(convolved)
-
-        return out
+    return tf.keras.Model(inputs=inputs, outputs=out)
