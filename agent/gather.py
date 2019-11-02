@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience."""
+import multiprocessing
 from collections import namedtuple
 from typing import Tuple, List
 
@@ -19,8 +20,10 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
                                        "episode_rewards", "episode_lengths"])
 ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
 
+RESERVED_GATHERING_CPUS = multiprocessing.cpu_count() - 2
 
-@ray.remote(num_cpus=8)
+
+@ray.remote(num_cpus=RESERVED_GATHERING_CPUS)
 def collect(model, horizon: int, env_name: str, discount: float, lam: float):
     import tensorflow as tfl
 
@@ -33,9 +36,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float):
         policy = tfl.keras.models.load_model(f"{model}/policy")
         critic = tfl.keras.models.load_model(f"{model}/value")
     elif isinstance(model, tuple):
-        policy = getattr(models, model[0].model_builder)(env)
+        policy, _, _ = getattr(models, model[0].model_builder)(env)
         policy.set_weights(model[0].weights)
-        critic = getattr(models, model[1].model_builder)(env)
+        _, critic, _ = getattr(models, model[1].model_builder)(env)
         critic.set_weights(model[1].weights)
     else:
         raise ValueError("Unknown input for model.")
@@ -47,9 +50,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float):
     # go for it
     states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
     state = env.reset().astype(numpy.float32)
+    act = act_continuous if env_is_continuous else act_discrete
     for t in range(horizon):
         # choose action and step
-        act = act_continuous if env_is_continuous else act_discrete
         action, action_probability = act(policy, numpy.expand_dims(state, axis=0))
         observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
 

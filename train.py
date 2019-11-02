@@ -4,7 +4,7 @@ from gym.spaces import Box
 
 from agent.ppo import PPOAgent
 from environments import *
-from models.fully_connected import build_ffn_actor_model, build_ffn_critic_model
+from models.fully_connected import build_ffn_shared_models, build_ffn_distinct_models
 from utilities.util import env_extract_dims
 from utilities.story import StoryTeller
 
@@ -17,11 +17,10 @@ EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers in
 LOAD_ID = None
 
 TASK = "CartPole-v1"
-build_policy_network = build_ffn_actor_model
-build_critic_network = build_ffn_critic_model
+build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 8
+WORKERS = 6
 HORIZON = 1024 if not DEBUG else 128
 EPOCHS = 3
 BATCH_SIZE = 32
@@ -53,7 +52,7 @@ if LOAD_ID is not None:
     agent = PPOAgent.from_agent_state(LOAD_ID)
 else:
     # set up the agent and a reporting module
-    agent = PPOAgent(build_policy_network, build_critic_network, env,
+    agent = PPOAgent(build_models, env,
                      horizon=HORIZON,
                      workers=WORKERS,
                      learning_rate_pi=LEARNING_RATE_POLICY,

@@ -17,7 +17,7 @@ from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, condense_worker_outputs, ModelTuple
+from agent.gather import collect, condense_worker_outputs, ModelTuple, RESERVED_GATHERING_CPUS
 from agent.policy import act_discrete, act_continuous
 from utilities.util import flat_print, env_extract_dims
 
@@ -34,7 +34,7 @@ class PPOAgent:
     to make any significant progress in more difficult environments such as LunarLander.
     """
 
-    def __init__(self, policy_builder, critic_builder, environment: gym.Env, horizon: int, workers: int,
+    def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int,
                  learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
                  lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, gradient_clipping: bool=True,
                  _make_dirs=True):
@@ -61,12 +61,10 @@ class PPOAgent:
         self.gradient_clipping = gradient_clipping
 
         # models and optimizers
-        self.policy = policy_builder(self.env)
-        self.critic = critic_builder(self.env)
+        self.policy, self.value, self.policy_value = model_builder(self.env)
 
         # load persistent network types
-        self.policy_type_name = policy_builder.__name__
-        self.critic_type_name = critic_builder.__name__
+        self.builder_function_name = model_builder.__name__
 
         self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi)
         self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v)
@@ -177,7 +175,7 @@ class PPOAgent:
         """
         ray.init(logging_level=logging.ERROR)
 
-        print(f"Parallelize Over {ray.available_resources()['CPU']} Threads.\n")
+        print(f"Parallelize Over {RESERVED_GATHERING_CPUS} Threads.\n")
         for self.iteration in range(self.iteration, n):
 
             iteration_start = time.time()
@@ -189,11 +187,11 @@ class PPOAgent:
             name_key = round(time.time())
             if export_to_file:
                 self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
-                self.critic.save(f"{self.model_export_dir}/{name_key}/value")
+                self.value.save(f"{self.model_export_dir}/{name_key}/value")
                 models = f"{self.model_export_dir}/{name_key}/"
             else:
-                policy_tuple = ModelTuple(self.policy_type_name, self.policy.get_weights())
-                critic_tuple = ModelTuple(self.critic_type_name, self.critic.get_weights())
+                policy_tuple = ModelTuple(self.builder_function_name, self.policy.get_weights())
+                critic_tuple = ModelTuple(self.builder_function_name, self.value.get_weights())
                 models = (policy_tuple, critic_tuple)
 
             # other parameters
@@ -298,17 +296,17 @@ class PPOAgent:
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
                         old_values = batch["return"] - batch["advantage"]
-                        new_values = self.critic(batch["state"], training=True)
+                        new_values = self.value(batch["state"], training=True)
                         critic_loss = self.critic_loss(
                             values=new_values,
                             old_values=old_values,
                             returns=batch["return"],
                         )
 
-                    critic_gradients = critic_tape.gradient(critic_loss, self.critic.trainable_variables)
+                    critic_gradients = critic_tape.gradient(critic_loss, self.value.trainable_variables)
                     if self.gradient_clipping:
                         critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 5)
-                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.critic.trainable_variables))
+                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.value.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(actor_loss))
                     critic_epoch_losses.append(tf.reduce_mean(critic_loss))
@@ -356,7 +354,7 @@ class PPOAgent:
 
     def save_agent_state(self):
         self.policy.save(self.agent_directory + f"/{self.iteration}/policy")
-        self.critic.save(self.agent_directory + f"/{self.iteration}/value")
+        self.value.save(self.agent_directory + f"/{self.iteration}/value")
 
         with open(self.agent_directory + f"/{self.iteration}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
