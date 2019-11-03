@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 """Collection of fully connected policy networks."""
+import math
+
 import gym
 import tensorflow as tf
 from gym.spaces import Box
@@ -8,11 +10,14 @@ from tensorflow_core.python.keras.utils import plot_model
 from utilities.util import env_extract_dims
 
 
+DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))
+
+
 def _build_encoding_sub_model(input_size, name: str = None):
     inputs = tf.keras.Input(shape=(input_size,))
-    x = tf.keras.layers.Dense(64)(inputs)
+    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
     x = tf.keras.layers.Activation("tanh")(x)
-    x = tf.keras.layers.Dense(64)(x)
+    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
     x = tf.keras.layers.Activation("tanh")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
@@ -28,14 +33,14 @@ def build_ffn_distinct_models(env: gym.Env):
     policy_latent = _build_encoding_sub_model(state_dimensionality)
     x = policy_latent(inputs)
     if continuous_control:
-        means = tf.keras.layers.Dense(n_actions, input_dim=64)(x)
+        means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
         means = tf.keras.layers.Activation("linear")(means)
-        stdevs = tf.keras.layers.Dense(n_actions, input_dim=64)(x)
+        stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
         stdevs = tf.keras.layers.Activation("softplus")(stdevs)
 
         out_policy = tf.keras.layers.Concatenate()([means, stdevs])
     else:
-        x = tf.keras.layers.Dense(n_actions)(x)
+        x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
         out_policy = tf.keras.layers.Activation("softmax")(x)
 
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
@@ -62,9 +67,9 @@ def build_ffn_shared_models(env: gym.Env):
 
     # policy head
     if continuous_control:
-        means = tf.keras.layers.Dense(n_actions, input_dim=64)(latent_representation)
+        means = tf.keras.layers.Dense(n_actions)(latent_representation)
         means = tf.keras.layers.Activation("linear")(means)
-        stdevs = tf.keras.layers.Dense(n_actions, input_dim=64)(x)
+        stdevs = tf.keras.layers.Dense(n_actions)(x)
         stdevs = tf.keras.layers.Activation("softplus")(stdevs)
 
         policy_out = tf.keras.layers.Concatenate()([means, stdevs])

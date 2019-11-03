@@ -1,15 +1,23 @@
 #!/usr/bin/env python
 """Helper functions."""
+import random
 from typing import Tuple
 
 import gym
 from gym.spaces import Discrete, Box
 import tensorflow as tf
+import numpy as np
 
 
 def flat_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
     print(f"\r{string}", end="")
+
+
+def set_all_seeds(seed):
+    tf.random.set_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 def env_extract_dims(env: gym.Env) -> Tuple[int, int]:

@@ -18,3 +18,9 @@ sudo apt-get install graphviz
 ```
 
 under any Debian-based Linux distribution.
+
+### Main Scripts
+
+The python files `train.py` and `evaluate.py` provide ready-made scripts for training 
+and evaluating an agent in an environment. With `pretrain.py`, it is possible to pretrain the visual component
+of a network on classification or reconstruction.

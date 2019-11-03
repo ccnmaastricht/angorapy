@@ -36,8 +36,8 @@ class PPOAgent:
 
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int,
                  learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
-                 lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, gradient_clipping: bool=True,
-                 _make_dirs=True):
+                 lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, c_value: float = 0.5,
+                 gradient_clipping: float = None, clip_values: bool = True, _make_dirs=True):
         """Initialize the Agent.
 
         :param discount:                discount factor applied to future rewards
@@ -57,8 +57,10 @@ class PPOAgent:
         self.learning_rate_v = learning_rate_v
         self.clip = clip
         self.c_entropy = c_entropy
+        self.c_value = c_value
         self.lam = lam
         self.gradient_clipping = gradient_clipping
+        self.clip_values = clip_values
 
         # models and optimizers
         self.policy, self.value, self.policy_value = model_builder(self.env)
@@ -66,8 +68,8 @@ class PPOAgent:
         # load persistent network types
         self.builder_function_name = model_builder.__name__
 
-        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi)
-        self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v)
+        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
+        self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
 
         # misc
         self.iteration = 0
@@ -112,27 +114,27 @@ class PPOAgent:
         :return:                        the value of the objective function
         """
         r = tf.math.divide(action_prob, old_action_prob)
-        return - tf.minimum(
-            tf.math.multiply(r, advantage),
-            tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
+        return tf.maximum(
+            - tf.math.multiply(r, advantage),
+            - tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
         )
 
-    def critic_loss(self, values: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor, clip=True) -> tf.Tensor:
+    def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor, clip=True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
-        :param values:              value prediction by the current critic network
-        :param old_values:          value prediction by the old critic network during gathering
-        :param returns:             discounted return estimation
+        :param value_predictions:               value prediction by the current critic network
+        :param old_values:                      value prediction by the old critic network during gathering
+        :param returns:                         discounted return estimation
 
         :return:                    squared error between prediction and return
         """
-        error = tf.square(values - returns)
+        error = tf.square(value_predictions - returns)
         if clip:
             # clips value error to reduce variance
-            clipped_values = old_values + tf.clip_by_value(values - old_values, -self.clip, self.clip)
+            clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
             clipped_error = tf.square(clipped_values - returns)
 
-            return tf.maximum(clipped_error, error) / 2
+            return tf.maximum(clipped_error, error) * 0.5
 
         return error
 
@@ -153,10 +155,9 @@ class PPOAgent:
 
     def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
                             prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs) -> tf.Tensor:
-        # loss needs to be negated since the original objective from the PPO paper is for maximization
         return self.actor_loss(action_prob, old_action_prob, advantage) \
-               + self.critic_loss(prediction, discounted_return) \
-               - self.c_entropy * self.entropy_bonus(action_probs)
+               + self.value_loss(prediction, discounted_return) * self.c_value \
+               - self.entropy_bonus(action_probs) * self.c_entropy
 
     def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False, save_every: int = 0):
         """Main training loop of the agent.
@@ -225,7 +226,8 @@ class PPOAgent:
 
             self.report()
 
-            if story_teller is not None and (self.iteration + 1) % story_teller.frequency == 0:
+            if story_teller is not None and story_teller.frequency != 0 and (
+                    self.iteration + 1) % story_teller.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
                 story_teller.create_episode_gif(n=3)
             story_teller.update_graphs()
@@ -234,6 +236,8 @@ class PPOAgent:
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 print("Saving the current state of the agent.")
                 self.save_agent_state()
+
+        ray.shutdown()
 
         return self
 
@@ -284,28 +288,29 @@ class PPOAgent:
                                                      old_action_prob=batch["action_prob"],
                                                      advantage=batch["advantage"])
 
-                        entropy = self.c_entropy * self.entropy_bonus(policy_output)
-                        actor_loss -= entropy
+                        entropy = self.entropy_bonus(policy_output)
                         entropies.append(tf.reduce_mean(entropy))
+                        actor_loss -= self.c_entropy * entropy
 
                     actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
-                    if self.gradient_clipping:
-                        actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 5)
+                    if self.gradient_clipping is not None:
+                        actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, self.gradient_clipping)
                     self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
 
                     # optimize the critic
                     with tf.GradientTape() as critic_tape:
                         old_values = batch["return"] - batch["advantage"]
                         new_values = self.value(batch["state"], training=True)
-                        critic_loss = self.critic_loss(
-                            values=new_values,
+                        critic_loss = self.value_loss(
+                            value_predictions=new_values,
                             old_values=old_values,
                             returns=batch["return"],
+                            clip=self.clip_values
                         )
 
                     critic_gradients = critic_tape.gradient(critic_loss, self.value.trainable_variables)
-                    if self.gradient_clipping:
-                        critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 5)
+                    if self.gradient_clipping is not None:
+                        critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, self.gradient_clipping)
                     self.critic_optimizer.apply_gradients(zip(critic_gradients, self.value.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(actor_loss))
@@ -345,10 +350,10 @@ class PPOAgent:
 
     def report(self):
         flat_print(f"Iteration {self.iteration:6d}: "
-                   f"Mean Epi. Perf.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
-                   f"Mean Epi. Length: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
+                   f"Mean Rew.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
+                   f"Mean Len.: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
                    f"Total Episodes: {len(self.episode_length_history):5d}; "
-                   f"Total Policy Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
+                   f"Total Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
                    f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
                    f"Exec. Speed: {self.current_fps:6.2f}fps\n")
 

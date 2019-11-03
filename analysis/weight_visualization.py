@@ -9,6 +9,7 @@ from typing import List
 import matplotlib.pyplot as plt
 import numpy
 import tensorflow as tf
+from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 
 from utilities.util import normalize
@@ -154,10 +155,10 @@ if __name__ == "__main__":
 
     model = tf.keras.applications.VGG16()
     analyzer = WeightAnalyzer(model, mode="save")
-    pprint(analyzer.list_layer_names())
+    # plot_model(model, show_shapes=True, expand_nested=True)
     analyzer.network.summary()
 
     analyzer.visualize_layer_weights("block1_conv1")
 
     # for l in analyzer.list_convolutional_layer_names():
-    analyzer.visualize_max_filter_respondence("block5_conv2", feature_ids=[200, 202])
+    analyzer.visualize_max_filter_respondence("block2_conv2", feature_ids=[1, 32, 10, 68, 55])

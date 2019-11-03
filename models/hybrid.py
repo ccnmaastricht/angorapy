@@ -42,7 +42,7 @@ if __name__ == "__main__":
     sequence_length = 10
 
     network = build_shadow_brain(3)
-    tf.keras.utils.plot_model(network, to_file="test.png")
+    tf.keras.utils.plot_model(network, show_shapes=True, expand_nested=True)
     input_data = [(tf.random.normal([16, sequence_length, 200, 200, 3]),
                    tf.random.normal([16, sequence_length, 24]),
                    tf.random.normal([16, sequence_length, 32]),
