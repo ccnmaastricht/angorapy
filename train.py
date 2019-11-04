@@ -18,12 +18,12 @@ GPU = False
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "LunarLander-v2"
+TASK = "Pong-ram-v0"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 1
-HORIZON = 2048 if not DEBUG else 128
+WORKERS = 12
+HORIZON = 128 if not DEBUG else 128
 EPOCHS = 4
 BATCH_SIZE = 512
 
@@ -79,8 +79,9 @@ agent.drill(n=ITERATIONS,
             epochs=EPOCHS,
             batch_size=BATCH_SIZE,
             story_teller=teller,
-            export_to_file=EXPORT_TO_FILE,
-            save_every=0)
+            export=EXPORT_TO_FILE,
+            save_every=0,
+            separate_eval=True)
 
 agent.save_agent_state()
 

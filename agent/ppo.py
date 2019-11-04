@@ -7,7 +7,7 @@ import re
 import shutil
 import statistics
 import time
-from typing import List
+from typing import List, Tuple
 
 import gym
 import numpy
@@ -84,6 +84,7 @@ class PPOAgent:
 
         # statistics
         self.total_frames_seen = 0
+        self.total_episodes_seen = 0
         self.episode_reward_history = []
         self.episode_length_history = []
         self.cycle_reward_history = []
@@ -119,7 +120,8 @@ class PPOAgent:
             - tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
         )
 
-    def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor, clip=True) -> tf.Tensor:
+    def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
+                   clip=True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
         :param value_predictions:               value prediction by the current critic network
@@ -159,7 +161,8 @@ class PPOAgent:
                + self.value_loss(prediction, discounted_return) * self.c_value \
                - self.entropy_bonus(action_probs) * self.c_entropy
 
-    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export_to_file=False, save_every: int = 0):
+    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export=False, save_every: int = 0,
+              separate_eval: bool = False):
         """Main training loop of the agent.
 
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -168,9 +171,11 @@ class PPOAgent:
         :param epochs:          the number of epochs for which the model is optimized on the same experience data
         :param batch_size       batch size for the optimization
         :param story_teller:    story telling object that creates visualizations of the training process on the fly
-        :param export_to_file:  boolean indicator for whether communication with workers is achieved through file saving
+        :param export:          boolean indicator for whether communication with workers is achieved through file saving
                                 or direct weight passing
         :param save_every:      for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
+        :param separate_eval:   if false (default), use episodes from gathering for statistics, if true, evaluate 10
+                                additional episodes.
 
         :return:                self
         """
@@ -186,7 +191,7 @@ class PPOAgent:
 
             # export the current state of the policy and value network under unique (-enough) key
             name_key = round(time.time())
-            if export_to_file:
+            if export:
                 self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
                 self.value.save(f"{self.model_export_dir}/{name_key}/value")
                 models = f"{self.model_export_dir}/{name_key}/"
@@ -206,25 +211,38 @@ class PPOAgent:
             dataset, stats = condense_worker_outputs(results)
 
             # clean up the saved models
-            if export_to_file:
+            if export:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
             # process stats from actors
             self.total_frames_seen += stats.numb_processed_frames
-            self.episode_length_history.extend(stats.episode_lengths)
-            self.episode_reward_history.extend(stats.episode_rewards)
-            self.cycle_length_history.append(None if stats.numb_completed_episodes == 0
-                                             else statistics.mean(stats.episode_lengths))
-            self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
-                                             else statistics.mean(stats.episode_rewards))
+            self.total_episodes_seen += stats.numb_completed_episodes
+            if not separate_eval:
+                if stats.numb_completed_episodes == 0:
+                    print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
+                          "Consider activating seperate evaluation in drill() to get meaningful statistics.")
+
+                self.episode_length_history.extend(stats.episode_lengths)
+                self.episode_reward_history.extend(stats.episode_rewards)
+                self.cycle_length_history.append(None if stats.numb_completed_episodes == 0
+                                                 else statistics.mean(stats.episode_lengths))
+                self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
+                                                 else statistics.mean(stats.episode_rewards))
+            else:
+                flat_print("Evaluating...")
+                eval_lengths, eval_rewards = self.evaluate(10)
+                self.episode_length_history.extend(eval_lengths)
+                self.episode_reward_history.extend(eval_rewards)
+                self.cycle_length_history.append(statistics.mean(eval_lengths))
+                self.cycle_reward_history.append(statistics.mean(eval_rewards))
+
+            self.report()
 
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
 
             iteration_end = time.time()
             self.current_fps = stats.numb_processed_frames / (iteration_end - iteration_start)
-
-            self.report()
 
             if story_teller is not None and story_teller.frequency != 0 and (
                     self.iteration + 1) % story_teller.frequency == 0:
@@ -255,17 +273,13 @@ class PPOAgent:
         :param epochs:          number of epochs to train on this dataset
         :param batch_size:      batch size with which the dataset is sampled
         """
-        actor_loss_history = []
-        critic_loss_history = []
-        entropy_history = []
+        actor_loss_history, critic_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break bias, then divided into batches
             shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
             batched_dataset = shuffled_dataset.batch(batch_size)
 
-            actor_epoch_losses = []
-            critic_epoch_losses = []
-            entropies = []
+            actor_epoch_losses, critic_epoch_losses, entropies = [], [], []
             for batch in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
@@ -324,35 +338,38 @@ class PPOAgent:
         self.critic_loss_history.extend(critic_loss_history)
         self.entropy_history.extend(entropy_history)
 
-    def evaluate(self, n: int) -> List[int]:
+    def evaluate(self, n: int) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         :param n:           integer value indicating the number of episodes that shall be run
 
-        :return:            a list of length n of episode rewards
+        :return:            two lists of length n, giving episode lengths and rewards
         """
-        rewards = []
+        rewards, lengths = [], []
         policy_act = act_discrete if not self.continuous_control else act_continuous
         for episode in range(n):
             done = False
             reward_trajectory = []
+            length = 0
             state = numpy.expand_dims(self.env.reset(), axis=0).astype(numpy.float32)
             while not done:
                 action, action_probability = policy_act(self.policy, state)
                 observation, reward, done, _ = self.env.step(action)
                 state = numpy.expand_dims(observation, axis=0).astype(numpy.float32)
                 reward_trajectory.append(reward)
+                length += 1
 
+            lengths.append(length)
             rewards.append(sum(reward_trajectory))
 
-        return rewards
+        return lengths, rewards
 
     def report(self):
-        flat_print(f"Iteration {self.iteration:6d}: "
+        flat_print(f"Iteration {self.iteration:5d}: "
                    f"Mean Rew.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
                    f"Mean Len.: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
-                   f"Total Episodes: {len(self.episode_length_history):5d}; "
+                   f"Total Episodes: {self.total_episodes_seen:5d}; "
                    f"Total Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
                    f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
                    f"Exec. Speed: {self.current_fps:6.2f}fps\n")
