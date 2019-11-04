@@ -7,7 +7,6 @@ from typing import List
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
-import mpld3
 import numpy
 import tensorflow as tf
 from tqdm import tqdm
@@ -178,7 +177,6 @@ class NetworkAnalyzer:
                     axis.set_xticks([])
                     axis.set_yticks([])
                     i += 1
-
         elif mode == "gray":
             plot_image_tiling([tf.squeeze(feature_maps[:, :, :, i]) for i in range(layer.output_shape[-1])],
                               cmap="gray")
@@ -206,22 +204,25 @@ class NetworkAnalyzer:
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+    f_weights = False
     f_max = False
     f_map = True
 
     tf.random.set_seed(1)
 
     model = tf.keras.applications.VGG16()
-    analyzer = NetworkAnalyzer(model, mode="show")
-    analyzer.list_layer_names()
+    analyzer = NetworkAnalyzer(model, mode="save")
+    print(analyzer.list_layer_names())
+
+    if f_weights:
+        analyzer.visualize_layer_weights("block1_conv1")
 
     # FEATURE MAXIMIZATION
     if f_max:
         n_features = analyzer.numb_features_in_layer("block2_conv2")
-        for f in range(n_features):
-            analyzer.visualize_max_filter_respondence("block3_conv3", feature_ids=[f])
+        analyzer.visualize_max_filter_respondence("block2_conv2", feature_ids=[24, 57, 89, 120, 42, 26, 45, 21, 99])
 
     # FEATURE MAPS
     if f_map:
-        reference = mpimg.imread("bird.jpg")
-        analyzer.visualize_activation_map("block1_conv1", reference, mode="plot")
+        reference = mpimg.imread("hase.jpg")
+        analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
