@@ -7,9 +7,9 @@ from typing import List
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+import mpld3
 import numpy
 import tensorflow as tf
-from matplotlib.axes import Axes
 from tqdm import tqdm
 
 from utilities.util import normalize
@@ -140,11 +140,13 @@ class NetworkAnalyzer:
             feature_maximizations.append(final_image)
 
         plot_image_tiling(feature_maximizations)
-        plt.show() if self.mode == "show" else plt.savefig(
+        plt.mlpd3() if self.mode == "show" else plt.savefig(
             f"{self.figure_directory}/feature_maximization_{layer_name}_{'_'.join(map(str, feature_ids))}.pdf",
             format="pdf")
 
-    def visualize_activation_map(self, layer_name, reference_img: numpy.ndarray, as_heatmaps: bool = True):
+    def visualize_activation_map(self, layer_name, reference_img: numpy.ndarray, mode: str = "gray"):
+        assert mode in ["gray", "heat", "plot"]
+
         layer = self.get_layer_by_name(layer_name)
         submodel = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
@@ -153,12 +155,13 @@ class NetworkAnalyzer:
         reference_width, reference_height = reference_img.shape[1], reference_img.shape[2]
 
         feature_maps = submodel(reference_img)
-        if as_heatmaps:
+        n_filters = feature_maps.shape[-1]
+
+        if mode == "heat":
             feature_maps = tf.image.resize(feature_maps, size=(reference_width, reference_height))
             feature_maps = tf.squeeze(feature_maps)
 
             # prepare subplots
-            n_filters = feature_maps.shape[-1]
             tiles_per_row = math.ceil(math.sqrt(n_filters))
             fig, axes = plt.subplots(tiles_per_row, tiles_per_row)
             plt.subplots_adjust(wspace=0.05, hspace=0.05)
@@ -176,13 +179,17 @@ class NetworkAnalyzer:
                     axis.set_yticks([])
                     i += 1
 
-        else:
+        elif mode == "gray":
             plot_image_tiling([tf.squeeze(feature_maps[:, :, :, i]) for i in range(layer.output_shape[-1])],
                               cmap="gray")
+        elif mode == "plot":
+            feature_maps = tf.squeeze(feature_maps)
+            mean_filter_responses = tf.reduce_mean(feature_maps, axis=[0, 1])
+            plt.bar(list(range(n_filters)), mean_filter_responses)
 
-        format = "png" if as_heatmaps else "pdf"
+        format = "png" if mode == "heat" else "pdf"
         plt.show() if self.mode == "show" else plt.savefig(
-            f"{self.figure_directory}/feature_maps_{layer_name}{'_heatmaps' if as_heatmaps else ''}.{format}",
+            f"{self.figure_directory}/feature_maps_{layer_name}{f'_{mode}'}.{format}",
             format=format, dpi=300)
 
         return feature_maps
@@ -205,7 +212,7 @@ if __name__ == "__main__":
     tf.random.set_seed(1)
 
     model = tf.keras.applications.VGG16()
-    analyzer = NetworkAnalyzer(model, mode="save")
+    analyzer = NetworkAnalyzer(model, mode="show")
     analyzer.list_layer_names()
 
     # FEATURE MAXIMIZATION
@@ -217,4 +224,4 @@ if __name__ == "__main__":
     # FEATURE MAPS
     if f_map:
         reference = mpimg.imread("bird.jpg")
-        analyzer.visualize_activation_map("block4_conv2", reference, as_heatmaps=True)
+        analyzer.visualize_activation_map("block1_conv1", reference, mode="plot")
