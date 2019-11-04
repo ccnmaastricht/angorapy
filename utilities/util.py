@@ -4,6 +4,7 @@ import random
 from typing import Tuple
 
 import gym
+import numpy
 from gym.spaces import Discrete, Box
 import tensorflow as tf
 import numpy as np
@@ -33,7 +34,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
     return obs_dim, act_dim
 
 
-def normalize(x, is_img=False):
+def normalize(x, is_img=False) -> numpy.ndarray:
     """Normalize a numpy array to have all values in range (0, 1)."""
     x = tf.convert_to_tensor(x).numpy()
     if not is_img:

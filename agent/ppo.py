@@ -215,8 +215,6 @@ class PPOAgent:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
             # process stats from actors
-            self.total_frames_seen += stats.numb_processed_frames
-            self.total_episodes_seen += stats.numb_completed_episodes
             if not separate_eval:
                 if stats.numb_completed_episodes == 0:
                     print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
@@ -243,6 +241,8 @@ class PPOAgent:
 
             iteration_end = time.time()
             self.current_fps = stats.numb_processed_frames / (iteration_end - iteration_start)
+            self.total_frames_seen += stats.numb_processed_frames
+            self.total_episodes_seen += stats.numb_completed_episodes
 
             if story_teller is not None and story_teller.frequency != 0 and (
                     self.iteration + 1) % story_teller.frequency == 0:
@@ -366,7 +366,7 @@ class PPOAgent:
         return lengths, rewards
 
     def report(self):
-        flat_print(f"Iteration {self.iteration:5d}: "
+        flat_print(f"{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}: "
                    f"Mean Rew.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
                    f"Mean Len.: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
                    f"Total Episodes: {self.total_episodes_seen:5d}; "
