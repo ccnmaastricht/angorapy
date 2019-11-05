@@ -4,9 +4,9 @@ from gym.spaces import Box
 
 from agent.ppo import PPOAgent
 from environments import *
-from models.fully_connected import build_ffn_shared_models, build_ffn_distinct_models
-from utilities.util import env_extract_dims, set_all_seeds
+from models.fully_connected import build_ffn_distinct_models
 from utilities.story import StoryTeller
+from utilities.util import env_extract_dims, set_all_seeds
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

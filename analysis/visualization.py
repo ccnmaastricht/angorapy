@@ -71,8 +71,11 @@ class NetworkAnalyzer:
     def numb_features_in_layer(self, layer: str):
         return self.get_layer_by_name(layer).output_shape[-1]
 
-    def list_layer_names(self) -> List[str]:
-        return [layer.name for layer in extract_layers(self.network)]
+    def list_layer_names(self, only_para_layers=False) -> List[str]:
+        if only_para_layers:
+            return [layer.name for layer in extract_layers(self.network) if not isinstance(layer, tf.keras.layers.Activation)]
+        else:
+            return [layer.name for layer in extract_layers(self.network)]
 
     def list_convolutional_layer_names(self) -> List[str]:
         return [layer.name for layer in extract_layers(self.network) if is_conv(layer)]
@@ -111,7 +114,7 @@ class NetworkAnalyzer:
                                                        else "convolutional ") + "layer " + layer_name + ".")
         intermediate_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
-        feature_ids = list(range(layer.output_shape[-1])) if feature_ids is None else feature_ids
+        feature_ids = list(range(layer.output_shape[-1])) if feature_ids is None or feature_ids == [] else feature_ids
         feature_maximizations = []
         for feature_id in tqdm(feature_ids, desc="Feature Maximization"):
             current_size = 56
@@ -192,6 +195,35 @@ class NetworkAnalyzer:
 
         return feature_maps
 
+    def obtain_saliency_map(self, reference):
+        # resize image to fit network input shape
+        reference = tf.Variable(tf.image.resize(reference, size=self.network.input_shape[1:-1]))
+
+        # obtain output layer and change its activation to linear
+        last_layer = self.get_layer_by_name(self.list_layer_names(only_para_layers=True)[-1])
+        last_layer_input_shape = (1,) + last_layer.input_shape[1:]
+        last_layer_config = tf.keras.layers.serialize(last_layer)
+        last_layer_config["config"]["activation"] = "linear"
+        new_last_layer = tf.keras.layers.deserialize(last_layer_config)
+        new_last_layer(tf.random.normal(last_layer_input_shape))
+        new_last_layer.set_weights(last_layer.get_weights())
+
+        # create a new model with the linear output
+        prev_last_layer = self.get_layer_by_name(self.list_layer_names(only_para_layers=True)[-2])
+        new_last_layer_output = new_last_layer(prev_last_layer.output)
+        submodel = tf.keras.Model(inputs=self.network.input, outputs=new_last_layer_output)
+
+        # make prediction based on new layer
+        with tf.GradientTape() as tape:
+            linear_prediction = submodel(tf.dtypes.cast(tf.expand_dims(reference, axis=0), dtype=tf.float32))
+            loss = -tf.reduce_sum(linear_prediction)
+
+        output_gradient = tape.gradient(loss, reference)
+
+        saliency_map = tf.reduce_mean(tf.keras.activations.relu(output_gradient), axis=-1)
+        plt.imshow(saliency_map, cmap="jet")
+        plt.show()
+
     # BUILDERS
 
     @staticmethod
@@ -206,7 +238,7 @@ if __name__ == "__main__":
 
     f_weights = False
     f_max = False
-    f_map = True
+    f_map = False
 
     tf.random.set_seed(1)
 
@@ -220,9 +252,14 @@ if __name__ == "__main__":
     # FEATURE MAXIMIZATION
     if f_max:
         n_features = analyzer.numb_features_in_layer("block2_conv2")
-        analyzer.visualize_max_filter_respondence("block2_conv2", feature_ids=[24, 57, 89, 120, 42, 26, 45, 21, 99])
+        analyzer.visualize_max_filter_respondence("fc1", feature_ids=[])
 
     # FEATURE MAPS
     if f_map:
         reference = mpimg.imread("hase.jpg")
         analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
+
+    # FEATURE MAPS
+    if True:
+        reference = mpimg.imread("hase.jpg")
+        analyzer.obtain_saliency_map(reference)
