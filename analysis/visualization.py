@@ -9,7 +9,9 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy
 import tensorflow as tf
+from sklearn.manifold import TSNE
 from tqdm import tqdm
+import tensorflow_datasets as tfds
 
 from utilities.util import normalize
 
@@ -224,6 +226,22 @@ class NetworkAnalyzer:
         plt.imshow(saliency_map, cmap="jet")
         plt.show()
 
+    def cluster_inputs(self, layer_name, input_images: List[numpy.ndarray], classes):
+        layer = self.get_layer_by_name(layer_name)
+        submodel = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
+
+        # retrieve representations
+        input_images = [tf.expand_dims(normalize(img).astype(numpy.float32), axis=0) for img in input_images]
+        representations = [tf.reshape(submodel(img), [-1]).numpy() for img in input_images]
+
+        # cluster
+        tsne = TSNE()
+        sneezed_datapoints = tsne.fit_transform(representations)
+        x, y = numpy.split(sneezed_datapoints, 2, axis=1)
+
+        plt.scatter(x=numpy.squeeze(x), y=numpy.squeeze(y), c=classes, cmap="Paired")
+        plt.show()
+
     # BUILDERS
 
     @staticmethod
@@ -238,6 +256,7 @@ if __name__ == "__main__":
     f_weights = False
     f_max = False
     f_map = False
+    f_salience = False
 
     tf.random.set_seed(1)
 
@@ -258,7 +277,18 @@ if __name__ == "__main__":
         reference = mpimg.imread("hase.jpg")
         analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
 
-    # FEATURE MAPS
-    if True:
+    # SALIENCE
+    if f_salience:
         reference = mpimg.imread("hase.jpg")
         analyzer.obtain_saliency_map(reference)
+
+    # T-SNE CLUSTERING
+    if True:
+        data, _ = tfds.load("cifar10", shuffle_files=True).values()
+        data = data.map(lambda img: (tf.image.resize(img["image"], (224, 224)) / 255, img["label"]))
+        data = list(iter(data.take(100)))
+        images = [d[0] for d in data]
+        classes = [d[1].numpy().item() for d in data]
+
+        analyzer.cluster_inputs("fc2", images, classes)
+
