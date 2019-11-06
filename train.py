@@ -18,7 +18,7 @@ GPU = True
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "LunarLander-v2"
+TASK = "CartPole-v1"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000

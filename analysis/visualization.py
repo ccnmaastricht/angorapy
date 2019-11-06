@@ -108,7 +108,6 @@ class NetworkAnalyzer:
                                          optimization_steps: int = 30):
         """Feature Maximization."""
         # build model that only goes to the layer of interest
-        input_shape = (1,) + self.network.input_shape[1:]
         layer = self.get_layer_by_name(layer_name)
         print("performing feature maximization on " + ("dense " if not isinstance(layer, CONVOLUTION_BASE_CLASS)
                                                        else "convolutional ") + "layer " + layer_name + ".")
@@ -142,7 +141,7 @@ class NetworkAnalyzer:
             feature_maximizations.append(final_image)
 
         plot_image_tiling(feature_maximizations)
-        plt.mlpd3() if self.mode == "show" else plt.savefig(
+        plt.show() if self.mode == "show" else plt.savefig(
             f"{self.figure_directory}/feature_maximization_{layer_name}_{'_'.join(map(str, feature_ids))}.pdf",
             format="pdf")
 
@@ -160,7 +159,7 @@ class NetworkAnalyzer:
         n_filters = feature_maps.shape[-1]
 
         if mode == "heat":
-            feature_maps = tf.image.resize(feature_maps, size=(reference_width, reference_height))
+            feature_maps = tf.image.resize(feature_maps, size=(reference_width, reference_height), method="bicubic")
             feature_maps = tf.squeeze(feature_maps)
 
             # prepare subplots
@@ -230,7 +229,6 @@ class NetworkAnalyzer:
     @staticmethod
     def from_saved_model(model_path: str, mode: str = "show"):
         assert os.path.exists(model_path), "Model Path does not exist!"
-
         return NetworkAnalyzer(tf.keras.models.load_model(model_path), mode=mode)
 
 

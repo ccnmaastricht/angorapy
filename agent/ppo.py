@@ -7,6 +7,7 @@ import re
 import shutil
 import statistics
 import time
+from collections import OrderedDict
 from typing import List, Tuple
 
 import gym
@@ -92,6 +93,7 @@ class PPOAgent:
         self.entropy_history = []
         self.actor_loss_history = []
         self.critic_loss_history = []
+        self.time_dicts = []
 
         # prepare for environment type
         if isinstance(self.env.action_space, Discrete):
@@ -183,8 +185,9 @@ class PPOAgent:
 
         print(f"Parallelize Over {RESERVED_GATHERING_CPUS} Threads.\n")
         for self.iteration in range(self.iteration, n):
-
-            iteration_start = time.time()
+            time_dict = OrderedDict(
+                [("gathering", None), ("optimization", None), ("evaluating", None), ("finalizing", None)])
+            subprocess_start = time.time()
 
             # run simulations in parallel
             flat_print("Gathering...")
@@ -214,6 +217,9 @@ class PPOAgent:
             if export:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
+            time_dict["gathering"] = time.time() - subprocess_start
+            subprocess_start = time.time()
+
             # process stats from actors
             if not separate_eval:
                 if stats.numb_completed_episodes == 0:
@@ -234,13 +240,20 @@ class PPOAgent:
                 self.cycle_length_history.append(statistics.mean(eval_lengths))
                 self.cycle_reward_history.append(statistics.mean(eval_rewards))
 
+            time_dict["evaluating"] = time.time() - subprocess_start
+            subprocess_start = time.time()
+
             self.report()
 
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
 
-            iteration_end = time.time()
-            self.current_fps = stats.numb_processed_frames / (iteration_end - iteration_start)
+            time_dict["optimizing"] = time.time() - subprocess_start
+            subprocess_start = time.time()
+
+            flat_print("Finalizing...")
+            self.time_dicts.append(time_dict)
+            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
@@ -254,6 +267,8 @@ class PPOAgent:
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 print("Saving the current state of the agent.")
                 self.save_agent_state()
+
+            time_dict["finalizing"] = time.time() - subprocess_start
 
         ray.shutdown()
 
@@ -366,13 +381,19 @@ class PPOAgent:
         return lengths, rewards
 
     def report(self):
+        time_distribution_string = ""
+        if len(self.time_dicts) > 0:
+            times = [time for time in self.time_dicts[-1].values() if time is not None]
+            jobs = [job[0] for job, time in self.time_dicts[-1].items() if time is not None]
+            time_percentages = [str(round(100 * t / sum(times))) + jobs[i] for i, t in enumerate(times)]
+            time_distribution_string = "[" + "|".join(map(str, time_percentages)) + "]"
         flat_print(f"{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}: "
                    f"Mean Rew.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
                    f"Mean Len.: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
                    f"Total Episodes: {self.total_episodes_seen:5d}; "
                    f"Total Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
                    f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
-                   f"Exec. Speed: {self.current_fps:6.2f}fps\n")
+                   f"Exec. Speed: {self.current_fps:6.2f}fps {time_distribution_string}\n")
 
     def save_agent_state(self):
         self.policy.save(self.agent_directory + f"/{self.iteration}/policy")
