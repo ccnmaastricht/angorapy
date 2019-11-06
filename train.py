@@ -22,7 +22,7 @@ TASK = "CartPole-v1"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 12
+WORKERS = 6
 HORIZON = 1024 if not DEBUG else 128
 EPOCHS = 4
 BATCH_SIZE = 32 * 8
