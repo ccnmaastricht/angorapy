@@ -62,7 +62,7 @@ analyzer.visualize_layer_weights("block1_conv1")
 
 This produces the following visualization:
 
-docs/readme/weights_block1_conv1.png-1.png
+![](https://i.postimg.cc/P5fCYQrx/weights-block1-conv1.png)
 
 ### Feature Maximization
 **Feature Maximization** creates an input image from random noise and optimizes its pixels to maximize the response of
@@ -73,9 +73,7 @@ For the first convolutional layer of a pretrained VGG16 model, this can be used 
 ```python
 analyzer.visualize_max_filter_respondence("block2_conv2", feature_ids=[24, 57, 89, 120, 42, 26, 45, 21, 99])
 ```
-
-docs/readme/feature_maximization_block2_conv2_24_57_89_120_42_26_45_21_99.png
-
+![](https://i.postimg.cc/6QgTssV2/feature-maximization-block2-conv2-24-57-89-120-42-26-45-21-99.png)
 
 ### Feature Maps
 **Feature Maps** take a given input image and record the activation at a specified layer. These activations can then 
@@ -91,7 +89,7 @@ reference = mpimg.imread("hase.jpg")
 analyzer.visualize_activation_map("block1_conv2", reference, mode="heat")
 ```
 
-docs/readme/feature_maps_block1_conv2_gray.png
+![](https://i.postimg.cc/65X25NkC/feature-maps-block1-conv2-gray.png)
 
 #### Heatmap Mode
 To tackle the issue with large receptive fields in deeper layers, the heatmap mode (`mode="heat"`) converts the
@@ -103,7 +101,7 @@ reference = mpimg.imread("hase.jpg")
 analyzer.visualize_activation_map("block1_conv2", reference, mode="heat")
 ```
 
-docs/readme/feature_maps_block1_conv2_heat.png
+![](https://i.postimg.cc/G3ktf54t/feature-maps-block1-conv2-heat.png)
 
 #### Bar Plot Mode
 Lastly, the bar plot mode (`mode="plot"`) shows the activation of a filter as a bar in a bar plot, averaged over the 
@@ -114,4 +112,4 @@ reference = mpimg.imread("hase.jpg")
 analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
 ```
 
-docs/readme/feature_maps_block1_conv2_plot.png
+![](https://i.postimg.cc/DyPWSMhH/feature-maps-block1-conv2-plot.png)
