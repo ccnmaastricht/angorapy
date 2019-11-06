@@ -14,16 +14,16 @@ set_all_seeds(1)
 
 # SETTINGS
 DEBUG = False
-GPU = False
+GPU = True
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "Pong-ram-v0"
+TASK = "LunarLander-v2"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
 WORKERS = 12
-HORIZON = 128 if not DEBUG else 128
+HORIZON = 1024 if not DEBUG else 128
 EPOCHS = 4
 BATCH_SIZE = 32 * 8
 

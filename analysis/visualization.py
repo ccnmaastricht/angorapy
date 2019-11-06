@@ -44,6 +44,7 @@ def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
 
 
 def is_conv(layer):
+    """Check if layer is convolutional."""
     return isinstance(layer, CONVOLUTION_BASE_CLASS)
 
 
@@ -105,8 +106,7 @@ class NetworkAnalyzer:
 
     def visualize_max_filter_respondence(self, layer_name: str, feature_ids: List[int] = None,
                                          optimization_steps: int = 30):
-        """Feature Maximization.
-        https://towardsdatascience.com/how-to-visualize-convolutional-features-in-40-lines-of-code-70b7d87b0030"""
+        """Feature Maximization."""
         # build model that only goes to the layer of interest
         input_shape = (1,) + self.network.input_shape[1:]
         layer = self.get_layer_by_name(layer_name)
@@ -216,7 +216,8 @@ class NetworkAnalyzer:
         # make prediction based on new layer
         with tf.GradientTape() as tape:
             linear_prediction = submodel(tf.dtypes.cast(tf.expand_dims(reference, axis=0), dtype=tf.float32))
-            loss = -tf.reduce_sum(linear_prediction)
+            max_feature = tf.argmax(linear_prediction, axis=1)
+            loss = -linear_prediction[:, int(max_feature.numpy().item())]
 
         output_gradient = tape.gradient(loss, reference)
 
