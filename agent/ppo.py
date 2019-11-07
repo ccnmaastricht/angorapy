@@ -70,7 +70,7 @@ class PPOAgent:
         self.builder_function_name = model_builder.__name__
 
         self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
-        self.critic_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
+        self.value_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
 
         # misc
         self.iteration = 0
@@ -374,7 +374,7 @@ class PPOAgent:
                     critic_gradients = critic_tape.gradient(critic_loss, self.value.trainable_variables)
                     if self.gradient_clipping is not None:
                         critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, self.gradient_clipping)
-                    self.critic_optimizer.apply_gradients(zip(critic_gradients, self.value.trainable_variables))
+                    self.value_optimizer.apply_gradients(zip(critic_gradients, self.value.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(actor_loss))
                     critic_epoch_losses.append(tf.reduce_mean(critic_loss))
@@ -387,13 +387,13 @@ class PPOAgent:
         self.critic_loss_history.extend(critic_loss_history)
         self.entropy_history.extend(entropy_history)
 
-    def evaluate(self, n: int) -> Tuple[List[int], List[int]]:
+    def evaluate(self, n: int, render=False) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
-            n: integer value indicating the number of episodes that shall be run
-            n: int:
+            n (int): integer value indicating the number of episodes that shall be run
+            render (bool): whether to render it
 
         Returns:
             two lists of length n, giving episode lengths and rewards
@@ -408,6 +408,7 @@ class PPOAgent:
             state = numpy.expand_dims(self.env.reset(), axis=0).astype(numpy.float32)
             while not done:
                 action, action_probability = policy_act(self.policy, state)
+                self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
                 state = numpy.expand_dims(observation, axis=0).astype(numpy.float32)
                 reward_trajectory.append(reward)
@@ -446,7 +447,8 @@ class PPOAgent:
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
         del parameters["env"]
-        del parameters["policy"], parameters["critic"], parameters["policy_optimizer"], parameters["critic_optimizer"]
+        del parameters["policy"], parameters["value"], parameters["policy_value"]
+        del parameters["policy_optimizer"], parameters["value_optimizer"]
 
         return parameters
 
