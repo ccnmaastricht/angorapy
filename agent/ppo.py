@@ -18,22 +18,23 @@ from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, condense_worker_outputs, ModelTuple, RESERVED_GATHERING_CPUS
+from agent.gather import collect, condense_worker_outputs, ModelTuple, RESERVED_GATHERING_CPUS, \
+    read_dataset_from_storage
 from agent.policy import act_discrete, act_continuous
 from utilities.util import flat_print, env_extract_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
 
-
-class COLORS:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+COLORS = dict(
+    HEADER='\033[95m',
+    OKBLUE='\033[94m',
+    OKGREEN='\033[92m',
+    WARNING='\033[93m',
+    FAIL='\033[91m',
+    ENDC='\033[0m',
+    BOLD='\033[1m',
+    UNDERLINE='\033[4m'
+)
 
 
 class PPOAgent:
@@ -100,6 +101,7 @@ class PPOAgent:
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory)
+        os.makedirs("storage/experience/", exist_ok=True)
 
         # statistics
         self.total_frames_seen = 0
@@ -219,9 +221,10 @@ class PPOAgent:
             env_name = self.env_name
             lam = self.lam
 
-            result_object_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in range(self.workers)]
-            results = [ray.get(oi) for oi in result_object_ids]
-            dataset, stats = condense_worker_outputs(results)
+            result_object_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in
+                                 range(self.workers)]
+            stats = [ray.get(oi) for oi in result_object_ids][0]
+            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32)
 
             # clean up the saved models
             if export:
@@ -391,7 +394,7 @@ class PPOAgent:
         return lengths, rewards
 
     def report(self):
-        sc, nc, ec = COLORS.OKGREEN, COLORS.OKBLUE, COLORS.ENDC
+        sc, nc, ec = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"]
 
         time_distribution_string = ""
         if len(self.time_dicts) > 0:

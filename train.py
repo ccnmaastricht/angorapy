@@ -13,12 +13,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 set_all_seeds(1)
 
 # SETTINGS
-DEBUG = False
+DEBUG = True
 GPU = True
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
 
-TASK = "CartPole-v1"
+TASK = "BipedalWalker-v2"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000

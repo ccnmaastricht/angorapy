@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Functions for gathering experience."""
 import multiprocessing
+import os
 from collections import namedtuple
 from typing import Tuple, List
 
@@ -21,6 +22,7 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
 ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
 
 RESERVED_GATHERING_CPUS = multiprocessing.cpu_count() - 2
+STORAGE_DIR = "storage/experience/"
 
 
 def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.data.Dataset, StatBundle]:
@@ -59,14 +61,21 @@ def _float_feature(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
 
 
-def serialize_sample(state, action, action_prob, returns, advantage):
+def _bytes_feature(value):
+    """"Returns a bytes_list from a string / byte."""
+    if isinstance(value, type(tf.constant(0))):
+        value = value.numpy()
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+
+def serialize_sample(s, a, ap, r, adv):
     """Serialize a sample from a dataset."""
     feature = {
-        "state": _float_feature(state),
-        "action": _float_feature(action),
-        "action_prob": _float_feature(action_prob),
-        "return": _float_feature(returns),
-        "advantage": _float_feature(advantage)
+        "state": _bytes_feature(tf.io.serialize_tensor(s)),
+        "action": _bytes_feature(tf.io.serialize_tensor(a)),
+        "action_prob": _float_feature(ap),
+        "return": _float_feature(r),
+        "advantage": _float_feature(adv)
     }
 
     # Create a Features message using tf.train.Example.
@@ -74,8 +83,12 @@ def serialize_sample(state, action, action_prob, returns, advantage):
     return example_proto.SerializeToString()
 
 
-def tf_serialize_example(s, a, ap, r, ad):
-    tf_string = tf.py_function(serialize_sample, (s, a, ap, r, ad), tf.string)
+def tf_serialize_example(sample):
+    tf_string = tf.py_function(serialize_sample, (sample["state"],
+                                                  sample["action"],
+                                                  sample["action_prob"],
+                                                  sample["return"],
+                                                  sample["advantage"],), tf.string)
     return tf.reshape(tf_string, ())
 
 
@@ -143,15 +156,32 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
     # save to tf record
     dataset, stats = condense_worker_outputs([buffer])
-    for f0, f1, f2, f3, f4 in dataset.take(4):
-        print(f0)
-        print(f1)
-        print(f2)
-        print(f3)
-        print(f4)
 
     dataset = dataset.map(tf_serialize_example)
     writer = tfl.data.experimental.TFRecordWriter(f"storage/experience/data_{pid}")
     writer.write(dataset)
 
     return stats
+
+
+def read_dataset_from_storage(dtype_actions: tf.dtypes.DType):
+    """Read all files in storage into a tf record dataset without actually loading everything into memory."""
+    feature_description = {
+        "state": tf.io.FixedLenFeature([], tf.string),
+        "action": tf.io.FixedLenFeature([], tf.string),
+        "action_prob": tf.io.FixedLenFeature([], tf.float32),
+        "return": tf.io.FixedLenFeature([], tf.float32),
+        "advantage": tf.io.FixedLenFeature([], tf.float32)
+    }
+
+    def _parse_function(example_proto):
+        # Parse the input `tf.Example` proto using the dictionary above.
+        parsed = tf.io.parse_single_example(example_proto, feature_description)
+        parsed["state"] = tf.io.parse_tensor(parsed["state"], out_type=tf.float32)
+        parsed["action"] = tf.io.parse_tensor(parsed["action"], out_type=dtype_actions)
+        return parsed
+
+    serialized_dataset = tf.data.TFRecordDataset([os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)])
+    serialized_dataset = serialized_dataset.map(_parse_function)
+
+    return serialized_dataset
