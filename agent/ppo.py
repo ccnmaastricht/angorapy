@@ -210,7 +210,7 @@ class PPOAgent:
         """
         ray.init(logging_level=logging.ERROR)
 
-        print(f"Parallelize Over {RESERVED_GATHERING_CPUS} Threads.\n")
+        print(f"Parallelizing {self.workers} Workers Over {RESERVED_GATHERING_CPUS} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict(
                 [("gathering", None), ("optimization", None), ("evaluating", None), ("finalizing", None)])

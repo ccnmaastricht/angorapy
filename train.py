@@ -1,3 +1,4 @@
+import logging
 import os
 
 from gym.spaces import Box
@@ -17,12 +18,13 @@ DEBUG = False
 GPU = True
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
+SEPERATE_EVAL = True if not DEBUG else False
 
-TASK = "CartPole-v1"
+TASK = "ShadowHand-v0"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 12
+WORKERS = 8
 HORIZON = 1024 if not DEBUG else 128
 EPOCHS = 4
 BATCH_SIZE = 32 * 8
@@ -37,8 +39,12 @@ C_VALUE = 1
 GRADIENT_CLIP_NORM = 0.5
 CLIP_VALUE = True
 
+if DEBUG:
+    logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
+
 # setup environment and extract and report information
 env = gym.make(TASK)
+print(env.observation_space)
 state_dimensionality, number_of_actions = env_extract_dims(env)
 env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
 env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
@@ -81,7 +87,7 @@ agent.drill(n=ITERATIONS,
             story_teller=teller,
             export=EXPORT_TO_FILE,
             save_every=0,
-            separate_eval=True)
+            separate_eval=SEPERATE_EVAL)
 
 agent.save_agent_state()
 

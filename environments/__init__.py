@@ -1,12 +1,22 @@
 """Module for additional environments as well as registering modified environments."""
-
-# MODIFIED ENVIRONMENTS
 import gym
 
 from environments.evasion import Evasion
 from environments.race import Race
 from environments.tunnel import Tunnel, TunnelRAM
 from environments.evasionwalls import EvasionWalls
+from environments.shadowhand import ShadowHand
+
+
+# SHADOW HAND #
+
+gym.envs.register(
+    id='ShadowHand-v0',
+    entry_point='environments:ShadowHand',
+    kwargs={},
+)
+
+# MODIFIED ENVIRONMENTS
 
 gym.envs.register(
     id='MountainCarLong-v0',

@@ -5,7 +5,7 @@ from typing import Tuple
 
 import gym
 import numpy
-from gym.spaces import Discrete, Box
+from gym.spaces import Discrete, Box, Dict
 import tensorflow as tf
 import numpy as np
 
@@ -23,7 +23,11 @@ def set_all_seeds(seed):
 
 def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
     """Returns state and (discrete) action space dimensionality for given environment."""
-    obs_dim = env.observation_space.shape[0]
+    if isinstance(env.observation_space, Dict):
+        obs_dim = env.observation_space["observation"].shape[0] + env.observation_space["desired_goal"].shape[0]
+    else:
+        obs_dim = env.observation_space.shape[0]
+
     if isinstance(env.action_space, Discrete):
         act_dim = env.action_space.n
     elif isinstance(env.action_space, Box):
@@ -43,9 +47,6 @@ def normalize(x, is_img=False) -> numpy.ndarray:
         return x / 255
 
 
-def resize_normalize(d: tf.data.Dataset):
-    return d.map(lambda img: (tf.image.resize(img["image"], (200, 200)) / 255,) * 2)
-
-
 def flatten(l):
+    """Flatten a python list."""
     return [l] if not isinstance(l, list) else [x for X in l for x in flatten(X)]

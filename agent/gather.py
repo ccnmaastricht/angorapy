@@ -20,7 +20,7 @@ StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processe
                                        "episode_rewards", "episode_lengths"])
 ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
 
-RESERVED_GATHERING_CPUS = multiprocessing.cpu_count() - 2
+RESERVED_GATHERING_CPUS = multiprocessing.cpu_count()
 
 
 @ray.remote(num_cpus=RESERVED_GATHERING_CPUS)
