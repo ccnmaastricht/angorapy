@@ -3,7 +3,7 @@
 import numpy
 from gym import utils
 from gym.envs.robotics import HandBlockEnv
-
+import matplotlib.pyplot as plt
 
 class ShadowHand(HandBlockEnv):
     """Wrapper for the In Hand Manipulation Environment."""
@@ -13,6 +13,14 @@ class ShadowHand(HandBlockEnv):
 
         self.max_steps = max_steps
         self.total_steps = 0
+
+    def _viewer_setup(self):
+        super()._viewer_setup()
+
+        # rotate camera to top down view
+        self.viewer.cam.distance = 0.5
+        self.viewer.cam.azimuth = -90.0
+        self.viewer.cam.elevation = -90.0
 
     def _convert_obs(self, obs):
         frame = self.render(mode="rgb_array", height=200, width=200)
