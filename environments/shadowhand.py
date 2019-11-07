@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """ShadowHand Environment Wrappers."""
 import numpy
-from gym import utils
 from gym.envs.robotics import HandBlockEnv
 import matplotlib.pyplot as plt
+
 
 class ShadowHand(HandBlockEnv):
     """Wrapper for the In Hand Manipulation Environment."""
@@ -13,6 +13,14 @@ class ShadowHand(HandBlockEnv):
 
         self.max_steps = max_steps
         self.total_steps = 0
+
+        print(self.sim.model.mat_rgba)
+
+        # color of the hand
+        self.sim.model.mat_rgba[2] = numpy.array([16, 18, 35, 255]) / 255
+
+        # background color
+        self.sim.model.mat_rgba[4] = numpy.array([104, 143, 71, 255]) / 255
 
     def _viewer_setup(self):
         super()._viewer_setup()
@@ -24,6 +32,8 @@ class ShadowHand(HandBlockEnv):
 
     def _convert_obs(self, obs):
         frame = self.render(mode="rgb_array", height=200, width=200)
+        plt.imshow(frame)
+        plt.show()
         return numpy.concatenate([obs["observation"], obs["desired_goal"]])
 
     def step(self, action):
