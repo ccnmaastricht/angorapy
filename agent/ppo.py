@@ -19,7 +19,7 @@ from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
-    read_dataset_from_storage
+    read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
 from utilities.util import flat_print, env_extract_dims
 
@@ -224,8 +224,7 @@ class PPOAgent:
 
         print(f"Parallelizing {self.workers} Workers Over {RESERVED_GATHERING_CPUS} Threads.\n")
         for self.iteration in range(self.iteration, n):
-            time_dict = OrderedDict(
-                [("gathering", None), ("optimization", None), ("evaluating", None), ("finalizing", None)])
+            time_dict = OrderedDict()
             subprocess_start = time.time()
 
             # run simulations in parallel
@@ -250,14 +249,18 @@ class PPOAgent:
 
             result_object_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in
                                  range(self.workers)]
-            stats = [ray.get(oi) for oi in result_object_ids][0]
+            stats = condense_stats([ray.get(oi) for oi in result_object_ids])
+
+            time_dict["gathering"] = time.time() - subprocess_start
+            subprocess_start = time.time()
+
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32)
 
             # clean up the saved models
             if export:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
-            time_dict["gathering"] = time.time() - subprocess_start
+            time_dict["communication"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
             # process stats from actors

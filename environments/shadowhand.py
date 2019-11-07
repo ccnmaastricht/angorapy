@@ -15,6 +15,7 @@ class ShadowHand(HandBlockEnv):
         self.total_steps = 0
 
     def _convert_obs(self, obs):
+        frame = self.render(mode="rgb_array", height=200, width=200)
         return numpy.concatenate([obs["observation"], obs["desired_goal"]])
 
     def step(self, action):

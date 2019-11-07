@@ -18,15 +18,15 @@ DEBUG = False
 GPU = True
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
-SEPERATE_EVAL = True if not DEBUG else False
+SEPERATE_EVAL = False if not DEBUG else False
 
 TASK = "ShadowHand-v0"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 6
-HORIZON = 128 if not DEBUG else 128
-EPOCHS = 4
+WORKERS = 8
+HORIZON = 1024 if not DEBUG else 128
+EPOCHS = 4 if not DEBUG else 1
 BATCH_SIZE = 32 * 8
 
 LEARNING_RATE_POLICY = 3e-4
@@ -44,7 +44,6 @@ if DEBUG:
 
 # setup environment and extract and report information
 env = gym.make(TASK)
-print(env.observation_space)
 state_dimensionality, number_of_actions = env_extract_dims(env)
 env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
 env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"

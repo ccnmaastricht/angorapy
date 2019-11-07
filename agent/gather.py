@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience."""
+import itertools
 import multiprocessing
 import os
 from collections import namedtuple
@@ -54,6 +55,15 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
     })
 
     return data, StatBundle(completed_episodes, numb_processed_frames, episode_rewards, episode_lengths)
+
+
+def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
+    return StatBundle(
+        numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
+        numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
+        episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
+        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles]))
+    )
 
 
 def _float_feature(value):
