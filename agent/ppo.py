@@ -18,11 +18,23 @@ from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, condense_worker_outputs, ModelTuple, RESERVED_GATHERING_CPUS
+from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
+    read_dataset_from_storage
 from agent.policy import act_discrete, act_continuous
 from utilities.util import flat_print, env_extract_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
+
+COLORS = dict(
+    HEADER='\033[95m',
+    OKBLUE='\033[94m',
+    OKGREEN='\033[92m',
+    WARNING='\033[93m',
+    FAIL='\033[91m',
+    ENDC='\033[0m',
+    BOLD='\033[1m',
+    UNDERLINE='\033[4m'
+)
 
 
 class PPOAgent:
@@ -46,9 +58,16 @@ class PPOAgent:
                  gradient_clipping: float = None, clip_values: bool = True, _make_dirs=True):
         super().__init__()
 
+        # environment info
         self.env = environment
         self.env_name = self.env.unwrapped.spec.id
         self.state_dim, self.n_actions = env_extract_dims(self.env)
+        if isinstance(self.env.action_space, Discrete):
+            self.continuous_control = False
+        elif isinstance(self.env.action_space, Box):
+            self.continuous_control = True
+        else:
+            raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
 
         # learning parameters
         self.horizon = horizon
@@ -72,7 +91,7 @@ class PPOAgent:
         self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
         self.value_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
 
-        # misc
+        # miscellaneous
         self.iteration = 0
         self.current_fps = 0
         self.device = "CPU:0"
@@ -82,6 +101,7 @@ class PPOAgent:
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory)
+        os.makedirs("storage/experience/", exist_ok=True)
 
         # statistics
         self.total_frames_seen = 0
@@ -94,14 +114,6 @@ class PPOAgent:
         self.actor_loss_history = []
         self.critic_loss_history = []
         self.time_dicts = []
-
-        # prepare for environment type
-        if isinstance(self.env.action_space, Discrete):
-            self.continuous_control = False
-        elif isinstance(self.env.action_space, Box):
-            self.continuous_control = True
-        else:
-            raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
 
     def set_gpu(self, activated: bool):
         """
@@ -236,9 +248,10 @@ class PPOAgent:
             env_name = self.env_name
             lam = self.lam
 
-            result_object_ids = [collect.remote(models, horizon, env_name, discount, lam) for _ in range(self.workers)]
-            results = [ray.get(oi) for oi in result_object_ids]
-            dataset, stats = condense_worker_outputs(results)
+            result_object_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in
+                                 range(self.workers)]
+            stats = [ray.get(oi) for oi in result_object_ids][0]
+            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32)
 
             # clean up the saved models
             if export:
@@ -421,19 +434,21 @@ class PPOAgent:
 
     def report(self):
         """Print a report of the current state of the training."""
+
+        sc, nc, ec = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"]
         time_distribution_string = ""
         if len(self.time_dicts) > 0:
             times = [time for time in self.time_dicts[-1].values() if time is not None]
             jobs = [job[0] for job, time in self.time_dicts[-1].items() if time is not None]
             time_percentages = [str(round(100 * t / sum(times))) + jobs[i] for i, t in enumerate(times)]
             time_distribution_string = "[" + "|".join(map(str, time_percentages)) + "]"
-        flat_print(f"{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}: "
-                   f"Mean Rew.: {0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}; "
-                   f"Mean Len.: {0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}; "
-                   f"Total Episodes: {self.total_episodes_seen:5d}; "
-                   f"Total Updates: {self.policy_optimizer.iterations.numpy().item():6d}; "
-                   f"Total Frames: {round(self.total_frames_seen / 1e3, 3):6.3f}k; "
-                   f"Exec. Speed: {self.current_fps:6.2f}fps {time_distribution_string}\n")
+        flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
+                   f"Mean Rew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
+                   f"Mean Len.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
+                   f"Total Episodes: {nc}{self.total_episodes_seen:5d}{ec}; "
+                   f"Total Updates: {nc}{self.policy_optimizer.iterations.numpy().item():6d}{ec}; "
+                   f"Total Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+                   f"Exec. Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
 
     def save_agent_state(self):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
