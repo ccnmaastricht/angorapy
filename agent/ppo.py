@@ -27,23 +27,23 @@ BASE_SAVE_PATH = "saved_models/states/"
 
 class PPOAgent:
     """Agent using the Proximal Policy Optimization Algorithm for learning.
-
+    
     The default is an implementation using two independent models for the critic and the actor. This is of course more
     expensive than using shared parameters because we need two forward and backward calculations
     per batch however this is what is used in the original paper and most implementations. During development this also
     turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
     to make any significant progress in more difficult environments such as LunarLander.
+
+    Args:
+
+    Returns:
+
     """
 
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int,
                  learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
                  lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, c_value: float = 0.5,
                  gradient_clipping: float = None, clip_values: bool = True, _make_dirs=True):
-        """Initialize the Agent.
-
-        :param discount:                discount factor applied to future rewards
-        :param clip:            clipping range for the actor's objective
-        """
         super().__init__()
 
         self.env = environment
@@ -104,17 +104,31 @@ class PPOAgent:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
 
     def set_gpu(self, activated: bool):
+        """
+
+        Args:
+          activated: bool: 
+
+        Returns:
+
+        """
         self.device = "GPU:0" if activated else "CPU:0"
 
     def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
         (as given in the paper), but this is the negated objective to be minimized!
 
-        :param action_prob:             the probability of the action for the state under the current policy
-        :param old_action_prob:         the probability of the action taken given by the old policy during the episode
-        :param advantage:               the advantage that taking the action gives over the estimated state value
+        Args:
+          action_prob: the probability of the action for the state under the current policy
+          old_action_prob: the probability of the action taken given by the old policy during the episode
+          advantage: the advantage that taking the action gives over the estimated state value
+          action_prob: tf.Tensor: 
+          old_action_prob: tf.Tensor: 
+          advantage: tf.Tensor: 
 
-        :return:                        the value of the objective function
+        Returns:
+          the value of the objective function
+
         """
         r = tf.math.divide(action_prob, old_action_prob)
         return tf.maximum(
@@ -126,11 +140,18 @@ class PPOAgent:
                    clip=True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
-        :param value_predictions:               value prediction by the current critic network
-        :param old_values:                      value prediction by the old critic network during gathering
-        :param returns:                         discounted return estimation
+        Args:
+          value_predictions: value prediction by the current critic network
+          old_values: value prediction by the old critic network during gathering
+          returns: discounted return estimation
+          value_predictions: tf.Tensor: 
+          old_values: tf.Tensor: 
+          returns: tf.Tensor: 
+          clip:  (Default value = True)
 
-        :return:                    squared error between prediction and return
+        Returns:
+          squared error between prediction and return
+
         """
         error = tf.square(value_predictions - returns)
         if clip:
@@ -147,39 +168,45 @@ class PPOAgent:
         entropy, the less probability mass lies on a single action, which would hinder exploration. We hence reduce
         the loss by the (scaled by c_entropy) entropy to encourage a certain degree of exploration.
 
-        :param policy_output:   a tensor containing (batches of) probabilities for actions in the case of discrete
-                                actions or (batches of) means and standard deviations for continuous control.
+        Args:
+          policy_output: a tensor containing (batches of) probabilities for actions in the case of discrete
+        actions or (batches of) means and standard deviations for continuous control.
+          policy_output: tf.Tensor: 
 
-        :return:                (batch of) entropy bonus(es)
+        Returns:
+          batch of) entropy bonus(es)
+
         """
         if self.continuous_control:
             return gaussian_entropy(stdevs=policy_output[:, self.n_actions:])
         else:
             return categorical_entropy(policy_output)
 
-    def joint_loss_function(self, old_action_prob: tf.Tensor, action_prob: tf.Tensor, advantage: tf.Tensor,
-                            prediction: tf.Tensor, discounted_return: tf.Tensor, action_probs) -> tf.Tensor:
-        return self.actor_loss(action_prob, old_action_prob, advantage) \
-               + self.value_loss(prediction, discounted_return) * self.c_value \
-               - self.entropy_bonus(action_probs) * self.c_entropy
-
     def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export=False, save_every: int = 0,
-              separate_eval: bool = False):
-        """Main training loop of the agent.
-
+              separate_eval: bool = False) -> "PPOAgent":
+        """Start a training loop of the agent.
+        
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
-        :param n:               the number of experience-optimization cycles that shall be run
-        :param epochs:          the number of epochs for which the model is optimized on the same experience data
-        :param batch_size       batch size for the optimization
-        :param story_teller:    story telling object that creates visualizations of the training process on the fly
-        :param export:          boolean indicator for whether communication with workers is achieved through file saving
-                                or direct weight passing
-        :param save_every:      for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
-        :param separate_eval:   if false (default), use episodes from gathering for statistics, if true, evaluate 10
-                                additional episodes.
+        Args:
+            n: the number of experience-optimization cycles that shall be run
+            epochs: the number of epochs for which the model is optimized on the same experience data
+            batch_size: batch size for the optimization
+            story_teller: story telling object that creates visualizations of the training process on the fly (Default value = None)
+            export: boolean indicator for whether communication with workers is achieved through file saving
+        or direct weight passing (Default value = False)
+            save_every: for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
+            separate_eval: if false (default), use episodes from gathering for statistics, if true, evaluate 10
+        additional episodes.
+            n: int:
+            epochs: int:
+            batch_size: int:
+            save_every: int:  (Default value = 0)
+            separate_eval: bool:  (Default value = False)
 
-        :return:                self
+        Returns:
+            self
+
         """
         ray.init(logging_level=logging.ERROR)
 
@@ -274,9 +301,9 @@ class PPOAgent:
 
         return self
 
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int):
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
-
+        
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
         handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
         best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
@@ -284,9 +311,16 @@ class PPOAgent:
         gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
         not. Even more so this applies with running simulations on the cluster.
 
-        :param dataset:         tensorflow dataset containing s, a, p(a), r and A as components per data point
-        :param epochs:          number of epochs to train on this dataset
-        :param batch_size:      batch size with which the dataset is sampled
+        Args:
+            dataset: tensorflow dataset containing s, a, p(a), r and A as components per data point
+            epochs: number of epochs to train on this dataset
+            batch_size: batch size with which the dataset is sampled
+            dataset: tf.data.Dataset:
+            epochs: int:
+            batch_size: int:
+
+        Returns:
+            None
         """
         actor_loss_history, critic_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
@@ -357,9 +391,13 @@ class PPOAgent:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
-        :param n:           integer value indicating the number of episodes that shall be run
+        Args:
+            n: integer value indicating the number of episodes that shall be run
+            n: int:
 
-        :return:            two lists of length n, giving episode lengths and rewards
+        Returns:
+            two lists of length n, giving episode lengths and rewards
+
         """
         rewards, lengths = [], []
         policy_act = act_discrete if not self.continuous_control else act_continuous
@@ -381,6 +419,7 @@ class PPOAgent:
         return lengths, rewards
 
     def report(self):
+        """Print a report of the current state of the training."""
         time_distribution_string = ""
         if len(self.time_dicts) > 0:
             times = [time for time in self.time_dicts[-1].values() if time is not None]
@@ -396,6 +435,7 @@ class PPOAgent:
                    f"Exec. Speed: {self.current_fps:6.2f}fps {time_distribution_string}\n")
 
     def save_agent_state(self):
+        """Save the current state of the agent into the agent directory, identified by the current iteration."""
         self.policy.save(self.agent_directory + f"/{self.iteration}/policy")
         self.value.save(self.agent_directory + f"/{self.iteration}/value")
 
@@ -403,6 +443,7 @@ class PPOAgent:
             json.dump(self.get_parameters(), f)
 
     def get_parameters(self):
+        """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
         del parameters["env"]
         del parameters["policy"], parameters["critic"], parameters["policy_optimizer"], parameters["critic_optimizer"]
@@ -410,7 +451,15 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int):
+    def from_agent_state(agent_id: int) -> "PPOAgent":
+        """Build an agent from a previously saved state.
+
+        Args:
+            agent_id: the ID of the agent to be loaded
+
+        Returns:
+            loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
+        """
         # TODO also load the state of the optimizers
         agent_path = BASE_SAVE_PATH + f"/{agent_id}"
         if not os.path.isdir(agent_path):

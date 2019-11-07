@@ -3,7 +3,7 @@
 import itertools
 import math
 import os
-from typing import List
+from typing import List, Iterable, Any
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -58,7 +58,7 @@ def transparent_cmap(cmap, N=255):
 
 
 class NetworkAnalyzer:
-
+    
     def __init__(self, network: tf.keras.Model, mode: str = "show"):
         self.network = network
         self.mode = "show"
@@ -68,29 +68,41 @@ class NetworkAnalyzer:
         os.makedirs(self.figure_directory, exist_ok=True)
 
     def set_mode(self, mode: str):
+        """ Set the mode of visualizations to either "show" or "save".
+
+        Args:
+            mode: either one of [show, save], where show creates popups for results and save saves them into the figure
+                directory
+        """
         assert mode in ["show", "save"], "Illegal Analyzer Mode. Choose from show, save."
         self.mode = mode
 
-    def numb_features_in_layer(self, layer: str):
-        return self.get_layer_by_name(layer).output_shape[-1]
+    def numb_features_in_layer(self, layer_name: str) -> int:
+        """Get the number of features/filters in the layer specified by its unique string representation."""
+        return self.get_layer_by_name(layer_name).output_shape[-1]
 
     def list_layer_names(self, only_para_layers=False) -> List[str]:
+        """Get a list of unique string representations of all layers in the network."""
         if only_para_layers:
             return [layer.name for layer in extract_layers(self.network) if not isinstance(layer, tf.keras.layers.Activation)]
         else:
             return [layer.name for layer in extract_layers(self.network)]
 
     def list_convolutional_layer_names(self) -> List[str]:
+        """Get a list of unique string representations of convolutional layers in the network."""
         return [layer.name for layer in extract_layers(self.network) if is_conv(layer)]
 
     def list_non_convolutional_layer_names(self) -> List[str]:
+        """Get a list of unique string representations of non-convolutional layers in the network."""
         return [layer.name for layer in extract_layers(self.network) if
                 not isinstance(layer, CONVOLUTION_BASE_CLASS) and not isinstance(layer, tf.keras.layers.Activation)]
 
     def get_layer_by_name(self, layer_name):
+        """Retrieve the layer object identified from the model by its unique string representation."""
         return extract_layers(self.network)[self.list_layer_names().index(layer_name)]
 
     def plot_model(self):
+        """Plot the network graph into a file."""
         tf.keras.utils.plot_model(self.network, show_shapes=True)
 
     def visualize_layer_weights(self, layer_name):
@@ -107,8 +119,23 @@ class NetworkAnalyzer:
         plt.close()
 
     def visualize_max_filter_respondence(self, layer_name: str, feature_ids: List[int] = None,
-                                         optimization_steps: int = 30):
-        """Feature Maximization."""
+                                         optimization_steps: int = 30) -> None:
+        """Visualize a given layer by performing feature maximization.
+
+        In feature maximization, a random input image is created (here, uniform noise) and then successively updated
+        to maximize the response in a filter (feature) of the specified layer(s). The procedure is extended to start
+        with a low-resolution input image that is upscaled after every 30 optimization steps by some factor. This
+        encourages the optimization to go towards a local minimum with low-frequency patterns, which are generally
+        easier to interpret.
+
+        Args:
+            layer_name (str): the unique string identifying the layer who's response shall be maximized
+            feature_ids (list): a list of filter/feature IDs that will be maximized and shown as a tiling
+            optimization_steps: the number of optimization steps between upscalings.
+
+        Returns:
+            None
+        """
         # build model that only goes to the layer of interest
         layer = self.get_layer_by_name(layer_name)
         print("performing feature maximization on " + ("dense " if not isinstance(layer, CONVOLUTION_BASE_CLASS)
@@ -147,17 +174,28 @@ class NetworkAnalyzer:
             f"{self.figure_directory}/feature_maximization_{layer_name}_{'_'.join(map(str, feature_ids))}.pdf",
             format="pdf")
 
-    def visualize_activation_map(self, layer_name, reference_img: numpy.ndarray, mode: str = "gray"):
+    def visualize_activation_map(self, layer_name: str, reference_img: numpy.ndarray, mode: str = "gray") -> None:
+        """Visualize the activation map of a given layer, either as a gray level image, as a heatmap on top of the
+        original image, or as a bar plot.
+
+        Args:
+            layer_name (str): the unique string identifying the layer from which to draw the activations
+            reference_img: the image serving as the input producing the activation
+            mode: the mode of the visualization, either one of [gray, heat, plot]
+
+        Returns:
+            None
+        """
         assert mode in ["gray", "heat", "plot"]
 
         layer = self.get_layer_by_name(layer_name)
-        submodel = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
+        sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
         reference_img = normalize(reference_img).astype(numpy.float32)
         reference_img = tf.expand_dims(reference_img, axis=0) if len(reference_img.shape) == 3 else reference_img
         reference_width, reference_height = reference_img.shape[1], reference_img.shape[2]
 
-        feature_maps = submodel(reference_img)
+        feature_maps = sub_model(reference_img)
         n_filters = feature_maps.shape[-1]
 
         if mode == "heat":
@@ -189,14 +227,20 @@ class NetworkAnalyzer:
             mean_filter_responses = tf.reduce_mean(feature_maps, axis=[0, 1])
             plt.bar(list(range(n_filters)), mean_filter_responses)
 
-        format = "png" if mode == "heat" else "pdf"
+        output_format = "png" if mode == "heat" else "pdf"
         plt.show() if self.mode == "show" else plt.savefig(
-            f"{self.figure_directory}/feature_maps_{layer_name}{f'_{mode}'}.{format}",
-            format=format, dpi=300)
+            f"{self.figure_directory}/feature_maps_{layer_name}{f'_{mode}'}.{output_format}",
+            format=output_format, dpi=300)
 
         return feature_maps
 
-    def obtain_saliency_map(self, reference):
+    def obtain_saliency_map(self, reference: Any[numpy.ndarray, tf.Tensor]) -> None:
+        """Create a saliency map indicating the importance of each input pixel for the output, based on gradients.
+
+        Args:
+            reference: the image serving as a reference image
+        """
+
         # resize image to fit network input shape
         reference = tf.Variable(tf.image.resize(reference, size=self.network.input_shape[1:-1]))
 
@@ -224,28 +268,38 @@ class NetworkAnalyzer:
 
         saliency_map = tf.reduce_mean(tf.keras.activations.relu(output_gradient), axis=-1)
         plt.imshow(saliency_map, cmap="jet")
-        plt.show()
 
-    def cluster_inputs(self, layer_name, input_images: List[numpy.ndarray], classes):
+        plt.show() if self.mode == "show" else plt.savefig(
+            f"{self.figure_directory}/saliency_map.pdf", format=format, dpi=300)
+
+    def cluster_inputs(self, layer_name: str, input_images: List[numpy.ndarray], classes: Iterable[int]) -> None:
+        """Cluster inputs based on the representation produced by a given layer, using the t-SNE algorithm.
+
+        Args:
+            layer_name (str): the unique string identifying the layer from which to take the representation.
+            input_images (list): a list of images that will be clustered
+            classes (list): the classes/categories of the images based on which they are colored in the cluster plot
+        """
         layer = self.get_layer_by_name(layer_name)
-        submodel = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
+        sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
         # retrieve representations
         input_images = [tf.expand_dims(normalize(img).astype(numpy.float32), axis=0) for img in input_images]
-        representations = [tf.reshape(submodel(img), [-1]).numpy() for img in input_images]
+        representations = [tf.reshape(sub_model(img), [-1]).numpy() for img in input_images]
 
         # cluster
-        tsne = TSNE()
-        sneezed_datapoints = tsne.fit_transform(representations)
+        t_sne = TSNE()
+        sneezed_datapoints = t_sne.fit_transform(representations)
         x, y = numpy.split(sneezed_datapoints, 2, axis=1)
 
         plt.scatter(x=numpy.squeeze(x), y=numpy.squeeze(y), c=classes, cmap="Paired")
-        plt.show()
 
-    # BUILDERS
+        plt.show() if self.mode == "show" else plt.savefig(
+            f"{self.figure_directory}/input_cluster_{layer_name}.pdf", format=format, dpi=300)
 
     @staticmethod
     def from_saved_model(model_path: str, mode: str = "show"):
+        """Build the analyzer from a model path."""
         assert os.path.exists(model_path), "Model Path does not exist!"
         return NetworkAnalyzer(tf.keras.models.load_model(model_path), mode=mode)
 
@@ -290,5 +344,5 @@ if __name__ == "__main__":
         images = [d[0] for d in data]
         classes = [d[1].numpy().item() for d in data]
 
-        analyzer.cluster_inputs("fc2", images, classes)
+        analyzer.cluster_inputs("predictions", images, classes)
 
