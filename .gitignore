@@ -3,6 +3,7 @@ saved_models/*
 misc/benchmark_efficiency.py
 docs/analysis/*
 MUJOCO_LOG.TXT
+storage/*
 
 ### PyCharm+all ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm

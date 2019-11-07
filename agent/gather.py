@@ -158,7 +158,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     dataset, stats = condense_worker_outputs([buffer])
 
     dataset = dataset.map(tf_serialize_example)
-    writer = tfl.data.experimental.TFRecordWriter(f"storage/experience/data_{pid}")
+    writer = tfl.data.experimental.TFRecordWriter(f"storage/experience/data_{pid}.tfrecord")
     writer.write(dataset)
 
     return stats
