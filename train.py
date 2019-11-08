@@ -11,8 +11,6 @@ from utilities.util import env_extract_dims, set_all_seeds
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-set_all_seeds(1)
-
 # SETTINGS
 DEBUG = False
 GPU = True
@@ -20,21 +18,21 @@ EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers in
 LOAD_ID = None
 SEPERATE_EVAL = False if not DEBUG else False
 
-TASK = "ShadowHand-v0"
+TASK = "HalfCheetah-v2"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 8
-HORIZON = 1024 if not DEBUG else 128
-EPOCHS = 4 if not DEBUG else 1
-BATCH_SIZE = 32 * 8
+WORKERS = 1
+HORIZON = 2048 if not DEBUG else 128
+EPOCHS = 10 if not DEBUG else 1
+BATCH_SIZE = 64
 
 LEARNING_RATE_POLICY = 3e-4
-LEARNING_RATE_CRITIC = 1e-3
+LEARNING_RATE_CRITIC = 3e-4
 DISCOUNT_FACTOR = 0.99
 GAE_LAMBDA = 0.95
 EPSILON_CLIP = 0.2
-C_ENTROPY = 0.01
+C_ENTROPY = 0.0
 C_VALUE = 1
 GRADIENT_CLIP_NORM = 0.5
 CLIP_VALUE = True

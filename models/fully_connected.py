@@ -7,6 +7,7 @@ import tensorflow as tf
 from gym.spaces import Box
 from tensorflow_core.python.keras.utils import plot_model
 
+from utilities.normalization import RunningNormalization
 from utilities.util import env_extract_dims
 
 
@@ -31,7 +32,9 @@ def build_ffn_distinct_models(env: gym.Env):
 
     # policy network
     policy_latent = _build_encoding_sub_model(state_dimensionality)
-    x = policy_latent(inputs)
+
+    normalized = RunningNormalization()(inputs)
+    x = policy_latent(normalized)
     if continuous_control:
         means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
         means = tf.keras.layers.Activation("linear")(means)
@@ -47,7 +50,8 @@ def build_ffn_distinct_models(env: gym.Env):
 
     # value network
     value_latent = _build_encoding_sub_model(state_dimensionality)
-    x = value_latent(inputs)
+    normalized = RunningNormalization()(inputs)
+    x = value_latent(normalized)
     x = tf.keras.layers.Dense(1, input_dim=64)(x)
     out_value = tf.keras.layers.Activation("linear")(x)
 
@@ -63,7 +67,8 @@ def build_ffn_shared_models(env: gym.Env):
     # shared encoding layers
     inputs = tf.keras.Input(shape=(state_dimensionality,))
     latent = _build_encoding_sub_model(state_dimensionality, name="Encoder")
-    latent_representation = latent(inputs)
+    normalized = RunningNormalization()(inputs)
+    latent_representation = latent(normalized)
 
     # policy head
     if continuous_control:

@@ -21,6 +21,7 @@ from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
     read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
+from utilities.normalization import RunningNormalization
 from utilities.util import flat_print, env_extract_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
@@ -84,12 +85,12 @@ class PPOAgent:
 
         # models and optimizers
         self.policy, self.value, self.policy_value = model_builder(self.env)
+        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
+        self.value_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
+        self.normalizer = RunningNormalization()
 
         # load persistent network types
         self.builder_function_name = model_builder.__name__
-
-        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
-        self.value_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
 
         # miscellaneous
         self.iteration = 0
@@ -101,6 +102,8 @@ class PPOAgent:
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory)
+
+        shutil.rmtree("storage/experience/")
         os.makedirs("storage/experience/", exist_ok=True)
 
         # statistics
@@ -346,6 +349,7 @@ class PPOAgent:
             for batch in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
+
                     # optimize the actor
                     with tf.GradientTape() as actor_tape:
                         policy_output = self.policy(batch["state"], training=True)
