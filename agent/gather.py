@@ -4,6 +4,7 @@ import itertools
 import multiprocessing
 import os
 from collections import namedtuple
+from time import sleep
 from typing import Tuple, List
 
 import numpy
@@ -58,6 +59,7 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
 
 
 def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
+    """Infer a single StatBundle from a list of StatBundles."""
     return StatBundle(
         numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
         numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
@@ -102,7 +104,7 @@ def tf_serialize_example(sample):
     return tf.reshape(tf_string, ())
 
 
-@ray.remote(num_cpus=RESERVED_GATHERING_CPUS)
+@ray.remote(num_cpus=1)
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
     import tensorflow as tfl
 

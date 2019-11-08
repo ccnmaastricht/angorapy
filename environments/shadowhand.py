@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 """ShadowHand Environment Wrappers."""
+import os
+
+import gym
 import numpy
 from gym.envs.robotics import HandBlockEnv
 import matplotlib.pyplot as plt
@@ -13,8 +16,6 @@ class ShadowHand(HandBlockEnv):
 
         self.max_steps = max_steps
         self.total_steps = 0
-
-        print(self.sim.model.mat_rgba)
 
         # color of the hand
         self.sim.model.mat_rgba[2] = numpy.array([16, 18, 35, 255]) / 255
@@ -31,9 +32,7 @@ class ShadowHand(HandBlockEnv):
         self.viewer.cam.elevation = -90.0
 
     def _convert_obs(self, obs):
-        frame = self.render(mode="rgb_array", height=200, width=200)
-        plt.imshow(frame)
-        plt.show()
+        # frame = self.render(mode="rgb_array", height=200, width=200)
         return numpy.concatenate([obs["observation"], obs["desired_goal"]])
 
     def step(self, action):
@@ -48,3 +47,17 @@ class ShadowHand(HandBlockEnv):
         obs = super().reset()
         self.total_steps = 0
         return self._convert_obs(obs)
+
+
+if __name__ == "__main__":
+    print(os.environ["LD_PRELOAD"])
+
+    from environments import *
+
+    env = gym.make("ShadowHand-v0")
+    done = False
+    state = env.reset()
+    while True:
+        env.render()
+        action = env.action_space.sample()
+        state, reward, done, info = env.step(action)

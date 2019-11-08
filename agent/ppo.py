@@ -247,9 +247,9 @@ class PPOAgent:
             env_name = self.env_name
             lam = self.lam
 
-            result_object_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in
-                                 range(self.workers)]
-            stats = condense_stats([ray.get(oi) for oi in result_object_ids])
+            result_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in range(self.workers)]
+            split_stats = [ray.get(oi) for oi in result_ids]
+            stats = condense_stats(split_stats)
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
@@ -312,8 +312,6 @@ class PPOAgent:
                 self.save_agent_state()
 
             time_dict["finalizing"] = time.time() - subprocess_start
-
-        ray.shutdown()
 
         return self
 
