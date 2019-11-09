@@ -18,7 +18,7 @@ EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers in
 LOAD_ID = None
 SEPERATE_EVAL = False if not DEBUG else False
 
-TASK = "HalfCheetah-v2"
+TASK = "CartPole-v1"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000

@@ -134,22 +134,19 @@ class PPOAgent:
         (as given in the paper), but this is the negated objective to be minimized!
 
         Args:
-          action_prob: the probability of the action for the state under the current policy
-          old_action_prob: the probability of the action taken given by the old policy during the episode
-          advantage: the advantage that taking the action gives over the estimated state value
-          action_prob: tf.Tensor: 
-          old_action_prob: tf.Tensor: 
-          advantage: tf.Tensor: 
+          action_prob (tf.Tensor): the probability of the action for the state under the current policy
+          old_action_prob (tf.Tensor): the probability of the action taken given by the old policy during the episode
+          advantage (tf.Tensor): the advantage that taking the action gives over the estimated state value
 
         Returns:
           the value of the objective function
 
         """
-        r = tf.math.divide(action_prob, old_action_prob)
-        return tf.maximum(
+        r = action_prob / old_action_prob
+        return tf.reduce_mean(tf.maximum(
             - tf.math.multiply(r, advantage),
             - tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
-        )
+        ))
 
     def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
                    clip=True) -> tf.Tensor:
@@ -176,7 +173,7 @@ class PPOAgent:
 
             return tf.maximum(clipped_error, error) * 0.5
 
-        return error
+        return tf.reduce_mean(error)
 
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
         """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
@@ -189,13 +186,13 @@ class PPOAgent:
           policy_output: tf.Tensor: 
 
         Returns:
-          batch of) entropy bonus(es)
-
+          entropy bonus
         """
+
         if self.continuous_control:
-            return gaussian_entropy(stdevs=policy_output[:, self.n_actions:])
+            return tf.reduce_mean(gaussian_entropy(stdevs=policy_output[:, self.n_actions:]))
         else:
-            return categorical_entropy(policy_output)
+            return tf.reduce_mean(categorical_entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export=False, save_every: int = 0,
               separate_eval: bool = False) -> "PPOAgent":

@@ -28,6 +28,8 @@ class RunningNormalization(tf.keras.layers.Layer):
     def call(self, batch: tf.Tensor, **kwargs) -> tf.Tensor:
         """Normalize a given batch of 1D tensors and update running mean and std."""
 
+        return batch
+
         # calculate statistics for the batch
         batch_len = batch.shape[0] if batch.shape[0] is not None else 0
         batch_means = tf.reduce_mean(batch, axis=0)
