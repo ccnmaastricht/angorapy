@@ -6,6 +6,7 @@ from gym.spaces import Box
 from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
+from utilities.const import COLORS
 from utilities.story import StoryTeller
 from utilities.util import env_extract_dims, set_all_seeds
 
@@ -16,23 +17,23 @@ DEBUG = False
 GPU = True
 EXPORT_TO_FILE = False  # if true, saves/reads policy to be loaded in workers into file
 LOAD_ID = None
-SEPERATE_EVAL = False if not DEBUG else False
+SEPERATE_EVAL = True if not DEBUG else False
 
-TASK = "CartPole-v1"
+TASK = "LunarLanderContinuous-v2"
 build_models = build_ffn_distinct_models
 
 ITERATIONS = 1000
-WORKERS = 1
+WORKERS = 8
 HORIZON = 2048 if not DEBUG else 128
-EPOCHS = 10 if not DEBUG else 1
-BATCH_SIZE = 64
+EPOCHS = 5 if not DEBUG else 1
+BATCH_SIZE = 512
 
-LEARNING_RATE_POLICY = 3e-4
-LEARNING_RATE_CRITIC = 3e-4
+LEARNING_RATE_POLICY = 0.0003
+LEARNING_RATE_CRITIC = 0.001
 DISCOUNT_FACTOR = 0.99
-GAE_LAMBDA = 0.95
+GAE_LAMBDA = 0.97
 EPSILON_CLIP = 0.2
-C_ENTROPY = 0.0
+C_ENTROPY = 0.01
 C_VALUE = 1
 GRADIENT_CLIP_NORM = 0.5
 CLIP_VALUE = True
@@ -46,11 +47,16 @@ state_dimensionality, number_of_actions = env_extract_dims(env)
 env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
 env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
 env_name = env.unwrapped.spec.id
-print(f"-----------------------------------------\n"
-      f"Learning the Task: {env_name}\n"
-      f"{state_dimensionality}-dimensional states ({env_observation_space_type}) "
-      f"and {number_of_actions} actions ({env_action_space_type}).\n"
-      f"-----------------------------------------\n")
+
+# announce experiment
+bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
+print(f"{wn}-----------------------------------------{ec}\n"
+      f"Learning the Task: {bc}{env_name}{ec}\n"
+      f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
+      f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
+      f"{wn}-----------------------------------------{ec}\n")
+
+
 if not GPU:
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 

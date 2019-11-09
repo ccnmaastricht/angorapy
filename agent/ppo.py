@@ -21,21 +21,11 @@ from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
     read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
+from utilities.const import COLORS
 from utilities.normalization import RunningNormalization
 from utilities.util import flat_print, env_extract_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
-
-COLORS = dict(
-    HEADER='\033[95m',
-    OKBLUE='\033[94m',
-    OKGREEN='\033[92m',
-    WARNING='\033[93m',
-    FAIL='\033[91m',
-    ENDC='\033[0m',
-    BOLD='\033[1m',
-    UNDERLINE='\033[4m'
-)
 
 
 class PPOAgent:
@@ -445,12 +435,13 @@ class PPOAgent:
             time_percentages = [str(round(100 * t / sum(times))) + jobs[i] for i, t in enumerate(times)]
             time_distribution_string = "[" + "|".join(map(str, time_percentages)) + "]"
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
-                   f"Mean Rew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
-                   f"Mean Len.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
-                   f"Total Episodes: {nc}{self.total_episodes_seen:5d}{ec}; "
-                   f"Total Updates: {nc}{self.policy_optimizer.iterations.numpy().item():6d}{ec}; "
-                   f"Total Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
-                   f"Exec. Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
+                   f"AvgRew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
+                   f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
+                   f"AvgEnt.: {nc}{0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2):5.2f}{ec}; "
+                   f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
+                   f"Updates: {nc}{self.policy_optimizer.iterations.numpy().item():6d}{ec}; "
+                   f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+                   f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
 
     def save_agent_state(self):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""

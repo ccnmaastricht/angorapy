@@ -24,6 +24,10 @@ def _build_encoding_sub_model(input_size, name: str = None):
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
 
+def _build_continuous_head(output_dim):
+    pass
+
+
 def build_ffn_distinct_models(env: gym.Env):
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
@@ -36,8 +40,11 @@ def build_ffn_distinct_models(env: gym.Env):
     normalized = RunningNormalization()(inputs)
     x = policy_latent(normalized)
     if continuous_control:
+        # means
         means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
         means = tf.keras.layers.Activation("linear")(means)
+
+        # stdevs
         stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
         stdevs = tf.keras.layers.Activation("softplus")(stdevs)
 

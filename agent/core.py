@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Core functionality of the module such as advantage estimation and several probabilistic calculations."""
 import math
+import os
 from itertools import accumulate
 from typing import List
 
@@ -64,7 +65,7 @@ def normalize_advantages(advantages: numpy.ndarray) -> numpy.ndarray:
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     samples_transformed = (samples - means) / stdevs
     pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.sqrt(2 * math.pi)) / stdevs
-    return tf.reduce_sum(pdf, axis=1)
+    return tf.math.reduce_prod(pdf, axis=1)
 
 
 def gaussian_entropy(stdevs: tf.Tensor):
@@ -77,8 +78,16 @@ def categorical_entropy(pmf: tf.Tensor):
 
 
 if __name__ == "__main__":
-    gaussian_pdf(tf.convert_to_tensor([[2, 3]]),
-                 tf.convert_to_tensor([[2, 3]]),
-                 tf.convert_to_tensor([[1, 1]]))
+    from scipy.stats import norm
 
-    gaussian_entropy(tf.convert_to_tensor([[1, 2]]))
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
+    mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
+    sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
+
+    print(gaussian_pdf(x, mu, sig))
+    print(norm.pdf(x, loc=mu, scale=sig))
+
+    print("\n")
+    print(gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float32)))
