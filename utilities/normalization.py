@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""Normalization methos."""
-from typing import Any, Union
+"""Normalization methods."""
 
 import tensorflow as tf
 from tensorflow_core import Tensor
@@ -41,7 +40,8 @@ class RunningNormalization(tf.keras.layers.Layer):
             weight_batch = 1 - weight_experience
 
             # update statistics
-            self.running_means = weight_experience * self.running_means + weight_batch * batch_means
+            self.running_means = tf.multiply(weight_experience, self.running_means) + tf.multiply(weight_batch,
+                                                                                                  batch_means)
             self.running_stdevs = weight_experience * self.running_stdevs + weight_batch * batch_stdevs
 
         # normalize

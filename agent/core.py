@@ -69,6 +69,11 @@ def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
 
 
 def gaussian_entropy(stdevs: tf.Tensor):
+    """Calculate the joint entropy of Gaussian random variables described by their standard deviations.
+
+    Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+    of the joint entropy and the sum of marginal entropies.
+    """
     entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
     return tf.reduce_sum(entropy, axis=1)
 
