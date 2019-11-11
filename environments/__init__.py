@@ -5,14 +5,20 @@ from environments.evasion import Evasion
 from environments.race import Race
 from environments.tunnel import Tunnel, TunnelRAM
 from environments.evasionwalls import EvasionWalls
-from environments.shadowhand import ShadowHand
+from environments.shadowhand import ShadowHandBase, ShadowHandV1
 
 
 # SHADOW HAND #
 
 gym.envs.register(
     id='ShadowHand-v0',
-    entry_point='environments:ShadowHand',
+    entry_point='environments:ShadowHandBase',
+    kwargs={},
+)
+
+gym.envs.register(
+    id='ShadowHand-v1',
+    entry_point='environments:ShadowHandV1',
     kwargs={},
 )
 

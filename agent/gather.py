@@ -4,7 +4,6 @@ import itertools
 import multiprocessing
 import os
 from collections import namedtuple
-from time import sleep
 from typing import Tuple, List
 
 import numpy
@@ -106,8 +105,6 @@ def tf_serialize_example(sample):
 
 @ray.remote(num_cpus=1)
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
-    import tensorflow as tfl
-
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)

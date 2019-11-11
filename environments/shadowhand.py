@@ -7,8 +7,10 @@ import numpy
 from gym.envs.robotics import HandBlockEnv
 import matplotlib.pyplot as plt
 
+from mujoco_py import GlfwContext
 
-class ShadowHand(HandBlockEnv):
+
+class ShadowHandBase(HandBlockEnv):
     """Wrapper for the In Hand Manipulation Environment."""
 
     def __init__(self, target_position='random', target_rotation='xyz', reward_type='not_sparse', max_steps=100):
@@ -23,6 +25,16 @@ class ShadowHand(HandBlockEnv):
         # background color
         self.sim.model.mat_rgba[4] = numpy.array([104, 143, 71, 255]) / 255
 
+        # other
+        self.goal_dim = 4 + 3
+        self.joint_dim = 24 + 24
+        self.object_dim = 6
+
+        # init rendering in background
+        GlfwContext(offscreen=True)
+
+        self.reset()
+
     def _viewer_setup(self):
         super()._viewer_setup()
 
@@ -32,7 +44,6 @@ class ShadowHand(HandBlockEnv):
         self.viewer.cam.elevation = -90.0
 
     def _convert_obs(self, obs):
-        # frame = self.render(mode="rgb_array", height=200, width=200)
         return numpy.concatenate([obs["observation"], obs["desired_goal"]])
 
     def step(self, action):
@@ -47,6 +58,18 @@ class ShadowHand(HandBlockEnv):
         obs = super().reset()
         self.total_steps = 0
         return self._convert_obs(obs)
+
+
+class ShadowHandV1(ShadowHandBase):
+
+    def _convert_obs(self, obs):
+        visual = self.render(mode="rgb_array", height=200, width=200)
+        proprio = obs["observation"][:self.joint_dim]
+        somato = obs["observation"][-self.object_dim:]
+        goal = obs["desired_goal"]
+
+        return visual, proprio, somato, goal
+
 
 
 if __name__ == "__main__":

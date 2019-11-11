@@ -81,7 +81,7 @@ def build_ffn_shared_models(env: gym.Env):
     if continuous_control:
         means = tf.keras.layers.Dense(n_actions)(latent_representation)
         means = tf.keras.layers.Activation("linear")(means)
-        stdevs = tf.keras.layers.Dense(n_actions)(x)
+        stdevs = tf.keras.layers.Dense(n_actions)(latent_representation)
         stdevs = tf.keras.layers.Activation("softplus")(stdevs)
 
         policy_out = tf.keras.layers.Concatenate()([means, stdevs])

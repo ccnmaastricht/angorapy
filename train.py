@@ -7,6 +7,7 @@ from gym.spaces import Box
 from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
+from models.hybrid import build_shadow_brain
 from utilities.const import COLORS
 from utilities.story import StoryTeller
 from utilities.util import env_extract_dims
@@ -17,7 +18,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 def run_experiment(settings: argparse.Namespace):
     """Run an experiment with the given settings."""
 
-    build_models = build_ffn_distinct_models
+    # setting appropriate model building function
+    if settings.env == "ShadowHand-v1":
+        build_models = build_shadow_brain
+    else:
+        build_models = build_ffn_distinct_models
 
     if settings.debug:
         logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
@@ -31,17 +36,20 @@ def run_experiment(settings: argparse.Namespace):
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
-    print(f"{wn}-----------------------------------------{ec}\n"
-          f"Learning the Task: {bc}{env_name}{ec}\n"
+    print(f"-----------------------------------------\n"
+          f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
           f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
           f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
-          f"{wn}-----------------------------------------{ec}\n")
+          f"Model: {build_models.__name__}\n"
+          f"-----------------------------------------\n")
+
+    print(f"{wn}HyperParameters{ec}: {args}\n")
 
     if settings.cpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     if settings.load_from is not None:
-        print(f"Loading from state {settings.load_from}")
+        print(f"{wn}Loading{ec} from state {settings.load_from}")
         agent = PPOAgent.from_agent_state(settings.load_from)
     else:
         # set up the agent and a reporting module
@@ -50,7 +58,7 @@ def run_experiment(settings: argparse.Namespace):
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
                          gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip)
 
-        print(f"Created agent with ID {agent.agent_id}")
+        print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
     agent.set_gpu(not settings.cpu)
     teller = StoryTeller(agent, env, frequency=0)
@@ -69,7 +77,7 @@ if __name__ == "__main__":
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
-    parser.add_argument("-e", "--env", type=str, default="CartPole-v1", help=f"the environment, e.g.: {all_envs}")
+    parser.add_argument("-e", "--env", type=str, default="ShadowHand-v0", help=f"the environment, e.g.: {all_envs}")
     parser.add_argument("-w", "--workers", type=int, default=4, help=f"the number of workers exploring the environment")
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
