@@ -18,6 +18,7 @@ def build_shadow_brain(env: gym.Env):
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
 
+    # make inputs with additional dimension for timestep
     visual_input = tf.keras.Input(shape=(None, 200, 200, 3), name="visual_input")
     proprioceptive_input = tf.keras.Input(shape=(None, 48,), name="proprioceptive_input")
     somatosensory_input = tf.keras.Input(shape=(None, 6,), name="somatosensory_input")

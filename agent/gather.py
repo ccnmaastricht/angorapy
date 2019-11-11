@@ -15,6 +15,7 @@ import models
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
+from utilities.util import state_as_float32, batchify_state
 
 ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_probabilities", "returns", "advantages",
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])
@@ -95,6 +96,7 @@ def serialize_sample(s, a, ap, r, adv):
 
 
 def tf_serialize_example(sample):
+    """TF wrapper for serialization function."""
     tf_string = tf.py_function(serialize_sample, (sample["state"],
                                                   sample["action"],
                                                   sample["action_prob"],
@@ -105,6 +107,9 @@ def tf_serialize_example(sample):
 
 @ray.remote(num_cpus=1)
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
+    """Collect a batch shard of experience for a given number of timesteps."""
+    import tensorflow as tfl
+
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)
@@ -127,11 +132,11 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
     # go for it
     states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
-    state = env.reset().astype(numpy.float32)
+    state = state_as_float32(env.reset())
     act = act_continuous if env_is_continuous else act_discrete
     for t in range(horizon):
         # choose action and step
-        action, action_probability = act(policy, numpy.expand_dims(state, axis=0))
+        action, action_probability = act(policy, batchify_state(state))
         observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
 
         # remember experience
@@ -144,14 +149,14 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
         # next state
         if done:
-            state = env.reset().astype(numpy.float32)
+            state = state_as_float32(env.reset())
             episode_lengths.append(episode_steps)
             episode_rewards.append(current_episode_return)
             episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
         else:
-            state = observation.astype(numpy.float32)
+            state = state_as_float32(observation)
             episode_steps += 1
 
     value_predictions = critic(numpy.concatenate((states, [state]))).numpy().reshape([-1])

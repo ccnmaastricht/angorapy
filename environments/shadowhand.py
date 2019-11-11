@@ -2,11 +2,8 @@
 """ShadowHand Environment Wrappers."""
 import os
 
-import gym
 import numpy
 from gym.envs.robotics import HandBlockEnv
-import matplotlib.pyplot as plt
-
 from mujoco_py import GlfwContext
 
 
@@ -29,11 +26,6 @@ class ShadowHandBase(HandBlockEnv):
         self.goal_dim = 4 + 3
         self.joint_dim = 24 + 24
         self.object_dim = 6
-
-        # init rendering in background
-        GlfwContext(offscreen=True)
-
-        self.reset()
 
     def _viewer_setup(self):
         super()._viewer_setup()
@@ -62,6 +54,12 @@ class ShadowHandBase(HandBlockEnv):
 
 class ShadowHandV1(ShadowHandBase):
 
+    def __init__(self):
+        super().__init__()
+
+        # init rendering [IMPORTANT]
+        GlfwContext(offscreen=True)
+
     def _convert_obs(self, obs):
         visual = self.render(mode="rgb_array", height=200, width=200)
         proprio = obs["observation"][:self.joint_dim]
@@ -69,7 +67,6 @@ class ShadowHandV1(ShadowHandBase):
         goal = obs["desired_goal"]
 
         return visual, proprio, somato, goal
-
 
 
 if __name__ == "__main__":

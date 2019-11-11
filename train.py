@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
-    parser.add_argument("-e", "--env", type=str, default="ShadowHand-v0", help=f"the environment, e.g.: {all_envs}")
+    parser.add_argument("-e", "--env", type=str, default="ShadowHand-v1", help=f"the environment, e.g.: {all_envs}")
     parser.add_argument("-w", "--workers", type=int, default=4, help=f"the number of workers exploring the environment")
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")

@@ -23,7 +23,7 @@ from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS
 from utilities.normalization import RunningNormalization
-from utilities.util import flat_print, env_extract_dims
+from utilities.util import flat_print, env_extract_dims, state_as_float32, batchify_state
 
 BASE_SAVE_PATH = "saved_models/states/"
 
@@ -406,12 +406,12 @@ class PPOAgent:
             done = False
             reward_trajectory = []
             length = 0
-            state = numpy.expand_dims(self.env.reset(), axis=0).astype(numpy.float32)
+            state = state_as_float32(batchify_state(self.env.reset()))
             while not done:
                 action, action_probability = policy_act(self.policy, state)
                 self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
-                state = numpy.expand_dims(observation, axis=0).astype(numpy.float32)
+                state = state_as_float32(batchify_state(observation))
                 reward_trajectory.append(reward)
                 length += 1
 
