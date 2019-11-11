@@ -194,17 +194,13 @@ class PPOAgent:
             n: the number of experience-optimization cycles that shall be run
             epochs: the number of epochs for which the model is optimized on the same experience data
             batch_size: batch size for the optimization
-            story_teller: story telling object that creates visualizations of the training process on the fly (Default value = None)
+            story_teller: story telling object that creates visualizations of the training process on the fly (Default
+                value = None)
             export: boolean indicator for whether communication with workers is achieved through file saving
-        or direct weight passing (Default value = False)
+                or direct weight passing (Default value = False)
             save_every: for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
             separate_eval: if false (default), use episodes from gathering for statistics, if true, evaluate 10
-        additional episodes.
-            n: int:
-            epochs: int:
-            batch_size: int:
-            save_every: int:  (Default value = 0)
-            separate_eval: bool:  (Default value = False)
+                additional episodes.
 
         Returns:
             self
