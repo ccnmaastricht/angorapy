@@ -2,24 +2,23 @@
 import gym
 
 from environments.evasion import Evasion
+from environments.evasionwalls import EvasionWalls
 from environments.race import Race
 from environments.tunnel import Tunnel, TunnelRAM
-from environments.evasionwalls import EvasionWalls
-from environments.shadowhand import ShadowHandBase, ShadowHandV1
-
+from environments.shadowhand import ShadowHandBlock
 
 # SHADOW HAND #
 
 gym.envs.register(
     id='ShadowHand-v0',
-    entry_point='environments:ShadowHandBase',
-    kwargs={},
+    entry_point='environments:ShadowHandBlock',
+    kwargs={"visual_input": False},
 )
 
 gym.envs.register(
     id='ShadowHand-v1',
-    entry_point='environments:ShadowHandV1',
-    kwargs={},
+    entry_point='environments:ShadowHandBlock',
+    kwargs={"visual_input": True},
 )
 
 # MODIFIED ENVIRONMENTS
@@ -35,29 +34,29 @@ gym.envs.register(
 gym.envs.register(
     id='Race-v0',
     entry_point='environments:Race',
-    kwargs={'width':30, 'height':30,
-            'driver_chance':0.05},
+    kwargs={'width': 30, 'height': 30,
+            'driver_chance': 0.05},
 )
 gym.envs.register(
     id='Evasion-v0',
     entry_point='environments:Evasion',
-    kwargs={'width':30, 'height':30,
-            'obstacle_chance':0.05},
+    kwargs={'width': 30, 'height': 30,
+            'obstacle_chance': 0.05},
 )
 gym.envs.register(
     id='Tunnel-v0',
     entry_point='environments:Tunnel',
-    kwargs={'width':30, 'height':30},
+    kwargs={'width': 30, 'height': 30},
 )
 
 gym.envs.register(
     id='TunnelRAM-v0',
     entry_point='environments:TunnelRAM',
-    kwargs={'width':30, 'height':30},
+    kwargs={'width': 30, 'height': 30},
 )
 
 gym.envs.register(
     id='EvasionWalls-v0',
     entry_point='environments:EvasionWalls',
-    kwargs={'width':30, 'height':30},
+    kwargs={'width': 30, 'height': 30},
 )

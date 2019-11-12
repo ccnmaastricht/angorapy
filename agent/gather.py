@@ -15,7 +15,7 @@ import models
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from utilities.util import state_as_float32, batchify_state
+from utilities.util import parse_state, batchify_state
 
 ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_probabilities", "returns", "advantages",
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])
@@ -132,7 +132,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
     # go for it
     states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
-    state = state_as_float32(env.reset())
+    state = parse_state(env.reset())
     act = act_continuous if env_is_continuous else act_discrete
     for t in range(horizon):
         # choose action and step
@@ -149,14 +149,14 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
         # next state
         if done:
-            state = state_as_float32(env.reset())
+            state = parse_state(env.reset())
             episode_lengths.append(episode_steps)
             episode_rewards.append(current_episode_return)
             episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
         else:
-            state = state_as_float32(observation)
+            state = parse_state(observation)
             episode_steps += 1
 
     value_predictions = critic(numpy.concatenate((states, [state]))).numpy().reshape([-1])

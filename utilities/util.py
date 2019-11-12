@@ -25,7 +25,7 @@ def set_all_seeds(seed):
 def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
     """Returns state and (discrete) action space dimensionality for given environment."""
     if isinstance(env.observation_space, Dict):
-        obs_dim = env.observation_space["observation"].shape[0] + env.observation_space["desired_goal"].shape[0]
+        obs_dim = sum(field.shape[0] for field in env.observation_space["observation"])
     else:
         obs_dim = env.observation_space.shape[0]
 
@@ -50,13 +50,18 @@ def flatten(some_list):
     return [some_list] if not isinstance(some_list, list) else [x for X in some_list for x in flatten(X)]
 
 
-def state_as_float32(state: Union[numpy.ndarray, Tuple]) -> Union[numpy.ndarray, Tuple]:
+def is_array_collection(a: numpy.ndarray):
+    """Check if an array is an array of objects (e.g. other arrays) or an actual array of direct data."""
+    return a.dtype == "O"
+
+
+def parse_state(state: Union[numpy.ndarray, dict]) -> Union[numpy.ndarray, Tuple]:
     """Parse a state (array or list of arrays) received from an environment to have type float32."""
-    return state.astype(numpy.float32) if isinstance(state, numpy.ndarray) else \
-        tuple(map(lambda x: x.astype(numpy.float32), state))
+    return state.astype(numpy.float32) if not is_array_collection(state) else \
+        tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
 
 
 def batchify_state(state: Union[numpy.ndarray, Tuple]) -> Union[numpy.ndarray, Tuple]:
     """Expand state (array or lost of arrays) to have a batch dimension."""
-    return numpy.expand_dims(state, axis=0) if isinstance(state, numpy.ndarray) else \
+    return numpy.expand_dims(state, axis=0) if not is_array_collection(state) else \
         tuple(map(lambda x: numpy.expand_dims(x, axis=0), state))
