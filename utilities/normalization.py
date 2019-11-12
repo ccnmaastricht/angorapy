@@ -42,7 +42,7 @@ class RunningNormalization(tf.keras.layers.Layer):
 
             # update statistics
             self.mu = tf.multiply(weight_experience, self.mu) + tf.multiply(weight_batch, batch_mu)
-            self.std = tf.sqrt((self.n * self.std + batch_len * batch_std + self.n * (
+            self.std = tf.sqrt((self.n * self.std ** 2 + batch_len * batch_std ** 2 + self.n * (
                         mu_old - self.mu) ** 2 + batch_len * (batch_mu - self.mu) ** 2) / (batch_len + self.n))
 
         self.n += batch_len
@@ -56,8 +56,8 @@ if __name__ == "__main__":
 
     normalizer = RunningNormalization()
 
-    std = 3
-    mean = 10
+    std = tf.convert_to_tensor(list(range(1, 7)), dtype=tf.float32)
+    mean = tf.convert_to_tensor(list(range(1, 7)), dtype=tf.float32)
     inputs = [tf.random.normal([5, 6]) for _ in range(1000)]
     all = tf.concat(inputs, axis=0)
 
@@ -67,5 +67,5 @@ if __name__ == "__main__":
     for batch in inputs:
         normalizer(batch * std + mean)
 
-    print(tf.reduce_mean(normalizer.mu))
-    print(tf.reduce_mean(normalizer.std))
+    print(normalizer.mu)
+    print(normalizer.std)

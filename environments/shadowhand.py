@@ -3,16 +3,18 @@
 import os
 
 import numpy
-from gym.envs.robotics import HandBlockEnv
+from gym.envs.robotics import HandBlockTouchSensorsEnv
 from mujoco_py import GlfwContext
 
 
-class ShadowHandBase(HandBlockEnv):
+class ShadowHandBase(HandBlockTouchSensorsEnv):
     """Wrapper for the In Hand Manipulation Environment."""
 
-    def __init__(self, target_position='random', target_rotation='xyz', reward_type='not_sparse', max_steps=100):
-        super().__init__(target_position, target_rotation, reward_type)
+    def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
+                 reward_type='not_sparse', max_steps=100):
 
+        super().__init__(target_position=target_position, target_rotation=target_rotation,
+                         touch_get_obs=touch_get_obs, reward_type=reward_type)
         self.max_steps = max_steps
         self.total_steps = 0
 
@@ -25,6 +27,7 @@ class ShadowHandBase(HandBlockEnv):
         # other
         self.goal_dim = 4 + 3
         self.joint_dim = 24 + 24
+        self.touch_dim = 92
         self.object_dim = 6
 
     def _viewer_setup(self):
@@ -59,11 +62,14 @@ class ShadowHandV1(ShadowHandBase):
 
         # init rendering [IMPORTANT]
         GlfwContext(offscreen=True)
+        print([f.shape for f in self.reset()])
 
     def _convert_obs(self, obs):
+        # obs is [joints, object velocity, touch sensors, object_position]
+
         visual = self.render(mode="rgb_array", height=200, width=200)
         proprio = obs["observation"][:self.joint_dim]
-        somato = obs["observation"][-self.object_dim:]
+        somato = obs["observation"][self.joint_dim + self.object_dim:self.joint_dim + self.object_dim + self.touch_dim]
         goal = obs["desired_goal"]
 
         return visual, proprio, somato, goal

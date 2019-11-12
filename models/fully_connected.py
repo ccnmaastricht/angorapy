@@ -28,6 +28,10 @@ def _build_continuous_head(output_dim):
     pass
 
 
+def _build_discrete_head(output_dim):
+    pass
+
+
 def build_ffn_distinct_models(env: gym.Env):
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
@@ -104,5 +108,7 @@ if __name__ == "__main__":
 
     policy, value, policy_value = build_ffn_distinct_models(gym.make("CartPole-v1"))
     s_policy, s_value, s_policy_value = build_ffn_shared_models(gym.make("CartPole-v1"))
+    policy.summary()
+
     plot_model(policy_value, "policy_value.png", show_shapes=True)
     plot_model(s_policy_value, "shared_policy_value.png", show_shapes=True)

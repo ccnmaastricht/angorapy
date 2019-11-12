@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 def build_visual_component():
-    inputs = tf.keras.Input(shape=(None, 200, 200, 3))
+    inputs = tf.keras.Input(shape=(200, 200, 3))
     x = tf.keras.layers.Conv2D(32, 5, 1)(inputs)
     x = tf.keras.layers.Activation("relu")(x)
     x = tf.keras.layers.Conv2D(32, 3, 1)(x)
