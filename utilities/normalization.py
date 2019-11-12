@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Normalization methods."""
+import os
 
 import tensorflow as tf
 from tensorflow_core import Tensor
@@ -12,37 +13,59 @@ class RunningNormalization(tf.keras.layers.Layer):
     the overall data and dividing by the standard deviation. Since the data distribution is not known, the layer
     keeps track of running means and standard deviations, based on which the transformation is applied.
     """
-    running_means: Tensor
-    running_stdevs: Tensor
+    mu: Tensor
+    std: Tensor
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.total_samples_observed = 0
+        self.n = 0
 
     def build(self, input_shape):
-        self.running_means = tf.zeros(input_shape[-1])
-        self.running_stdevs = tf.ones(input_shape[-1])
+        self.mu = tf.zeros(input_shape[-1])
+        self.std = tf.ones(input_shape[-1])
 
     def call(self, batch: tf.Tensor, **kwargs) -> tf.Tensor:
         """Normalize a given batch of 1D tensors and update running mean and std."""
 
-        return batch
-
         # calculate statistics for the batch
         batch_len = batch.shape[0] if batch.shape[0] is not None else 0
-        batch_means = tf.reduce_mean(batch, axis=0)
-        batch_stdevs = tf.math.reduce_std(batch, axis=0)
+        batch_mu = tf.reduce_mean(batch, axis=0)
+        batch_std = tf.math.reduce_std(batch, axis=0)
+
+        mu_old = tf.convert_to_tensor(self.mu.numpy())
 
         if batch_len > 0:  # protect against building
             # calculate weights based on number of seen examples
-            weight_experience = self.total_samples_observed / (self.total_samples_observed + batch_len)
+            weight_experience = self.n / (self.n + batch_len)
             weight_batch = 1 - weight_experience
 
             # update statistics
-            self.running_means = tf.multiply(weight_experience, self.running_means) + tf.multiply(weight_batch,
-                                                                                                  batch_means)
-            self.running_stdevs = weight_experience * self.running_stdevs + weight_batch * batch_stdevs
+            self.mu = tf.multiply(weight_experience, self.mu) + tf.multiply(weight_batch, batch_mu)
+            self.std = tf.sqrt((self.n * self.std + batch_len * batch_std + self.n * (
+                        mu_old - self.mu) ** 2 + batch_len * (batch_mu - self.mu) ** 2) / (batch_len + self.n))
+
+        self.n += batch_len
 
         # normalize
-        return (batch - self.running_means) / (self.running_stdevs + 1e-8)
+        return (batch - self.mu) / (self.std + 1e-8)
+
+
+if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    normalizer = RunningNormalization()
+
+    std = 3
+    mean = 10
+    inputs = [tf.random.normal([5, 6]) for _ in range(1000)]
+    all = tf.concat(inputs, axis=0)
+
+    print(tf.reduce_mean(all))
+    print(tf.math.reduce_std(all))
+
+    for batch in inputs:
+        normalizer(batch * std + mean)
+
+    print(tf.reduce_mean(normalizer.mu))
+    print(tf.reduce_mean(normalizer.std))
