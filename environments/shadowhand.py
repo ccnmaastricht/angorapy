@@ -15,7 +15,7 @@ class ShadowHand(manipulate.ManipulateEnv):
     def __init__(self, model_path, target_position, target_rotation, target_position_range, reward_type,
                  initial_qpos={}, randomize_initial_position=True, randomize_initial_rotation=True,
                  distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=False,
-                 ignore_z_target_rotation=False, touch_visualisation="on_touch", touch_get_obs="sensordata",
+                 ignore_z_target_rotation=False, touch_visualisation="off", touch_get_obs="sensordata",
                  visual_input: bool = False, max_steps=100):
         """Initializes a new Hand manipulation environment with touch sensors.
 
@@ -73,11 +73,12 @@ class ShadowHand(manipulate.ManipulateEnv):
         # set hand and background colors
         self.sim.model.mat_rgba[2] = numpy.array([16, 18, 35, 255]) / 255
         self.sim.model.mat_rgba[4] = numpy.array([104, 143, 71, 255]) / 255
+        self.sim.model.geom_rgba[48] = numpy.array([0.5, 0.5, 0.5, 0])
 
         # set observation space
         obs = self._get_obs()
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['desired_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             observation=spaces.Tuple((
                 spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][0].shape, dtype='float32'),  # visual/object
@@ -111,7 +112,7 @@ class ShadowHand(manipulate.ManipulateEnv):
             primary = self.render(mode="rgb_array", height=200, width=200)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
-            primary = numpy.concatenate(achieved_goal, object_vel)
+            primary = numpy.concatenate([achieved_goal, object_vel])
 
         # get proprioceptive information (positions of joints)
         robot_pos, robot_vel = manipulate.robot_get_obs(self.sim)
@@ -179,11 +180,13 @@ if __name__ == "__main__":
     print(os.environ["LD_PRELOAD"])
 
     from environments import *
+    import matplotlib.pyplot as plt
 
-    env = gym.make("ShadowHand-v0")
-    done = False
-    state = env.reset()
+    env = gym.make("ShadowHand-v1")
+    d, s = False, env.reset()
     while True:
-        env.render()
+        # env.render()
         action = env.action_space.sample()
-        state, reward, done, info = env.step(action)
+        s, _, _, _ = env.step(action)
+        plt.imshow(s["observation"][0])
+        plt.show()
