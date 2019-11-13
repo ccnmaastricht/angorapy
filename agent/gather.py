@@ -15,7 +15,7 @@ import models
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from utilities.util import parse_state, batchify_state
+from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
 
 ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_probabilities", "returns", "advantages",
                                                    "episodes_completed", "episode_rewards", "episode_lengths"])
@@ -58,6 +58,43 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
     return data, StatBundle(completed_episodes, numb_processed_frames, episode_rewards, episode_lengths)
 
 
+def make_dataset_and_stats(buffer: ExperienceBuffer):
+    """Make dataset object and StatBundle from ExperienceBuffer."""
+    completed_episodes = buffer.episodes_completed
+    numb_processed_frames = len(buffer.states)
+
+    if isinstance(buffer.states[0], numpy.ndarray):
+        dataset = tf.data.Dataset.from_tensor_slices({
+            "state": buffer.states,
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages
+        })
+    elif isinstance(buffer.states[0], Tuple):
+        dataset = tf.data.Dataset.from_tensor_slices({
+            "in_vision": [x[0] for x in buffer.states],
+            "in_proprio": [x[1] for x in buffer.states],
+            "in_touch": [x[2] for x in buffer.states],
+            "in_goal": [x[3] for x in buffer.states],
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages
+        })
+    else:
+        raise NotImplementedError(f"Cannot handle state type {type(buffer.states[0])}")
+
+    stats = StatBundle(
+        completed_episodes,
+        numb_processed_frames,
+        buffer.episode_rewards,
+        buffer.episode_lengths
+    )
+
+    return dataset, stats
+
+
 def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
     """Infer a single StatBundle from a list of StatBundles."""
     return StatBundle(
@@ -80,7 +117,7 @@ def _bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 
-def serialize_sample(s, a, ap, r, adv):
+def serialize_flat_sample(s, a, ap, r, adv):
     """Serialize a sample from a dataset."""
     feature = {
         "state": _bytes_feature(tf.io.serialize_tensor(s)),
@@ -95,13 +132,34 @@ def serialize_sample(s, a, ap, r, adv):
     return example_proto.SerializeToString()
 
 
+def serialize_shadowhand_sample(sv, sp, st, sg, a, ap, r, adv):
+    feature = {
+        "in_vision": _bytes_feature(tf.io.serialize_tensor(sv)),
+        "in_proprio": _bytes_feature(tf.io.serialize_tensor(sp)),
+        "in_touch": _bytes_feature(tf.io.serialize_tensor(st)),
+        "in_goal": _bytes_feature(tf.io.serialize_tensor(sg)),
+        "action": _bytes_feature(tf.io.serialize_tensor(a)),
+        "action_prob": _float_feature(ap),
+        "return": _float_feature(r),
+        "advantage": _float_feature(adv)
+    }
+
+    # Create a Features message using tf.train.Example.
+    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
+    return example_proto.SerializeToString()
+
+
 def tf_serialize_example(sample):
     """TF wrapper for serialization function."""
-    tf_string = tf.py_function(serialize_sample, (sample["state"],
-                                                  sample["action"],
-                                                  sample["action_prob"],
-                                                  sample["return"],
-                                                  sample["advantage"],), tf.string)
+    if "state" in sample:
+        inputs = (sample["state"],)
+        serializer = serialize_flat_sample
+    else:
+        inputs = (sample["in_vision"], sample["in_proprio"], sample["in_touch"], sample["in_goal"])
+        serializer = serialize_shadowhand_sample
+    inputs += (sample["action"], sample["action_prob"], sample["return"], sample["advantage"])
+
+    tf_string = tf.py_function(serializer, inputs, tf.string)
     return tf.reshape(tf_string, ())
 
 
@@ -126,6 +184,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     else:
         raise ValueError("Unknown input for model.")
 
+    # check if there is a recurrent layer inside the model
+    is_recurrent = is_recurrent_model(policy)
+
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1
     episode_rewards, episode_lengths = [], []
@@ -136,7 +197,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     act = act_continuous if env_is_continuous else act_discrete
     for t in range(horizon):
         # choose action and step
-        action, action_probability = act(policy, batchify_state(state))
+        action, action_probability = act(policy, add_state_dims(state, dims=2 if is_recurrent else 1))
         observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
 
         # remember experience
@@ -159,7 +220,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
             state = parse_state(observation)
             episode_steps += 1
 
-    value_predictions = critic(numpy.concatenate((states, [state]))).numpy().reshape([-1])
+    merged_states = merge_into_batch(states + [state])
+    merged_states = add_state_dims(merged_states, axis=1) if is_recurrent else merged_states
+    value_predictions = critic(merged_states).numpy().reshape([-1])
     advantages = estimate_advantage(rewards, value_predictions, t_is_terminal, gamma=discount, lam=lam)
     returns = numpy.add(advantages, value_predictions[:-1])
     advantages = normalize_advantages(advantages)
@@ -168,9 +231,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
                               episodes_completed, episode_rewards, episode_lengths)
 
-    # save to tf record
-    dataset, stats = condense_worker_outputs([buffer])
+    dataset, stats = make_dataset_and_stats(buffer)
 
+    # save to tf record
     dataset = dataset.map(tf_serialize_example)
     writer = tfl.data.experimental.TFRecordWriter(f"storage/experience/data_{pid}.tfrecord")
     writer.write(dataset)
@@ -195,7 +258,8 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType):
         parsed["action"] = tf.io.parse_tensor(parsed["action"], out_type=dtype_actions)
         return parsed
 
-    serialized_dataset = tf.data.TFRecordDataset([os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)])
+    serialized_dataset = tf.data.TFRecordDataset(
+        [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)])
     serialized_dataset = serialized_dataset.map(_parse_function)
 
     return serialized_dataset

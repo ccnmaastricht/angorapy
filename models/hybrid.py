@@ -9,6 +9,7 @@ from tensorflow.keras.layers import TimeDistributed as TD
 
 from environments import *
 from models.components import build_visual_component, build_non_visual_component
+from models.fully_connected import _build_continuous_head, _build_discrete_head
 from utilities.util import env_extract_dims
 
 
@@ -17,44 +18,39 @@ def build_shadow_brain(env: gym.Env):
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
-    print(n_actions)
 
     # inputs
-    visual_input = tf.keras.Input(shape=(200, 200, 3), name="visual_input")
-    proprioceptive_input = tf.keras.Input(shape=(48,), name="proprioceptive_input")
-    somatosensory_input = tf.keras.Input(shape=(6,), name="somatosensory_input")
-    goal_input = tf.keras.Input(shape=(7,), name="goal_input")
-    hidden_state_input = tf.keras.Input(shape=(hidden_dimensions,))
+    visual_in = tf.keras.Input(shape=(None, 200, 200, 3), name="visual_input")
+    proprio_in = tf.keras.Input(shape=(None, 48,), name="proprioceptive_input")
+    touch_in = tf.keras.Input(shape=(None, 92,), name="somatosensory_input")
+    goal_in = tf.keras.Input(shape=(None, 7,), name="goal_input")
 
-    visual_abstraction = build_visual_component()(visual_input)
-    proprioceptive_abstraction = build_non_visual_component(48, 12, 8)(proprioceptive_input)
-    somatosensory_abstraction = build_non_visual_component(6, 24, 8)(somatosensory_input)
+    visual_abstraction = TD(build_visual_component())(visual_in)
+    proprioceptive_abstraction = TD(build_non_visual_component(48, 12, 8))(proprio_in)
+    somatosensory_abstraction = TD(build_non_visual_component(92, 24, 8))(touch_in)
 
     concatenation = tf.keras.layers.Concatenate()([visual_abstraction,
                                                    proprioceptive_abstraction,
                                                    somatosensory_abstraction])
 
-    x = tf.keras.layers.Dense(48)(concatenation)
-    x = tf.keras.layers.Dense(32)(x)
-    x = tf.keras.layers.Concatenate()([x, goal_input])
+    x = TD(tf.keras.layers.Dense(48))(concatenation)
+    x = TD(tf.keras.layers.Dense(32))(x)
+    x = tf.keras.layers.Concatenate()([x, goal_in])
+    x = tf.keras.layers.LSTM(hidden_dimensions)(x)
 
-    x, h = tf.keras.layers.LSTMCell(hidden_dimensions)(x, hidden_state_input)
-
-    policy_outputs = tf.keras.layers.Dense(n_actions)(x)
-    value_outputs = tf.keras.layers.Dense(1)(x)
+    policy_out = _build_continuous_head(n_actions, x) if continuous_control else _build_discrete_head(n_actions, x)
+    value_out = tf.keras.layers.Dense(1)(x)
 
     # models
-    policy = tf.keras.Model(inputs=[visual_input, proprioceptive_input, somatosensory_input, goal_input],
-                            outputs=[policy_outputs, h])
-    value = tf.keras.Model(inputs=[visual_input, proprioceptive_input, somatosensory_input, goal_input],
-                           outputs=[value_outputs, h])
-    policy_value = tf.keras.Model(inputs=[visual_input, proprioceptive_input, somatosensory_input, goal_input],
-                                  outputs=[policy_outputs, value_outputs, h])
+    policy = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[policy_out])
+    value = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[value_out])
+    policy_value = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[policy_out, value_out])
 
     return policy, value, policy_value
 
 
 def init_hidden(shape):
+    """Get initial hidden state"""
     return tf.zeros(shape=shape)
 
 
@@ -64,18 +60,16 @@ if __name__ == "__main__":
     sequence_length = 10
     batch_size = 16
 
-    policy, value, policy_value = build_shadow_brain(gym.make("ShadowHand-v0"))
-    tf.keras.utils.plot_model(policy, show_shapes=True, expand_nested=True)
+    pi, vn, pv = build_shadow_brain(gym.make("ShadowHand-v1"))
+    tf.keras.utils.plot_model(pi, show_shapes=True, expand_nested=True)
 
     start_time = time.time()
-    hidden = init_hidden(shape=(16, 32))
     for t in range(sequence_length):
-        input_data = (tf.random.normal([batch_size, 200, 200, 3]),
-                      tf.random.normal([batch_size, 24]),
-                      tf.random.normal([batch_size, 32]),
-                      tf.random.normal([batch_size, 4]),
-                      hidden)
+        input_data = (tf.random.normal([batch_size, 1, 200, 200, 3]),
+                      tf.random.normal([batch_size, 1, 48]),
+                      tf.random.normal([batch_size, 1, 92]),
+                      tf.random.normal([batch_size, 1, 7]))
 
-        out, hidden = policy(input_data)
+        out = pi(input_data)
 
     print(f"Execution Time: {time.time() - start_time}")

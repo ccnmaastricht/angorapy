@@ -56,7 +56,7 @@ def run_experiment(settings: argparse.Namespace):
         agent = PPOAgent(build_models, env, horizon=settings.horizon, workers=settings.workers,
                          learning_rate_pi=settings.lr_pi, learning_rate_v=settings.lr_v, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
-                         gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip)
+                         gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
@@ -105,5 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
 
     args = parser.parse_args()
+
+    args.debug = False
 
     run_experiment(args)

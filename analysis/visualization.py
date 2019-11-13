@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Tools to visualize the weights in any network."""
-import itertools
 import math
 import os
 from typing import List, Iterable, Any
@@ -13,7 +12,7 @@ from sklearn.manifold import TSNE
 from tqdm import tqdm
 import tensorflow_datasets as tfds
 
-from utilities.util import normalize
+from utilities.util import normalize, extract_layers
 
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 
@@ -36,13 +35,6 @@ def plot_image_tiling(images: List[numpy.ndarray], cmap: str = None):
             axis.set_xticks([])
             axis.set_yticks([])
             i += 1
-
-
-def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
-    """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
-    return list(itertools.chain(*[extract_layers(layer)
-                                  if isinstance(layer, tf.keras.Sequential)
-                                  else [layer] for layer in network.layers]))
 
 
 def is_conv(layer):

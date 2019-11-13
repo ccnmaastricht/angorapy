@@ -18,7 +18,7 @@ gym.envs.register(
 gym.envs.register(
     id='ShadowHand-v1',
     entry_point='environments:ShadowHandBlock',
-    kwargs={"visual_input": True},
+    kwargs={"visual_input": True, "max_steps": 100},
 )
 
 # MODIFIED ENVIRONMENTS

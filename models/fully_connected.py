@@ -14,22 +14,24 @@ from utilities.util import env_extract_dims
 DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))
 
 
-def _build_encoding_sub_model(input_size, name: str = None):
-    inputs = tf.keras.Input(shape=(input_size,))
+def _build_encoding_sub_model(inputs):
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
     x = tf.keras.layers.Activation("tanh")(x)
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
-    x = tf.keras.layers.Activation("tanh")(x)
-
-    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
+    return tf.keras.layers.Activation("tanh")(x)
 
 
-def _build_continuous_head(output_dim):
-    pass
+def _build_continuous_head(n_actions, inputs):
+    means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    means = tf.keras.layers.Activation("linear")(means)
+    stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    stdevs = tf.keras.layers.Activation("softplus")(stdevs)
+    return tf.keras.layers.Concatenate()([means, stdevs])
 
 
-def _build_discrete_head(output_dim):
-    pass
+def _build_discrete_head(n_actions, inputs):
+    x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    return tf.keras.layers.Activation("softmax")(x)
 
 
 def build_ffn_distinct_models(env: gym.Env):
@@ -39,30 +41,14 @@ def build_ffn_distinct_models(env: gym.Env):
     inputs = tf.keras.Input(shape=(state_dimensionality,))
 
     # policy network
-    policy_latent = _build_encoding_sub_model(state_dimensionality)
-
     normalized = RunningNormalization()(inputs)
-    x = policy_latent(normalized)
-    if continuous_control:
-        # means
-        means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
-        means = tf.keras.layers.Activation("linear")(means)
-
-        # stdevs
-        stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
-        stdevs = tf.keras.layers.Activation("softplus")(stdevs)
-
-        out_policy = tf.keras.layers.Concatenate()([means, stdevs])
-    else:
-        x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(x)
-        out_policy = tf.keras.layers.Activation("softmax")(x)
-
+    x = _build_encoding_sub_model(normalized)
+    out_policy = _build_continuous_head(n_actions, x) if continuous_control else _build_discrete_head(n_actions, x)
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
 
     # value network
-    value_latent = _build_encoding_sub_model(state_dimensionality)
     normalized = RunningNormalization()(inputs)
-    x = value_latent(normalized)
+    x = _build_encoding_sub_model(normalized)
     x = tf.keras.layers.Dense(1, input_dim=64)(x)
     out_value = tf.keras.layers.Activation("linear")(x)
 
@@ -77,25 +63,24 @@ def build_ffn_shared_models(env: gym.Env):
 
     # shared encoding layers
     inputs = tf.keras.Input(shape=(state_dimensionality,))
-    latent = _build_encoding_sub_model(state_dimensionality, name="Encoder")
     normalized = RunningNormalization()(inputs)
-    latent_representation = latent(normalized)
+    latent = _build_encoding_sub_model(normalized)
 
     # policy head
     if continuous_control:
-        means = tf.keras.layers.Dense(n_actions)(latent_representation)
+        means = tf.keras.layers.Dense(n_actions)(latent)
         means = tf.keras.layers.Activation("linear")(means)
-        stdevs = tf.keras.layers.Dense(n_actions)(latent_representation)
+        stdevs = tf.keras.layers.Dense(n_actions)(latent)
         stdevs = tf.keras.layers.Activation("softplus")(stdevs)
 
         policy_out = tf.keras.layers.Concatenate()([means, stdevs])
     else:
-        x = tf.keras.layers.Dense(n_actions)(latent_representation)
+        x = tf.keras.layers.Dense(n_actions)(latent)
         policy_out = tf.keras.layers.Activation("softmax")(x)
     policy = tf.keras.Model(inputs=inputs, outputs=policy_out)
 
     # value head
-    x = tf.keras.layers.Dense(1, input_dim=64)(latent_representation)
+    x = tf.keras.layers.Dense(1, input_dim=64)(latent)
     value_out = tf.keras.layers.Activation("linear")(x)
     value = tf.keras.Model(inputs=inputs, outputs=value_out)
 
@@ -106,9 +91,11 @@ if __name__ == "__main__":
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    policy, value, policy_value = build_ffn_distinct_models(gym.make("CartPole-v1"))
-    s_policy, s_value, s_policy_value = build_ffn_shared_models(gym.make("CartPole-v1"))
-    policy.summary()
+    env = "LunarLanderContinuous-v2"
 
-    plot_model(policy_value, "policy_value.png", show_shapes=True)
-    plot_model(s_policy_value, "shared_policy_value.png", show_shapes=True)
+    pi, vn, pv = build_ffn_distinct_models(gym.make(env))
+    s_pi, s_vn, s_pv = build_ffn_shared_models(gym.make(env))
+    pi.summary()
+
+    plot_model(pv, "policy_value.png", show_shapes=True)
+    plot_model(s_pv, "shared_policy_value.png", show_shapes=True)

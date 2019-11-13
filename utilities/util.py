@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 """Helper functions."""
+import itertools
 import random
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 import gym
 import numpy
-from gym.spaces import Discrete, Box, Dict
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
+from gym.spaces import Discrete, Box, Dict
 
 
 def flat_print(string: str):
@@ -25,7 +26,7 @@ def set_all_seeds(seed):
 def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
     """Returns state and (discrete) action space dimensionality for given environment."""
     if isinstance(env.observation_space, Dict):
-        obs_dim = sum(field.shape[0] for field in env.observation_space["observation"])
+        obs_dim = tuple(field.shape for field in env.observation_space["observation"])
     else:
         obs_dim = env.observation_space.shape[0]
 
@@ -50,18 +51,50 @@ def flatten(some_list):
     return [some_list] if not isinstance(some_list, list) else [x for X in some_list for x in flatten(X)]
 
 
+def is_recurrent_model(model: tf.keras.Model):
+    """Check if given model is recurrent (i.e. contains a recurrent layer of any sort)"""
+    for layer in extract_layers(model):
+        if isinstance(layer, tf.keras.layers.RNN):
+            return True
+
+    return False
+
+
 def is_array_collection(a: numpy.ndarray):
     """Check if an array is an array of objects (e.g. other arrays) or an actual array of direct data."""
     return a.dtype == "O"
 
 
 def parse_state(state: Union[numpy.ndarray, dict]) -> Union[numpy.ndarray, Tuple]:
-    """Parse a state (array or list of arrays) received from an environment to have type float32."""
-    return state.astype(numpy.float32) if not is_array_collection(state) else \
+    """Parse a state (array or array of arrays) received from an environment to have type float32."""
+    return state.astype(numpy.float32) if not isinstance(state, dict) else \
         tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
 
 
-def batchify_state(state: Union[numpy.ndarray, Tuple]) -> Union[numpy.ndarray, Tuple]:
+def add_state_dims(state: Union[numpy.ndarray, Tuple], dims: int = 1, axis: int = 0) -> Union[numpy.ndarray, Tuple]:
     """Expand state (array or lost of arrays) to have a batch dimension."""
-    return numpy.expand_dims(state, axis=0) if not is_array_collection(state) else \
-        tuple(map(lambda x: numpy.expand_dims(x, axis=0), state))
+    if dims < 1:
+        return state
+
+    return numpy.expand_dims(add_state_dims(state, dims=dims - 1, axis=axis), axis=axis) if not isinstance(state, Tuple) \
+        else tuple(map(lambda x: numpy.expand_dims(x, axis=axis), add_state_dims(state, dims=dims - 1, axis=axis)))
+
+
+def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
+    """Merge a list of states into one huge batch of states. Handles both single and multi input states."""
+    if isinstance(list_of_states[0], numpy.ndarray):
+        return numpy.concatenate(list_of_states)
+    else:
+        return tuple(numpy.concatenate(list(map(lambda x: add_state_dims(x[i]), list_of_states)), axis=0)
+                     for i in range(len(list_of_states[0])))
+
+
+def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
+    """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
+    return list(itertools.chain(*[extract_layers(layer)
+                                  if isinstance(layer, tf.keras.Sequential)
+                                  else [layer] for layer in network.layers]))
+
+
+if __name__ == "__main__":
+    print(add_state_dims(numpy.ndarray([10, 20]), dims=2).shape)

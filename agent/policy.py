@@ -21,7 +21,7 @@ def act_continuous(policy, state: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarr
     means = multivariates[:, :n_actions]
     stdevs = multivariates[:, n_actions:]
 
-    actions = tf.random.normal([state.shape[0], n_actions], means, stdevs)
+    actions = tf.random.normal([multivariates.shape[0], n_actions], means, stdevs)
     probabilities = gaussian_pdf(actions, means=means, stdevs=stdevs)
 
     return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()

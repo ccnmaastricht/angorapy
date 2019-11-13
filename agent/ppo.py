@@ -23,7 +23,7 @@ from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS
 from utilities.normalization import RunningNormalization
-from utilities.util import flat_print, env_extract_dims, parse_state, batchify_state
+from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
 
@@ -43,11 +43,12 @@ class PPOAgent:
 
     """
 
-    def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int,
-                 learning_rate_pi: float = 0.001, learning_rate_v: float = 0.001, discount: float = 0.99,
-                 lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01, c_value: float = 0.5,
-                 gradient_clipping: float = None, clip_values: bool = True, _make_dirs=True):
+    def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate_pi: float = 0.001,
+                 learning_rate_v: float = 0.001, discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
+                 c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
+                 clip_values: bool = True, _make_dirs=True, debug: bool = False):
         super().__init__()
+        self.debug = debug
 
         # environment info
         self.env = environment
@@ -206,7 +207,7 @@ class PPOAgent:
             self
 
         """
-        ray.init(logging_level=logging.ERROR)
+        ray.init(logging_level=logging.ERROR, local_mode=self.debug)
 
         print(f"Parallelizing {self.workers} Workers Over {RESERVED_GATHERING_CPUS} Threads.\n")
         for self.iteration in range(self.iteration, n):
@@ -406,12 +407,12 @@ class PPOAgent:
             done = False
             reward_trajectory = []
             length = 0
-            state = parse_state(batchify_state(self.env.reset()))
+            state = parse_state(add_state_dims(self.env.reset()))
             while not done:
                 action, action_probability = policy_act(self.policy, state)
                 self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
-                state = parse_state(batchify_state(observation))
+                state = parse_state(add_state_dims(observation))
                 reward_trajectory.append(reward)
                 length += 1
 
@@ -485,9 +486,7 @@ class PPOAgent:
         example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
         value.predict(example_input)
 
-        loaded_agent = PPOAgent(policy, value, env,
-                                parameters["horizon"], parameters["workers"],
-                                _make_dirs=False)
+        loaded_agent = PPOAgent(policy, value, env, parameters["horizon"], parameters["workers"], _make_dirs=False)
 
         for p, v in parameters.items():
             loaded_agent.__dict__[p] = v
