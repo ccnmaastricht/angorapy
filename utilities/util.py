@@ -81,9 +81,12 @@ def add_state_dims(state: Union[numpy.ndarray, Tuple], dims: int = 1, axis: int 
 
 
 def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
-    """Merge a list of states into one huge batch of states. Handles both single and multi input states."""
+    """Merge a list of states into one huge batch of states. Handles both single and multi input states.
+
+    Assumes NO batch dimension!
+    """
     if isinstance(list_of_states[0], numpy.ndarray):
-        return numpy.concatenate(list_of_states)
+        return numpy.concatenate(add_state_dims(list_of_states))
     else:
         return tuple(numpy.concatenate(list(map(lambda x: add_state_dims(x[i]), list_of_states)), axis=0)
                      for i in range(len(list_of_states[0])))

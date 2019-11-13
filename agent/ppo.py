@@ -76,9 +76,7 @@ class PPOAgent:
 
         # models and optimizers
         self.policy, self.value, self.policy_value = model_builder(self.env)
-        self.policy_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
-        self.value_optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_v, epsilon=1e-5)
-        self.normalizer = RunningNormalization()
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
 
         # load persistent network types
         self.builder_function_name = model_builder.__name__
@@ -120,7 +118,7 @@ class PPOAgent:
         """
         self.device = "GPU:0" if activated else "CPU:0"
 
-    def actor_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
+    def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
         (as given in the paper), but this is the negated objective to be minimized!
 
@@ -329,14 +327,15 @@ class PPOAgent:
             shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
             batched_dataset = shuffled_dataset.batch(batch_size)
 
-            actor_epoch_losses, critic_epoch_losses, entropies = [], [], []
+            actor_epoch_losses, value_epoch_losses, entropies = [], [], []
             for batch in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
 
-                    # optimize the actor
-                    with tf.GradientTape() as actor_tape:
-                        policy_output = self.policy(batch["state"], training=True)
+                    # optimize policy and value network simultaneously
+                    with tf.GradientTape() as tape:
+                        policy_output, value_output = self.policy_value(batch["state"], training=True)
+                        old_values = batch["return"] - batch["advantage"]
 
                         if self.continuous_control:
                             # if action space is continuous, calculate PDF at chosen action value
@@ -349,40 +348,31 @@ class PPOAgent:
                                 [policy_output[i][a] for i, a in enumerate(batch["action"])])
 
                         # calculate the clipped loss
-                        actor_loss = self.actor_loss(action_prob=action_probabilities,
-                                                     old_action_prob=batch["action_prob"],
-                                                     advantage=batch["advantage"])
-
+                        policy_loss = self.policy_loss(action_prob=action_probabilities,
+                                                       old_action_prob=batch["action_prob"],
+                                                       advantage=batch["advantage"])
+                        value_loss = self.value_loss(value_predictions=value_output,
+                                                     old_values=old_values,
+                                                     returns=batch["return"],
+                                                     clip=self.clip_values)
                         entropy = self.entropy_bonus(policy_output)
                         entropies.append(tf.reduce_mean(entropy))
-                        actor_loss -= self.c_entropy * entropy
 
-                    actor_gradients = actor_tape.gradient(actor_loss, self.policy.trainable_variables)
+                        total_loss = policy_loss \
+                                     + tf.multiply(self.c_value, value_loss) \
+                                     - tf.multiply(self.c_entropy, entropy)
+
+                    trainable_vars = self.policy.trainable_variables + self.value.trainable_variables
+                    gradients = tape.gradient(total_loss, trainable_vars)
                     if self.gradient_clipping is not None:
-                        actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, self.gradient_clipping)
-                    self.policy_optimizer.apply_gradients(zip(actor_gradients, self.policy.trainable_variables))
+                        gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
+                    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-                    # optimize the critic
-                    with tf.GradientTape() as critic_tape:
-                        old_values = batch["return"] - batch["advantage"]
-                        new_values = self.value(batch["state"], training=True)
-                        critic_loss = self.value_loss(
-                            value_predictions=new_values,
-                            old_values=old_values,
-                            returns=batch["return"],
-                            clip=self.clip_values
-                        )
-
-                    critic_gradients = critic_tape.gradient(critic_loss, self.value.trainable_variables)
-                    if self.gradient_clipping is not None:
-                        critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, self.gradient_clipping)
-                    self.value_optimizer.apply_gradients(zip(critic_gradients, self.value.trainable_variables))
-
-                    actor_epoch_losses.append(tf.reduce_mean(actor_loss))
-                    critic_epoch_losses.append(tf.reduce_mean(critic_loss))
+                    actor_epoch_losses.append(tf.reduce_mean(policy_loss))
+                    value_epoch_losses.append(tf.reduce_mean(value_loss))
 
             actor_loss_history.append(statistics.mean([numb.numpy().item() for numb in actor_epoch_losses]))
-            critic_loss_history.append(statistics.mean([numb.numpy().item() for numb in critic_epoch_losses]))
+            critic_loss_history.append(statistics.mean([numb.numpy().item() for numb in value_epoch_losses]))
             entropy_history.append(statistics.mean([numb.numpy().item() for numb in entropies]))
 
         self.actor_loss_history.extend(actor_loss_history)
@@ -436,7 +426,7 @@ class PPOAgent:
                    f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
                    f"AvgEnt.: {nc}{0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2):5.2f}{ec}; "
                    f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
-                   f"Updates: {nc}{self.policy_optimizer.iterations.numpy().item():6d}{ec}; "
+                   f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                    f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                    f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
 

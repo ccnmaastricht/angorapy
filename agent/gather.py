@@ -58,43 +58,6 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
     return data, StatBundle(completed_episodes, numb_processed_frames, episode_rewards, episode_lengths)
 
 
-def make_dataset_and_stats(buffer: ExperienceBuffer):
-    """Make dataset object and StatBundle from ExperienceBuffer."""
-    completed_episodes = buffer.episodes_completed
-    numb_processed_frames = len(buffer.states)
-
-    if isinstance(buffer.states[0], numpy.ndarray):
-        dataset = tf.data.Dataset.from_tensor_slices({
-            "state": buffer.states,
-            "action": buffer.actions,
-            "action_prob": buffer.action_probabilities,
-            "return": buffer.returns,
-            "advantage": buffer.advantages
-        })
-    elif isinstance(buffer.states[0], Tuple):
-        dataset = tf.data.Dataset.from_tensor_slices({
-            "in_vision": [x[0] for x in buffer.states],
-            "in_proprio": [x[1] for x in buffer.states],
-            "in_touch": [x[2] for x in buffer.states],
-            "in_goal": [x[3] for x in buffer.states],
-            "action": buffer.actions,
-            "action_prob": buffer.action_probabilities,
-            "return": buffer.returns,
-            "advantage": buffer.advantages
-        })
-    else:
-        raise NotImplementedError(f"Cannot handle state type {type(buffer.states[0])}")
-
-    stats = StatBundle(
-        completed_episodes,
-        numb_processed_frames,
-        buffer.episode_rewards,
-        buffer.episode_lengths
-    )
-
-    return dataset, stats
-
-
 def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
     """Infer a single StatBundle from a list of StatBundles."""
     return StatBundle(
@@ -133,6 +96,7 @@ def serialize_flat_sample(s, a, ap, r, adv):
 
 
 def serialize_shadowhand_sample(sv, sp, st, sg, a, ap, r, adv):
+    """Serialize a multi-input (shadowhand) sample from a dataset."""
     feature = {
         "in_vision": _bytes_feature(tf.io.serialize_tensor(sv)),
         "in_proprio": _bytes_feature(tf.io.serialize_tensor(sp)),
@@ -239,6 +203,43 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     writer.write(dataset)
 
     return stats
+
+
+def make_dataset_and_stats(buffer: ExperienceBuffer):
+    """Make dataset object and StatBundle from ExperienceBuffer."""
+    completed_episodes = buffer.episodes_completed
+    numb_processed_frames = len(buffer.states)
+
+    if isinstance(buffer.states[0], numpy.ndarray):
+        dataset = tf.data.Dataset.from_tensor_slices({
+            "state": buffer.states,
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages
+        })
+    elif isinstance(buffer.states[0], Tuple):
+        dataset = tf.data.Dataset.from_tensor_slices({
+            "in_vision": [x[0] for x in buffer.states],
+            "in_proprio": [x[1] for x in buffer.states],
+            "in_touch": [x[2] for x in buffer.states],
+            "in_goal": [x[3] for x in buffer.states],
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages
+        })
+    else:
+        raise NotImplementedError(f"Cannot handle state type {type(buffer.states[0])}")
+
+    stats = StatBundle(
+        completed_episodes,
+        numb_processed_frames,
+        buffer.episode_rewards,
+        buffer.episode_lengths
+    )
+
+    return dataset, stats
 
 
 def read_dataset_from_storage(dtype_actions: tf.dtypes.DType):
