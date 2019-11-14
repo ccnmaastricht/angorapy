@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Functions for gathering experience."""
+import inspect
 import itertools
-import multiprocessing
 import os
 from typing import Tuple, List
 
@@ -14,7 +14,6 @@ import models
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import init_hidden
 from utilities.datatypes import ExperienceBuffer, StatBundle
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
 
@@ -29,15 +28,24 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     env_is_continuous = isinstance(env.action_space, Box)
+    act = act_continuous if env_is_continuous else act_discrete
 
     # load policy
     if isinstance(model, str):
         policy = tfl.keras.models.load_model(f"{model}/policy")
         critic = tfl.keras.models.load_model(f"{model}/value")
     elif isinstance(model, tuple):
-        policy, _, _ = getattr(models, model[0].model_builder)(env)
+        policy_builder = getattr(models, model[0].model_builder)
+        value_builder = getattr(models, model[1].model_builder)
+
+        # recurrent policy needs batch size for statefulness
+        policy, _, _ = policy_builder(env, **(
+            {"batch_size": 1} if "batch_size" in inspect.getfullargspec(policy_builder).args else {}))
+        _, critic, _ = value_builder(env, **(
+            {"batch_size": 1} if "batch_size" in inspect.getfullargspec(policy_builder).args else {}))
+
+        # load the weights
         policy.set_weights(model[0].weights)
-        _, critic, _ = getattr(models, model[1].model_builder)(env)
         critic.set_weights(model[1].weights)
     else:
         raise ValueError("Unknown input for model.")
@@ -50,11 +58,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     episode_rewards, episode_lengths = [], []
 
     # go for it
-    states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
+    states, rewards, actions, action_probabilities, t_is_terminal, values = [], [], [], [], [], []
     state = parse_state(env.reset())
-    print(policy.output_shape[-1])
-    hidden = init_hidden(policy.output_shape[-1])
-    act = act_continuous if env_is_continuous else act_discrete
+    values.append(critic(add_state_dims(state, dims=2 if is_recurrent else 1)))
     for t in range(horizon):
         # choose action and step
         action, action_probability = act(policy, add_state_dims(state, dims=2 if is_recurrent else 1))
@@ -80,13 +86,13 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
             state = parse_state(observation)
             episode_steps += 1
 
+        values.append(critic(add_state_dims(state, dims=2 if is_recurrent else 1)))
+
     env.close()
 
-    merged_states = merge_into_batch(states + [state])
-    merged_states = add_state_dims(merged_states, axis=1) if is_recurrent else merged_states
-    value_predictions = critic(merged_states).numpy().reshape([-1])
-    advantages = estimate_advantage(rewards, value_predictions, t_is_terminal, gamma=discount, lam=lam)
-    returns = numpy.add(advantages, value_predictions[:-1])
+    values = tfl.reshape(values, [-1])
+    advantages = estimate_advantage(rewards, values, t_is_terminal, gamma=discount, lam=lam)
+    returns = numpy.add(advantages, values[:-1])
     advantages = normalize_advantages(advantages)
 
     # store this worker's gathering in a experience buffer

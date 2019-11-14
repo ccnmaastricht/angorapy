@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
+import inspect
 import json
 import logging
 import multiprocessing
@@ -76,7 +77,8 @@ class PPOAgent:
         self.clip_values = clip_values
 
         # models and optimizers
-        self.policy, self.value, self.joint = model_builder(self.env)
+        self.policy, self.value, self.joint = model_builder(self.env, **(
+            {"batch_size": 1} if "batch_size" in inspect.getfullargspec(model_builder).args else {}))
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
 
         # load persistent network types
