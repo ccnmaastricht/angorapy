@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
-import inspect
 import json
-import logging
 import multiprocessing
 import os
 import re
@@ -10,6 +8,7 @@ import shutil
 import statistics
 import time
 from collections import OrderedDict
+from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
 import gym
@@ -25,7 +24,7 @@ from agent.gather import collect, \
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS
 from utilities.datatypes import ModelTuple
-from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims
+from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch
 
 BASE_SAVE_PATH = "saved_models/states/"
 
@@ -38,12 +37,10 @@ class PPOAgent:
     per batch however this is what is used in the original paper and most implementations. During development this also
     turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
     to make any significant progress in more difficult environments such as LunarLander.
-
-    Args:
-
-    Returns:
-
     """
+    policy: tf.keras.Model
+    value: tf.keras.Model
+    joint: tf.keras.Model
 
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate_pi: float = 0.001,
                  learning_rate_v: float = 0.001, discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
@@ -77,12 +74,16 @@ class PPOAgent:
         self.clip_values = clip_values
 
         # models and optimizers
-        self.policy, self.value, self.joint = model_builder(self.env, **(
-            {"batch_size": 1} if "batch_size" in inspect.getfullargspec(model_builder).args else {}))
+        self.model_builder = model_builder
+        self.builder_function_name = model_builder.__name__
+        self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
+            model_builder).args else {}))
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
 
-        # load persistent network types
-        self.builder_function_name = model_builder.__name__
+        # passing one sample, which for some reason prevents cuDNN init error
+        if "observation" in self.env.observation_space.sample():
+            self.joint(merge_into_batch(
+                [add_state_dims(self.env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
         # miscellaneous
         self.iteration = 0
@@ -134,17 +135,14 @@ class PPOAgent:
         ))
 
     def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
-                   clip=True) -> tf.Tensor:
+                   clip: bool = True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return.
 
         Args:
-          value_predictions: value prediction by the current critic network
-          old_values: value prediction by the old critic network during gathering
-          returns: discounted return estimation
-          value_predictions: tf.Tensor: 
-          old_values: tf.Tensor: 
-          returns: tf.Tensor: 
-          clip:  (Default value = True)
+          value_predictions (tf.Tensor): value prediction by the current critic network
+          old_values (tf.Tensor): value prediction by the old critic network during gathering
+          returns (tf.Tensor): discounted return estimation
+          clip (object):  (Default value = True) value loss can be clipped by same range as policy loss
 
         Returns:
           squared error between prediction and return
@@ -201,7 +199,15 @@ class PPOAgent:
             self
 
         """
-        ray.init(logging_level=logging.ERROR, local_mode=self.debug)
+        assert self.horizon * self.workers >= batch_size, "Batch Size is larger than the number of transitions."
+
+        ray.init(local_mode=self.debug)
+
+        # rebuild model with desired batch size
+        weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.model_builder(self.env, **({"bs": batch_size} if "bs" in fargs(
+            self.model_builder).args else {}))
+        self.joint.set_weights(weights)
 
         print(f"Parallelizing {self.workers} Workers Over {multiprocessing.cpu_count()} Threads.\n")
         for self.iteration in range(self.iteration, n):
@@ -238,13 +244,12 @@ class PPOAgent:
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
 
-            print("data read..")
+            time_dict["communication"] = time.time() - subprocess_start
+            subprocess_start = time.time()
+
             # clean up the saved models
             if export:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
-
-            time_dict["communication"] = time.time() - subprocess_start
-            subprocess_start = time.time()
 
             # process stats from actors
             if not separate_eval:
@@ -309,24 +314,22 @@ class PPOAgent:
         not. Even more so this applies with running simulations on the cluster.
 
         Args:
-            dataset: tensorflow dataset containing s, a, p(a), r and A as components per data point
-            epochs: number of epochs to train on this dataset
-            batch_size: batch size with which the dataset is sampled
-            dataset: tf.data.Dataset:
-            epochs: int:
-            batch_size: int:
+            dataset (tf.data.Dataset): tensorflow dataset containing s, a, p(a), r and A as components per data point
+            epochs (int): number of epochs to train on this dataset
+            batch_size (int): batch size with which the dataset is sampled
 
         Returns:
             None
         """
         actor_loss_history, critic_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
-            # for each epoch, dataset first should be shuffled to break bias, then divided into batches
-            shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
-            batched_dataset = shuffled_dataset.batch(batch_size)
+            # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
+            # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
+            batched_dataset = dataset.batch(batch_size)
 
             actor_epoch_losses, value_epoch_losses, entropies = [], [], []
             for batch in batched_dataset:
+
                 # use the dataset to optimize the model
                 with tf.device(self.device):
 
@@ -357,20 +360,21 @@ class PPOAgent:
                                                      returns=batch["return"],
                                                      clip=self.clip_values)
                         entropy = self.entropy_bonus(policy_output)
-                        entropies.append(tf.reduce_mean(entropy))
-
-                        total_loss = policy_loss \
-                                     + tf.multiply(self.c_value, value_loss) \
-                                     - tf.multiply(self.c_entropy, entropy)
+                        total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy,
+                                                                                                       entropy)
 
                     gradients = tape.gradient(total_loss, self.joint.trainable_variables)
                     if self.gradient_clipping is not None:
                         gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
                     self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
+                    entropies.append(tf.reduce_mean(entropy))
                     actor_epoch_losses.append(tf.reduce_mean(policy_loss))
                     value_epoch_losses.append(tf.reduce_mean(value_loss))
 
+                    self.joint.reset_states()
+
+            # remember some statistics
             actor_loss_history.append(statistics.mean([numb.numpy().item() for numb in actor_epoch_losses]))
             critic_loss_history.append(statistics.mean([numb.numpy().item() for numb in value_epoch_losses]))
             entropy_history.append(statistics.mean([numb.numpy().item() for numb in entropies]))
@@ -413,7 +417,6 @@ class PPOAgent:
 
     def report(self):
         """Print a report of the current state of the training."""
-
         sc, nc, ec = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"]
         time_distribution_string = ""
         if len(self.time_dicts) > 0:

@@ -20,7 +20,7 @@ from utilities.util import parse_state, add_state_dims, is_recurrent_model, merg
 STORAGE_DIR = "storage/experience/"
 
 
-@ray.remote(num_cpus=1)
+@ray.remote(num_cpus=1, num_gpus=0)
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
     import tensorflow as tfl
@@ -40,9 +40,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
         # recurrent policy needs batch size for statefulness
         policy, _, _ = policy_builder(env, **(
-            {"batch_size": 1} if "batch_size" in inspect.getfullargspec(policy_builder).args else {}))
+            {"bs": 1} if "bs" in inspect.getfullargspec(policy_builder).args else {}))
         _, critic, _ = value_builder(env, **(
-            {"batch_size": 1} if "batch_size" in inspect.getfullargspec(policy_builder).args else {}))
+            {"bs": 1} if "bs" in inspect.getfullargspec(policy_builder).args else {}))
 
         # load the weights
         policy.set_weights(model[0].weights)
