@@ -2,6 +2,7 @@
 """Implementation of Proximal Policy Optimization Algorithm."""
 import json
 import logging
+import multiprocessing
 import os
 import re
 import shutil
@@ -18,11 +19,11 @@ from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, ModelTuple, RESERVED_GATHERING_CPUS, \
+from agent.gather import collect, \
     read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS
-from utilities.normalization import RunningNormalization
+from utilities.datatypes import ModelTuple
 from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims
 
 BASE_SAVE_PATH = "saved_models/states/"
@@ -75,7 +76,7 @@ class PPOAgent:
         self.clip_values = clip_values
 
         # models and optimizers
-        self.policy, self.value, self.policy_value = model_builder(self.env)
+        self.policy, self.value, self.joint = model_builder(self.env)
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_pi, epsilon=1e-5)
 
         # load persistent network types
@@ -108,14 +109,7 @@ class PPOAgent:
         self.time_dicts = []
 
     def set_gpu(self, activated: bool):
-        """
-
-        Args:
-          activated: bool: 
-
-        Returns:
-
-        """
+        """Set GPU usage mode."""
         self.device = "GPU:0" if activated else "CPU:0"
 
     def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
@@ -207,7 +201,7 @@ class PPOAgent:
         """
         ray.init(logging_level=logging.ERROR, local_mode=self.debug)
 
-        print(f"Parallelizing {self.workers} Workers Over {RESERVED_GATHERING_CPUS} Threads.\n")
+        print(f"Parallelizing {self.workers} Workers Over {multiprocessing.cpu_count()} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -239,8 +233,10 @@ class PPOAgent:
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
-            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32)
+            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                                                is_shadow_hand=isinstance(self.state_dim, tuple))
 
+            print("data read..")
             # clean up the saved models
             if export:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
@@ -334,7 +330,10 @@ class PPOAgent:
 
                     # optimize policy and value network simultaneously
                     with tf.GradientTape() as tape:
-                        policy_output, value_output = self.policy_value(batch["state"], training=True)
+                        state_batch = batch["state"] if "state" in batch else add_state_dims((
+                            batch["in_vision"], batch["in_proprio"],
+                            batch["in_touch"], batch["in_goal"]), axis=1)
+                        policy_output, value_output = self.joint(state_batch, training=True)
                         old_values = batch["return"] - batch["advantage"]
 
                         if self.continuous_control:
@@ -362,11 +361,10 @@ class PPOAgent:
                                      + tf.multiply(self.c_value, value_loss) \
                                      - tf.multiply(self.c_entropy, entropy)
 
-                    trainable_vars = self.policy.trainable_variables + self.value.trainable_variables
-                    gradients = tape.gradient(total_loss, trainable_vars)
+                    gradients = tape.gradient(total_loss, self.joint.trainable_variables)
                     if self.gradient_clipping is not None:
                         gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
-                    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+                    self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
                     actor_epoch_losses.append(tf.reduce_mean(policy_loss))
                     value_epoch_losses.append(tf.reduce_mean(value_loss))

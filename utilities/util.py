@@ -9,6 +9,13 @@ import numpy
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
+from tensorflow.python.client import device_lib
+
+
+def get_available_gpus():
+    """Get list of available GPUs."""
+    local_device_protos = device_lib.list_local_devices()
+    return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 
 def flat_print(string: str):
@@ -23,7 +30,7 @@ def set_all_seeds(seed):
     random.seed(seed)
 
 
-def env_extract_dims(env: gym.Env) -> Tuple[int, int]:
+def env_extract_dims(env: gym.Env) -> Tuple[Union[int, tuple], int]:
     """Returns state and (discrete) action space dimensionality for given environment."""
     if isinstance(env.observation_space, Dict):
         obs_dim = tuple(field.shape for field in env.observation_space["observation"])

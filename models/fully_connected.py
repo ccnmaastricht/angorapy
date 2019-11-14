@@ -1,37 +1,14 @@
 #!/usr/bin/env python
 """Collection of fully connected policy networks."""
-import math
 
 import gym
 import tensorflow as tf
 from gym.spaces import Box
 from tensorflow_core.python.keras.utils import plot_model
 
+from models.components import _build_encoding_sub_model, _build_continuous_head, _build_discrete_head
 from utilities.normalization import RunningNormalization
 from utilities.util import env_extract_dims
-
-
-DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))
-
-
-def _build_encoding_sub_model(inputs):
-    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
-    x = tf.keras.layers.Activation("tanh")(x)
-    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
-    return tf.keras.layers.Activation("tanh")(x)
-
-
-def _build_continuous_head(n_actions, inputs):
-    means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
-    means = tf.keras.layers.Activation("linear")(means)
-    stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
-    stdevs = tf.keras.layers.Activation("softplus")(stdevs)
-    return tf.keras.layers.Concatenate()([means, stdevs])
-
-
-def _build_discrete_head(n_actions, inputs):
-    x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
-    return tf.keras.layers.Activation("softmax")(x)
 
 
 def build_ffn_distinct_models(env: gym.Env):

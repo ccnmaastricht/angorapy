@@ -3,3 +3,4 @@
 from models.convolutional import *
 from models.fully_connected import *
 from models.hybrid import *
+from models.components import *

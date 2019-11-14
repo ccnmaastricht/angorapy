@@ -3,7 +3,6 @@
 import itertools
 import multiprocessing
 import os
-from collections import namedtuple
 from typing import Tuple, List
 
 import numpy
@@ -15,16 +14,93 @@ import models
 from agent.core import estimate_advantage, normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
+from models import init_hidden
+from utilities.datatypes import ExperienceBuffer, StatBundle
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
 
-ExperienceBuffer = namedtuple("ExperienceBuffer", ["states", "actions", "action_probabilities", "returns", "advantages",
-                                                   "episodes_completed", "episode_rewards", "episode_lengths"])
-StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
-                                       "episode_rewards", "episode_lengths"])
-ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
-
-RESERVED_GATHERING_CPUS = multiprocessing.cpu_count()
 STORAGE_DIR = "storage/experience/"
+
+
+@ray.remote(num_cpus=1)
+def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
+    """Collect a batch shard of experience for a given number of timesteps."""
+    import tensorflow as tfl
+
+    # build new environment for each collector to make multiprocessing possible
+    env = gym.make(env_name)
+    env_is_continuous = isinstance(env.action_space, Box)
+
+    # load policy
+    if isinstance(model, str):
+        policy = tfl.keras.models.load_model(f"{model}/policy")
+        critic = tfl.keras.models.load_model(f"{model}/value")
+    elif isinstance(model, tuple):
+        policy, _, _ = getattr(models, model[0].model_builder)(env)
+        policy.set_weights(model[0].weights)
+        _, critic, _ = getattr(models, model[1].model_builder)(env)
+        critic.set_weights(model[1].weights)
+    else:
+        raise ValueError("Unknown input for model.")
+
+    # check if there is a recurrent layer inside the model
+    is_recurrent = is_recurrent_model(policy)
+
+    # trackers
+    episodes_completed, current_episode_return, episode_steps = 0, 0, 1
+    episode_rewards, episode_lengths = [], []
+
+    # go for it
+    states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
+    state = parse_state(env.reset())
+    print(policy.output_shape[-1])
+    hidden = init_hidden(policy.output_shape[-1])
+    act = act_continuous if env_is_continuous else act_discrete
+    for t in range(horizon):
+        # choose action and step
+        action, action_probability = act(policy, add_state_dims(state, dims=2 if is_recurrent else 1))
+        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
+
+        # remember experience
+        states.append(state)
+        actions.append(action)
+        action_probabilities.append(action_probability)
+        rewards.append(reward)
+        t_is_terminal.append(done == 1)
+        current_episode_return += reward
+
+        # next state
+        if done:
+            state = parse_state(env.reset())
+            episode_lengths.append(episode_steps)
+            episode_rewards.append(current_episode_return)
+            episodes_completed += 1
+            episode_steps = 1
+            current_episode_return = 0
+        else:
+            state = parse_state(observation)
+            episode_steps += 1
+
+    env.close()
+
+    merged_states = merge_into_batch(states + [state])
+    merged_states = add_state_dims(merged_states, axis=1) if is_recurrent else merged_states
+    value_predictions = critic(merged_states).numpy().reshape([-1])
+    advantages = estimate_advantage(rewards, value_predictions, t_is_terminal, gamma=discount, lam=lam)
+    returns = numpy.add(advantages, value_predictions[:-1])
+    advantages = normalize_advantages(advantages)
+
+    # store this worker's gathering in a experience buffer
+    buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
+                              episodes_completed, episode_rewards, episode_lengths)
+
+    dataset, stats = make_dataset_and_stats(buffer)
+
+    # save to tf record
+    dataset = dataset.map(tf_serialize_example)
+    writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
+    writer.write(dataset)
+
+    return stats
 
 
 def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.data.Dataset, StatBundle]:
@@ -96,7 +172,7 @@ def serialize_flat_sample(s, a, ap, r, adv):
 
 
 def serialize_shadowhand_sample(sv, sp, st, sg, a, ap, r, adv):
-    """Serialize a multi-input (shadowhand) sample from a dataset."""
+    """Serialize a multi-input (shadow hand) sample from a dataset."""
     feature = {
         "in_vision": _bytes_feature(tf.io.serialize_tensor(sv)),
         "in_proprio": _bytes_feature(tf.io.serialize_tensor(sp)),
@@ -125,84 +201,6 @@ def tf_serialize_example(sample):
 
     tf_string = tf.py_function(serializer, inputs, tf.string)
     return tf.reshape(tf_string, ())
-
-
-@ray.remote(num_cpus=1)
-def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
-    """Collect a batch shard of experience for a given number of timesteps."""
-    import tensorflow as tfl
-
-    # build new environment for each collector to make multiprocessing possible
-    env = gym.make(env_name)
-    env_is_continuous = isinstance(env.action_space, Box)
-
-    # load policy
-    if isinstance(model, str):
-        policy = tfl.keras.models.load_model(f"{model}/policy")
-        critic = tfl.keras.models.load_model(f"{model}/value")
-    elif isinstance(model, tuple):
-        policy, _, _ = getattr(models, model[0].model_builder)(env)
-        policy.set_weights(model[0].weights)
-        _, critic, _ = getattr(models, model[1].model_builder)(env)
-        critic.set_weights(model[1].weights)
-    else:
-        raise ValueError("Unknown input for model.")
-
-    # check if there is a recurrent layer inside the model
-    is_recurrent = is_recurrent_model(policy)
-
-    # trackers
-    episodes_completed, current_episode_return, episode_steps = 0, 0, 1
-    episode_rewards, episode_lengths = [], []
-
-    # go for it
-    states, rewards, actions, action_probabilities, t_is_terminal = [], [], [], [], []
-    state = parse_state(env.reset())
-    act = act_continuous if env_is_continuous else act_discrete
-    for t in range(horizon):
-        # choose action and step
-        action, action_probability = act(policy, add_state_dims(state, dims=2 if is_recurrent else 1))
-        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
-
-        # remember experience
-        states.append(state)
-        actions.append(action)
-        action_probabilities.append(action_probability)
-        rewards.append(reward)
-        t_is_terminal.append(done == 1)
-        current_episode_return += reward
-
-        # next state
-        if done:
-            state = parse_state(env.reset())
-            episode_lengths.append(episode_steps)
-            episode_rewards.append(current_episode_return)
-            episodes_completed += 1
-            episode_steps = 1
-            current_episode_return = 0
-        else:
-            state = parse_state(observation)
-            episode_steps += 1
-
-    merged_states = merge_into_batch(states + [state])
-    merged_states = add_state_dims(merged_states, axis=1) if is_recurrent else merged_states
-    value_predictions = critic(merged_states).numpy().reshape([-1])
-    advantages = estimate_advantage(rewards, value_predictions, t_is_terminal, gamma=discount, lam=lam)
-    returns = numpy.add(advantages, value_predictions[:-1])
-    advantages = normalize_advantages(advantages)
-
-    # store this worker's gathering in a experience buffer
-    buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
-                              episodes_completed, episode_rewards, episode_lengths)
-
-    dataset, stats = make_dataset_and_stats(buffer)
-
-    # save to tf record
-    dataset = dataset.map(tf_serialize_example)
-    writer = tfl.data.experimental.TFRecordWriter(f"storage/experience/data_{pid}.tfrecord")
-    writer.write(dataset)
-
-    return stats
 
 
 def make_dataset_and_stats(buffer: ExperienceBuffer):
@@ -242,20 +240,35 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
     return dataset, stats
 
 
-def read_dataset_from_storage(dtype_actions: tf.dtypes.DType):
+def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bool):
     """Read all files in storage into a tf record dataset without actually loading everything into memory."""
     feature_description = {
-        "state": tf.io.FixedLenFeature([], tf.string),
         "action": tf.io.FixedLenFeature([], tf.string),
         "action_prob": tf.io.FixedLenFeature([], tf.float32),
         "return": tf.io.FixedLenFeature([], tf.float32),
         "advantage": tf.io.FixedLenFeature([], tf.float32)
     }
 
+    if not is_shadow_hand:
+        feature_description["state"] = tf.io.FixedLenFeature([], tf.string)
+    else:
+        feature_description.update({
+            "in_vision": tf.io.FixedLenFeature([], tf.string),
+            "in_proprio": tf.io.FixedLenFeature([], tf.string),
+            "in_touch": tf.io.FixedLenFeature([], tf.string),
+            "in_goal": tf.io.FixedLenFeature([], tf.string),
+        })
+
     def _parse_function(example_proto):
         # Parse the input `tf.Example` proto using the dictionary above.
         parsed = tf.io.parse_single_example(example_proto, feature_description)
-        parsed["state"] = tf.io.parse_tensor(parsed["state"], out_type=tf.float32)
+        if not is_shadow_hand:
+            parsed["state"] = tf.io.parse_tensor(parsed["state"], out_type=tf.float32)
+        else:
+            parsed["in_vision"] = tf.io.parse_tensor(parsed["in_vision"], out_type=tf.float32)
+            parsed["in_proprio"] = tf.io.parse_tensor(parsed["in_proprio"], out_type=tf.float32)
+            parsed["in_touch"] = tf.io.parse_tensor(parsed["in_touch"], out_type=tf.float32)
+            parsed["in_goal"] = tf.io.parse_tensor(parsed["in_goal"], out_type=tf.float32)
         parsed["action"] = tf.io.parse_tensor(parsed["action"], out_type=dtype_actions)
         return parsed
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """Components that can be loaded into another network."""
+import math
 import os
 
 import tensorflow as tf
 
 
-def build_visual_component():
-    inputs = tf.keras.Input(shape=(200, 200, 3))
+def _build_visual_encoder(shape, batch_size=None):
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + shape)
+
     x = tf.keras.layers.Conv2D(32, 5, 1)(inputs)
     x = tf.keras.layers.Activation("relu")(x)
     x = tf.keras.layers.Conv2D(32, 3, 1)(x)
@@ -20,15 +22,15 @@ def build_visual_component():
     x = tf.keras.layers.Dense(64)(x)
     x = tf.keras.layers.Activation("relu")(x)
     x = tf.keras.layers.Dense(64)(x)
-    outputs = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.Activation("relu")(x)
 
-    return tf.keras.Model(inputs=inputs, outputs=outputs, name="visual_component")
+    return tf.keras.Model(inputs=inputs, outputs=x, )
 
 
-def build_visual_decoder():
+def _build_visual_decoder(shape, batch_size=None):
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + shape)
+
     spatial_reshape_size = 7 * 7 * 64
-
-    inputs = tf.keras.Input(shape=(64,))
     x = tf.keras.layers.Dense(64)(inputs)
     x = tf.keras.layers.Activation("relu")(x)
     x = tf.keras.layers.Dense(spatial_reshape_size)(x)
@@ -43,21 +45,22 @@ def build_visual_decoder():
     x = tf.keras.layers.Conv2DTranspose(32, 3, 1)(x)
     x = tf.keras.layers.Activation("relu")(x)
     x = tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="sigmoid")(x)
-    outputs = tf.keras.layers.Activation("sigmoid")(x)
+    x = tf.keras.layers.Activation("sigmoid")(x)
 
-    return tf.keras.Model(inputs=inputs, outputs=outputs, name="visual_decoder")
+    return tf.keras.Model(inputs=inputs, outputs=x)
 
 
-def build_non_visual_component(input_dimensionality: int, hidden_dimensionality: int, output_dimensionality: int):
-    inputs = tf.keras.Input(shape=(input_dimensionality,))
-    x = tf.keras.layers.Dense(input_dimensionality)(inputs)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Dense(hidden_dimensionality)(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Dense(output_dimensionality)(x)
-    outputs = tf.keras.layers.Activation("relu")(x)
+def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int, batch_size: int = None):
+    inputs = tf.keras.Input(batch_shape=(batch_size, input_dim))
 
-    return tf.keras.Model(inputs=inputs, outputs=outputs)
+    x = tf.keras.layers.Dense(hidden_dim)(inputs)
+    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Dense(hidden_dim)(x)
+    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Dense(output_dim)(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x)
 
 
 def build_residual_block():
@@ -67,11 +70,34 @@ def build_residual_block():
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    net = build_visual_component()
+    net = _build_visual_encoder()
     tensor = tf.random.normal([4, 200, 200, 3])
     latent = net(tensor)
     print(f"Latent Shape: {latent.shape}")
 
-    decoder = build_visual_decoder()
+    decoder = _build_visual_decoder()
     reconstruction = decoder(latent)
     print(f"Reconstruction Shape: {reconstruction.shape}")
+
+
+def _build_encoding_sub_model(inputs):
+    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
+    x = tf.keras.layers.Activation("tanh")(x)
+    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
+    return tf.keras.layers.Activation("tanh")(x)
+
+
+def _build_continuous_head(n_actions, inputs):
+    means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    means = tf.keras.layers.Activation("linear")(means)
+    stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    stdevs = tf.keras.layers.Activation("softplus")(stdevs)
+    return tf.keras.layers.Concatenate()([means, stdevs])
+
+
+def _build_discrete_head(n_actions, inputs):
+    x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    return tf.keras.layers.Activation("softmax")(x)
+
+
+DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))

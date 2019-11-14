@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from models.components import build_visual_component, build_visual_decoder
+from models.components import _build_visual_encoder, _build_visual_decoder
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -26,8 +26,8 @@ if TASK == "reconstruction":
 
     # model is constructed from visual component and a decoder
     inputs = tf.keras.Input(shape=(200, 200, 3))
-    encoder = build_visual_component()
-    decoder = build_visual_decoder()
+    encoder = _build_visual_encoder()
+    decoder = _build_visual_decoder()
     encoded_image = encoder(inputs)
     decoded_image = decoder(encoded_image)
     model = tf.keras.Model(inputs=inputs, outputs=decoded_image)
@@ -74,7 +74,7 @@ elif TASK == "classification":
 
     # model is constructed from visual component and classification layer
     inputs = tf.keras.Input(shape=(200, 200, 3))
-    encoder = build_visual_component()
+    encoder = _build_visual_encoder()
     encoded_img = encoder(inputs)
     classifier = tf.keras.layers.Dense(10, activation="softmax")(encoded_img)
     model = tf.keras.Model(inputs=inputs, outputs=classifier)
