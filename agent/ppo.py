@@ -292,8 +292,7 @@ class PPOAgent:
                     self.iteration + 1) % story_teller.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
                 story_teller.create_episode_gif(n=3)
-            story_teller.update_graphs()
-            story_teller.update_story()
+            story_teller.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 print("Saving the current state of the agent.")

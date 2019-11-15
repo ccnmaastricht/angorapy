@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
+import datetime
+import json
 import os
 import re
 import time
@@ -14,7 +16,7 @@ from matplotlib import animation
 from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
 
-PATH_TO_STORIES = "stories/"
+PATH_TO_STORIES = "monitor/"
 TEMPLATE_PATH = PATH_TO_STORIES + "/template/"
 
 
@@ -23,6 +25,7 @@ def scale(vector):
 
 
 class StoryTeller:
+    """Monitor for learning progress."""
 
     def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
         self.agent = agent
@@ -44,6 +47,7 @@ class StoryTeller:
         self.make_metadata()
 
     def create_episode_gif(self, n: int):
+        """Make n GIFs with the current policy."""
         act = act_continuous if self.continuous_control else act_discrete
 
         for i in range(n):
@@ -75,29 +79,35 @@ class StoryTeller:
             plt.close()
 
     def make_metadata(self):
-        # TODO
-        pass
+        """Write meta data information about experiment into json file."""
+        metadata = dict(
+            environment=self.agent.env_name,
+            date=str(datetime.datetime.now()),
+            hyperparameters=dict(
+                continuous=self.agent.continuous_control,
+                learning_rate=self.agent.learning_rate_pi,
+                epsilon_clip=self.agent.clip,
+                entropy_coefficient=self.agent.c_entropy,
+            )
+        )
 
-    def make_hp_box(self):
-        with open(TEMPLATE_PATH + "hp_box.html") as f:
-            tpl = f.read()
+        with open(f"{self.story_directory}/meta.json", "w") as f:
+            json.dump(metadata, f)
 
-        relevant_hps = [
-            ("CONTINUOUS", self.agent.continuous_control),
-            ("LEARNING RATE", self.agent.learning_rate_pi),
-            ("EPSILON CLIP", self.agent.clip),
-            ("ENTROPY COEFFICIENT", self.agent.c_entropy),
-        ]
+    def write_progress(self):
+        """Write training statistics into json file."""
+        progress = dict(
+            rewards=self.agent.cycle_reward_history,
+            lengths=self.agent.cycle_length_history,
+            entropies=self.agent.entropy_history
+        )
 
-        hplist = ""
-        for p, v in relevant_hps:
-            hplist += f"<div class='hp-element'>{p}: {v}</div>\n"
-
-        box = re.sub("%HPS%", hplist, tpl)
-
-        return box
+        with open(f"{self.story_directory}/progress.json", "w") as f:
+            json.dump(progress, f)
 
     def update_graphs(self):
+        """Update graphs."""
+
         # reward plot
         fig, ax = plt.subplots()
         ax.set_title("Mean Rewards and Episode Lengths for Each Training Cycle.")
@@ -135,58 +145,7 @@ class StoryTeller:
 
         plt.close(fig)
 
-    def update_story(self):
-        story = ""
-
-        with open(f"{TEMPLATE_PATH}/head.html") as f:
-            story += f.read()
-            story += "\n\n"
-
-        # main title
-        story += f"<h1 align='center'>A Story About {self.agent.env.unwrapped.spec.id}</h1>\n\n"
-
-        # hyperparameters
-        story += self.make_hp_box()
-
-        # reward plot
-        story += "<div class='plot-wrapper'>"
-        reward_plot_path = self.story_directory + "/reward_plot.svg"
-        if os.path.isfile(reward_plot_path):
-            story += f"<div class='plot-block'>\n" \
-                     f"\t<img src=reward_plot.svg />\n" \
-                     f"</div>\n\n"
-        loss_plot_path = self.story_directory + "/reward_plot.svg"
-        if os.path.isfile(loss_plot_path):
-            story += f"<div class='plot-block'>\n" \
-                     f"\t<img src=loss_plot.svg />\n" \
-                     f"</div>\n\n"
-        story += "</div>"
-
-        gif_files = sorted([fp for fp in os.listdir(self.story_directory) if fp[-4:] == ".gif"],
-                           key=lambda f: int(re.search("[0-9]+", f).group(0)))
-
-        last_gif_iteration = -1
-        for gif_filename in gif_files:
-            gif_filepath = f"{gif_filename}"
-
-            gif_iteration = int(re.search('[0-9]+', gif_filepath).group(0))
-
-            if gif_iteration != last_gif_iteration:
-                if last_gif_iteration != -1:
-                    story += "</div>\n\n"
-
-                story += f"<div class='iteration-block'>\n" \
-                         f"\t<h3>Iteration {gif_iteration}</h3>\n" \
-                         f"\t<h5>&mu; = {0 if self.agent.cycle_reward_history[-1] is None else round(self.agent.cycle_reward_history[gif_iteration], 2)}, " \
-                         f"&sigma; = {0 if self.agent.cycle_length_history[-1] is None else round(self.agent.cycle_length_history[gif_iteration], 2)}</h5>"
-
-            story += f"\t<img src={gif_filepath} width=320 height=320 />\n"
-
-            last_gif_iteration = gif_iteration
-        story += "</div>\n\n"
-
-        with open(f"{PATH_TO_STORIES}/template/foot.html") as f:
-            story += f.read()
-
-        with open(f"{self.story_directory}/story.html", "w") as f:
-            f.write(story)
+    def update(self):
+        """Update different components of the Monitor."""
+        self.write_progress()
+        self.update_graphs()

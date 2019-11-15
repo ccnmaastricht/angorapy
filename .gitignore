@@ -1,4 +1,4 @@
-stories/experiments/
+monitor/experiments/
 saved_models/*
 misc/benchmark_efficiency.py
 docs/analysis/*

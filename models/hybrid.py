@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Hybrid policy networks that utilize both visual and unstructured input data."""
 import os
+import sys
 import time
 from typing import Iterable
 
@@ -44,7 +45,7 @@ def build_shadow_brain(env: gym.Env, bs: int):
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=True, batch_size=bs)(x)
+    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=False, batch_size=bs)(x)
 
     # output heads
     policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
@@ -70,25 +71,22 @@ if __name__ == "__main__":
     batch_size = 128
 
     env = gym.make("ShadowHand-v1")
+    _, _, joint = build_shadow_brain(env, bs=batch_size)
+    optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
-    pi, vn, pv = build_shadow_brain(gym.make("ShadowHand-v1"), bs=batch_size)
-    tf.keras.utils.plot_model(pi, show_shapes=True, expand_nested=True)
-
-    optimizer = tf.keras.optimizers.Adam()
     start_time = time.time()
     with tf.device("GPU:0"):
         for t in tqdm(range(sequence_length), disable=False):
             sample_batch = merge_into_batch(
                 [add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(batch_size)])
+
             with tf.GradientTape() as tape:
-                out, v = pv(sample_batch, training=True)
+                out, v = joint(sample_batch, training=True)
                 loss = tf.math.reduce_sum(out * v)
 
-            grads = tape.gradient(loss, pv.trainable_variables)
-            optimizer.apply_gradients(zip(grads, pv.trainable_variables))
+            grads = tape.gradient(loss, joint.trainable_variables)
+            optimizer.apply_gradients(zip(grads, joint.trainable_variables))
 
-            pv.reset_states()
-            pi.reset_states()
-            vn.reset_states()
+            joint.reset_states()
 
     print(f"Execution Time: {time.time() - start_time}")
