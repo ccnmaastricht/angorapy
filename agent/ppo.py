@@ -41,10 +41,28 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
-    def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate_pi: float = 0.001,
-                 learning_rate_v: float = 0.001, discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
+    def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate: float = 0.001,
+                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
                  c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
                  clip_values: bool = True, _make_dirs=True, debug: bool = False):
+        """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
+
+        Args:
+            model_builder: a function creating a policy, value and joint model
+            environment (gym.Env): the environment in which the agent will learn 
+            horizon (int): the number of timesteps each worker collects 
+            workers (int): the number of workers
+            learning_rate (float): the learning rate of the Adam optimizer
+            discount (float): discount factor for future rewards during collection
+            lam (float): lambda parameter of the generalized advantage estimation
+            clip (float): clipping range for both policy and value loss
+            c_entropy (float): coefficient for entropy in the combined loss
+            c_value (float): coefficient fot value in the combined loss
+            gradient_clipping (float): max norm for the gradient clipping, set None to deactivate (default)
+            clip_values (bool): boolean switch to turn off or on the clipping of the value loss
+            _make_dirs (bool): internal parameter to indicate whether or not to recreate the directories
+            debug (bool): turn on/off debugging mode
+        """
         super().__init__()
         self.debug = debug
 
@@ -63,8 +81,7 @@ class PPOAgent:
         self.horizon = horizon
         self.workers = workers
         self.discount = discount
-        self.learning_rate_pi = learning_rate_pi
-        self.learning_rate_v = learning_rate_v
+        self.learning_rate_pi = learning_rate
         self.clip = clip
         self.c_entropy = c_entropy
         self.c_value = c_value
@@ -196,6 +213,7 @@ class PPOAgent:
             self
         """
         assert self.horizon * self.workers >= batch_size, "Batch Size is larger than the number of transitions."
+        # TODO check if batch can even be created for recurrent
 
         ray.init(local_mode=self.debug)
 

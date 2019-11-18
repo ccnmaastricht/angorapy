@@ -72,11 +72,9 @@ if __name__ == "__main__":
 
     env = gym.make("ShadowHand-v1")
     _, _, joint = build_shadow_brain(env, bs=batch_size)
-    joint.summary()
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     start_time = time.time()
-
     for t in tqdm(range(sequence_length), disable=False):
         sample_batch = (
             tf.random.normal([batch_size, 1, 200, 200, 3]),
@@ -85,8 +83,12 @@ if __name__ == "__main__":
             tf.random.normal([batch_size, 1, 7])
         )
 
-        out, v = joint(sample_batch, training=True)
-        _, _, joint = build_shadow_brain(env, bs=batch_size)
+        with tf.GradientTape() as tape:
+            out, v = joint(sample_batch)
+            loss = tf.reduce_mean(out - v)
+
+        grads = tape.gradient(loss, joint.trainable_variables)
+        optimizer.apply_gradients(zip(grads, joint.trainable_variables))
         joint.reset_states()
 
     print(f"Execution Time: {time.time() - start_time}")

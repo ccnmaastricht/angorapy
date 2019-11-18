@@ -55,7 +55,7 @@ def run_experiment(settings: argparse.Namespace):
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings.horizon, workers=settings.workers,
-                         learning_rate_pi=settings.lr_pi, learning_rate_v=settings.lr_v, discount=settings.discount,
+                         learning_rate=settings.lr_pi, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
                          gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip, debug=settings.debug)
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--iterations", type=int, default=1000, help=f"number of iterations before training ends")
     parser.add_argument("-b", "--batch-size", type=int, default=128, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=3e-4, help=f"learning rate of the policy")
-    parser.add_argument("--lr-v", type=float, default=1e-3, help=f"learning rate of the value network")
+    # parser.add_argument("--lr-v", type=float, default=1e-3, help=f"learning rate of the value network")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--export-file", type=int, default=None,
                         help=f"save/read policy to be loaded in workers into file")
-    parser.add_argument("--eval", action="store_true", help=f"evaluate seperately (instead of using worker experience)")
+    parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
     parser.add_argument("--save_every", type=int, default=0,
                         help=f"save agent every given number of iterations (0 for no saving)")
 

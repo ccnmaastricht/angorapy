@@ -316,4 +316,4 @@ if __name__ == "__main__":
     mods = (policy_tuple, critic_tuple)
 
     ray.init(local_mode=True)
-    collect.remote(mods, 32, env_name, 0.99, 0.95, 2)
+    collect.remote(mods, 1024, env_name, 0.99, 0.95, 2)
