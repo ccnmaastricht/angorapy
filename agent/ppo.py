@@ -24,7 +24,8 @@ from agent.gather import collect, \
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
-from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch
+from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch, \
+    is_recurrent_model
 
 
 class PPOAgent:
@@ -140,7 +141,7 @@ class PPOAgent:
           value_predictions (tf.Tensor): value prediction by the current critic network
           old_values (tf.Tensor): value prediction by the old critic network during gathering
           returns (tf.Tensor): discounted return estimation
-          clip (object):  (Default value = True) value loss can be clipped by same range as policy loss
+          clip (object): (Default value = True) value loss can be clipped by same range as policy loss
 
         Returns:
           squared error between prediction and return
@@ -162,40 +163,37 @@ class PPOAgent:
         the loss by the (scaled by c_entropy) entropy to encourage a certain degree of exploration.
 
         Args:
-          policy_output: a tensor containing (batches of) probabilities for actions in the case of discrete
-        actions or (batches of) means and standard deviations for continuous control.
-          policy_output: tf.Tensor: 
+          policy_output (tf.Tensor): a tensor containing (batches of) probabilities for actions in the case of discrete
+            actions or (batches of) means and standard deviations for continuous control.
 
         Returns:
           entropy bonus
         """
-
         if self.continuous_control:
             return tf.reduce_mean(gaussian_entropy(stdevs=policy_output[:, self.n_actions:]))
         else:
             return tf.reduce_mean(categorical_entropy(policy_output))
 
-    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export=False, save_every: int = 0,
+    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
         Args:
-            n: the number of experience-optimization cycles that shall be run
-            epochs: the number of epochs for which the model is optimized on the same experience data
-            batch_size: batch size for the optimization
+            n (int): the number of experience-optimization cycles that shall be run
+            epochs (int): the number of epochs for which the model is optimized on the same experience data
+            batch_size (int): batch size for the optimization
             story_teller: story telling object that creates visualizations of the training process on the fly (Default
                 value = None)
-            export: boolean indicator for whether communication with workers is achieved through file saving
+            export (bool): boolean indicator for whether communication with workers is achieved through file saving
                 or direct weight passing (Default value = False)
-            save_every: for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
-            separate_eval: if false (default), use episodes from gathering for statistics, if true, evaluate 10
+            save_every (int): for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
+            separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
 
         Returns:
             self
-
         """
         assert self.horizon * self.workers >= batch_size, "Batch Size is larger than the number of transitions."
 
@@ -226,13 +224,9 @@ class PPOAgent:
                 critic_tuple = ModelTuple(self.builder_function_name, self.value.get_weights())
                 models = (policy_tuple, critic_tuple)
 
-            # other parameters
-            horizon = self.horizon
-            discount = self.discount
-            env_name = self.env_name
-            lam = self.lam
-
-            result_ids = [collect.remote(models, horizon, env_name, discount, lam, pid) for pid in range(self.workers)]
+            # create processes and execute them
+            result_ids = [collect.remote(models, self.horizon, self.env_name, self.discount, self.lam, pid) for pid in
+                          range(self.workers)]
             split_stats = [ray.get(oi) for oi in result_ids]
             stats = condense_stats(split_stats)
 
@@ -321,7 +315,7 @@ class PPOAgent:
         actor_loss_history, critic_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
-            # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate buffer size based on number of datapoints
+            # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate shuffling sensitive to stateful orderedness
             batched_dataset = dataset.batch(batch_size)
 
             actor_epoch_losses, value_epoch_losses, entropies = [], [], []
@@ -369,13 +363,15 @@ class PPOAgent:
                     actor_epoch_losses.append(tf.reduce_mean(policy_loss))
                     value_epoch_losses.append(tf.reduce_mean(value_loss))
 
-                    self.joint.reset_states()
+            # reset RNN states after an epoch if there are any
+            self.joint.reset_states()
 
             # remember some statistics
             actor_loss_history.append(statistics.mean([numb.numpy().item() for numb in actor_epoch_losses]))
             critic_loss_history.append(statistics.mean([numb.numpy().item() for numb in value_epoch_losses]))
             entropy_history.append(statistics.mean([numb.numpy().item() for numb in entropies]))
 
+        # store statistics in agent history
         self.actor_loss_history.extend(actor_loss_history)
         self.critic_loss_history.extend(critic_loss_history)
         self.entropy_history.extend(entropy_history)
@@ -389,21 +385,21 @@ class PPOAgent:
             render (bool): whether to render it
 
         Returns:
-            two lists of length n, giving episode lengths and rewards
-
+            two lists of length n, giving episode lengths and rewards respectively
         """
         rewards, lengths = [], []
+        is_recurrent = is_recurrent_model(self.policy)
         policy_act = act_discrete if not self.continuous_control else act_continuous
         for episode in range(n):
             done = False
             reward_trajectory = []
             length = 0
-            state = parse_state(add_state_dims(self.env.reset()))
+            state = parse_state(self.env.reset())
             while not done:
-                action, action_probability = policy_act(self.policy, state)
+                action, action_prob = policy_act(self.policy, add_state_dims(state, dims=2 if is_recurrent else 1))
                 self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
-                state = parse_state(add_state_dims(observation))
+                state = parse_state(self.env.reset())
                 reward_trajectory.append(reward)
                 length += 1
 

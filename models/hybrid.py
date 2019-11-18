@@ -7,7 +7,6 @@ from typing import Iterable
 import tensorflow as tf
 from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
-from tensorflow.python.eager import profiler
 from tqdm import tqdm
 
 from environments import *
@@ -45,7 +44,7 @@ def build_shadow_brain(env: gym.Env, bs: int):
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = x  # tf.keras.layers.LSTM(hidden_dimensions, stateful=False, batch_size=bs)(x)
+    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=False, batch_size=bs)(x)
 
     # output heads
     policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
@@ -66,30 +65,28 @@ def init_hidden(shape: Iterable):
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     sequence_length = 100
-    batch_size = 32
+    batch_size = 128
 
     env = gym.make("ShadowHand-v1")
     _, _, joint = build_shadow_brain(env, bs=batch_size)
+    joint.summary()
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     start_time = time.time()
 
-    with profiler.Profiler("haha"):
-        for t in tqdm(range(sequence_length), disable=False):
-            # sample_batch = merge_into_batch(
-            #     [add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(batch_size)])
+    for t in tqdm(range(sequence_length), disable=False):
+        sample_batch = (
+            tf.random.normal([batch_size, 1, 200, 200, 3]),
+            tf.random.normal([batch_size, 1, 48]),
+            tf.random.normal([batch_size, 1, 92]),
+            tf.random.normal([batch_size, 1, 7])
+        )
 
-            sample_batch = (
-                tf.random.normal([batch_size, 1, 200, 200, 3]),
-                tf.random.normal([batch_size, 1, 48]),
-                tf.random.normal([batch_size, 1, 92]),
-                tf.random.normal([batch_size, 1, 7])
-            )
-
-            out, v = joint(sample_batch, training=True)
-            _, _, joint = build_shadow_brain(env, bs=batch_size)
-            joint.reset_states()
+        out, v = joint(sample_batch, training=True)
+        _, _, joint = build_shadow_brain(env, bs=batch_size)
+        joint.reset_states()
 
     print(f"Execution Time: {time.time() - start_time}")

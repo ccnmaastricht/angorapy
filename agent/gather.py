@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Functions for gathering experience."""
+"""Functions for gathering experience and communicating it to the main thread."""
 import inspect
 import itertools
 import os
@@ -107,37 +107,6 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
     writer.write(dataset)
 
     return stats
-
-
-def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.data.Dataset, StatBundle]:
-    """Given a list of experience buffers produced by workers, produce a joined dataset and extract statistics."""
-    completed_episodes = 0
-    episode_rewards, episode_lengths = [], []
-    joined_s_trajectory, joined_a_trajectory, joined_aprob_trajectory, joined_r, joined_advs = [], [], [], [], []
-
-    # get and merge results
-    for buffer in worker_outputs:
-        joined_s_trajectory.extend(buffer.states)
-        joined_a_trajectory.extend(buffer.actions)
-        joined_aprob_trajectory.extend(buffer.action_probabilities)
-        joined_r.extend(buffer.returns)
-        joined_advs.extend(buffer.advantages)
-
-        completed_episodes += buffer.episodes_completed
-        episode_rewards.extend(buffer.episode_rewards)
-        episode_lengths.extend(buffer.episode_lengths)
-
-    numb_processed_frames = len(joined_s_trajectory)
-
-    data = tf.data.Dataset.from_tensor_slices({
-        "state": joined_s_trajectory,
-        "action": joined_a_trajectory,
-        "action_prob": joined_aprob_trajectory,
-        "return": joined_r,
-        "advantage": joined_advs
-    })
-
-    return data, StatBundle(completed_episodes, numb_processed_frames, episode_rewards, episode_lengths)
 
 
 def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
@@ -283,3 +252,35 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
     serialized_dataset = serialized_dataset.map(_parse_function)
 
     return serialized_dataset
+
+
+@DeprecationWarning
+def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.data.Dataset, StatBundle]:
+    """Given a list of experience buffers produced by workers, produce a joined dataset and extract statistics."""
+    completed_episodes = 0
+    episode_rewards, episode_lengths = [], []
+    joined_s_trajectory, joined_a_trajectory, joined_aprob_trajectory, joined_r, joined_advs = [], [], [], [], []
+
+    # get and merge results
+    for buffer in worker_outputs:
+        joined_s_trajectory.extend(buffer.states)
+        joined_a_trajectory.extend(buffer.actions)
+        joined_aprob_trajectory.extend(buffer.action_probabilities)
+        joined_r.extend(buffer.returns)
+        joined_advs.extend(buffer.advantages)
+
+        completed_episodes += buffer.episodes_completed
+        episode_rewards.extend(buffer.episode_rewards)
+        episode_lengths.extend(buffer.episode_lengths)
+
+    numb_processed_frames = len(joined_s_trajectory)
+
+    data = tf.data.Dataset.from_tensor_slices({
+        "state": joined_s_trajectory,
+        "action": joined_a_trajectory,
+        "action_prob": joined_aprob_trajectory,
+        "return": joined_r,
+        "advantage": joined_advs
+    })
+
+    return data, StatBundle(completed_episodes, numb_processed_frames, episode_rewards, episode_lengths)
