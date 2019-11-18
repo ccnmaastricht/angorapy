@@ -11,13 +11,13 @@ import tensorflow as tf
 from gym.spaces import Box
 
 import models
-from agent.core import estimate_advantage, normalize_advantages
+from agent.core import estimate_advantage
+from utilities.normalization import normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
+from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, StatBundle
-from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
-
-STORAGE_DIR = "storage/experience/"
+from utilities.util import parse_state, add_state_dims, is_recurrent_model
 
 
 @ray.remote(num_cpus=1, num_gpus=0)

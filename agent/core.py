@@ -9,6 +9,8 @@ import numpy
 import tensorflow as tf
 
 
+# RETURN/ADVANTAGE CALCULATION
+
 def get_discounted_returns(reward_trajectory, discount_factor: float):
     """Discounted future rewards calculation using itertools. Way faster than list comprehension."""
     return list(accumulate(reward_trajectory[::-1], lambda previous, x: previous * discount_factor + x))[::-1]
@@ -56,13 +58,10 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
     return return_estimations
 
 
-def normalize_advantages(advantages: numpy.ndarray) -> numpy.ndarray:
-    """Z-score standardization of advantages if activated."""
-    zero_devision_epsilon = 1e-10
-    return (advantages - advantages.mean()) / (advantages.std() + zero_devision_epsilon)
-
+# PROBABILITY
 
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
+    """Calculate probability density for a given batch of potentially joint Gaussian PDF."""
     samples_transformed = (samples - means) / stdevs
     pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.sqrt(2 * math.pi)) / stdevs
     return tf.math.reduce_prod(pdf, axis=1)
@@ -79,6 +78,7 @@ def gaussian_entropy(stdevs: tf.Tensor):
 
 
 def categorical_entropy(pmf: tf.Tensor):
+    """Calculate entropy of a categorical distribution."""
     return - tf.reduce_sum(pmf * tf.math.log(pmf), 1)
 
 

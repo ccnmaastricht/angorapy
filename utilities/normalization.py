@@ -2,8 +2,9 @@
 """Normalization methods."""
 import os
 
+import numpy
 import tensorflow as tf
-from tensorflow_core import Tensor
+from tensorflow import Tensor
 
 
 class RunningNormalization(tf.keras.layers.Layer):
@@ -71,3 +72,9 @@ if __name__ == "__main__":
 
     print(normalizer.mu)
     print(normalizer.std)
+
+
+def normalize_advantages(advantages: numpy.ndarray) -> numpy.ndarray:
+    """Z-score standardization of advantages if activated."""
+    zero_devision_epsilon = 1e-10
+    return (advantages - advantages.mean()) / (advantages.std() + zero_devision_epsilon)

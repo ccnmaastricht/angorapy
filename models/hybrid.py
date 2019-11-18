@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """Hybrid policy networks that utilize both visual and unstructured input data."""
 import os
-import sys
 import time
 from typing import Iterable
 
 import tensorflow as tf
 from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
+from tensorflow.python.eager import profiler
 from tqdm import tqdm
 
 from environments import *
 from models.components import _build_visual_encoder, _build_non_visual_component, _build_continuous_head, \
     _build_discrete_head
-from utilities.util import env_extract_dims, merge_into_batch, add_state_dims
+from utilities.util import env_extract_dims
 
 
 def build_shadow_brain(env: gym.Env, bs: int):
@@ -45,7 +45,7 @@ def build_shadow_brain(env: gym.Env, bs: int):
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=False, batch_size=bs)(x)
+    o = x  # tf.keras.layers.LSTM(hidden_dimensions, stateful=False, batch_size=bs)(x)
 
     # output heads
     policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
@@ -68,25 +68,28 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     sequence_length = 100
-    batch_size = 128
+    batch_size = 32
 
     env = gym.make("ShadowHand-v1")
     _, _, joint = build_shadow_brain(env, bs=batch_size)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     start_time = time.time()
-    with tf.device("GPU:0"):
+
+    with profiler.Profiler("haha"):
         for t in tqdm(range(sequence_length), disable=False):
-            sample_batch = merge_into_batch(
-                [add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(batch_size)])
+            # sample_batch = merge_into_batch(
+            #     [add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(batch_size)])
 
-            with tf.GradientTape() as tape:
-                out, v = joint(sample_batch, training=True)
-                loss = tf.math.reduce_sum(out * v)
+            sample_batch = (
+                tf.random.normal([batch_size, 1, 200, 200, 3]),
+                tf.random.normal([batch_size, 1, 48]),
+                tf.random.normal([batch_size, 1, 92]),
+                tf.random.normal([batch_size, 1, 7])
+            )
 
-            grads = tape.gradient(loss, joint.trainable_variables)
-            optimizer.apply_gradients(zip(grads, joint.trainable_variables))
-
+            out, v = joint(sample_batch, training=True)
+            _, _, joint = build_shadow_brain(env, bs=batch_size)
             joint.reset_states()
 
     print(f"Execution Time: {time.time() - start_time}")

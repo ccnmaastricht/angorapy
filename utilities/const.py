@@ -11,3 +11,6 @@ COLORS = dict(
     BOLD='\033[1m',
     UNDERLINE='\033[4m'
 )
+
+BASE_SAVE_PATH = "storage/saved_models/states/"
+STORAGE_DIR = "storage/experience/"

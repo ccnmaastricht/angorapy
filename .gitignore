@@ -1,5 +1,5 @@
 monitor/experiments/
-saved_models/*
+storage/saved_models/*
 misc/benchmark_efficiency.py
 docs/analysis/*
 MUJOCO_LOG.TXT

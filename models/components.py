@@ -10,19 +10,19 @@ def _build_visual_encoder(shape, batch_size=None):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + shape)
 
     x = tf.keras.layers.Conv2D(32, 5, 1)(inputs)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2D(32, 3, 1)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.MaxPooling2D(3, 3)(x)
     x = tf.keras.layers.Conv2D(64, 3, 3)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2D(64, 3, 3)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(64)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Dense(64)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, )
 
@@ -32,18 +32,18 @@ def _build_visual_decoder(shape, batch_size=None):
 
     spatial_reshape_size = 7 * 7 * 64
     x = tf.keras.layers.Dense(64)(inputs)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Dense(spatial_reshape_size)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Reshape([7, 7, 64])(x)
     x = tf.keras.layers.Conv2DTranspose(64, 3, 3)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2DTranspose(32, 3, 3, output_padding=1)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2DTranspose(32, 3, 3, output_padding=2)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2DTranspose(32, 3, 1)(x)
-    x = tf.keras.layers.Activation("relu")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="sigmoid")(x)
     x = tf.keras.layers.Activation("sigmoid")(x)
 
@@ -61,23 +61,6 @@ def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int
     x = tf.keras.layers.ReLU()(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x)
-
-
-def build_residual_block():
-    raise NotImplementedError
-
-
-if __name__ == "__main__":
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-    net = _build_visual_encoder()
-    tensor = tf.random.normal([4, 200, 200, 3])
-    latent = net(tensor)
-    print(f"Latent Shape: {latent.shape}")
-
-    decoder = _build_visual_decoder()
-    reconstruction = decoder(latent)
-    print(f"Reconstruction Shape: {reconstruction.shape}")
 
 
 def _build_encoding_sub_model(inputs):
@@ -101,3 +84,23 @@ def _build_discrete_head(n_actions, inputs):
 
 
 DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))
+
+
+def build_residual_block():
+    raise NotImplementedError
+
+
+if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    net = _build_visual_encoder()
+    tensor = tf.random.normal([4, 200, 200, 3])
+    latent = net(tensor)
+    print(f"Latent Shape: {latent.shape}")
+
+    decoder = _build_visual_decoder()
+    reconstruction = decoder(latent)
+    print(f"Reconstruction Shape: {reconstruction.shape}")
+
+
+

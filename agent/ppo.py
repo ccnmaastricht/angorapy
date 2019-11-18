@@ -22,11 +22,9 @@ from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
 from agent.gather import collect, \
     read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
-from utilities.const import COLORS
+from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
 from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch
-
-BASE_SAVE_PATH = "saved_models/states/"
 
 
 class PPOAgent:
