@@ -316,7 +316,7 @@ class PPOAgent:
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
             # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate shuffling sensitive to stateful orderedness
-            batched_dataset = dataset.batch(batch_size)
+            batched_dataset = dataset.batch(batch_size, drop_remainder=True)
 
             actor_epoch_losses, value_epoch_losses, entropies = [], [], []
             for batch in batched_dataset:
@@ -326,9 +326,8 @@ class PPOAgent:
 
                     # optimize policy and value network simultaneously
                     with tf.GradientTape() as tape:
-                        state_batch = batch["state"] if "state" in batch else add_state_dims((
-                            batch["in_vision"], batch["in_proprio"],
-                            batch["in_touch"], batch["in_goal"]), axis=1)
+                        state_batch = batch["state"] if "state" in batch else (batch["in_vision"], batch["in_proprio"],
+                                                                               batch["in_touch"], batch["in_goal"])
                         policy_output, value_output = self.joint(state_batch, training=True)
                         old_values = batch["return"] - batch["advantage"]
 

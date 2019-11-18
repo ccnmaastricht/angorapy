@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
-import inspect
+from inspect import getfullargspec as fargs
 import itertools
 import os
 from typing import Tuple, List
@@ -12,17 +12,20 @@ from gym.spaces import Box
 
 import models
 from agent.core import estimate_advantage
+from models import build_shadow_brain
 from utilities.normalization import normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
 from utilities.const import STORAGE_DIR
-from utilities.datatypes import ExperienceBuffer, StatBundle
+from utilities.datatypes import ExperienceBuffer, StatBundle, ModelTuple
 from utilities.util import parse_state, add_state_dims, is_recurrent_model
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
-def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int):
+def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int, sub_sequence_length: int = 16):
     """Collect a batch shard of experience for a given number of timesteps."""
+
+    # import here to avoid pickling errors
     import tensorflow as tfl
 
     # build new environment for each collector to make multiprocessing possible
@@ -39,10 +42,8 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
         value_builder = getattr(models, model[1].model_builder)
 
         # recurrent policy needs batch size for statefulness
-        policy, _, _ = policy_builder(env, **(
-            {"bs": 1} if "bs" in inspect.getfullargspec(policy_builder).args else {}))
-        _, critic, _ = value_builder(env, **(
-            {"bs": 1} if "bs" in inspect.getfullargspec(policy_builder).args else {}))
+        policy, _, _ = policy_builder(env, **({"bs": 1} if "bs" in fargs(policy_builder).args else {}))
+        _, critic, _ = value_builder(env, **({"bs": 1} if "bs" in fargs(policy_builder).args else {}))
 
         # load the weights
         policy.set_weights(model[0].weights)
@@ -52,6 +53,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
     # check if there is a recurrent layer inside the model
     is_recurrent = is_recurrent_model(policy)
+    if is_recurrent:
+        assert horizon % sub_sequence_length == 0, "Subsequence length for TBPTT would require cutting of part of the" \
+                                                   " observations."
 
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1
@@ -92,8 +96,22 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
 
     values = tfl.reshape(values, [-1])
     advantages = estimate_advantage(rewards, values, t_is_terminal, gamma=discount, lam=lam)
-    returns = numpy.add(advantages, values[:-1])
+    returns = tfl.add(advantages, values[:-1])
     advantages = normalize_advantages(advantages)
+
+    # make TBPTT-compatible subsequences from transition vectors if model is recurrent
+    if is_recurrent:
+        num_sub_sequences = horizon // sub_sequence_length
+
+        # states
+        feature_tensors = [tfl.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
+        states = list(zip(*list(map(lambda x: tfl.split(x, num_sub_sequences), feature_tensors))))
+
+        # others
+        actions = tfl.split(actions, num_sub_sequences)
+        action_probabilities = tfl.split(action_probabilities, num_sub_sequences)
+        advantages = tfl.split(advantages, num_sub_sequences)
+        returns = tfl.split(returns, num_sub_sequences)
 
     # store this worker's gathering in a experience buffer
     buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
@@ -136,9 +154,9 @@ def serialize_flat_sample(s, a, ap, r, adv):
     feature = {
         "state": _bytes_feature(tf.io.serialize_tensor(s)),
         "action": _bytes_feature(tf.io.serialize_tensor(a)),
-        "action_prob": _float_feature(ap),
-        "return": _float_feature(r),
-        "advantage": _float_feature(adv)
+        "action_prob": _bytes_feature(tf.io.serialize_tensor(ap)),
+        "return": _bytes_feature(tf.io.serialize_tensor(r)),
+        "advantage": _bytes_feature(tf.io.serialize_tensor(adv))
     }
 
     # Create a Features message using tf.train.Example.
@@ -146,7 +164,7 @@ def serialize_flat_sample(s, a, ap, r, adv):
     return example_proto.SerializeToString()
 
 
-def serialize_shadowhand_sample(sv, sp, st, sg, a, ap, r, adv):
+def serialize_shadow_hand_sample(sv, sp, st, sg, a, ap, r, adv):
     """Serialize a multi-input (shadow hand) sample from a dataset."""
     feature = {
         "in_vision": _bytes_feature(tf.io.serialize_tensor(sv)),
@@ -154,9 +172,9 @@ def serialize_shadowhand_sample(sv, sp, st, sg, a, ap, r, adv):
         "in_touch": _bytes_feature(tf.io.serialize_tensor(st)),
         "in_goal": _bytes_feature(tf.io.serialize_tensor(sg)),
         "action": _bytes_feature(tf.io.serialize_tensor(a)),
-        "action_prob": _float_feature(ap),
-        "return": _float_feature(r),
-        "advantage": _float_feature(adv)
+        "action_prob": _bytes_feature(tf.io.serialize_tensor(ap)),
+        "return": _bytes_feature(tf.io.serialize_tensor(r)),
+        "advantage": _bytes_feature(tf.io.serialize_tensor(adv))
     }
 
     # Create a Features message using tf.train.Example.
@@ -171,7 +189,7 @@ def tf_serialize_example(sample):
         serializer = serialize_flat_sample
     else:
         inputs = (sample["in_vision"], sample["in_proprio"], sample["in_touch"], sample["in_goal"])
-        serializer = serialize_shadowhand_sample
+        serializer = serialize_shadow_hand_sample
     inputs += (sample["action"], sample["action_prob"], sample["return"], sample["advantage"])
 
     tf_string = tf.py_function(serializer, inputs, tf.string)
@@ -219,11 +237,12 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
     """Read all files in storage into a tf record dataset without actually loading everything into memory."""
     feature_description = {
         "action": tf.io.FixedLenFeature([], tf.string),
-        "action_prob": tf.io.FixedLenFeature([], tf.float32),
-        "return": tf.io.FixedLenFeature([], tf.float32),
-        "advantage": tf.io.FixedLenFeature([], tf.float32)
+        "action_prob": tf.io.FixedLenFeature([], tf.string),
+        "return": tf.io.FixedLenFeature([], tf.string),
+        "advantage": tf.io.FixedLenFeature([], tf.string)
     }
 
+    # add states
     if not is_shadow_hand:
         feature_description["state"] = tf.io.FixedLenFeature([], tf.string)
     else:
@@ -284,3 +303,17 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
     })
 
     return data, StatBundle(completed_episodes, numb_processed_frames, episode_rewards, episode_lengths)
+
+
+if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    env_name = "ShadowHand-v1"
+    policy, value, joint = build_shadow_brain(gym.make(env_name), 1)
+
+    policy_tuple = ModelTuple(build_shadow_brain.__name__, policy.get_weights())
+    critic_tuple = ModelTuple(build_shadow_brain.__name__, value.get_weights())
+    mods = (policy_tuple, critic_tuple)
+
+    ray.init(local_mode=True)
+    collect.remote(mods, 32, env_name, 0.99, 0.95, 2)

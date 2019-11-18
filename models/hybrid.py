@@ -44,7 +44,7 @@ def build_shadow_brain(env: gym.Env, bs: int):
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=False, batch_size=bs)(x)
+    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=True, batch_size=bs)(x)
 
     # output heads
     policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
