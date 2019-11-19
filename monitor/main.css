@@ -1,5 +1,28 @@
 body {
+    font-family: 'Fira Sans', sans-serif;
+}
 
+.main-title {
+    padding: 20px;
+    border: 0px solid darkcyan;
+    margin-top: 40px;
+    margin-bottom: 40px;
+
+    width: 100%;
+    text-align: center;
+
+    color: white;
+    background-color: midnightblue;
+}
+
+.sub-title {
+    padding: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+
+    /*border: 1px solid darkcyan;*/
+    /*border-radius: 15px;*/
+    /*background-color: lightcyan;*/
 }
 
 .iteration-block {
@@ -42,13 +65,4 @@ body {
     border-radius: 15px;
     color: white;
     padding: 10px;
-}
-
-h3 {
-    margin-bottom: 0;
-}
-
-h5 {
-    margin-top: 5px;
-    font-weight: normal;
 }

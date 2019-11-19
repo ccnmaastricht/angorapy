@@ -10,7 +10,7 @@ from environments import *
 from models.fully_connected import build_ffn_distinct_models
 from models.hybrid import build_shadow_brain
 from utilities.const import COLORS
-from utilities.story import StoryTeller
+from utilities.monitoring import StoryTeller
 from utilities.util import env_extract_dims
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

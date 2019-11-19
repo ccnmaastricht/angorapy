@@ -16,11 +16,11 @@ from matplotlib import animation
 from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
 
-PATH_TO_STORIES = "monitor/"
-TEMPLATE_PATH = PATH_TO_STORIES + "/template/"
+PATH_TO_EXPERIMENTS = "monitor/experiments/"
 
 
 def scale(vector):
+    """Min Max scale a vector."""
     return (numpy.array(vector) - min(vector)) / (max(vector) - min(vector))
 
 
@@ -36,14 +36,15 @@ class StoryTeller:
 
         if id is None:
             self.story_id = round(time.time())
-            self.story_directory = f"{PATH_TO_STORIES}/experiments/{self.story_id}/"
+            self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
             os.makedirs(self.story_directory)
         else:
             self.story_id = id
-            self.story_directory = f"{PATH_TO_STORIES}/experiments/{self.story_id}/"
+            self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
             if not os.path.isdir(self.story_directory):
                 raise ValueError("Given ID not found in experiments.")
 
+        tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", dpi=300)
         self.make_metadata()
 
     def create_episode_gif(self, n: int):

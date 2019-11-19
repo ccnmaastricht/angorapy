@@ -105,7 +105,7 @@ class PPOAgent:
         self.iteration = 0
         self.current_fps = 0
         self.device = "CPU:0"
-        self.model_export_dir = "saved_models/exports/"
+        self.model_export_dir = "storage/saved_models/exports/"
         self.agent_id = round(time.time())
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         if _make_dirs:

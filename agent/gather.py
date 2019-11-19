@@ -264,6 +264,9 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
             parsed["in_touch"] = tf.io.parse_tensor(parsed["in_touch"], out_type=tf.float32)
             parsed["in_goal"] = tf.io.parse_tensor(parsed["in_goal"], out_type=tf.float32)
         parsed["action"] = tf.io.parse_tensor(parsed["action"], out_type=dtype_actions)
+        parsed["action_prob"] = tf.io.parse_tensor(parsed["action_prob"], out_type=tf.float32)
+        parsed["return"] = tf.io.parse_tensor(parsed["return"], out_type=tf.float32)
+        parsed["advantage"] = tf.io.parse_tensor(parsed["advantage"], out_type=tf.float32)
         return parsed
 
     serialized_dataset = tf.data.TFRecordDataset(
