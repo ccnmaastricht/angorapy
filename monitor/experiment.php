@@ -31,7 +31,7 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
     </div>
 
     <div class="row justify-content-center mt-5">
-        <div class="col col-lg col-6">
+        <div class="col col-6">
             <h4 align="center" class="sub-title">Hyperparameters</h4>
 
             <table class="table table-striped" title="Hyperparameters">
@@ -54,20 +54,20 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
             </table>
         </div>
 
-        <div class="col col-lg col-6">
+        <div class="col col-6">
             <h4 align="center" class="sub-title">Model</h4>
 
-            <img src="<?php echo $DIR . '/model.png' ?>" alt="Plot of the Model" style="height: 100%; width: 100%; object-fit: contain"/>
+            <img src="<?php echo $DIR . '/model.png' ?>" alt="Plot of the Model" class="fit-div"/>
         </div>
     </div>
 
-    <div class="row justify-content-center mt-4">
-        <div class="col col-lg col-6">
-            <img src="<?php echo $DIR . "./reward_plot.svg" ?>" alt="Reward Plot" />
+    <div class="row justify-content-center mt-5">
+        <div class="col col-6">
+            <img src="<?php echo $DIR . "./reward_plot.svg" ?>" alt="Reward Plot" class="fit-div" />
         </div>
 
-        <div class="col col-lg col-6">
-            <img src="<?php echo $DIR . "./loss_plot.svg" ?>" alt="Loss Plot" />
+        <div class="col col-6">
+            <img src="<?php echo $DIR . "./loss_plot.svg" ?>" alt="Loss Plot" class="fit-div" />
         </div>
     </div>
 </div>

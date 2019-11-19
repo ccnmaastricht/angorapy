@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
-from inspect import getfullargspec as fargs
 import itertools
 import os
+import random
+from inspect import getfullargspec as fargs
 from typing import Tuple, List
 
 import numpy
@@ -12,12 +13,12 @@ from gym.spaces import Box
 
 import models
 from agent.core import estimate_advantage
-from models import build_shadow_brain
-from utilities.normalization import normalize_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
+from models import build_shadow_brain
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, StatBundle, ModelTuple
+from utilities.normalization import normalize_advantages
 from utilities.util import parse_state, add_state_dims, is_recurrent_model
 
 
@@ -233,7 +234,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
     return dataset, stats
 
 
-def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bool):
+def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bool, shuffle: bool = True):
     """Read all files in storage into a tf record dataset without actually loading everything into memory."""
     feature_description = {
         "action": tf.io.FixedLenFeature([], tf.string),
@@ -267,10 +268,12 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
         parsed["action_prob"] = tf.io.parse_tensor(parsed["action_prob"], out_type=tf.float32)
         parsed["return"] = tf.io.parse_tensor(parsed["return"], out_type=tf.float32)
         parsed["advantage"] = tf.io.parse_tensor(parsed["advantage"], out_type=tf.float32)
+
         return parsed
 
-    serialized_dataset = tf.data.TFRecordDataset(
-        [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)])
+    files = [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)]
+    files = files if not shuffle else random.shuffle(files)
+    serialized_dataset = tf.data.TFRecordDataset(files)
     serialized_dataset = serialized_dataset.map(_parse_function)
 
     return serialized_dataset

@@ -4,7 +4,6 @@ body {
 
 .main-title {
     padding: 20px;
-    border: 0px solid darkcyan;
     margin-top: 40px;
     margin-bottom: 40px;
 
@@ -12,7 +11,13 @@ body {
     text-align: center;
 
     color: white;
-    background-color: midnightblue;
+    background-color: #295ea7;
+}
+
+.fit-div {
+    height: 100%;
+    width: 100%;
+    object-fit: contain
 }
 
 .sub-title {

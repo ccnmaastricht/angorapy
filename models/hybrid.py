@@ -7,6 +7,7 @@ from typing import Iterable
 import tensorflow as tf
 from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
+from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 
 from environments import *
@@ -22,29 +23,29 @@ def build_shadow_brain(env: gym.Env, bs: int):
     hidden_dimensions = 32
 
     # inputs
-    visual_in = tf.keras.Input(batch_shape=(bs, None, 200, 200, 3), name="visual_input")
+    visual_in = tf.keras.Input(batch_shape=(bs, None, 224, 224, 3), name="visual_input")
     proprio_in = tf.keras.Input(batch_shape=(bs, None, 48,), name="proprioceptive_input")
     touch_in = tf.keras.Input(batch_shape=(bs, None, 92,), name="somatosensory_input")
     goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
 
     # abstractions of perceptive inputs
-    visual_latent = TD(_build_visual_encoder(shape=(200, 200, 3), batch_size=bs))(visual_in)
+    visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs, name="vision_encoder"))(visual_in)
     proprio_latent = TD(_build_non_visual_component(48, 12, 8, batch_size=bs))(proprio_in)
     touch_latent = TD(_build_non_visual_component(92, 24, 8, batch_size=bs))(touch_in)
 
     # concatenation of perceptive abstractions
     concatenation = tf.keras.layers.Concatenate()([visual_latent, proprio_latent, touch_latent])
 
-    # fully connected ReLu block integrating perceptive representations
+    # fully connected layer integrating perceptive representations
     x = TD(tf.keras.layers.Dense(48))(concatenation)
     x = TD(tf.keras.layers.ReLU())(x)
-    x = TD(tf.keras.layers.Dense(32))(x)
-    x = TD(tf.keras.layers.ReLU())(x)
+
+    # concatenation of goal and perception
     x.set_shape([bs] + x.shape[1:])
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = tf.keras.layers.LSTM(hidden_dimensions, stateful=True, batch_size=bs)(x)
+    o = tf.keras.layers.GRU(hidden_dimensions, stateful=True, batch_size=bs)(x)
 
     # output heads
     policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
@@ -72,6 +73,7 @@ if __name__ == "__main__":
 
     env = gym.make("ShadowHand-v1")
     _, _, joint = build_shadow_brain(env, bs=batch_size)
+    plot_model(joint, to_file="model.png")
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     start_time = time.time()

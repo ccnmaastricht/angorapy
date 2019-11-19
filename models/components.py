@@ -1,30 +1,47 @@
 #!/usr/bin/env python
 """Components that can be loaded into another network."""
 import math
-import os
 
 import tensorflow as tf
 
 
-def _build_visual_encoder(shape, batch_size=None):
+def _build_visual_encoder(shape, batch_size=None, name=None):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + shape)
 
-    x = tf.keras.layers.Conv2D(32, 5, 1)(inputs)
+    # first layer
+    x = tf.keras.layers.Conv2D(96, 11, 4)(inputs)
     x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2D(32, 3, 1)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.MaxPooling2D(3, 3)(x)
-    x = tf.keras.layers.Conv2D(64, 3, 3)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2D(64, 3, 3)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(64)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Dense(64)(x)
+    x = tf.keras.layers.MaxPool2D(3, 2)(x)
     x = tf.keras.layers.ReLU()(x)
 
-    return tf.keras.Model(inputs=inputs, outputs=x, )
+    # second layer
+    x = tf.keras.layers.Conv2D(256, 5, 1)(x)
+    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.MaxPool2D(3, 2)(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    # third layer
+    x = tf.keras.layers.Conv2D(384, 3, 1)(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    # fourth layer
+    x = tf.keras.layers.Conv2D(384, 3, 1)(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    # fifth layer
+    x = tf.keras.layers.Conv2D(256, 3, 1)(x)
+    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.MaxPool2D(3, 2)(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    # fully connected layers
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(4096)(x)
+    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Dense(4096)(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
 
 def _build_visual_decoder(shape, batch_size=None):
@@ -55,8 +72,6 @@ def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int
 
     x = tf.keras.layers.Dense(hidden_dim)(inputs)
     x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Dense(hidden_dim)(x)
-    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Dense(output_dim)(x)
     x = tf.keras.layers.ReLU()(x)
 
@@ -65,16 +80,19 @@ def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int
 
 def _build_encoding_sub_model(inputs):
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
-    x = tf.keras.layers.Activation("tanh")(x)
+    x = tf.keras.layers.ReLU("tanh")(x)
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
+
     return tf.keras.layers.Activation("tanh")(x)
 
 
 def _build_continuous_head(n_actions, inputs):
     means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
     means = tf.keras.layers.Activation("linear")(means)
+
     stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
     stdevs = tf.keras.layers.Activation("softplus")(stdevs)
+
     return tf.keras.layers.Concatenate()([means, stdevs])
 
 
@@ -84,23 +102,3 @@ def _build_discrete_head(n_actions, inputs):
 
 
 DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))
-
-
-def build_residual_block():
-    raise NotImplementedError
-
-
-if __name__ == "__main__":
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-    net = _build_visual_encoder()
-    tensor = tf.random.normal([4, 200, 200, 3])
-    latent = net(tensor)
-    print(f"Latent Shape: {latent.shape}")
-
-    decoder = _build_visual_decoder()
-    reconstruction = decoder(latent)
-    print(f"Reconstruction Shape: {reconstruction.shape}")
-
-
-
