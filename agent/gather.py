@@ -272,7 +272,8 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
         return parsed
 
     files = [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)]
-    files = files if not shuffle else random.shuffle(files)
+    if shuffle:
+        random.shuffle(files)
     serialized_dataset = tf.data.TFRecordDataset(files)
     serialized_dataset = serialized_dataset.map(_parse_function)
 

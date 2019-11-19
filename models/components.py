@@ -80,7 +80,7 @@ def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int
 
 def _build_encoding_sub_model(inputs):
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
-    x = tf.keras.layers.ReLU("tanh")(x)
+    x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
 
     return tf.keras.layers.Activation("tanh")(x)
@@ -88,7 +88,6 @@ def _build_encoding_sub_model(inputs):
 
 def _build_continuous_head(n_actions, inputs):
     means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
-    means = tf.keras.layers.Activation("linear")(means)
 
     stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
     stdevs = tf.keras.layers.Activation("softplus")(stdevs)
