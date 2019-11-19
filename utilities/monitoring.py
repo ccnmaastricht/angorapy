@@ -83,13 +83,27 @@ class StoryTeller:
     def make_metadata(self):
         """Write meta data information about experiment into json file."""
         metadata = dict(
-            environment=self.agent.env_name,
             date=str(datetime.datetime.now()),
+            environment=dict(
+                name=self.agent.env_name,
+                action_space=str(self.agent.env.action_space),
+                observation_space=str(self.agent.env.observation_space),
+                deterministic=self.agent.env.spec.nondeterministic,
+                max_steps=self.agent.env.spec.max_episode_steps,
+                reward_threshold=self.agent.env.spec.reward_threshold,
+            ),
             hyperparameters=dict(
                 continuous=self.agent.continuous_control,
-                learning_rate=self.agent.learning_rate_pi,
+                learning_rate=self.agent.learning_rate,
                 epsilon_clip=self.agent.clip,
                 entropy_coefficient=self.agent.c_entropy,
+                value_coefficient=self.agent.c_value,
+                horizon=self.agent.horizon,
+                workers=self.agent.workers,
+                discount=self.agent.discount,
+                GAE_lambda=self.agent.lam,
+                gradient_clipping=self.agent.gradient_clipping,
+                clip_values=self.agent.clip_values,
             )
         )
 
@@ -107,6 +121,11 @@ class StoryTeller:
         with open(f"{self.story_directory}/progress.json", "w") as f:
             json.dump(progress, f)
 
+    def _make_graph(self, ax, lines, labels, name):
+        ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15),
+                  fancybox=True, shadow=True, ncol=5)
+        plt.savefig(f"{self.story_directory}/{name}.svg", format="svg", bbox_inches="tight")
+
     def update_graphs(self):
         """Update graphs."""
 
@@ -118,14 +137,12 @@ class StoryTeller:
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Episode Steps")
 
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="orange")
-        l_line = twin_ax.plot(self.agent.cycle_length_history, label="Episode Length", color="blue")
+        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red")
+        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="blue")
         lines = r_line + l_line
         labels = [l.get_label() for l in lines]
 
-        ax.legend(lines, labels, loc=2)
-        fig.savefig(f"{self.story_directory}/reward_plot.svg", format="svg")
-
+        self._make_graph(ax, lines, labels, "reward_plot")
         plt.close(fig)
 
         # entropy, loss plot
@@ -142,9 +159,7 @@ class StoryTeller:
         lines = actor_loss_line + critic_loss_line + entropy_line
         labels = [l.get_label() for l in lines]
 
-        ax.legend(lines, labels, loc=2)
-        fig.savefig(f"{self.story_directory}/loss_plot.svg", format="svg")
-
+        self._make_graph(ax, lines, labels, "loss_plot")
         plt.close(fig)
 
     def update(self):

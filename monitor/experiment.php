@@ -27,10 +27,10 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
 <body>
 <div class="container">
     <div class="row justify-content-center mt-6">
-        <h1 class="main-title display-3">Experiment: <?php echo $meta["environment"] ?></h1>
+        <h1 class="main-title display-3">Experiment: <?php echo $meta["environment"]["name"] ?></h1>
     </div>
 
-    <div class="row justify-content-center mt-5">
+    <div class="row justify-content-center">
         <div class="col col-6">
             <h4 align="center" class="sub-title">Hyperparameters</h4>
 
@@ -55,6 +55,31 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
         </div>
 
         <div class="col col-6">
+            <h4 align="center" class="sub-title">Environment</h4>
+
+            <table class="table table-striped" title="Hyperparameters">
+                <thead>
+                <tr>
+                    <th scope="col">Attribute</th>
+                    <th scope="col">Value</th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php
+                foreach ($meta["environment"] as $p => $v) {
+                    ?><tr>
+                    <td><?php echo $p ?></td>
+                    <td><?php echo $v ?></td>
+                    </tr><?php
+                }
+                ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row justify-content-center mt-5">
+        <div class="col col-8">
             <h4 align="center" class="sub-title">Model</h4>
 
             <img src="<?php echo $DIR . '/model.png' ?>" alt="Plot of the Model" class="fit-div"/>
