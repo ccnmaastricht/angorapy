@@ -3,10 +3,10 @@
 import datetime
 import json
 import os
-import re
 import time
 
 import gym
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy
 import tensorflow as tf
@@ -17,6 +17,7 @@ from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
 
 PATH_TO_EXPERIMENTS = "monitor/experiments/"
+matplotlib.use('Agg')
 
 
 def scale(vector):
