@@ -146,7 +146,7 @@ class ShadowHandBlock(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with a Block as an object."""
 
     def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='sparse', visual_input: bool = False, max_steps=100):
+                 reward_type='not_sparse', visual_input: bool = False, max_steps=100):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         ShadowHand.__init__(self,
                             model_path=MANIPULATE_BLOCK_XML,
@@ -163,7 +163,7 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with an Egg as an object."""
 
     def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='sparse', visual_input: bool = False, max_steps=100):
+                 reward_type='not_sparse', visual_input: bool = False, max_steps=100):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         ShadowHand.__init__(self,
                             model_path=MANIPULATE_EGG_XML,

@@ -67,7 +67,8 @@ def _build_visual_decoder(shape, batch_size=None):
     return tf.keras.Model(inputs=inputs, outputs=x)
 
 
-def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int, batch_size: int = None):
+def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int, batch_size: int = None,
+                                name: str = None):
     inputs = tf.keras.Input(batch_shape=(batch_size, input_dim))
 
     x = tf.keras.layers.Dense(hidden_dim)(inputs)
@@ -75,7 +76,7 @@ def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int
     x = tf.keras.layers.Dense(output_dim)(x)
     x = tf.keras.layers.ReLU()(x)
 
-    return tf.keras.Model(inputs=inputs, outputs=x)
+    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
 
 def _build_encoding_sub_model(inputs):

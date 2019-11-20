@@ -98,6 +98,7 @@ class PPOAgent:
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate, epsilon=1e-5)
+        self.is_recurrent = is_recurrent_model(self.policy)
 
         # passing one sample, which for some reason prevents cuDNN init error
         if "observation" in self.env.observation_space.sample():
@@ -267,7 +268,7 @@ class PPOAgent:
             if not separate_eval:
                 if stats.numb_completed_episodes == 0:
                     print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
-                          "Consider activating seperate evaluation in drill() to get meaningful statistics.")
+                          "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
                 self.episode_length_history.extend(stats.episode_lengths)
                 self.episode_reward_history.extend(stats.episode_rewards)
@@ -296,7 +297,8 @@ class PPOAgent:
 
             flat_print("Finalizing...")
             self.time_dicts.append(time_dict)
-            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+            self.current_fps = stats.numb_processed_frames * (int(self.is_recurrent) * self.tbptt_length) / (
+                sum([v for v in time_dict.values() if v is not None]))
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
@@ -332,7 +334,7 @@ class PPOAgent:
         Returns:
             None
         """
-        progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size))
+        progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size), leave=False)
         actor_loss_history, critic_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
