@@ -10,6 +10,7 @@ import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Box
+from tqdm import tqdm
 
 import models
 from agent.core import estimate_advantage
@@ -23,7 +24,7 @@ from utilities.util import parse_state, add_state_dims, is_recurrent_model
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
-def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid: int, sub_sequence_length: int = 16):
+def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub_sequence_length: int, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
 
     # import here to avoid pickling errors
@@ -91,7 +92,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, pid
             state = parse_state(observation)
             episode_steps += 1
 
-        values.append(critic(add_state_dims(state, dims=2 if is_recurrent else 1)))
+        values.append(critic.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
 
     env.close()
 
@@ -323,4 +324,4 @@ if __name__ == "__main__":
     mods = (policy_tuple, critic_tuple)
 
     ray.init(local_mode=True)
-    collect.remote(mods, 1024, env_name, 0.99, 0.95, 2)
+    collect.remote(mods, 1024, env_name, 0.99, 0.95, 0)

@@ -57,7 +57,8 @@ def run_experiment(settings: argparse.Namespace):
         agent = PPOAgent(build_models, env, horizon=settings.horizon, workers=settings.workers,
                          learning_rate=settings.lr_pi, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
-                         gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip, debug=settings.debug)
+                         gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
+                         tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
@@ -83,14 +84,14 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("-i", "--iterations", type=int, default=1000, help=f"number of iterations before training ends")
-    parser.add_argument("-b", "--batch-size", type=int, default=128, help=f"minibatch size during optimization")
+    parser.add_argument("-b", "--batch-size", type=int, default=64, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=3e-4, help=f"learning rate of the policy")
-    # parser.add_argument("--lr-v", type=float, default=1e-3, help=f"learning rate of the value network")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
+    parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping")
     parser.add_argument("--no-value-clip", action="store_false",
                         help=f"deactivate clipping in value network's objective")

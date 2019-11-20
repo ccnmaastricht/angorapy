@@ -61,7 +61,7 @@ def _build_visual_decoder(shape, batch_size=None):
     x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.Conv2DTranspose(32, 3, 1)(x)
     x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2DTranspose(3, 5, 1, activation="sigmoid")(x)
+    x = tf.keras.layers.Conv2DTranspose(3, 5, 1)(x)
     x = tf.keras.layers.Activation("sigmoid")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x)
@@ -80,24 +80,24 @@ def _build_non_visual_component(input_dim: int, hidden_dim: int, output_dim: int
 
 def _build_encoding_sub_model(inputs):
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
     x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
 
     return tf.keras.layers.Activation("tanh")(x)
 
 
 def _build_continuous_head(n_actions, inputs):
-    means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT, name="means")(inputs)
 
     stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
-    stdevs = tf.keras.layers.Activation("softplus")(stdevs)
+    stdevs = tf.keras.layers.Activation("softplus", name="stdevs")(stdevs)
 
-    return tf.keras.layers.Concatenate()([means, stdevs])
+    return tf.keras.layers.Concatenate(name="multivariates")([means, stdevs])
 
 
 def _build_discrete_head(n_actions, inputs):
     x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
-    return tf.keras.layers.Activation("softmax")(x)
+    return tf.keras.layers.Activation("softmax", name="actions")(x)
 
 
 DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))

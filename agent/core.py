@@ -64,7 +64,7 @@ def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     """Calculate probability density for a given batch of potentially joint Gaussian PDF."""
     samples_transformed = (samples - means) / stdevs
     pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.sqrt(2 * math.pi)) / stdevs
-    return tf.math.reduce_prod(pdf, axis=1)
+    return tf.math.reduce_prod(pdf, axis=-1)
 
 
 def gaussian_entropy(stdevs: tf.Tensor):
@@ -74,7 +74,7 @@ def gaussian_entropy(stdevs: tf.Tensor):
     of the joint entropy and the sum of marginal entropies.
     """
     entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
-    return tf.reduce_sum(entropy, axis=1)
+    return tf.reduce_sum(entropy, axis=-1)
 
 
 def categorical_entropy(pmf: tf.Tensor):

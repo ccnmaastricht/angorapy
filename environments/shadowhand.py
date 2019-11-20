@@ -34,7 +34,7 @@ class ShadowHand(manipulate.ManipulateEnv):
             max_steps (int): maximum number of steps before episode is ended
         """
         # init rendering [IMPORTANT]
-        GlfwContext(offscreen=True)
+        GlfwContext(offscreen=True, quiet=True)
 
         self.touch_visualisation = touch_visualisation
         self.touch_get_obs = touch_get_obs
@@ -109,7 +109,7 @@ class ShadowHand(manipulate.ManipulateEnv):
         # "primary" information, either this is the visual frame or the object position and velocity
         achieved_goal = self._get_achieved_goal().ravel()
         if self.visual_input:
-            primary = self.render(mode="rgb_array", height=200, width=200)
+            primary = self.render(mode="rgb_array", height=224, width=224)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
             primary = numpy.concatenate([achieved_goal, object_vel])

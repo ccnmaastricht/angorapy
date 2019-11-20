@@ -45,11 +45,11 @@ def build_shadow_brain(env: gym.Env, bs: int):
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = tf.keras.layers.GRU(hidden_dimensions, stateful=True, batch_size=bs)(x)
+    o = tf.keras.layers.GRU(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     # output heads
     policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
-    value_out = tf.keras.layers.Dense(1)(o)
+    value_out = tf.keras.layers.Dense(1, name="value")(o)
 
     # define separate and joint models
     policy = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[policy_out])
@@ -65,32 +65,36 @@ def init_hidden(shape: Iterable):
 
 
 if __name__ == "__main__":
+
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     sequence_length = 100
-    batch_size = 128
+    batch_size = 256
 
     env = gym.make("ShadowHand-v1")
     _, _, joint = build_shadow_brain(env, bs=batch_size)
     plot_model(joint, to_file="model.png")
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
-    start_time = time.time()
-    for t in tqdm(range(sequence_length), disable=False):
-        sample_batch = (
-            tf.random.normal([batch_size, 1, 200, 200, 3]),
-            tf.random.normal([batch_size, 1, 48]),
-            tf.random.normal([batch_size, 1, 92]),
-            tf.random.normal([batch_size, 1, 7])
-        )
+    @tf.function
+    def _train():
+        start_time = time.time()
 
-        with tf.GradientTape() as tape:
-            out, v = joint(sample_batch)
-            loss = tf.reduce_mean(out - v)
+        for _ in tqdm(range(sequence_length), disable=False):
+            sample_batch = (tf.convert_to_tensor(tf.random.normal([batch_size, 4, 224, 224, 3])),
+                            tf.convert_to_tensor(tf.random.normal([batch_size, 4, 48])),
+                            tf.convert_to_tensor(tf.random.normal([batch_size, 4, 92])),
+                            tf.convert_to_tensor(tf.random.normal([batch_size, 4, 7])))
 
-        grads = tape.gradient(loss, joint.trainable_variables)
-        optimizer.apply_gradients(zip(grads, joint.trainable_variables))
-        joint.reset_states()
+            with tf.GradientTape() as tape:
+                out, v = joint(sample_batch, training=True)
+                print(out)
+                loss = tf.reduce_mean(out - v)
 
-    print(f"Execution Time: {time.time() - start_time}")
+            grads = tape.gradient(loss, joint.trainable_variables)
+            optimizer.apply_gradients(zip(grads, joint.trainable_variables))
+
+        print(f"Execution Time: {time.time() - start_time}")
+
+    _train()
