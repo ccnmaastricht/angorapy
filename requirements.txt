@@ -1,5 +1,5 @@
-argcomplete
 absl-py==0.8.1
+argcomplete==1.10.0
 astor==0.8.0
 atari-py==0.2.6
 atomicwrites==1.3.0
@@ -17,10 +17,11 @@ cycler==0.10.0
 Cython==0.29.14
 decorator==4.4.1
 dill==0.3.1.1
+fasteners==0.15
 filelock==3.0.12
 funcsigs==1.0.2
 future==0.18.2
-gast==0.3.2
+gast==0.2.2
 glfw==1.8.4
 google-auth==1.7.0
 google-auth-oauthlib==0.4.1
@@ -46,8 +47,10 @@ Markdown==3.1.1
 markdown2==2.3.8
 MarkupSafe==1.1.1
 matplotlib==3.1.1
+monotonic==1.5
 more-itertools==7.2.0
 mpld3==0.3
+mujoco-py==2.0.2.8
 numpy==1.17.3
 oauthlib==3.1.0
 opencv-python==4.1.1.26
@@ -63,7 +66,8 @@ pyasn1==0.4.7
 pyasn1-modules==0.2.7
 pycparser==2.19
 pydot-ng==2.0.0
-pyglet==1.4.6
+pyglet==1.3.2
+Pyment==0.3.3
 pyparsing==2.4.4
 pyrsistent==0.15.5
 pytest==5.2.2
