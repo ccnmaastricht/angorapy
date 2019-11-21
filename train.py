@@ -61,9 +61,9 @@ def run_experiment(settings: argparse.Namespace):
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
+    teller = StoryTeller(agent, env, frequency=0)
 
     agent.set_gpu(not settings.cpu)
-    teller = StoryTeller(agent, env, frequency=0)
 
     # train
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, story_teller=teller,

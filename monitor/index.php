@@ -14,6 +14,14 @@
         <h1 class="display-3">Experiments</h1>
     </div>
 
+    <div class="row mt-4 mb-4 justify-content-center">
+
+        <form action="clean.php" method="get">
+            <button type="submit button" class="btn btn-warning">Remove All Empty</button>
+        </form>
+
+    </div>
+
     <table class="table">
         <thead class="thead-dark">
             <tr>

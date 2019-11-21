@@ -47,6 +47,7 @@ class StoryTeller:
 
         tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", dpi=300)
         self.make_metadata()
+        self.write_progress()
 
     def create_episode_gif(self, n: int):
         """Make n GIFs with the current policy."""
@@ -138,8 +139,8 @@ class StoryTeller:
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Episode Steps")
 
+        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange")
         r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red")
-        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="blue")
         lines = r_line + l_line
         labels = [l.get_label() for l in lines]
 
