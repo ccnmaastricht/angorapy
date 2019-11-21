@@ -82,17 +82,44 @@ def categorical_entropy(pmf: tf.Tensor):
     return - tf.reduce_sum(pmf * tf.math.log(pmf), 1)
 
 
+@tf.function
+def extract_discrete_action_probabilities(predictions, actions):
+    """Given a tensor of predictions with shape [None, None, n_actions] or [None, n_actions] and a 2D or 1D
+    tensor of actions extract the probabilities for the actions.
+    """
+    assert len(actions.shape) in [1, 2], "Actions should be a tensor of rank 1 or 2."
+
+    if len(actions.shape) == 2:
+        # TODO
+        raise NotImplementedError("Discrete Action Spaces do not work with recurrent networks yet.")
+
+    indices = tf.concat([tf.reshape(tf.range(actions.shape[0]), [-1, 1]), tf.reshape(actions, [-1, 1])], axis=-1)
+    return tf.gather_nd(predictions, indices)
+
+
 if __name__ == "__main__":
     from scipy.stats import norm
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-    mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-    sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
+    # x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
+    # mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
+    # sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
+    #
+    # print(gaussian_pdf(x, mu, sig))
+    # print(norm.pdf(x, loc=mu, scale=sig))
+    #
+    # print("\n")
+    # print(gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float32)))
 
-    print(gaussian_pdf(x, mu, sig))
-    print(norm.pdf(x, loc=mu, scale=sig))
+    tf.config.experimental_run_functions_eagerly(True)
 
-    print("\n")
-    print(gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float32)))
+    action_probs = tf.convert_to_tensor([[1, 5], [3, 7], [7, 2], [8, 4], [0, 2], [4, 5], [4, 2], [7, 5]])
+    actions = tf.convert_to_tensor([1, 0, 1, 1, 0, 0, 0, 1])
+
+    result_py = tf.convert_to_tensor([action_probs[i][a] for i, a in enumerate(actions)])
+    result_tf = extract_discrete_action_probabilities(action_probs, actions)
+
+    print(result_py)
+    print(result_tf)
+    print(tf.reduce_all(tf.equal(result_tf, result_py)))

@@ -107,4 +107,4 @@ def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
 
 
 if __name__ == "__main__":
-    print(add_state_dims(numpy.ndarray([10, 20]), dims=2).shape)
+    pass

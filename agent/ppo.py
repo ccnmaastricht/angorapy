@@ -20,7 +20,7 @@ from gym.spaces import Discrete, Box
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
-from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
+from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
 from agent.gather import collect, \
     read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
@@ -296,11 +296,14 @@ class PPOAgent:
             subprocess_start = time.time()
 
             flat_print("Finalizing...")
-            self.time_dicts.append(time_dict)
-            self.current_fps = stats.numb_processed_frames * (int(self.is_recurrent) * self.tbptt_length) / (
-                sum([v for v in time_dict.values() if v is not None]))
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
+
+            # calculate processing speed in fps
+            self.time_dicts.append(time_dict)
+            fps_multiplier = self.tbptt_length if self.is_recurrent else 1
+            self.current_fps = stats.numb_processed_frames * fps_multiplier / (
+                sum([v for v in time_dict.values() if v is not None]))
 
             if story_teller is not None and story_teller.frequency != 0 and (
                     self.iteration + 1) % story_teller.frequency == 0:
@@ -385,8 +388,7 @@ class PPOAgent:
                                                     stdevs=stdevs)
             else:
                 # if the action space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = tf.convert_to_tensor(
-                    [policy_output[i][a] for i, a in enumerate(batch["action"])])
+                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
             # calculate the clipped loss
             policy_loss = self.policy_loss(action_prob=action_probabilities,
