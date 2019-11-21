@@ -35,26 +35,20 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     env_is_continuous = isinstance(env.action_space, Box)
     act = act_continuous if env_is_continuous else act_discrete
 
-    # load policy
+    # load policy TODO only one builder here
     if isinstance(model, str):
-        policy = tfl.keras.models.load_model(f"{model}/policy")
-        critic = tfl.keras.models.load_model(f"{model}/value")
-    elif isinstance(model, tuple):
-        policy_builder = getattr(models, model[0].model_builder)
-        value_builder = getattr(models, model[1].model_builder)
+        joint = tfl.keras.models.load_model(f"{model}/model")
+    elif isinstance(model, ModelTuple):
+        model_builder = getattr(models, model.model_builder)
 
         # recurrent policy needs batch size for statefulness
-        policy, _, _ = policy_builder(env, **({"bs": 1} if "bs" in fargs(policy_builder).args else {}))
-        _, critic, _ = value_builder(env, **({"bs": 1} if "bs" in fargs(policy_builder).args else {}))
-
-        # load the weights
-        policy.set_weights(model[0].weights)
-        critic.set_weights(model[1].weights)
+        _, _, joint = model_builder(env, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
+        joint.set_weights(model.weights)
     else:
         raise ValueError("Unknown input for model.")
 
     # check if there is a recurrent layer inside the model
-    is_recurrent = is_recurrent_model(policy)
+    is_recurrent = is_recurrent_model(joint)
     if is_recurrent:
         assert horizon % sub_sequence_length == 0, "Subsequence length for TBPTT would require cutting of part of the" \
                                                    " observations."
@@ -62,14 +56,15 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1
     episode_rewards, episode_lengths = [], []
+    current_subsequence_length = 0
 
     # go for it
     states, rewards, actions, action_probabilities, t_is_terminal, values = [], [], [], [], [], []
     state = parse_state(env.reset())
-    values.append(critic(add_state_dims(state, dims=2 if is_recurrent else 1)))
     for t in range(horizon):
-        # choose action and step
-        action, action_probability = act(policy, add_state_dims(state, dims=2 if is_recurrent else 1))
+        # choose action and make step
+        action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
+        action, action_probability = act(action_distribution)
         observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
 
         # remember experience
@@ -79,6 +74,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         rewards.append(reward)
         t_is_terminal.append(done == 1)
         current_episode_return += reward
+        values.append(value)
 
         # next state
         if done:
@@ -92,10 +88,11 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             state = parse_state(observation)
             episode_steps += 1
 
-        values.append(critic.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+    values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1])
 
     env.close()
 
+    # calculate advantage
     values = tfl.reshape(values, [-1])
     advantages = estimate_advantage(rewards, values, t_is_terminal, gamma=discount, lam=lam)
     returns = tfl.add(advantages, values[:-1])

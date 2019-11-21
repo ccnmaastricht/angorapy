@@ -63,7 +63,8 @@ class StoryTeller:
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
-                action, _ = act(self.agent.policy, state)
+                probabilities = self.agent.policy(state)
+                action, _ = act(probabilities)
                 observation, reward, done, _ = self.env.step(action)
                 state = tf.expand_dims(observation.astype(numpy.float32), axis=0)
 

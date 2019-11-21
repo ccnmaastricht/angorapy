@@ -237,16 +237,13 @@ class PPOAgent:
             # export the current state of the policy and value network under unique (-enough) key
             name_key = round(time.time())
             if export:
-                self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
-                self.value.save(f"{self.model_export_dir}/{name_key}/value")
-                models = f"{self.model_export_dir}/{name_key}/"
+                self.joint.save(f"{self.model_export_dir}/{name_key}/model")
+                model_representation = f"{self.model_export_dir}/{name_key}/"
             else:
-                policy_tuple = ModelTuple(self.builder_function_name, self.policy.get_weights())
-                critic_tuple = ModelTuple(self.builder_function_name, self.value.get_weights())
-                models = (policy_tuple, critic_tuple)
+                model_representation = ModelTuple(self.builder_function_name, self.joint.get_weights())
 
             # create processes and execute them
-            result_ids = [collect.remote(models, self.horizon, self.env_name, self.discount, self.lam,
+            result_ids = [collect.remote(model_representation, self.horizon, self.env_name, self.discount, self.lam,
                                          self.tbptt_length, pid) for pid in range(self.workers)]
             split_stats = [ray.get(oi) for oi in result_ids]
             stats = condense_stats(split_stats)
@@ -429,7 +426,8 @@ class PPOAgent:
             length = 0
             state = parse_state(self.env.reset())
             while not done:
-                action, action_prob = policy_act(self.policy, add_state_dims(state, dims=2 if is_recurrent else 1))
+                probabilities = self.policy(add_state_dims(state, dims=2 if is_recurrent else 1))
+                action, action_prob = policy_act(probabilities)
                 self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
                 state = parse_state(self.env.reset())
