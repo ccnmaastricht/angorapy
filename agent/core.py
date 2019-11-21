@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Core functionality of the module such as advantage estimation and several probabilistic calculations."""
+"""Core methods providing functionality to the agent."""
 import math
 import os
 from itertools import accumulate

@@ -61,7 +61,7 @@ def run_experiment(settings: argparse.Namespace):
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    teller = StoryTeller(agent, env, frequency=0)
+    teller = StoryTeller(agent, env, frequency=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
@@ -101,8 +101,11 @@ if __name__ == "__main__":
     parser.add_argument("--export-file", type=int, default=None,
                         help=f"save/read policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
-    parser.add_argument("--save_every", type=int, default=0,
+    parser.add_argument("--save-every", type=int, default=0,
                         help=f"save agent every given number of iterations (0 for no saving)")
+    parser.add_argument("--gif-every", type=int, default=0,
+                        help=f"make three gifs of the agent in the environment every given number of iterations "
+                             f"(0 for never).")
 
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
     argcomplete.autocomplete(parser)

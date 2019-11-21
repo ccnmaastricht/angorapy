@@ -16,7 +16,7 @@ import gym
 import numpy
 import ray
 import tensorflow as tf
-from gym.spaces import Discrete, Box
+from gym.spaces import Discrete, Box, Dict
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
@@ -101,7 +101,7 @@ class PPOAgent:
         self.is_recurrent = is_recurrent_model(self.policy)
 
         # passing one sample, which for some reason prevents cuDNN init error
-        if "observation" in self.env.observation_space.sample():
+        if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
             self.joint(merge_into_batch(
                 [add_state_dims(self.env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
@@ -350,9 +350,9 @@ class PPOAgent:
                 with tf.device(self.device):
                     ent, pi_loss, v_loss = self._learn_on_batch(b)
 
-                entropies.append(tf.reduce_mean(ent))
-                actor_epoch_losses.append(tf.reduce_mean(pi_loss))
-                value_epoch_losses.append(tf.reduce_mean(v_loss))
+                entropies.append(ent)
+                actor_epoch_losses.append(pi_loss)
+                value_epoch_losses.append(v_loss)
 
                 progressbar.update(1)
 
@@ -407,7 +407,7 @@ class PPOAgent:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
-        return entropy, policy_loss, value_loss
+        return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def evaluate(self, n: int, render=False) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to

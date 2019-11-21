@@ -18,5 +18,6 @@ for path in experiment_paths:
             if "rewards" in progress and len(progress["rewards"]) < 2:
                 shutil.rmtree(path)
                 deleted += 1
+
 print("DONE")
 print(deleted)
