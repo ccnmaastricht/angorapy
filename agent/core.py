@@ -60,6 +60,7 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
 
 # PROBABILITY
 
+@tf.function
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     """Calculate probability density for a given batch of potentially joint Gaussian PDF."""
     samples_transformed = (samples - means) / stdevs
@@ -67,6 +68,7 @@ def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     return tf.math.reduce_prod(pdf, axis=-1)
 
 
+@tf.function
 def gaussian_entropy(stdevs: tf.Tensor):
     """Calculate the joint entropy of Gaussian random variables described by their standard deviations.
 
@@ -77,10 +79,13 @@ def gaussian_entropy(stdevs: tf.Tensor):
     return tf.reduce_sum(entropy, axis=-1)
 
 
+@tf.function
 def categorical_entropy(pmf: tf.Tensor):
     """Calculate entropy of a categorical distribution."""
-    return - tf.reduce_sum(pmf * tf.math.log(pmf), 1)
+    return - tf.reduce_sum(pmf * tf.math.log(pmf), axis=-1)
 
+
+# MANIPULATION
 
 @tf.function
 def extract_discrete_action_probabilities(predictions, actions):
@@ -102,24 +107,12 @@ if __name__ == "__main__":
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    # x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-    # mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-    # sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
-    #
-    # print(gaussian_pdf(x, mu, sig))
-    # print(norm.pdf(x, loc=mu, scale=sig))
-    #
-    # print("\n")
-    # print(gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float32)))
+    x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
+    mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
+    sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
 
-    tf.config.experimental_run_functions_eagerly(True)
+    print(gaussian_pdf(x, mu, sig))
+    print(norm.pdf(x, loc=mu, scale=sig))
 
-    action_probs = tf.convert_to_tensor([[1, 5], [3, 7], [7, 2], [8, 4], [0, 2], [4, 5], [4, 2], [7, 5]])
-    actions = tf.convert_to_tensor([1, 0, 1, 1, 0, 0, 0, 1])
-
-    result_py = tf.convert_to_tensor([action_probs[i][a] for i, a in enumerate(actions)])
-    result_tf = extract_discrete_action_probabilities(action_probs, actions)
-
-    print(result_py)
-    print(result_tf)
-    print(tf.reduce_all(tf.equal(result_tf, result_py)))
+    print("\n")
+    print(gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float32)))
