@@ -26,7 +26,7 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
 
 <body>
 <div class="container">
-    <div class="row justify-content-center mt-6">
+    <div class="row justify-content-center">
         <h1 class="main-title display-3">Experiment: <?php echo $meta["environment"]["name"] ?></h1>
     </div>
 

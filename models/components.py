@@ -6,39 +6,42 @@ import tensorflow as tf
 
 
 def _build_visual_encoder(shape, batch_size=None, name=None):
-    inputs = tf.keras.Input(batch_shape=(batch_size,) + shape)
+    """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory."""
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
     # first layer
-    x = tf.keras.layers.Conv2D(96, 11, 4)(inputs)
+    x = tf.keras.layers.Conv2D(32, 11, 4)(inputs)
     x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
     x = tf.keras.layers.ReLU()(x)
 
     # second layer
-    x = tf.keras.layers.Conv2D(256, 5, 1)(x)
+    x = tf.keras.layers.Conv2D(32, 5, 1, padding="same")(x)
     x = tf.keras.layers.ReLU()(x)
+
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
     x = tf.keras.layers.ReLU()(x)
 
     # third layer
-    x = tf.keras.layers.Conv2D(384, 3, 1)(x)
+    x = tf.keras.layers.Conv2D(64, 3, 1, padding="same")(x)
     x = tf.keras.layers.ReLU()(x)
 
     # fourth layer
-    x = tf.keras.layers.Conv2D(384, 3, 1)(x)
+    x = tf.keras.layers.Conv2D(64, 3, 1, padding="same")(x)
     x = tf.keras.layers.ReLU()(x)
 
     # fifth layer
-    x = tf.keras.layers.Conv2D(256, 3, 1)(x)
+    x = tf.keras.layers.Conv2D(32, 3, 1, padding="same")(x)
     x = tf.keras.layers.ReLU()(x)
+
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
     x = tf.keras.layers.ReLU()(x)
 
     # fully connected layers
     x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(4096)(x)
+    x = tf.keras.layers.Dense(512)(x)
     x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Dense(4096)(x)
+    x = tf.keras.layers.Dense(512)(x)
     x = tf.keras.layers.ReLU()(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
@@ -102,3 +105,7 @@ def _build_discrete_head(n_actions, inputs):
 
 
 DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))
+
+
+if __name__ == "__main__":
+    conv_comp = _build_visual_encoder((227, 227, 3))
