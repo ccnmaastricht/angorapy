@@ -10,7 +10,7 @@ from environments import *
 from models.fully_connected import build_ffn_distinct_models
 from models.hybrid import build_shadow_brain
 from utilities.const import COLORS
-from utilities.monitoring import StoryTeller
+from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -61,7 +61,7 @@ def run_experiment(settings: argparse.Namespace):
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    teller = StoryTeller(agent, env, frequency=settings.gif_every)
+    teller = Monitor(agent, env, frequency=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
-    parser.add_argument("-w", "--workers", type=int, default=4, help=f"the number of workers exploring the environment")
+    parser.add_argument("-w", "--workers", type=int, default=8, help=f"the number of workers exploring the environment")
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("-i", "--iterations", type=int, default=1000, help=f"number of iterations before training ends")

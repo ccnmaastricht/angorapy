@@ -30,7 +30,18 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
         <h1 class="main-title display-3">Experiment: <?php echo $meta["environment"]["name"] ?></h1>
     </div>
 
-    <div class="row justify-content-center">
+    <div class="row justify-content-center mt-3">
+        <div class="col col-6">
+            <img src="<?php echo $DIR . "./reward_plot.svg" ?>" alt="Reward Plot" class="fit-div" />
+        </div>
+
+        <div class="col col-6">
+            <img src="<?php echo $DIR . "./loss_plot.svg" ?>" alt="Loss Plot" class="fit-div" />
+        </div>
+    </div>
+
+
+    <div class="row justify-content-center mt-5">
         <div class="col col-6">
             <h4 align="center" class="sub-title">Hyperparameters</h4>
 
@@ -83,16 +94,6 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
             <h4 align="center" class="sub-title">Model</h4>
 
             <img src="<?php echo $DIR . '/model.png' ?>" alt="Plot of the Model" class="fit-div"/>
-        </div>
-    </div>
-
-    <div class="row justify-content-center mt-5">
-        <div class="col col-6">
-            <img src="<?php echo $DIR . "./reward_plot.svg" ?>" alt="Reward Plot" class="fit-div" />
-        </div>
-
-        <div class="col col-6">
-            <img src="<?php echo $DIR . "./loss_plot.svg" ?>" alt="Loss Plot" class="fit-div" />
         </div>
     </div>
 </div>

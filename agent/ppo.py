@@ -92,12 +92,19 @@ class PPOAgent:
         self.clip_values = clip_values
         self.tbptt_length = tbptt_length
 
+        # learning rate schedule
+        self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=self.learning_rate,
+            decay_steps=1000,
+            decay_rate=0.98
+        )
+
         # models and optimizers
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
-        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate, epsilon=1e-5)
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
 
         # passing one sample, which for some reason prevents cuDNN init error
@@ -190,7 +197,7 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(gaussian_entropy(stdevs=policy_output[:, self.n_actions:]))
+            return tf.reduce_mean(gaussian_entropy(stdevs=tf.split(policy_output, 2, axis=-1)))
         else:
             return tf.reduce_mean(categorical_entropy(policy_output))
 
@@ -453,6 +460,7 @@ class PPOAgent:
                    f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
                    f"AvgEnt.: {nc}{0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2):5.2f}{ec}; "
                    f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
+                   f"Lr: {nc}{self.lr_schedule(self.optimizer.iterations):.2e}{ec}; "
                    f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                    f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                    f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")

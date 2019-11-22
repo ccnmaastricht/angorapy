@@ -10,7 +10,6 @@ import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Box
-from tqdm import tqdm
 
 import models
 from agent.core import estimate_advantage
@@ -314,10 +313,10 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     env_name = "ShadowHand-v1"
-    policy, value, joint = build_shadow_brain(gym.make(env_name), 1)
+    p, v, j = build_shadow_brain(gym.make(env_name), 1)
 
-    policy_tuple = ModelTuple(build_shadow_brain.__name__, policy.get_weights())
-    critic_tuple = ModelTuple(build_shadow_brain.__name__, value.get_weights())
+    policy_tuple = ModelTuple(build_shadow_brain.__name__, p.get_weights())
+    critic_tuple = ModelTuple(build_shadow_brain.__name__, v.get_weights())
     mods = (policy_tuple, critic_tuple)
 
     ray.init(local_mode=True)

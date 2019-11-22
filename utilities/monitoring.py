@@ -25,7 +25,7 @@ def scale(vector):
     return (numpy.array(vector) - min(vector)) / (max(vector) - min(vector))
 
 
-class StoryTeller:
+class Monitor:
     """Monitor for learning progress."""
 
     def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
@@ -98,8 +98,8 @@ class StoryTeller:
                 continuous=str(self.agent.continuous_control),
                 learning_rate=str(self.agent.learning_rate),
                 epsilon_clip=str(self.agent.clip),
-                entropy_coefficient=str(self.agent.c_entropy),
-                value_coefficient=str(self.agent.c_value),
+                entropy_coefficient=str(self.agent.c_entropy.numpy().item()),
+                value_coefficient=str(self.agent.c_value.numpy().item()),
                 horizon=str(self.agent.horizon),
                 workers=str(self.agent.workers),
                 discount=str(self.agent.discount),
@@ -125,6 +125,12 @@ class StoryTeller:
             json.dump(progress, f)
 
     def _make_graph(self, ax, lines, labels, name):
+        ax.set_title(ax.get_title(),
+                     fontdict={'fontsize': "large",
+                               'fontweight': "bold",
+                               'verticalalignment': 'baseline',
+                               'horizontalalignment': "center"}
+                     )
         ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15),
                   fancybox=True, shadow=True, ncol=5)
         plt.savefig(f"{self.story_directory}/{name}.svg", format="svg", bbox_inches="tight")
