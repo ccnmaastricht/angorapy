@@ -12,6 +12,7 @@ import numpy
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
+from matplotlib.axes import Axes
 from scipy.signal import savgol_filter
 
 from agent.policy import act_discrete, act_continuous
@@ -147,11 +148,16 @@ class Monitor:
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Episode Steps")
 
+        # average lengths
         l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
+        if len(self.agent.cycle_reward_history) > 11:
+            twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange")
+
+        # average rewards
         r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3)
         if len(self.agent.cycle_reward_history) > 11:
-            l_smoothed = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange")
-            r_smoothed = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red")
+            ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red")
+
         if self.agent.env.spec.reward_threshold is not None:
             ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
 
@@ -163,16 +169,26 @@ class Monitor:
 
         # entropy, loss plot
         fig, ax = plt.subplots()
+        ax: Axes
         ax.set_title("Entropy and Loss.")
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Loss")
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Entropy")
 
-        actor_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)")
-        critic_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Critic Loss (Normalized)")
-        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green")
-        lines = actor_loss_line + critic_loss_line + entropy_line
+        policy_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)", alpha=0.3)
+        if len(self.agent.policy_loss_history) > 11:
+            ax.plot(savgol_filter(scale(self.agent.policy_loss_history), 11, 3), color=policy_loss_line[-1].get_color())
+
+        value_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Value Loss (Normalized)", alpha=0.3)
+        if len(self.agent.value_loss_history) > 11:
+            ax.plot(savgol_filter(scale(self.agent.value_loss_history), 11, 3), color=value_loss_line[-1].get_color())
+
+        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green", alpha=0.3)
+        if len(self.agent.entropy_history) > 11:
+            ax.plot(savgol_filter(scale(self.agent.entropy_history), 11, 3), color=entropy_line[-1].get_color())
+
+        lines = policy_loss_line + value_loss_line + entropy_line
         labels = [l.get_label() for l in lines]
 
         self._make_graph(ax, lines, labels, "loss_plot")

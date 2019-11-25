@@ -4,21 +4,21 @@ import itertools
 import os
 import random
 from inspect import getfullargspec as fargs
-from typing import Tuple, List, Any, Union
+from typing import Tuple, List
 
 import numpy
 import ray
 import tensorflow as tf
-from gym.spaces import Box
+from gym.spaces import Box, Dict
 
 import models
-from agent.core import estimate_advantage, estimate_episode_advantages
+from agent.core import estimate_episode_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_shadow_brain, build_ffn_distinct_models
+from models import build_shadow_brain
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, StatBundle, ModelTuple
-from utilities.util import parse_state, add_state_dims, is_recurrent_model
+from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -60,27 +60,34 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
     state = parse_state(env.reset())
     for t in range(horizon):
-        # choose action and make step
+        # based on the given state, predict action distribution and state value
         action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
-        action, action_probability = act(action_distribution)
-        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
-
-        # remember experience
         states.append(state)
+        values.append(numpy.squeeze(value).item())
+
+        # from the action distribution sample an action and remember both the action and its probability
+        action, action_probability = act(action_distribution)
         actions.append(action)
         action_probabilities.append(action_probability)
+
+        # make a step based on the chosen action and collect the reward for this state
+        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
         rewards.append(reward)
-        values.append(numpy.squeeze(value).item())
         current_episode_return += reward
 
-        # next state
+        # depending on whether the state is terminal, choose the next state
         if done:
             state = parse_state(env.reset())
-            episode_lengths.append(episode_steps)
-            episode_rewards.append(current_episode_return)
+
+            # calculate advantages for the finished episode, where the last value is 0 since it refers to the terminal
+            # state that we just observed
             advantages.append(
                 estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0], discount, lam)
             )
+
+            # update/reset some statistics and trackers
+            episode_lengths.append(episode_steps)
+            episode_rewards.append(current_episode_return)
             episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
@@ -318,15 +325,19 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
 
 
 if __name__ == "__main__":
+    os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    # env_n = "ShadowHand-v1"
-    # p, v, j = build_shadow_brain(gym.make(env_n), 1)
+    env_n = "ShadowHand-v1"
+    env = gym.make(env_n)
+    p, v, j = build_shadow_brain(env, 1)
+    joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
+    if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
+        j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
-    env_n = "CartPole-v1"
-    p, v, j = build_ffn_distinct_models(gym.make(env_n))
-
-    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
+    # env_n = "CartPole-v1"
+    # p, v, j = build_ffn_distinct_models(gym.make(env_n))
+    # joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
-    ray.get(collect.remote(joint_tuple, 100, env_n, 0.99, 0.95, 16, 0))
+    ray.get(collect.remote(joint_tuple, 128, env_n, 0.99, 0.95, 8, 0))
