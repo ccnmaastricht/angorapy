@@ -3,9 +3,13 @@ import unittest
 
 import numpy
 import tensorflow as tf
+from scipy.signal import lfilter
 from scipy.stats import norm, entropy
 
-from agent.core import extract_discrete_action_probabilities, gaussian_pdf, gaussian_entropy, categorical_entropy
+from agent.core import extract_discrete_action_probabilities, gaussian_pdf, gaussian_entropy, categorical_entropy, \
+    estimate_advantage, estimate_episode_advantages
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class CoreTest(unittest.TestCase):
@@ -47,11 +51,41 @@ class ProbabilityTest(unittest.TestCase):
         result_reference = entropy(probs[0].numpy())
         result = categorical_entropy(probs).numpy().item()
 
+
+
         self.assertTrue(numpy.allclose(result_reference, result))
 
 
+class AdvantageTest(unittest.TestCase):
+
+    def test_gae_estimation(self):
+        def discount(x, gamma):
+            return lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
+
+        rewards = numpy.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0, 10, 10, 4, 9, 4])
+        values = numpy.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 4, 10, 5, 7, 8, 9])
+        terminals = numpy.array(
+            [False, False, False, False, False, False, False, False, False, False, True,
+             False, False, False, False, False])
+
+        rewards = numpy.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0])
+        values = numpy.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 0])
+        terminals = numpy.array([False, False, False, False, False, False, False, False, False, False, True])
+
+        gamma = 1
+        lamb = 1
+
+        result = estimate_advantage(rewards, values, terminals, gamma=gamma, lam=lamb)
+
+        prep = rewards + gamma * values[1:] * (1 - terminals) - values[:-1]
+        result_reference = discount(prep, gamma * lamb)
+
+        print(result)
+        print(result_reference)
+        print(estimate_episode_advantages(rewards, values, gamma, lamb))
+
+
 if __name__ == '__main__':
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     tf.config.experimental_run_functions_eagerly(True)
 
     unittest.main()

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Methods for sampling an action given a policy and a state for discrete and continuous actions spaces."""
+import os
 from typing import Tuple
 
 import numpy
@@ -23,3 +24,10 @@ def act_continuous(multivariates: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarr
     probabilities = gaussian_pdf(actions, means=means, stdevs=stdevs)
 
     return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
+
+
+if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    out = act_discrete(tf.sigmoid(tf.random.normal([16, 4])))
+    print(out)

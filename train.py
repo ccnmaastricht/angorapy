@@ -61,12 +61,12 @@ def run_experiment(settings: argparse.Namespace):
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    teller = Monitor(agent, env, frequency=settings.gif_every)
+    monitor = Monitor(agent, env, frequency=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
     # train
-    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, story_teller=teller,
+    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, story_teller=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
     agent.save_agent_state()
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
-    parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
+    parser.add_argument("--tbptt", type=int, default=8, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping")
     parser.add_argument("--no-value-clip", action="store_false",
                         help=f"deactivate clipping in value network's objective")

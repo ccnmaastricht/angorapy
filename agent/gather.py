@@ -4,7 +4,7 @@ import itertools
 import os
 import random
 from inspect import getfullargspec as fargs
-from typing import Tuple, List
+from typing import Tuple, List, Any, Union
 
 import numpy
 import ray
@@ -12,13 +12,12 @@ import tensorflow as tf
 from gym.spaces import Box
 
 import models
-from agent.core import estimate_advantage
+from agent.core import estimate_advantage, estimate_episode_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_shadow_brain
+from models import build_shadow_brain, build_ffn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, StatBundle, ModelTuple
-from utilities.normalization import normalize_advantages
 from utilities.util import parse_state, add_state_dims, is_recurrent_model
 
 
@@ -58,7 +57,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     current_subsequence_length = 0
 
     # go for it
-    states, rewards, actions, action_probabilities, t_is_terminal, values = [], [], [], [], [], []
+    states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
     state = parse_state(env.reset())
     for t in range(horizon):
         # choose action and make step
@@ -71,15 +70,17 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         actions.append(action)
         action_probabilities.append(action_probability)
         rewards.append(reward)
-        t_is_terminal.append(done == 1)
+        values.append(numpy.squeeze(value).item())
         current_episode_return += reward
-        values.append(value)
 
         # next state
         if done:
             state = parse_state(env.reset())
             episode_lengths.append(episode_steps)
             episode_rewards.append(current_episode_return)
+            advantages.append(
+                estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0], discount, lam)
+            )
             episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
@@ -87,15 +88,22 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             state = parse_state(observation)
             episode_steps += 1
 
-    values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1])
+    values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1].numpy().item())
+    if episode_steps > 1:
+        advantages.append(estimate_episode_advantages(rewards[-episode_steps + 1:],
+                                                      values[-episode_steps:],
+                                                      discount, lam))
+    advantages = tfl.convert_to_tensor(numpy.hstack(advantages), dtype=tfl.float32)
 
     env.close()
 
     # calculate advantage
-    values = tfl.reshape(values, [-1])
-    advantages = estimate_advantage(rewards, values, t_is_terminal, gamma=discount, lam=lam)
+    values = tfl.convert_to_tensor(values, dtype=tfl.float32)
     returns = tfl.add(advantages, values[:-1])
-    advantages = normalize_advantages(advantages)
+
+    # normalize advantages
+    advantages = (advantages - tfl.reduce_mean(advantages)) / tfl.maximum(
+        tfl.math.reduce_std(advantages), 1e-6)
 
     # make TBPTT-compatible subsequences from transition vectors if model is recurrent
     if is_recurrent:
@@ -312,12 +320,13 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env_name = "ShadowHand-v1"
-    p, v, j = build_shadow_brain(gym.make(env_name), 1)
+    # env_n = "ShadowHand-v1"
+    # p, v, j = build_shadow_brain(gym.make(env_n), 1)
 
-    policy_tuple = ModelTuple(build_shadow_brain.__name__, p.get_weights())
-    critic_tuple = ModelTuple(build_shadow_brain.__name__, v.get_weights())
-    mods = (policy_tuple, critic_tuple)
+    env_n = "CartPole-v1"
+    p, v, j = build_ffn_distinct_models(gym.make(env_n))
+
+    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
-    collect.remote(mods, 1024, env_name, 0.99, 0.95, 0)
+    ray.get(collect.remote(joint_tuple, 100, env_n, 0.99, 0.95, 16, 0))

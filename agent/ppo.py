@@ -21,8 +21,7 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
-from agent.gather import collect, \
-    read_dataset_from_storage, condense_stats
+from agent.gather import collect, read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
@@ -134,8 +133,8 @@ class PPOAgent:
         self.cycle_reward_history = []
         self.cycle_length_history = []
         self.entropy_history = []
-        self.actor_loss_history = []
-        self.critic_loss_history = []
+        self.policy_loss_history = []
+        self.value_loss_history = []
         self.time_dicts = []
 
     def set_gpu(self, activated: bool):
@@ -342,7 +341,7 @@ class PPOAgent:
             None
         """
         progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size), leave=False)
-        actor_loss_history, critic_loss_history, entropy_history = [], [], []
+        policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
             # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate shuffling sensitive to stateful orderedness
@@ -364,13 +363,13 @@ class PPOAgent:
             self.joint.reset_states()
 
             # remember some statistics
-            actor_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
-            critic_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+            policy_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
+            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
             entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         # store statistics in agent history
-        self.actor_loss_history.extend(actor_loss_history)
-        self.critic_loss_history.extend(critic_loss_history)
+        self.policy_loss_history.extend(policy_loss_history)
+        self.value_loss_history.extend(value_loss_history)
         self.entropy_history.extend(entropy_history)
 
         progressbar.close()

@@ -12,6 +12,7 @@ import numpy
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
+from scipy.signal import savgol_filter
 
 from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
@@ -140,14 +141,20 @@ class Monitor:
 
         # reward plot
         fig, ax = plt.subplots()
-        ax.set_title("Mean Rewards and Episode Lengths for Each Training Cycle.")
-        ax.set_xlabel("Iteration")
-        ax.set_ylabel("Accumulative Reward")
+        ax.set_title("Mean Rewards and Episode Lengths.")
+        ax.set_xlabel("Iteration (Cycle)")
+        ax.set_ylabel("Mean Episode Reward")
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Episode Steps")
 
-        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange")
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red")
+        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
+        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3)
+        if len(self.agent.cycle_reward_history) > 11:
+            l_smoothed = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange")
+            r_smoothed = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red")
+        if self.agent.env.spec.reward_threshold is not None:
+            ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
+
         lines = r_line + l_line
         labels = [l.get_label() for l in lines]
 
@@ -162,8 +169,8 @@ class Monitor:
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Entropy")
 
-        actor_loss_line = ax.plot(scale(self.agent.actor_loss_history), label="Policy Loss (Normalized)")
-        critic_loss_line = ax.plot(scale(self.agent.critic_loss_history), label="Critic Loss (Normalized)")
+        actor_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)")
+        critic_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Critic Loss (Normalized)")
         entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green")
         lines = actor_loss_line + critic_loss_line + entropy_line
         labels = [l.get_label() for l in lines]
