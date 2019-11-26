@@ -8,7 +8,6 @@ from gym.spaces import Box
 from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
-from models.hybrid import build_shadow_brain
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
@@ -21,6 +20,7 @@ def run_experiment(settings: argparse.Namespace):
 
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
+        from models.hybrid import build_shadow_brain
         build_models = build_shadow_brain
     else:
         build_models = build_ffn_distinct_models

@@ -13,13 +13,13 @@ from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
 import gym
-import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
+import models
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
 from agent.gather import collect, read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
@@ -315,7 +315,6 @@ class PPOAgent:
             story_teller.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
-                print("Saving the current state of the agent.")
                 self.save_agent_state()
 
             time_dict["finalizing"] = time.time() - subprocess_start
@@ -466,8 +465,7 @@ class PPOAgent:
 
     def save_agent_state(self):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
-        self.policy.save(self.agent_directory + f"/{self.iteration}/policy")
-        self.value.save(self.agent_directory + f"/{self.iteration}/value")
+        self.joint.save_weights(self.agent_directory + f"/{self.iteration}/weights")
 
         with open(self.agent_directory + f"/{self.iteration}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
@@ -476,8 +474,11 @@ class PPOAgent:
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
         del parameters["env"]
-        del parameters["policy"], parameters["value"], parameters["policy_value"]
-        del parameters["policy_optimizer"], parameters["value_optimizer"]
+        del parameters["policy"], parameters["value"], parameters["joint"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"]
+
+        parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
+        parameters["c_value"] = parameters["c_value"].numpy().item()
 
         return parameters
 
@@ -500,19 +501,32 @@ class PPOAgent:
             raise FileNotFoundError("The given agent ID's save history is empty.")
 
         latest = max([int(re.match("([0-9]+)", fn).group(0)) for fn in os.listdir(agent_path)])
-        policy = tf.keras.models.load_model(f"{agent_path}/{latest}/policy")
-        value = tf.keras.models.load_model(f"{agent_path}/{latest}/value")
-
+        print(f"Loading from most recent iteration {latest}.")
         with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
             parameters = json.load(f)
 
-        env = gym.make(parameters["env_name"])
-        example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
-        value.predict(example_input)
+        model_builder = getattr(models, parameters["builder_function_name"])
 
-        loaded_agent = PPOAgent(policy, value, env, parameters["horizon"], parameters["workers"], _make_dirs=False)
+        env = gym.make(parameters["env_name"])
+
+        loaded_agent = PPOAgent(model_builder,
+                                environment=env,
+                                horizon=parameters["horizon"],
+                                workers=parameters["workers"],
+                                learning_rate=parameters["learning_rate"],
+                                discount=parameters["discount"],
+                                lam=parameters["lam"],
+                                clip=parameters["clip"],
+                                c_entropy=parameters["c_entropy"],
+                                c_value=parameters["c_value"],
+                                gradient_clipping=parameters["gradient_clipping"],
+                                clip_values=parameters["clip_values"],
+                                tbptt_length=parameters["tbptt_length"],
+                                _make_dirs=False)
 
         for p, v in parameters.items():
             loaded_agent.__dict__[p] = v
+
+        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{latest}/weights")
 
         return loaded_agent
