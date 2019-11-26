@@ -21,12 +21,13 @@ from tqdm import tqdm
 
 import models
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
-from agent.gather import collect, read_dataset_from_storage, condense_stats
+from agent.gather import collect
+from agent.dataio import read_dataset_from_storage
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
 from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch, \
-    is_recurrent_model
+    is_recurrent_model, condense_stats
 
 
 class PPOAgent:
