@@ -21,12 +21,11 @@ from tqdm import tqdm
 
 import models
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
-from agent.gather import collect
 from agent.dataio import read_dataset_from_storage
-from agent.policy import act_discrete, act_continuous
+from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
-from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch, \
+from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, \
     is_recurrent_model, condense_stats
 
 
@@ -287,7 +286,7 @@ class PPOAgent:
                                                  else statistics.mean(stats.episode_rewards))
             else:
                 flat_print("Evaluating...")
-                eval_lengths, eval_rewards = self.evaluate(10)
+                eval_lengths, eval_rewards = self.evaluate(8, ray_already_initialized=True)
                 self.episode_length_history.extend(eval_lengths)
                 self.episode_reward_history.extend(eval_rewards)
                 self.cycle_length_history.append(statistics.mean(eval_lengths))
@@ -424,36 +423,24 @@ class PPOAgent:
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
-    def evaluate(self, n: int, render=False) -> Tuple[List[int], List[int]]:
+    def evaluate(self, n: int, ray_already_initialized: bool = False) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
-            render (bool): whether to render it
+            ray_already_initialized (bool): if True, do not initialize ray again (default False)
 
         Returns:
             two lists of length n, giving episode lengths and rewards respectively
         """
-        rewards, lengths = [], []
-        is_recurrent = is_recurrent_model(self.policy)
-        policy_act = act_discrete if not self.continuous_control else act_continuous
-        for episode in range(n):
-            done = False
-            reward_trajectory = []
-            length = 0
-            state = parse_state(self.env.reset())
-            while not done:
-                probabilities = self.policy(add_state_dims(state, dims=2 if is_recurrent else 1))
-                action, action_prob = policy_act(probabilities)
-                self.env.render() if render else None
-                observation, reward, done, _ = self.env.step(action)
-                state = parse_state(observation)
-                reward_trajectory.append(reward)
-                length += 1
+        if not ray_already_initialized:
+            ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
-            lengths.append(length)
-            rewards.append(sum(reward_trajectory))
+        model_representation = ModelTuple(self.builder_function_name, self.policy.get_weights())
+        result_ids = [evaluate.remote(model_representation, self.env_name) for _ in range(n)]
+
+        lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])
 
         return lengths, rewards
 

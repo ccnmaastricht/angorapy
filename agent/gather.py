@@ -2,10 +2,11 @@
 """Functions for gathering experience and communicating it to the main thread."""
 import os
 from inspect import getfullargspec as fargs
+from typing import Tuple
 
 import numpy
 import ray
-from gym.spaces import Box, Dict
+from gym.spaces import Box, Dict, Discrete
 
 import models
 from agent.core import estimate_episode_advantages
@@ -134,6 +135,45 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     writer.write(dataset)
 
     return stats
+
+
+@ray.remote(num_cpus=1, num_gpus=0)
+def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
+    """Evaluate one episode of the given environment following the given policy. Remote implementation."""
+    environment = gym.make(env_name)
+
+    if isinstance(policy_tuple, ModelTuple):
+        model_builder = getattr(models, policy_tuple.model_builder)
+
+        # recurrent policy needs batch size for statefulness
+        policy, _, _ = model_builder(environment, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
+        policy.set_weights(policy_tuple.weights)
+    else:
+        raise ValueError("Cannot handle given model type. Should be a ModelTuple.")
+
+    if isinstance(environment.action_space, Discrete):
+        continuous_control = False
+    elif isinstance(environment.action_space, Box):
+        continuous_control = True
+    else:
+        raise ValueError("Unknown action space.")
+
+    is_recurrent = is_recurrent_model(policy)
+    policy_act = act_discrete if not continuous_control else act_continuous
+
+    done = False
+    reward_trajectory = []
+    length = 0
+    state = parse_state(environment.reset())
+    while not done:
+        probabilities = policy(add_state_dims(state, dims=2 if is_recurrent else 1))
+        action, action_prob = policy_act(probabilities)
+        observation, reward, done, _ = environment.step(action)
+        state = parse_state(observation)
+        reward_trajectory.append(reward)
+        length += 1
+
+    return length, sum(reward_trajectory)
 
 
 if __name__ == "__main__":
