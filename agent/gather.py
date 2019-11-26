@@ -117,13 +117,13 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
         # states
         feature_tensors = [tfl.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
-        states = list(zip(*list(map(lambda x: tfl.split(x, num_sub_sequences), feature_tensors))))
+        states = tuple(map(lambda x: tfl.stack(tfl.split(x, num_sub_sequences)), feature_tensors))
 
         # others
-        actions = tfl.split(actions, num_sub_sequences)
-        action_probabilities = tfl.split(action_probabilities, num_sub_sequences)
-        advantages = tfl.split(advantages, num_sub_sequences)
-        returns = tfl.split(returns, num_sub_sequences)
+        actions = tfl.stack(tfl.split(actions, num_sub_sequences))
+        action_probabilities = tfl.stack(tfl.split(action_probabilities, num_sub_sequences))
+        advantages = tfl.stack(tfl.split(advantages, num_sub_sequences))
+        returns = tfl.stack(tfl.split(returns, num_sub_sequences))
 
     # store this worker's gathering in a experience buffer
     buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
@@ -221,16 +221,20 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
             "return": buffer.returns,
             "advantage": buffer.advantages
         })
-    elif isinstance(buffer.states[0], Tuple):
+    elif isinstance(buffer.states, Tuple):
         dataset = tf.data.Dataset.from_tensor_slices({
-            "in_vision": [x[0] for x in buffer.states],
-            "in_proprio": [x[1] for x in buffer.states],
-            "in_touch": [x[2] for x in buffer.states],
-            "in_goal": [x[3] for x in buffer.states],
-            "action": buffer.actions,
-            "action_prob": buffer.action_probabilities,
-            "return": buffer.returns,
-            "advantage": buffer.advantages
+            # "in_vision": [x[0] for x in buffer.states],
+            # "in_proprio": [x[1] for x in buffer.states],
+            # "in_touch": [x[2] for x in buffer.states],
+            # "in_goal": [x[3] for x in buffer.states],
+            "in_vision": tf.expand_dims(buffer.states[0], axis=0),
+            "in_proprio": tf.expand_dims(buffer.states[1], axis=0),
+            "in_touch": tf.expand_dims(buffer.states[2], axis=0),
+            "in_goal": tf.expand_dims(buffer.states[3], axis=0),
+            "action": tf.expand_dims(buffer.actions, axis=0),
+            "action_prob": tf.expand_dims(buffer.action_probabilities, axis=0),
+            "return": tf.expand_dims(buffer.returns, axis=0),
+            "advantage": tf.expand_dims(buffer.advantages, axis=0),
         })
     else:
         raise NotImplementedError(f"Cannot handle state type {type(buffer.states[0])}")

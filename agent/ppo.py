@@ -340,6 +340,11 @@ class PPOAgent:
         Returns:
             None
         """
+        if self.is_recurrent and batch_size > self.workers:
+            logging.warning(
+                f"Batchsize is larger than batches possible with Truncated BPTT. Setting batchsize to {self.workers}")
+            batch_size = self.workers
+
         progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size), leave=False)
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
@@ -350,8 +355,15 @@ class PPOAgent:
             actor_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
-                with tf.device(self.device):
-                    ent, pi_loss, v_loss = self._learn_on_batch(b)
+                if not self.is_recurrent:
+                    with tf.device(self.device):
+                        ent, pi_loss, v_loss = self._learn_on_batch(b)
+                else:
+                    # truncated back propagation through time
+                    split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
+                    for i in range(len(b["advantage"])):
+                        partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
+                        ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
 
                 entropies.append(ent)
                 actor_epoch_losses.append(pi_loss)
