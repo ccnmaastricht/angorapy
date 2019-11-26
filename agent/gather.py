@@ -54,7 +54,6 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1
     episode_rewards, episode_lengths = [], []
-    current_subsequence_length = 0
 
     # go for it
     states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []

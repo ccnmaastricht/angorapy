@@ -122,7 +122,8 @@ class PPOAgent:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory)
 
-        shutil.rmtree("storage/experience/")
+        if os.path.isdir("storage/experience"):
+            shutil.rmtree("storage/experience/")
         os.makedirs("storage/experience/", exist_ok=True)
 
         # statistics
@@ -200,7 +201,7 @@ class PPOAgent:
         else:
             return tf.reduce_mean(categorical_entropy(policy_output))
 
-    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export: bool = False, save_every: int = 0,
+    def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
@@ -210,7 +211,7 @@ class PPOAgent:
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
             batch_size (int): batch size for the optimization
-            story_teller: story telling object that creates visualizations of the training process on the fly (Default
+            monitor: story telling object that creates visualizations of the training process on the fly (Default
                 value = None)
             export (bool): boolean indicator for whether communication with workers is achieved through file saving
                 or direct weight passing (Default value = False)
@@ -308,11 +309,11 @@ class PPOAgent:
             self.current_fps = stats.numb_processed_frames * fps_multiplier / (
                 sum([v for v in time_dict.values() if v is not None]))
 
-            if story_teller is not None and story_teller.frequency != 0 and (
-                    self.iteration + 1) % story_teller.frequency == 0:
+            if monitor is not None and monitor.frequency != 0 and (
+                    self.iteration + 1) % monitor.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
-                story_teller.create_episode_gif(n=3)
-            story_teller.update()
+                monitor.create_episode_gif(n=3)
+            monitor.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 self.save_agent_state()

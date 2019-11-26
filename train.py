@@ -4,6 +4,7 @@ import os
 
 import argcomplete
 from gym.spaces import Box
+from models.hybrid import build_shadow_brain
 
 from agent.ppo import PPOAgent
 from environments import *
@@ -20,7 +21,6 @@ def run_experiment(settings: argparse.Namespace):
 
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
-        from models.hybrid import build_shadow_brain
         build_models = build_shadow_brain
     else:
         build_models = build_ffn_distinct_models
@@ -66,7 +66,7 @@ def run_experiment(settings: argparse.Namespace):
     agent.set_gpu(not settings.cpu)
 
     # train
-    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, story_teller=monitor,
+    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
     agent.save_agent_state()
