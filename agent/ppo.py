@@ -435,7 +435,7 @@ class PPOAgent:
                 action, action_prob = policy_act(probabilities)
                 self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
-                state = parse_state(self.env.reset())
+                state = parse_state(observation)
                 reward_trajectory.append(reward)
                 length += 1
 
