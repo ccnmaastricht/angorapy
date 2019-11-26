@@ -223,7 +223,11 @@ class PPOAgent:
             self
         """
         assert self.horizon * self.workers >= batch_size, "Batch Size is larger than the number of transitions."
-        # TODO check if batch can even be created for recurrent
+        if self.is_recurrent and batch_size > self.workers:
+            logging.warning(
+                f"Batchsize is larger than possible with the available number of independent sequences for "
+                f"Truncated BPTT. Setting batchsize to {self.workers}")
+            batch_size = self.workers
 
         ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
@@ -340,11 +344,6 @@ class PPOAgent:
         Returns:
             None
         """
-        if self.is_recurrent and batch_size > self.workers:
-            logging.warning(
-                f"Batchsize is larger than batches possible with Truncated BPTT. Setting batchsize to {self.workers}")
-            batch_size = self.workers
-
         progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size), leave=False)
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):

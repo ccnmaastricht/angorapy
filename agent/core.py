@@ -6,13 +6,11 @@ from itertools import accumulate
 from typing import List
 
 import numpy
-import scipy
 import tensorflow as tf
+from scipy.signal import lfilter
 
 
 # RETURN/ADVANTAGE CALCULATION
-from scipy.signal import lfilter
-
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):
     """Discounted future rewards calculation using itertools. Way faster than list comprehension."""
