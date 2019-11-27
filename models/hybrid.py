@@ -48,7 +48,8 @@ def build_shadow_brain(env: gym.Env, bs: int):
     o = tf.keras.layers.GRU(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     # output heads
-    policy_out = _build_continuous_head(n_actions, o) if continuous_control else _build_discrete_head(n_actions, o)
+    policy_out = _build_continuous_head(n_actions, o.shape[1:], bs)(o) if continuous_control else _build_discrete_head(
+        n_actions, o.shape[1:], bs)(o)
     value_out = tf.keras.layers.Dense(1, name="value")(o)
 
     # define separate and joint models
@@ -77,6 +78,7 @@ if __name__ == "__main__":
     plot_model(joint, to_file="model.png")
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
+
     @tf.function
     def _train():
         start_time = time.time()
@@ -95,5 +97,6 @@ if __name__ == "__main__":
             optimizer.apply_gradients(zip(grads, joint.trainable_variables))
 
         print(f"Execution Time: {time.time() - start_time}")
+
 
     _train()

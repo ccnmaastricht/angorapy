@@ -32,8 +32,8 @@ def _build_encoding_sub_model(shape, batch_size):
 
 # POLICY HEADS
 
-def _build_continuous_head(n_actions, shape, batch_size):
-    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
+def _build_continuous_head(n_actions, input_shape, batch_size):
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
     means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT, name="means")(inputs)
 
@@ -45,8 +45,8 @@ def _build_continuous_head(n_actions, shape, batch_size):
     return tf.keras.Model(inputs=inputs, outputs=concat)
 
 
-def _build_discrete_head(n_actions, shape, batch_size):
-    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
+def _build_discrete_head(n_actions, input_shape, batch_size):
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
     x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
     x = tf.keras.layers.Activation("softmax", name="actions")(x)

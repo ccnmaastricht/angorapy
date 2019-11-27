@@ -20,7 +20,7 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
     # policy network
     x = TD(_build_encoding_sub_model((state_dimensionality, ), bs), name="TD_policy")(inputs)
     x.set_shape([bs] + x.shape[1:])
-    x = tf.keras.layers.LSTM(32, stateful=True)(x)
+    x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     out_policy = _build_continuous_head(n_actions, (32, ), bs)(x) if continuous_control \
         else _build_discrete_head(n_actions, (32, ), bs)(x)
@@ -43,6 +43,10 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     environment = gym.make("LunarLanderContinuous-v2")
-    pi, v, pv = build_rnn_distinct_models(environment, bs=1)
+    pi, v, pv = build_rnn_distinct_models(environment, bs=3)
 
     tf.keras.utils.plot_model(pv)
+
+    out_pi, out_v = pv.predict(tf.random.normal((3, 16, 8)))
+    print(out_pi.shape)
+    print(out_v.shape)

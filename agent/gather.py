@@ -13,7 +13,7 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_shadow_brain
+from models import build_shadow_brain, build_rnn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
@@ -48,6 +48,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     if is_recurrent:
         assert horizon % sub_sequence_length == 0, "Subsequence length for TBPTT would require cutting of part of the" \
                                                    " observations."
+    is_shadow_brain = "ShadowHand" in env_name
 
     # trackers
     episodes_completed, current_episode_return, episode_steps = 0, 0, 1
@@ -114,18 +115,21 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         num_sub_sequences = horizon // sub_sequence_length
 
         # states
-        feature_tensors = [tfl.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
-        states = tuple(map(lambda x: tfl.stack(tfl.split(x, num_sub_sequences)), feature_tensors))
+        if is_shadow_brain:
+            feature_tensors = [tfl.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
+            states = tuple(map(lambda x: tfl.stack(tfl.split(x, num_sub_sequences)), feature_tensors))
+        else:
+            states = tfl.stack(tfl.split(states, num_sub_sequences, axis=0)).numpy()
 
         # others
-        actions = tfl.stack(tfl.split(actions, num_sub_sequences))
-        action_probabilities = tfl.stack(tfl.split(action_probabilities, num_sub_sequences))
-        advantages = tfl.stack(tfl.split(advantages, num_sub_sequences))
-        returns = tfl.stack(tfl.split(returns, num_sub_sequences))
+        actions = tfl.stack(tfl.split(actions, num_sub_sequences)).numpy()
+        action_probabilities = tfl.stack(tfl.split(action_probabilities, num_sub_sequences)).numpy()
+        advantages = tfl.stack(tfl.split(advantages, num_sub_sequences)).numpy()
+        returns = tfl.stack(tfl.split(returns, num_sub_sequences)).numpy()
 
     # store this worker's gathering in a experience buffer
-    buffer = ExperienceBuffer(states, actions, action_probabilities, returns, advantages,
-                              episodes_completed, episode_rewards, episode_lengths)
+    buffer = ExperienceBuffer(states, actions, action_probabilities, returns,
+                              advantages, episodes_completed, episode_rewards, episode_lengths)
 
     dataset, stats = make_dataset_and_stats(buffer)
 
@@ -188,8 +192,8 @@ if __name__ == "__main__":
         j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
     # env_n = "CartPole-v1"
-    # p, v, j = build_ffn_distinct_models(gym.make(env_n))
-    # joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
+    # p, v, j = build_rnn_distinct_models(gym.make(env_n), 1)
+    # joint_tuple = ModelTuple(build_rnn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
-    ray.get(collect.remote(joint_tuple, 128, env_n, 0.99, 0.95, 8, 0))
+    ray.get(collect.remote(joint_tuple, 256, env_n, 0.99, 0.95, 2, 0))

@@ -95,18 +95,28 @@ def categorical_entropy(pmf: tf.Tensor):
 # MANIPULATION
 
 @tf.function
-def extract_discrete_action_probabilities(predictions, actions):
-    """Given a tensor of predictions with shape [None, None, n_actions] or [None, n_actions] and a 2D or 1D
-    tensor of actions extract the probabilities for the actions.
-    """
+def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Tensor) -> tf.Tensor:
+    """Given a tensor of predictions with shape [batch_size, sequence, n_actions] or [batch_size, n_actions] and a 2D or
+    1D tensor of actions with shape [batch_size, sequence_length] or [batch_size] extract the probabilities for the
+    actions."""
     assert len(actions.shape) in [1, 2], "Actions should be a tensor of rank 1 or 2."
+    assert len(predictions.shape) in [2, 3], "Predictions should be a tensor of rank 2 or 3."
 
-    if len(actions.shape) == 2:
-        # TODO
-        raise NotImplementedError("Discrete Action Spaces do not work with recurrent networks yet.")
+    if len(actions.shape) == 1:
+        indices = tf.concat([tf.reshape(tf.range(actions.shape[0]), [-1, 1]), tf.reshape(actions, [-1, 1])], axis=-1)
+        choices = tf.gather_nd(predictions, indices)
+    else:
+        batch_indices = tf.reshape(
+            tf.tile(tf.expand_dims(tf.range(actions.shape[0]), axis=-1), [1, actions.shape[1]]), [-1, 1])
+        sequence_indices = tf.reshape(
+            tf.tile(tf.expand_dims(tf.range(actions.shape[1]), axis=0), [1, actions.shape[0]]), [-1, 1])
 
-    indices = tf.concat([tf.reshape(tf.range(actions.shape[0]), [-1, 1]), tf.reshape(actions, [-1, 1])], axis=-1)
-    return tf.gather_nd(predictions, indices)
+        indices = tf.concat((batch_indices, sequence_indices, tf.reshape(actions, [-1, 1])), axis=-1)
+
+        choices = tf.gather_nd(predictions, indices)
+        choices = tf.reshape(choices, actions.shape)
+
+    return choices
 
 
 if __name__ == "__main__":

@@ -359,6 +359,7 @@ class PPOAgent:
                         ent, pi_loss, v_loss = self._learn_on_batch(b)
                 else:
                     # truncated back propagation through time
+                    # batch is expected to be of shape (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
                     split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
                     for i in range(len(b["advantage"])):
                         partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}

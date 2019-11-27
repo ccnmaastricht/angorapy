@@ -78,13 +78,14 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
     completed_episodes = buffer.episodes_completed
     numb_processed_frames = len(buffer.states)
 
+    # expand dims when constructing dataset to inject batch dimension
     if isinstance(buffer.states[0], numpy.ndarray):
         dataset = tf.data.Dataset.from_tensor_slices({
-            "state": buffer.states,
-            "action": buffer.actions,
-            "action_prob": buffer.action_probabilities,
-            "return": buffer.returns,
-            "advantage": buffer.advantages
+            "state": tf.expand_dims(buffer.states, axis=0),
+            "action": tf.expand_dims(buffer.actions, axis=0),
+            "action_prob": tf.expand_dims(buffer.action_probabilities, axis=0),
+            "return": tf.expand_dims(buffer.returns, axis=0),
+            "advantage": tf.expand_dims(buffer.advantages, axis=0)
         })
     elif isinstance(buffer.states, Tuple):
         dataset = tf.data.Dataset.from_tensor_slices({
