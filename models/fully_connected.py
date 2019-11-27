@@ -72,7 +72,6 @@ if __name__ == "__main__":
 
     pi, vn, pv = build_ffn_distinct_models(gym.make(env))
     s_pi, s_vn, s_pv = build_ffn_shared_models(gym.make(env))
-    pi.summary()
 
     plot_model(pv, "policy_value.png", show_shapes=True)
     plot_model(s_pv, "shared_policy_value.png", show_shapes=True)
