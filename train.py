@@ -24,7 +24,7 @@ def run_experiment(settings: argparse.Namespace):
     if settings.env == "ShadowHand-v1":
         build_models = build_shadow_brain
     else:
-        if settings.model == "fcn":
+        if settings.model == "ffn":
             build_models = build_ffn_distinct_models
         elif settings.model == "rnn":
             build_models = build_rnn_distinct_models
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping")
     parser.add_argument("--no-value-clip", action="store_false",
                         help=f"deactivate clipping in value network's objective")
-    parser.add_argument("--model", choices=["ffn", "rnn"], help=f"model type if not shadowhand")
+    parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
 
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")

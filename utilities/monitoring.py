@@ -47,7 +47,8 @@ class Monitor:
             if not os.path.isdir(self.story_directory):
                 raise ValueError("Given ID not found in experiments.")
 
-        tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", dpi=300)
+        tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
+                                  show_shapes=True, dpi=300)
         self.make_metadata()
         self.write_progress()
 
