@@ -13,13 +13,14 @@ To install all required python packages run
 pip install -r requirements.txt
 ```
 
-While this might not be necessary for most uses, when you want to use the keras model plotting, run
+Additionally fome libraries will be required:
 
 ```bash
 sudo apt-get install graphviz
 ```
 
-under any Debian-based Linux distribution.
+To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) as well as mujoco-py.
+
 
 ### Main Scripts
 

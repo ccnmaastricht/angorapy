@@ -9,18 +9,16 @@ from typing import Tuple, List
 import numpy
 import ray
 import tensorflow as tf
-from gym.spaces import Box
-from tqdm import tqdm
+from gym.spaces import Box, Dict
 
 import models
-from agent.core import estimate_advantage
+from agent.core import estimate_episode_advantages
 from agent.policy import act_discrete, act_continuous
 from environments import *
 from models import build_shadow_brain
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, StatBundle, ModelTuple
-from utilities.normalization import normalize_advantages
-from utilities.util import parse_state, add_state_dims, is_recurrent_model
+from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -35,26 +33,20 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     env_is_continuous = isinstance(env.action_space, Box)
     act = act_continuous if env_is_continuous else act_discrete
 
-    # load policy
+    # load policy TODO only one builder here
     if isinstance(model, str):
-        policy = tfl.keras.models.load_model(f"{model}/policy")
-        critic = tfl.keras.models.load_model(f"{model}/value")
-    elif isinstance(model, tuple):
-        policy_builder = getattr(models, model[0].model_builder)
-        value_builder = getattr(models, model[1].model_builder)
+        joint = tfl.keras.models.load_model(f"{model}/model")
+    elif isinstance(model, ModelTuple):
+        model_builder = getattr(models, model.model_builder)
 
         # recurrent policy needs batch size for statefulness
-        policy, _, _ = policy_builder(env, **({"bs": 1} if "bs" in fargs(policy_builder).args else {}))
-        _, critic, _ = value_builder(env, **({"bs": 1} if "bs" in fargs(policy_builder).args else {}))
-
-        # load the weights
-        policy.set_weights(model[0].weights)
-        critic.set_weights(model[1].weights)
+        _, _, joint = model_builder(env, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
+        joint.set_weights(model.weights)
     else:
         raise ValueError("Unknown input for model.")
 
     # check if there is a recurrent layer inside the model
-    is_recurrent = is_recurrent_model(policy)
+    is_recurrent = is_recurrent_model(joint)
     if is_recurrent:
         assert horizon % sub_sequence_length == 0, "Subsequence length for TBPTT would require cutting of part of the" \
                                                    " observations."
@@ -64,25 +56,35 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     episode_rewards, episode_lengths = [], []
 
     # go for it
-    states, rewards, actions, action_probabilities, t_is_terminal, values = [], [], [], [], [], []
+    states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
     state = parse_state(env.reset())
-    values.append(critic(add_state_dims(state, dims=2 if is_recurrent else 1)))
     for t in range(horizon):
-        # choose action and step
-        action, action_probability = act(policy, add_state_dims(state, dims=2 if is_recurrent else 1))
-        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
-
-        # remember experience
+        # based on the given state, predict action distribution and state value
+        action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
         states.append(state)
+        values.append(numpy.squeeze(value).item())
+
+        # from the action distribution sample an action and remember both the action and its probability
+        action, action_probability = act(action_distribution)
         actions.append(action)
         action_probabilities.append(action_probability)
+
+        # make a step based on the chosen action and collect the reward for this state
+        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
         rewards.append(reward)
-        t_is_terminal.append(done == 1)
         current_episode_return += reward
 
-        # next state
+        # depending on whether the state is terminal, choose the next state
         if done:
             state = parse_state(env.reset())
+
+            # calculate advantages for the finished episode, where the last value is 0 since it refers to the terminal
+            # state that we just observed
+            advantages.append(
+                estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0], discount, lam)
+            )
+
+            # update/reset some statistics and trackers
             episode_lengths.append(episode_steps)
             episode_rewards.append(current_episode_return)
             episodes_completed += 1
@@ -92,14 +94,22 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             state = parse_state(observation)
             episode_steps += 1
 
-        values.append(critic.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+    values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1].numpy().item())
+    if episode_steps > 1:
+        advantages.append(estimate_episode_advantages(rewards[-episode_steps + 1:],
+                                                      values[-episode_steps:],
+                                                      discount, lam))
+    advantages = tfl.convert_to_tensor(numpy.hstack(advantages), dtype=tfl.float32)
 
     env.close()
 
-    values = tfl.reshape(values, [-1])
-    advantages = estimate_advantage(rewards, values, t_is_terminal, gamma=discount, lam=lam)
+    # calculate advantage
+    values = tfl.convert_to_tensor(values, dtype=tfl.float32)
     returns = tfl.add(advantages, values[:-1])
-    advantages = normalize_advantages(advantages)
+
+    # normalize advantages
+    advantages = (advantages - tfl.reduce_mean(advantages)) / tfl.maximum(
+        tfl.math.reduce_std(advantages), 1e-6)
 
     # make TBPTT-compatible subsequences from transition vectors if model is recurrent
     if is_recurrent:
@@ -314,14 +324,19 @@ def condense_worker_outputs(worker_outputs: List[ExperienceBuffer]) -> Tuple[tf.
 
 
 if __name__ == "__main__":
+    os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env_name = "ShadowHand-v1"
-    policy, value, joint = build_shadow_brain(gym.make(env_name), 1)
+    env_n = "ShadowHand-v1"
+    env = gym.make(env_n)
+    p, v, j = build_shadow_brain(env, 1)
+    joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
+    if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
+        j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
-    policy_tuple = ModelTuple(build_shadow_brain.__name__, policy.get_weights())
-    critic_tuple = ModelTuple(build_shadow_brain.__name__, value.get_weights())
-    mods = (policy_tuple, critic_tuple)
+    # env_n = "CartPole-v1"
+    # p, v, j = build_ffn_distinct_models(gym.make(env_n))
+    # joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
-    collect.remote(mods, 1024, env_name, 0.99, 0.95, 0)
+    ray.get(collect.remote(joint_tuple, 128, env_n, 0.99, 0.95, 8, 0))

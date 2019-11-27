@@ -8,41 +8,59 @@
 </head>
 <body>
 
-<table class="table">
-    <thead class="thead-dark">
-        <tr>
-            <th scope="col">#</th>
-            <th scope="col">Agent ID</th>
-            <th scope="col">Environment</th>
-            <th scope="col">Date</th>
-        </tr>
-    </thead>
+<div class="container">
 
-    <tbody>
+    <div class="row justify-content-center mt-4 mb-4">
+        <h1 class="display-3">Experiments</h1>
+    </div>
 
-    <?php
-    $dirs = array_filter(glob('experiments/*', GLOB_ONLYDIR), 'is_dir');
+    <div class="row mt-4 mb-4 justify-content-center">
 
-    $count = 1;
-    foreach ($dirs as $agent_path) {
-        $agent_id = explode("/", $agent_path)[1];
-        $meta = json_decode(file_get_contents($agent_path . "/meta.json"), true);
-        ?><tr>
-            <th scope="row"><?php echo $count ?></th>
-            <td><a href="experiment.php?id=<?php echo $agent_id ?>"><?php echo $agent_id ?></a></td>
-            <td><?php echo $meta["environment"] ?></td>
-            <td><?php echo $meta["date"] ?></td>
-        </tr><?php
+        <form action="clean.php" method="get">
+            <button type="submit button" class="btn btn-warning">Remove All Empty</button>
+        </form>
 
-        $count++;
+    </div>
 
-    }
+    <table class="table">
+        <thead class="thead-dark">
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Agent ID</th>
+                <th scope="col">Environment</th>
+                <th scope="col">Date</th>
+                <th scope="col">Maximum Reward</th>
+            </tr>
+        </thead>
 
-    ?>
+        <tbody>
 
-    </tbody>
-</table>
+        <?php
+        $dirs = array_filter(glob('experiments/*', GLOB_ONLYDIR), 'is_dir');
 
+        $count = 1;
+        foreach ($dirs as $agent_path) {
+            $agent_id = explode("/", $agent_path)[1];
+            $meta = json_decode(file_get_contents($agent_path . "/meta.json"), true);
+            $progress = json_decode(file_get_contents($agent_path . "/progress.json"), true);
+
+            ?><tr>
+                <th scope="row"><?php echo $count ?></th>
+                <td><a href="experiment.php?id=<?php echo $agent_id ?>"><?php echo $agent_id ?></a></td>
+                <td><?php echo $meta["environment"]["name"] ?></td>
+                <td><?php echo $meta["date"] ?></td>
+                <td><?php echo max($progress["rewards"]) ?></td>
+            </tr><?php
+
+            $count++;
+
+        }
+
+        ?>
+
+        </tbody>
+    </table>
+</div>
 
 </body>
 </html>

@@ -11,8 +11,8 @@ from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 
 from environments import *
-from models.components import _build_visual_encoder, _build_non_visual_component, _build_continuous_head, \
-    _build_discrete_head
+from models.components import _build_fcn_component, _build_continuous_head, _build_discrete_head
+from models.convolutional import _build_visual_encoder
 from utilities.util import env_extract_dims
 
 
@@ -30,8 +30,8 @@ def build_shadow_brain(env: gym.Env, bs: int):
 
     # abstractions of perceptive inputs
     visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs, name="latent_vision"))(visual_in)
-    proprio_latent = TD(_build_non_visual_component(48, 12, 8, batch_size=bs, name="latent_proprio"))(proprio_in)
-    touch_latent = TD(_build_non_visual_component(92, 24, 8, batch_size=bs, name="latent_touch"))(touch_in)
+    proprio_latent = TD(_build_fcn_component(48, 12, 8, batch_size=bs, name="latent_proprio"))(proprio_in)
+    touch_latent = TD(_build_fcn_component(92, 24, 8, batch_size=bs, name="latent_touch"))(touch_in)
 
     # concatenation of perceptive abstractions
     concatenation = tf.keras.layers.Concatenate()([visual_latent, proprio_latent, touch_latent])

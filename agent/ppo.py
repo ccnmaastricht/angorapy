@@ -13,16 +13,15 @@ from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
 import gym
-import numpy
 import ray
 import tensorflow as tf
-from gym.spaces import Discrete, Box
+from gym.spaces import Discrete, Box, Dict
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
-from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy
-from agent.gather import collect, \
-    read_dataset_from_storage, condense_stats
+import models
+from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
+from agent.gather import collect, read_dataset_from_storage, condense_stats
 from agent.policy import act_discrete, act_continuous
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
@@ -92,16 +91,23 @@ class PPOAgent:
         self.clip_values = clip_values
         self.tbptt_length = tbptt_length
 
+        # learning rate schedule
+        self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=self.learning_rate,
+            decay_steps=1000,
+            decay_rate=0.98
+        )
+
         # models and optimizers
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
-        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate, epsilon=1e-5)
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
 
         # passing one sample, which for some reason prevents cuDNN init error
-        if "observation" in self.env.observation_space.sample():
+        if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
             self.joint(merge_into_batch(
                 [add_state_dims(self.env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
@@ -116,7 +122,8 @@ class PPOAgent:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory)
 
-        shutil.rmtree("storage/experience/")
+        if os.path.isdir("storage/experience"):
+            shutil.rmtree("storage/experience/")
         os.makedirs("storage/experience/", exist_ok=True)
 
         # statistics
@@ -127,8 +134,8 @@ class PPOAgent:
         self.cycle_reward_history = []
         self.cycle_length_history = []
         self.entropy_history = []
-        self.actor_loss_history = []
-        self.critic_loss_history = []
+        self.policy_loss_history = []
+        self.value_loss_history = []
         self.time_dicts = []
 
     def set_gpu(self, activated: bool):
@@ -190,11 +197,11 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(gaussian_entropy(stdevs=policy_output[:, self.n_actions:]))
+            return tf.reduce_mean(gaussian_entropy(stdevs=tf.split(policy_output, 2, axis=-1)))
         else:
             return tf.reduce_mean(categorical_entropy(policy_output))
 
-    def drill(self, n: int, epochs: int, batch_size: int, story_teller=None, export: bool = False, save_every: int = 0,
+    def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
@@ -204,7 +211,7 @@ class PPOAgent:
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
             batch_size (int): batch size for the optimization
-            story_teller: story telling object that creates visualizations of the training process on the fly (Default
+            monitor: story telling object that creates visualizations of the training process on the fly (Default
                 value = None)
             export (bool): boolean indicator for whether communication with workers is achieved through file saving
                 or direct weight passing (Default value = False)
@@ -237,16 +244,13 @@ class PPOAgent:
             # export the current state of the policy and value network under unique (-enough) key
             name_key = round(time.time())
             if export:
-                self.policy.save(f"{self.model_export_dir}/{name_key}/policy")
-                self.value.save(f"{self.model_export_dir}/{name_key}/value")
-                models = f"{self.model_export_dir}/{name_key}/"
+                self.joint.save(f"{self.model_export_dir}/{name_key}/model")
+                model_representation = f"{self.model_export_dir}/{name_key}/"
             else:
-                policy_tuple = ModelTuple(self.builder_function_name, self.policy.get_weights())
-                critic_tuple = ModelTuple(self.builder_function_name, self.value.get_weights())
-                models = (policy_tuple, critic_tuple)
+                model_representation = ModelTuple(self.builder_function_name, self.joint.get_weights())
 
             # create processes and execute them
-            result_ids = [collect.remote(models, self.horizon, self.env_name, self.discount, self.lam,
+            result_ids = [collect.remote(model_representation, self.horizon, self.env_name, self.discount, self.lam,
                                          self.tbptt_length, pid) for pid in range(self.workers)]
             split_stats = [ray.get(oi) for oi in result_ids]
             stats = condense_stats(split_stats)
@@ -296,20 +300,22 @@ class PPOAgent:
             subprocess_start = time.time()
 
             flat_print("Finalizing...")
-            self.time_dicts.append(time_dict)
-            self.current_fps = stats.numb_processed_frames * (int(self.is_recurrent) * self.tbptt_length) / (
-                sum([v for v in time_dict.values() if v is not None]))
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
-            if story_teller is not None and story_teller.frequency != 0 and (
-                    self.iteration + 1) % story_teller.frequency == 0:
+            # calculate processing speed in fps
+            self.time_dicts.append(time_dict)
+            fps_multiplier = self.tbptt_length if self.is_recurrent else 1
+            self.current_fps = stats.numb_processed_frames * fps_multiplier / (
+                sum([v for v in time_dict.values() if v is not None]))
+
+            if monitor is not None and monitor.frequency != 0 and (
+                    self.iteration + 1) % monitor.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
-                story_teller.create_episode_gif(n=3)
-            story_teller.update()
+                monitor.create_episode_gif(n=3)
+            monitor.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
-                print("Saving the current state of the agent.")
                 self.save_agent_state()
 
             time_dict["finalizing"] = time.time() - subprocess_start
@@ -335,7 +341,7 @@ class PPOAgent:
             None
         """
         progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size), leave=False)
-        actor_loss_history, critic_loss_history, entropy_history = [], [], []
+        policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
             # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate shuffling sensitive to stateful orderedness
@@ -347,9 +353,9 @@ class PPOAgent:
                 with tf.device(self.device):
                     ent, pi_loss, v_loss = self._learn_on_batch(b)
 
-                entropies.append(tf.reduce_mean(ent))
-                actor_epoch_losses.append(tf.reduce_mean(pi_loss))
-                value_epoch_losses.append(tf.reduce_mean(v_loss))
+                entropies.append(ent)
+                actor_epoch_losses.append(pi_loss)
+                value_epoch_losses.append(v_loss)
 
                 progressbar.update(1)
 
@@ -357,13 +363,13 @@ class PPOAgent:
             self.joint.reset_states()
 
             # remember some statistics
-            actor_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
-            critic_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+            policy_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
+            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
             entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         # store statistics in agent history
-        self.actor_loss_history.extend(actor_loss_history)
-        self.critic_loss_history.extend(critic_loss_history)
+        self.policy_loss_history.extend(policy_loss_history)
+        self.value_loss_history.extend(value_loss_history)
         self.entropy_history.extend(entropy_history)
 
         progressbar.close()
@@ -385,8 +391,7 @@ class PPOAgent:
                                                     stdevs=stdevs)
             else:
                 # if the action space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = tf.convert_to_tensor(
-                    [policy_output[i][a] for i, a in enumerate(batch["action"])])
+                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
             # calculate the clipped loss
             policy_loss = self.policy_loss(action_prob=action_probabilities,
@@ -405,7 +410,7 @@ class PPOAgent:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
-        return entropy, policy_loss, value_loss
+        return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def evaluate(self, n: int, render=False) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
@@ -427,10 +432,11 @@ class PPOAgent:
             length = 0
             state = parse_state(self.env.reset())
             while not done:
-                action, action_prob = policy_act(self.policy, add_state_dims(state, dims=2 if is_recurrent else 1))
+                probabilities = self.policy(add_state_dims(state, dims=2 if is_recurrent else 1))
+                action, action_prob = policy_act(probabilities)
                 self.env.render() if render else None
                 observation, reward, done, _ = self.env.step(action)
-                state = parse_state(self.env.reset())
+                state = parse_state(observation)
                 reward_trajectory.append(reward)
                 length += 1
 
@@ -453,14 +459,14 @@ class PPOAgent:
                    f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
                    f"AvgEnt.: {nc}{0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2):5.2f}{ec}; "
                    f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
+                   f"Lr: {nc}{self.lr_schedule(self.optimizer.iterations):.2e}{ec}; "
                    f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                    f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                    f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
 
     def save_agent_state(self):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
-        self.policy.save(self.agent_directory + f"/{self.iteration}/policy")
-        self.value.save(self.agent_directory + f"/{self.iteration}/value")
+        self.joint.save_weights(self.agent_directory + f"/{self.iteration}/weights")
 
         with open(self.agent_directory + f"/{self.iteration}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
@@ -469,8 +475,11 @@ class PPOAgent:
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
         del parameters["env"]
-        del parameters["policy"], parameters["value"], parameters["policy_value"]
-        del parameters["policy_optimizer"], parameters["value_optimizer"]
+        del parameters["policy"], parameters["value"], parameters["joint"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"]
+
+        parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
+        parameters["c_value"] = parameters["c_value"].numpy().item()
 
         return parameters
 
@@ -493,19 +502,32 @@ class PPOAgent:
             raise FileNotFoundError("The given agent ID's save history is empty.")
 
         latest = max([int(re.match("([0-9]+)", fn).group(0)) for fn in os.listdir(agent_path)])
-        policy = tf.keras.models.load_model(f"{agent_path}/{latest}/policy")
-        value = tf.keras.models.load_model(f"{agent_path}/{latest}/value")
-
+        print(f"Loading from most recent iteration {latest}.")
         with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
             parameters = json.load(f)
 
-        env = gym.make(parameters["env_name"])
-        example_input = env.reset().reshape([1, -1]).astype(numpy.float32)
-        value.predict(example_input)
+        model_builder = getattr(models, parameters["builder_function_name"])
 
-        loaded_agent = PPOAgent(policy, value, env, parameters["horizon"], parameters["workers"], _make_dirs=False)
+        env = gym.make(parameters["env_name"])
+
+        loaded_agent = PPOAgent(model_builder,
+                                environment=env,
+                                horizon=parameters["horizon"],
+                                workers=parameters["workers"],
+                                learning_rate=parameters["learning_rate"],
+                                discount=parameters["discount"],
+                                lam=parameters["lam"],
+                                clip=parameters["clip"],
+                                c_entropy=parameters["c_entropy"],
+                                c_value=parameters["c_value"],
+                                gradient_clipping=parameters["gradient_clipping"],
+                                clip_values=parameters["clip_values"],
+                                tbptt_length=parameters["tbptt_length"],
+                                _make_dirs=False)
 
         for p, v in parameters.items():
             loaded_agent.__dict__[p] = v
+
+        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{latest}/weights")
 
         return loaded_agent

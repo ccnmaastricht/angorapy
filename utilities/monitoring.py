@@ -12,6 +12,8 @@ import numpy
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
+from matplotlib.axes import Axes
+from scipy.signal import savgol_filter
 
 from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
@@ -25,7 +27,7 @@ def scale(vector):
     return (numpy.array(vector) - min(vector)) / (max(vector) - min(vector))
 
 
-class StoryTeller:
+class Monitor:
     """Monitor for learning progress."""
 
     def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
@@ -47,6 +49,7 @@ class StoryTeller:
 
         tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", dpi=300)
         self.make_metadata()
+        self.write_progress()
 
     def create_episode_gif(self, n: int):
         """Make n GIFs with the current policy."""
@@ -62,7 +65,8 @@ class StoryTeller:
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
-                action, _ = act(self.agent.policy, state)
+                probabilities = self.agent.policy(state)
+                action, _ = act(probabilities)
                 observation, reward, done, _ = self.env.step(action)
                 state = tf.expand_dims(observation.astype(numpy.float32), axis=0)
 
@@ -96,8 +100,8 @@ class StoryTeller:
                 continuous=str(self.agent.continuous_control),
                 learning_rate=str(self.agent.learning_rate),
                 epsilon_clip=str(self.agent.clip),
-                entropy_coefficient=str(self.agent.c_entropy),
-                value_coefficient=str(self.agent.c_value),
+                entropy_coefficient=str(self.agent.c_entropy.numpy().item()),
+                value_coefficient=str(self.agent.c_value.numpy().item()),
                 horizon=str(self.agent.horizon),
                 workers=str(self.agent.workers),
                 discount=str(self.agent.discount),
@@ -123,6 +127,12 @@ class StoryTeller:
             json.dump(progress, f)
 
     def _make_graph(self, ax, lines, labels, name):
+        ax.set_title(ax.get_title(),
+                     fontdict={'fontsize': "large",
+                               'fontweight': "bold",
+                               'verticalalignment': 'baseline',
+                               'horizontalalignment': "center"}
+                     )
         ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15),
                   fancybox=True, shadow=True, ncol=5)
         plt.savefig(f"{self.story_directory}/{name}.svg", format="svg", bbox_inches="tight")
@@ -132,14 +142,25 @@ class StoryTeller:
 
         # reward plot
         fig, ax = plt.subplots()
-        ax.set_title("Mean Rewards and Episode Lengths for Each Training Cycle.")
-        ax.set_xlabel("Iteration")
-        ax.set_ylabel("Accumulative Reward")
+        ax.set_title("Mean Rewards and Episode Lengths.")
+        ax.set_xlabel("Iteration (Cycle)")
+        ax.set_ylabel("Mean Episode Reward")
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Episode Steps")
 
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red")
-        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="blue")
+        # average lengths
+        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
+        if len(self.agent.cycle_reward_history) > 11:
+            twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange")
+
+        # average rewards
+        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3)
+        if len(self.agent.cycle_reward_history) > 11:
+            ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red")
+
+        if self.agent.env.spec.reward_threshold is not None:
+            ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
+
         lines = r_line + l_line
         labels = [l.get_label() for l in lines]
 
@@ -148,16 +169,26 @@ class StoryTeller:
 
         # entropy, loss plot
         fig, ax = plt.subplots()
+        ax: Axes
         ax.set_title("Entropy and Loss.")
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Loss")
         twin_ax = ax.twinx()
         twin_ax.set_ylabel("Entropy")
 
-        actor_loss_line = ax.plot(scale(self.agent.actor_loss_history), label="Policy Loss (Normalized)")
-        critic_loss_line = ax.plot(scale(self.agent.critic_loss_history), label="Critic Loss (Normalized)")
-        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green")
-        lines = actor_loss_line + critic_loss_line + entropy_line
+        policy_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)", alpha=0.3)
+        if len(self.agent.policy_loss_history) > 11:
+            ax.plot(savgol_filter(scale(self.agent.policy_loss_history), 11, 3), color=policy_loss_line[-1].get_color())
+
+        value_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Value Loss (Normalized)", alpha=0.3)
+        if len(self.agent.value_loss_history) > 11:
+            ax.plot(savgol_filter(scale(self.agent.value_loss_history), 11, 3), color=value_loss_line[-1].get_color())
+
+        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green", alpha=0.3)
+        if len(self.agent.entropy_history) > 11:
+            ax.plot(savgol_filter(scale(self.agent.entropy_history), 11, 3), color=entropy_line[-1].get_color())
+
+        lines = policy_loss_line + value_loss_line + entropy_line
         labels = [l.get_label() for l in lines]
 
         self._make_graph(ax, lines, labels, "loss_plot")

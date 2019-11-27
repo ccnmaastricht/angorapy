@@ -1,15 +1,18 @@
 #!/usr/bin/env python
-"""Core functionality of the module such as advantage estimation and several probabilistic calculations."""
+"""Core methods providing functionality to the agent."""
 import math
 import os
 from itertools import accumulate
 from typing import List
 
 import numpy
+import scipy
 import tensorflow as tf
 
 
 # RETURN/ADVANTAGE CALCULATION
+from scipy.signal import lfilter
+
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):
     """Discounted future rewards calculation using itertools. Way faster than list comprehension."""
@@ -38,7 +41,7 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
     :return:                    the estimations about the returns of a trajectory
     """
     if numpy.size(rewards, 0) - numpy.size(values, 0) != -1:
-        raise ValueError("Values must include one more prediction than there are states.")
+        raise ValueError("Values must include one more prediction than there are rewards.")
 
     total_steps = numpy.size(rewards, 0)
     return_estimations = numpy.ndarray(shape=(total_steps,)).astype(numpy.float32)
@@ -58,8 +61,15 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
     return return_estimations
 
 
+def estimate_episode_advantages(rewards, values, gamma, lam):
+    """Estimate advantage of a single episode (or part of it), taken from Open AI's spinning up repository."""
+    deltas = rewards + gamma * numpy.array(values[1:]) - numpy.array(values[:-1])
+    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1]
+
+
 # PROBABILITY
 
+@tf.function
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     """Calculate probability density for a given batch of potentially joint Gaussian PDF."""
     samples_transformed = (samples - means) / stdevs
@@ -67,6 +77,7 @@ def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     return tf.math.reduce_prod(pdf, axis=-1)
 
 
+@tf.function
 def gaussian_entropy(stdevs: tf.Tensor):
     """Calculate the joint entropy of Gaussian random variables described by their standard deviations.
 
@@ -77,9 +88,27 @@ def gaussian_entropy(stdevs: tf.Tensor):
     return tf.reduce_sum(entropy, axis=-1)
 
 
+@tf.function
 def categorical_entropy(pmf: tf.Tensor):
     """Calculate entropy of a categorical distribution."""
-    return - tf.reduce_sum(pmf * tf.math.log(pmf), 1)
+    return - tf.reduce_sum(pmf * tf.math.log(pmf), axis=-1)
+
+
+# MANIPULATION
+
+@tf.function
+def extract_discrete_action_probabilities(predictions, actions):
+    """Given a tensor of predictions with shape [None, None, n_actions] or [None, n_actions] and a 2D or 1D
+    tensor of actions extract the probabilities for the actions.
+    """
+    assert len(actions.shape) in [1, 2], "Actions should be a tensor of rank 1 or 2."
+
+    if len(actions.shape) == 2:
+        # TODO
+        raise NotImplementedError("Discrete Action Spaces do not work with recurrent networks yet.")
+
+    indices = tf.concat([tf.reshape(tf.range(actions.shape[0]), [-1, 1]), tf.reshape(actions, [-1, 1])], axis=-1)
+    return tf.gather_nd(predictions, indices)
 
 
 if __name__ == "__main__":

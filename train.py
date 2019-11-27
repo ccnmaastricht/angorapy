@@ -4,13 +4,13 @@ import os
 
 import argcomplete
 from gym.spaces import Box
+from models.hybrid import build_shadow_brain
 
 from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
-from models.hybrid import build_shadow_brain
 from utilities.const import COLORS
-from utilities.monitoring import StoryTeller
+from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -61,12 +61,12 @@ def run_experiment(settings: argparse.Namespace):
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
+    monitor = Monitor(agent, env, frequency=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
-    teller = StoryTeller(agent, env, frequency=0)
 
     # train
-    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, story_teller=teller,
+    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
     agent.save_agent_state()
@@ -79,8 +79,8 @@ if __name__ == "__main__":
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
-    parser.add_argument("-e", "--env", type=str, default="ShadowHand-v1", choices=all_envs)
-    parser.add_argument("-w", "--workers", type=int, default=4, help=f"the number of workers exploring the environment")
+    parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
+    parser.add_argument("-w", "--workers", type=int, default=8, help=f"the number of workers exploring the environment")
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("-i", "--iterations", type=int, default=1000, help=f"number of iterations before training ends")
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
-    parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
+    parser.add_argument("--tbptt", type=int, default=8, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping")
     parser.add_argument("--no-value-clip", action="store_false",
                         help=f"deactivate clipping in value network's objective")
@@ -101,8 +101,11 @@ if __name__ == "__main__":
     parser.add_argument("--export-file", type=int, default=None,
                         help=f"save/read policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
-    parser.add_argument("--save_every", type=int, default=0,
+    parser.add_argument("--save-every", type=int, default=0,
                         help=f"save agent every given number of iterations (0 for no saving)")
+    parser.add_argument("--gif-every", type=int, default=0,
+                        help=f"make three gifs of the agent in the environment every given number of iterations "
+                             f"(0 for never).")
 
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
     argcomplete.autocomplete(parser)

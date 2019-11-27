@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy
 
 from environments import *

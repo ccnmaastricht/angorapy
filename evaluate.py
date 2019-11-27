@@ -8,12 +8,12 @@ from agent.ppo import PPOAgent
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-AGENT_ID = 1571837490
+AGENT_ID = 1574781207
 
 agent = PPOAgent.from_agent_state(AGENT_ID)
 print(f"Agent {AGENT_ID} successfully loaded.")
 
-rewards = agent.evaluate(10)
+lengths, rewards = agent.evaluate(10)
 
 average_reward = round(statistics.mean(rewards), 2)
 std_reward = round(statistics.stdev(rewards), 2)
