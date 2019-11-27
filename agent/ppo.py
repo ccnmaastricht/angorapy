@@ -354,16 +354,17 @@ class PPOAgent:
             actor_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
-                if not self.is_recurrent:
-                    with tf.device(self.device):
+                with tf.device(self.device):
+                    if not self.is_recurrent:
+                        # b = {k: tf.squeeze(v, axis=0) for k, v in b.items()}
                         ent, pi_loss, v_loss = self._learn_on_batch(b)
-                else:
-                    # truncated back propagation through time
-                    # batch is expected to be of shape (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
-                    split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
-                    for i in range(len(b["advantage"])):
-                        partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
-                        ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                    else:
+                        # truncated back propagation through time
+                        # batch is expected to be of shape (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
+                        split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
+                        for i in range(len(b["advantage"])):
+                            partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
+                            ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
 
                 entropies.append(ent)
                 actor_epoch_losses.append(pi_loss)

@@ -81,11 +81,11 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
     # expand dims when constructing dataset to inject batch dimension
     if isinstance(buffer.states[0], numpy.ndarray):
         dataset = tf.data.Dataset.from_tensor_slices({
-            "state": tf.expand_dims(buffer.states, axis=0),
-            "action": tf.expand_dims(buffer.actions, axis=0),
-            "action_prob": tf.expand_dims(buffer.action_probabilities, axis=0),
-            "return": tf.expand_dims(buffer.returns, axis=0),
-            "advantage": tf.expand_dims(buffer.advantages, axis=0)
+            "state": buffer.states,
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages
         })
     elif isinstance(buffer.states, Tuple):
         dataset = tf.data.Dataset.from_tensor_slices({
@@ -93,14 +93,14 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
             # "in_proprio": [x[1] for x in buffer.states],
             # "in_touch": [x[2] for x in buffer.states],
             # "in_goal": [x[3] for x in buffer.states],
-            "in_vision": tf.expand_dims(buffer.states[0], axis=0),
-            "in_proprio": tf.expand_dims(buffer.states[1], axis=0),
-            "in_touch": tf.expand_dims(buffer.states[2], axis=0),
-            "in_goal": tf.expand_dims(buffer.states[3], axis=0),
-            "action": tf.expand_dims(buffer.actions, axis=0),
-            "action_prob": tf.expand_dims(buffer.action_probabilities, axis=0),
-            "return": tf.expand_dims(buffer.returns, axis=0),
-            "advantage": tf.expand_dims(buffer.advantages, axis=0),
+            "in_vision": buffer.states[0],
+            "in_proprio": buffer.states[1],
+            "in_touch": buffer.states[2],
+            "in_goal": buffer.states[3],
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages,
         })
     else:
         raise NotImplementedError(f"Cannot handle state type {type(buffer.states[0])}")

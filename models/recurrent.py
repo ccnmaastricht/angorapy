@@ -22,8 +22,8 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
     x.set_shape([bs] + x.shape[1:])
     x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
 
-    out_policy = _build_continuous_head(n_actions, (32, ), bs)(x) if continuous_control \
-        else _build_discrete_head(n_actions, (32, ), bs)(x)
+    out_policy = _build_continuous_head(n_actions, x.shape[1:], bs)(x) if continuous_control \
+        else _build_discrete_head(n_actions, x.shape[1:], bs)(x)
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
 
     # value network

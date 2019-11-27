@@ -13,7 +13,7 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_shadow_brain, build_rnn_distinct_models
+from models import build_shadow_brain, build_rnn_distinct_models, build_ffn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
@@ -117,15 +117,16 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         # states
         if is_shadow_brain:
             feature_tensors = [tfl.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
-            states = tuple(map(lambda x: tfl.stack(tfl.split(x, num_sub_sequences)), feature_tensors))
+            states = tuple(map(lambda x: tfl.expand_dims(tfl.stack(tfl.split(x, num_sub_sequences)), axis=0),
+                               feature_tensors))
         else:
-            states = tfl.stack(tfl.split(states, num_sub_sequences, axis=0)).numpy()
+            states = tfl.expand_dims(tfl.stack(tfl.split(states, num_sub_sequences, axis=0)), axis=0).numpy()
 
-        # others
-        actions = tfl.stack(tfl.split(actions, num_sub_sequences)).numpy()
-        action_probabilities = tfl.stack(tfl.split(action_probabilities, num_sub_sequences)).numpy()
-        advantages = tfl.stack(tfl.split(advantages, num_sub_sequences)).numpy()
-        returns = tfl.stack(tfl.split(returns, num_sub_sequences)).numpy()
+        # others, expanding dims to inject batch dimension
+        actions = tfl.expand_dims(tfl.stack(tfl.split(actions, num_sub_sequences)), axis=0).numpy()
+        action_probabilities = tfl.expand_dims(tfl.stack(tfl.split(action_probabilities, num_sub_sequences)), axis=0).numpy()
+        advantages = tfl.expand_dims(tfl.stack(tfl.split(advantages, num_sub_sequences)), axis=0).numpy()
+        returns = tfl.expand_dims(tfl.stack(tfl.split(returns, num_sub_sequences)), axis=0).numpy()
 
     # store this worker's gathering in a experience buffer
     buffer = ExperienceBuffer(states, actions, action_probabilities, returns,
@@ -184,16 +185,16 @@ if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env_n = "ShadowHand-v1"
-    env = gym.make(env_n)
-    p, v, j = build_shadow_brain(env, 1)
-    joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
-    if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
-        j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
+    # env_n = "ShadowHand-v1"
+    # env = gym.make(env_n)
+    # p, v, j = build_shadow_brain(env, 1)
+    # joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
+    # if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
+    #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
-    # env_n = "CartPole-v1"
-    # p, v, j = build_rnn_distinct_models(gym.make(env_n), 1)
-    # joint_tuple = ModelTuple(build_rnn_distinct_models.__name__, j.get_weights())
+    env_n = "CartPole-v1"
+    p, v, j = build_ffn_distinct_models(gym.make(env_n))
+    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
     ray.get(collect.remote(joint_tuple, 256, env_n, 0.99, 0.95, 2, 0))
