@@ -105,6 +105,8 @@ class PPOAgent:
             model_builder).args else {}))
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
+        if not self.is_recurrent:
+            self.tbptt_length = 1
 
         # passing one sample, which for some reason prevents cuDNN init error
         if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
@@ -226,7 +228,8 @@ class PPOAgent:
         if self.is_recurrent and batch_size > self.workers:
             logging.warning(
                 f"Batchsize is larger than possible with the available number of independent sequences for "
-                f"Truncated BPTT. Setting batchsize to {self.workers}")
+                f"Truncated BPTT. Setting batchsize to {self.workers}, which means {self.workers * self.tbptt_length} "
+                f"transitions per batch.")
             batch_size = self.workers
 
         ray.init(local_mode=self.debug, logging_level=logging.ERROR)
@@ -355,6 +358,7 @@ class PPOAgent:
                 with tf.device(self.device):
                     if not self.is_recurrent:
                         ent, pi_loss, v_loss = self._learn_on_batch(b)
+                        progressbar.update(1)
                     else:
                         # truncated back propagation through time
                         # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
@@ -362,12 +366,12 @@ class PPOAgent:
                         for i in range(len(b["advantage"])):
                             partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
                             ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                            progressbar.update(1)
 
                 entropies.append(ent)
                 actor_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
 
-                progressbar.update(1)
 
             # reset RNN states after an epoch if there are any
             self.joint.reset_states()

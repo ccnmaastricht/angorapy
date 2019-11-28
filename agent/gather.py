@@ -123,7 +123,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             states = tuple(map(lambda x: np.expand_dims(np.stack(np.split(x, num_sub_sequences)), axis=0),
                                feature_tensors))
         else:
-            states = np.expand_dims(np.stack(np.split(states, num_sub_sequences, axis=0)), axis=0)
+            states = np.expand_dims(np.stack(np.split(np.array(states), num_sub_sequences, axis=0)), axis=0)
 
         # others, expanding dims to inject batch dimension
         actions = np.expand_dims(np.stack(np.split(actions, num_sub_sequences)), axis=0)

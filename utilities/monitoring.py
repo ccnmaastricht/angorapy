@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 import time
+from inspect import getfullargspec as fargs
 
 import gym
 import matplotlib
@@ -17,6 +18,7 @@ from scipy.signal import savgol_filter
 
 from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
+from utilities.util import parse_state, add_state_dims
 
 PATH_TO_EXPERIMENTS = "monitor/experiments/"
 matplotlib.use('Agg')
@@ -56,20 +58,26 @@ class Monitor:
         """Make n GIFs with the current policy."""
         act = act_continuous if self.continuous_control else act_discrete
 
+        # rebuild model with batch size of 1
+        policy, _, _ = self.agent.model_builder(self.env,
+                                                **({"bs": 1} if "bs" in fargs(self.agent.model_builder).args else {}))
+        policy.set_weights(self.agent.policy.get_weights())
+
         for i in range(n):
             episode_letter = chr(97 + i)
 
             # collect an episode
             done = False
             frames = []
-            state = tf.expand_dims(self.env.reset().astype(numpy.float32), axis=0)
+            state = parse_state(self.env.reset())
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
-                probabilities = self.agent.policy(state)
+                probabilities = policy.predict(add_state_dims(state, dims=2 if self.agent.is_recurrent else 1))
                 action, _ = act(probabilities)
-                observation, reward, done, _ = self.env.step(action)
-                state = tf.expand_dims(observation.astype(numpy.float32), axis=0)
+                observation, reward, done, _ = self.env.step(
+                    numpy.atleast_1d(action) if self.continuous_control else action)
+                state = parse_state(observation)
 
             # the figure
             plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
@@ -152,12 +160,12 @@ class Monitor:
         # average lengths
         l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
         if len(self.agent.cycle_reward_history) > 11:
-            twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange")
+            l_line = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange", label="Episode Length")
 
         # average rewards
         r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3)
         if len(self.agent.cycle_reward_history) > 11:
-            ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red")
+            r_line = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red", label="Average Reward")
 
         if self.agent.env.spec.reward_threshold is not None:
             ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
@@ -179,15 +187,18 @@ class Monitor:
 
         policy_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)", alpha=0.3)
         if len(self.agent.policy_loss_history) > 11:
-            ax.plot(savgol_filter(scale(self.agent.policy_loss_history), 11, 3), color=policy_loss_line[-1].get_color())
+            policy_loss_line = ax.plot(savgol_filter(scale(self.agent.policy_loss_history), 11, 3),
+                                       color=policy_loss_line[-1].get_color(), label="Policy Loss (Normalized)")
 
         value_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Value Loss (Normalized)", alpha=0.3)
         if len(self.agent.value_loss_history) > 11:
-            ax.plot(savgol_filter(scale(self.agent.value_loss_history), 11, 3), color=value_loss_line[-1].get_color())
+            value_loss_line = ax.plot(savgol_filter(scale(self.agent.value_loss_history), 11, 3),
+                                      color=value_loss_line[-1].get_color(), label="Value Loss (Normalized)")
 
         entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green", alpha=0.3)
         if len(self.agent.entropy_history) > 11:
-            ax.plot(savgol_filter(scale(self.agent.entropy_history), 11, 3), color=entropy_line[-1].get_color())
+            entropy_line = ax.plot(savgol_filter(scale(self.agent.entropy_history), 11, 3),
+                                   color=entropy_line[-1].get_color(), label="Entropy")
 
         lines = policy_loss_line + value_loss_line + entropy_line
         labels = [l.get_label() for l in lines]
