@@ -16,7 +16,7 @@ from models.convolutional import _build_visual_encoder
 from utilities.util import env_extract_dims
 
 
-def build_shadow_brain(env: gym.Env, bs: int):
+def build_shadow_brain_v1(env: gym.Env, bs: int):
     """Build network for the shadow hand task."""
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
@@ -52,10 +52,64 @@ def build_shadow_brain(env: gym.Env, bs: int):
         n_actions, o.shape[1:], bs)(o)
     value_out = tf.keras.layers.Dense(1, name="value")(o)
 
-    # define separate and joint models
-    policy = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[policy_out])
-    value = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[value_out])
-    joint = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in], outputs=[policy_out, value_out])
+    # define models
+    policy = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
+                            outputs=[policy_out], name="shadow_brain_v1_policy")
+    value = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
+                           outputs=[value_out], name="shadow_brain_v1_value")
+    joint = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
+                           outputs=[policy_out, value_out], name="shadow_brain_v1")
+
+    return policy, value, joint
+
+
+def build_shadow_brain_v2(env: gym.Env, bs: int):
+    """Build network for the shadow hand task, version 2."""
+    continuous_control = isinstance(env.action_space, Box)
+    state_dimensionality, n_actions = env_extract_dims(env)
+    hidden_dimensions = 32
+
+    # inputs
+    visual_in = tf.keras.Input(batch_shape=(bs, None, 224, 224, 3), name="visual_input")
+    proprio_in = tf.keras.Input(batch_shape=(bs, None, 48,), name="proprioceptive_input")
+    touch_in = tf.keras.Input(batch_shape=(bs, None, 92,), name="somatosensory_input")
+    goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
+
+    # abstractions of perceptive inputs
+    visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs, name="latent_vision"))(visual_in)
+    visual_latent = TD(tf.keras.layers.Dense(128))(visual_latent)
+    visual_latent.set_shape([bs] + visual_latent.shape[1:])
+    visual_plus_goal = tf.keras.layers.Concatenate()([visual_latent, goal_in])
+    eigengrasps = TD(tf.keras.layers.Dense(20))(visual_plus_goal)
+
+    # concatenation of touch and proprioception
+    proprio_touch = tf.keras.layers.Concatenate()([proprio_in, touch_in])
+    proprio_touch_latent = TD(tf.keras.layers.Dense(20))(proprio_touch)
+    proprio_touch_latent = TD(tf.keras.layers.ReLU())(proprio_touch_latent)
+
+    # concatenation of goal and perception
+    proprio_touch_latent.set_shape([bs] + proprio_touch_latent.shape[1:])
+    eigengrasps.set_shape([bs] + eigengrasps.shape[1:])
+    x = tf.keras.layers.Concatenate()([goal_in, eigengrasps, proprio_touch_latent])
+
+    # recurrent layer
+    rnn_out = tf.keras.layers.GRU(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
+
+    # output heads
+    if continuous_control:
+        policy_out = _build_continuous_head(n_actions, rnn_out.shape[1:], bs)(rnn_out)
+    else:
+        policy_out = _build_discrete_head(n_actions, rnn_out.shape[1:], bs)(rnn_out)
+
+    value_out = tf.keras.layers.Dense(1, name="value")(rnn_out)
+
+    # define models
+    policy = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
+                            outputs=[policy_out], name="shadow_brain_v2_policy")
+    value = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
+                           outputs=[value_out], name="shadow_brain_v2_value")
+    joint = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
+                           outputs=[policy_out, value_out], name="shadow_brain_v2")
 
     return policy, value, joint
 
@@ -74,8 +128,8 @@ if __name__ == "__main__":
     batch_size = 256
 
     env = gym.make("ShadowHand-v1")
-    _, _, joint = build_shadow_brain(env, bs=batch_size)
-    plot_model(joint, to_file="model.png")
+    _, _, joint = build_shadow_brain_v2(env, bs=batch_size)
+    plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
 

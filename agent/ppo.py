@@ -313,7 +313,7 @@ class PPOAgent:
             if monitor is not None and monitor.frequency != 0 and (
                     self.iteration + 1) % monitor.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
-                monitor.create_episode_gif(n=3)
+                monitor.create_episode_gif(n=1)
             monitor.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:

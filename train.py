@@ -4,7 +4,7 @@ import os
 
 import argcomplete
 from gym.spaces import Box
-from models.hybrid import build_shadow_brain
+from models.hybrid import build_shadow_brain_v1
 
 from agent.ppo import PPOAgent
 from environments import *
@@ -22,7 +22,7 @@ def run_experiment(settings: argparse.Namespace):
 
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
-        build_models = build_shadow_brain
+        build_models = build_shadow_brain_v1
     else:
         if settings.model == "ffn":
             build_models = build_ffn_distinct_models
