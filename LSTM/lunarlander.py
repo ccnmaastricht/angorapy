@@ -35,7 +35,7 @@ class DQNSolver:
         #self.model = _buildingblock_network(self.observation_space, self.action_space, 24)
         self.model.compile(loss="mse",
                            optimizer=Adam(lr=LEARNING_RATE))
-        utils.plot_model(self.model, 'lunarlander_network.png')
+        utils.plot_model(self.model, 'lunarlander_network.png', show_shapes=True)
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))

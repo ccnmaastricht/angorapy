@@ -217,4 +217,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# iCloud
+*.icloud
+
 # End of https://www.gitignore.io/api/python,pycharm+all
