@@ -1,38 +1,88 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import collections
-import matplotlib.pyplot as plt
+import gym
 import numpy as np
-
-import tensorflow as tf
-
-from tensorflow.keras import layers
-
-model = tf.keras.Sequential()
-# Add an Embedding layer expecting input vocab of size 1000, and
-# output embedding dimension of size 64.
-model.add(layers.Embedding(input_dim=1000, output_dim=64))
-
-# Add a LSTM layer with 128 internal units.
-model.add(layers.LSTM(128))
-
-# Add a Dense layer with 10 units and softmax activation.
-model.add(layers.Dense(10, activation='softmax'))
-
-model.summary()
-
-mnist = tf.keras.datasets.mnist
-
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_train, x_test = x_train / 255.0, x_test / 255.0
-sample, sample_label = x_train[0], y_train[0]
+import random
+from collections import deque
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.optimizers import Adam
 
 
-model.compile(loss='sparse_categorical_crossentropy',
-              optimizer='sgd',
-              metrics=['accuracy'])
-batch_size = 64
-model.fit(x_train, y_train,
-          validation_data=(x_test, y_test),
-          batch_size=batch_size,
-          epochs=5)
+
+GAMMA = 0.95
+LEARNING_RATE = 0.001
+
+MEMORY_SIZE = 1000000
+BATCH_SIZE = 20
+
+EXPLORATION_MAX = 1.0
+EXPLORATION_MIN = 0.01
+EXPLORATION_DECAY = 0.995
+
+class DQNSolver:
+
+    def __init__(self, observation_space, action_space):
+        self.exploration_rate = EXPLORATION_MAX
+
+        self.action_space = action_space
+        self.memory = deque(maxlen=MEMORY_SIZE)
+
+        self.model = Sequential()
+        self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(24, activation="relu"))
+        self.model.add(Dense(self.action_space, activation="linear"))
+        self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
+
+    def remember(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
+
+    def act(self, state):
+        if np.random.rand() < self.exploration_rate:
+            return random.randrange(self.action_space)
+        q_values = self.model.predict(state)
+        return np.argmax(q_values[0])
+
+    def experience_replay(self):
+        if len(self.memory) < BATCH_SIZE:
+            return
+        batch = random.sample(self.memory, BATCH_SIZE)
+        for state, action, reward, state_next, terminal in batch:
+            q_update = reward
+            if not terminal:
+                q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
+            q_values = self.model.predict(state)
+            q_values[0][action] = q_update
+            self.model.fit(state, q_values, verbose=0)
+        self.exploration_rate *= EXPLORATION_DECAY
+        self.exploration_rate = max(EXPLORATION_MIN, self.exploration_rate)
+
+
+
+env = gym.make("CartPole-v1")
+
+env = gym.make("CartPole-v1")
+#score_logger = ScoreLogger("CartPole-v1")
+observation_space = env.observation_space.shape[0]
+action_space = env.action_space.n
+dqn_solver = DQNSolver(observation_space, action_space)
+run = 0
+while True:
+    run += 1
+    state = env.reset()
+    state = np.reshape(state, [1, observation_space])
+    step = 0
+    while True:
+        step += 1
+        env.render()
+        action = dqn_solver.act(state)
+        state_next, reward, terminal, info = env.step(action)
+        reward = reward if not terminal else -reward
+        state_next = np.reshape(state_next, [1, observation_space])
+        dqn_solver.remember(state, action, reward, state_next, terminal)
+        state = state_next
+        if terminal:
+            print
+            "Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step)
+            #score_logger.add_score(step, run)
+            break
+        dqn_solver.experience_replay()
+env.close()
