@@ -78,9 +78,11 @@ def build_shadow_brain_v2(env: gym.Env, bs: int):
     # abstractions of perceptive inputs
     visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs, name="latent_vision"))(visual_in)
     visual_latent = TD(tf.keras.layers.Dense(128))(visual_latent)
+    visual_latent = TD(tf.keras.layers.ReLU())(visual_latent)
     visual_latent.set_shape([bs] + visual_latent.shape[1:])
     visual_plus_goal = tf.keras.layers.Concatenate()([visual_latent, goal_in])
     eigengrasps = TD(tf.keras.layers.Dense(20))(visual_plus_goal)
+    eigengrasps = TD(tf.keras.layers.ReLU())(eigengrasps)
 
     # concatenation of touch and proprioception
     proprio_touch = tf.keras.layers.Concatenate()([proprio_in, touch_in])
