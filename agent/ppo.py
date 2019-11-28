@@ -307,12 +307,6 @@ class PPOAgent:
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
-            # calculate processing speed in fps
-            self.time_dicts.append(time_dict)
-            fps_multiplier = self.tbptt_length if self.is_recurrent else 1
-            self.current_fps = stats.numb_processed_frames * fps_multiplier / (
-                sum([v for v in time_dict.values() if v is not None]))
-
             if monitor is not None and monitor.frequency != 0 and (
                     self.iteration + 1) % monitor.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
@@ -323,6 +317,10 @@ class PPOAgent:
                 self.save_agent_state()
 
             time_dict["finalizing"] = time.time() - subprocess_start
+
+            # calculate processing speed in fps
+            self.time_dicts.append(time_dict)
+            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
 
         return self
 
@@ -356,11 +354,10 @@ class PPOAgent:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        # b = {k: tf.squeeze(v, axis=0) for k, v in b.items()}
                         ent, pi_loss, v_loss = self._learn_on_batch(b)
                     else:
                         # truncated back propagation through time
-                        # batch is expected to be of shape (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
+                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
                         split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
                         for i in range(len(b["advantage"])):
                             partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}

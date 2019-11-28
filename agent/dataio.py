@@ -76,7 +76,7 @@ def tf_serialize_example(sample):
 def make_dataset_and_stats(buffer: ExperienceBuffer):
     """Make dataset object and StatBundle from ExperienceBuffer."""
     completed_episodes = buffer.episodes_completed
-    numb_processed_frames = len(buffer.states)
+    numb_processed_frames = numpy.prod(buffer.advantages.shape)
 
     # expand dims when constructing dataset to inject batch dimension
     if isinstance(buffer.states[0], numpy.ndarray):

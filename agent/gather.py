@@ -4,19 +4,19 @@ import os
 from inspect import getfullargspec as fargs
 from typing import Tuple
 
-import numpy
+import numpy as np
 import ray
-from gym.spaces import Box, Dict, Discrete
+from gym.spaces import Box, Discrete
 
 import models
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_shadow_brain, build_rnn_distinct_models, build_ffn_distinct_models
+from models import build_ffn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
-from utilities.util import parse_state, add_state_dims, is_recurrent_model, merge_into_batch
+from utilities.util import parse_state, add_state_dims, is_recurrent_model
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -28,8 +28,8 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
-    env_is_continuous = isinstance(env.action_space, Box)
-    act = act_continuous if env_is_continuous else act_discrete
+    is_continuous = isinstance(env.action_space, Box)
+    act = act_continuous if is_continuous else act_discrete
 
     # load policy TODO only one builder here
     if isinstance(model, str):
@@ -61,7 +61,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         # based on the given state, predict action distribution and state value
         action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
         states.append(state)
-        values.append(numpy.squeeze(value).item())
+        values.append(np.squeeze(value).item())
 
         # from the action distribution sample an action and remember both the action and its probability
         action, action_probability = act(action_distribution)
@@ -69,7 +69,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         action_probabilities.append(action_probability)
 
         # make a step based on the chosen action and collect the reward for this state
-        observation, reward, done, _ = env.step(numpy.atleast_1d(action) if env_is_continuous else action)
+        observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
         rewards.append(reward)
         current_episode_return += reward
 
@@ -92,23 +92,25 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         else:
             state = parse_state(observation)
             episode_steps += 1
+    env.close()
 
     values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1].numpy().item())
     if episode_steps > 1:
         advantages.append(estimate_episode_advantages(rewards[-episode_steps + 1:],
                                                       values[-episode_steps:],
                                                       discount, lam))
-    advantages = tfl.convert_to_tensor(numpy.hstack(advantages), dtype=tfl.float32)
 
-    env.close()
+    # convert lists to numpy arrays, excluding states as it can be multi-component
+    actions = np.array(actions, dtype=np.float32 if is_continuous else np.int32)
+    action_probabilities = np.array(action_probabilities, dtype=np.float32)
+    advantages = np.hstack(advantages)
+    values = np.array(values, dtype=np.float32)
 
-    # calculate advantage
-    values = tfl.convert_to_tensor(values, dtype=tfl.float32)
-    returns = tfl.add(advantages, values[:-1])
+    # get returns from advantages and values
+    returns = advantages + values[:-1]
 
     # normalize advantages
-    advantages = (advantages - tfl.reduce_mean(advantages)) / tfl.maximum(
-        tfl.math.reduce_std(advantages), 1e-6)
+    advantages = (advantages - advantages.mean()) / np.maximum(advantages.std(), 1e-6)
 
     # make TBPTT-compatible subsequences from transition vectors if model is recurrent
     if is_recurrent:
@@ -116,17 +118,18 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
         # states
         if is_shadow_brain:
-            feature_tensors = [tfl.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
-            states = tuple(map(lambda x: tfl.expand_dims(tfl.stack(tfl.split(x, num_sub_sequences)), axis=0),
+            feature_tensors = [np.stack(list(map(lambda x: x[feature], states))) for feature in
+                               range(len(states[0]))]
+            states = tuple(map(lambda x: np.expand_dims(np.stack(np.split(x, num_sub_sequences)), axis=0),
                                feature_tensors))
         else:
-            states = tfl.expand_dims(tfl.stack(tfl.split(states, num_sub_sequences, axis=0)), axis=0).numpy()
+            states = np.expand_dims(np.stack(np.split(states, num_sub_sequences, axis=0)), axis=0)
 
         # others, expanding dims to inject batch dimension
-        actions = tfl.expand_dims(tfl.stack(tfl.split(actions, num_sub_sequences)), axis=0).numpy()
-        action_probabilities = tfl.expand_dims(tfl.stack(tfl.split(action_probabilities, num_sub_sequences)), axis=0).numpy()
-        advantages = tfl.expand_dims(tfl.stack(tfl.split(advantages, num_sub_sequences)), axis=0).numpy()
-        returns = tfl.expand_dims(tfl.stack(tfl.split(returns, num_sub_sequences)), axis=0).numpy()
+        actions = np.expand_dims(np.stack(np.split(actions, num_sub_sequences)), axis=0)
+        action_probabilities = np.expand_dims(np.stack(np.split(action_probabilities, num_sub_sequences)), axis=0)
+        advantages = np.expand_dims(np.stack(np.split(advantages, num_sub_sequences)), axis=0)
+        returns = np.expand_dims(np.stack(np.split(returns, num_sub_sequences)), axis=0)
 
     # store this worker's gathering in a experience buffer
     buffer = ExperienceBuffer(states, actions, action_probabilities, returns,

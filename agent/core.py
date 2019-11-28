@@ -5,7 +5,7 @@ import os
 from itertools import accumulate
 from typing import List
 
-import numpy
+import numpy as np
 import tensorflow as tf
 from scipy.signal import lfilter
 
@@ -17,7 +17,7 @@ def get_discounted_returns(reward_trajectory, discount_factor: float):
     return list(accumulate(reward_trajectory[::-1], lambda previous, x: previous * discount_factor + x))[::-1]
 
 
-def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: float, lam: float) -> numpy.ndarray:
+def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: float, lam: float) -> np.ndarray:
     """K-Step return estimator for Generalized Advantage Estimation.
     From: HIGH-DIMENSIONAL CONTINUOUS CONTROL USING GENERALIZED ADVANTAGE ESTIMATION. (Schulman et. al., 2018)
 
@@ -38,11 +38,11 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
 
     :return:                    the estimations about the returns of a trajectory
     """
-    if numpy.size(rewards, 0) - numpy.size(values, 0) != -1:
+    if np.size(rewards, 0) - np.size(values, 0) != -1:
         raise ValueError("Values must include one more prediction than there are rewards.")
 
-    total_steps = numpy.size(rewards, 0)
-    return_estimations = numpy.ndarray(shape=(total_steps,)).astype(numpy.float32)
+    total_steps = np.size(rewards, 0)
+    return_estimations = np.ndarray(shape=(total_steps,)).astype(np.float32)
 
     previous = 0
     for t in reversed(range(total_steps)):
@@ -61,8 +61,8 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
 
 def estimate_episode_advantages(rewards, values, gamma, lam):
     """Estimate advantage of a single episode (or part of it), taken from Open AI's spinning up repository."""
-    deltas = rewards + gamma * numpy.array(values[1:]) - numpy.array(values[:-1])
-    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1]
+    deltas = np.array(rewards, dtype=np.float32) + gamma * np.array(values[1:], dtype=np.float32) - np.array(values[:-1], dtype=np.float32)
+    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(np.float32)
 
 
 # PROBABILITY
