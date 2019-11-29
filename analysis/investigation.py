@@ -48,6 +48,9 @@ class Investigator:
         states = []
         activations = []
 
+        layer = self.network.get_layer(layer_name)
+        dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
+
         if isinstance(env.action_space, Discrete):
             continuous_control = False
         elif isinstance(env.action_space, Box):
@@ -62,9 +65,9 @@ class Investigator:
         reward_trajectory = []
         state = parse_state(env.reset())
         while not done:
-            probabilities = self.network.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
+            activation, probabilities = dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
             states.append(state)
-            activations.append(self.get_layer_activations(layer_name, add_state_dims(state, dims=2 if is_recurrent else 1)))
+            activations.append(activation)
             env.render() if render else ""
 
             action, action_prob = policy_act(probabilities)
