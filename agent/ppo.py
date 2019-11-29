@@ -232,15 +232,15 @@ class PPOAgent:
                 f"transitions per batch.")
             batch_size = self.workers
 
-        ray.init(local_mode=self.debug, logging_level=logging.ERROR)
-
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.model_builder(self.env, **({"bs": batch_size} if "bs" in fargs(
             self.model_builder).args else {}))
         self.joint.set_weights(weights)
 
-        print(f"Parallelizing {self.workers} Workers Over {multiprocessing.cpu_count()} Threads.\n")
+        available_cpus = multiprocessing.cpu_count()
+        ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+        print(f"Parallelizing {self.workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -257,9 +257,8 @@ class PPOAgent:
                 model_representation = ModelTuple(self.builder_function_name, self.joint.get_weights())
 
             # create processes and execute them
-            result_ids = [collect.remote(model_representation, self.horizon, self.env_name, self.discount, self.lam,
-                                         self.tbptt_length, pid) for pid in range(self.workers)]
-            split_stats = [ray.get(oi) for oi in result_ids]
+            split_stats = ray.get([collect.remote(model_representation, self.horizon, self.env_name, self.discount,
+                                                  self.lam, self.tbptt_length, pid) for pid in range(self.workers)])
             stats = condense_stats(split_stats)
 
             time_dict["gathering"] = time.time() - subprocess_start
@@ -310,11 +309,12 @@ class PPOAgent:
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
-            if monitor is not None and monitor.frequency != 0 and (
-                    self.iteration + 1) % monitor.frequency == 0:
+            if monitor is not None and monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
                 print("Creating Episode GIFs for current state of policy...")
                 monitor.create_episode_gif(n=1)
-            monitor.update()
+
+            if monitor is not None and monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                monitor.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 self.save_agent_state()
@@ -322,71 +322,10 @@ class PPOAgent:
             time_dict["finalizing"] = time.time() - subprocess_start
 
             # calculate processing speed in fps
-            self.time_dicts.append(time_dict)
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+            self.time_dicts.append(time_dict)
 
         return self
-
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
-        """Optimize the agent's policy and value network based on a given dataset.
-        
-        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
-        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
-        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
-        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
-        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
-        not. Even more so this applies with running simulations on the cluster.
-
-        Args:
-            dataset (tf.data.Dataset): tensorflow dataset containing s, a, p(a), r and A as components per data point
-            epochs (int): number of epochs to train on this dataset
-            batch_size (int): batch size with which the dataset is sampled
-
-        Returns:
-            None
-        """
-        progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size), leave=False)
-        policy_loss_history, value_loss_history, entropy_history = [], [], []
-        for epoch in range(epochs):
-            # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
-            # shuffled_dataset = dataset.shuffle(10000)  # TODO appropriate shuffling sensitive to stateful orderedness
-            batched_dataset = dataset.batch(batch_size, drop_remainder=True)
-
-            actor_epoch_losses, value_epoch_losses, entropies = [], [], []
-            for b in batched_dataset:
-                # use the dataset to optimize the model
-                with tf.device(self.device):
-                    if not self.is_recurrent:
-                        ent, pi_loss, v_loss = self._learn_on_batch(b)
-                        progressbar.update(1)
-                    else:
-                        # truncated back propagation through time
-                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
-                        split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
-                        for i in range(len(b["advantage"])):
-                            partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
-                            ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
-                            progressbar.update(1)
-
-                entropies.append(ent)
-                actor_epoch_losses.append(pi_loss)
-                value_epoch_losses.append(v_loss)
-
-
-            # reset RNN states after an epoch if there are any
-            self.joint.reset_states()
-
-            # remember some statistics
-            policy_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
-            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
-
-        # store statistics in agent history
-        self.policy_loss_history.extend(policy_loss_history)
-        self.value_loss_history.extend(value_loss_history)
-        self.entropy_history.extend(entropy_history)
-
-        progressbar.close()
 
     @tf.function
     def _learn_on_batch(self, batch):
@@ -425,6 +364,66 @@ class PPOAgent:
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+
+    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
+        """Optimize the agent's policy and value network based on a given dataset.
+        
+        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
+        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
+        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
+        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
+        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
+        not. Even more so this applies with running simulations on the cluster.
+
+        Args:
+            dataset (tf.data.Dataset): tensorflow dataset containing s, a, p(a), r and A as components per data point
+            epochs (int): number of epochs to train on this dataset
+            batch_size (int): batch size with which the dataset is sampled
+
+        Returns:
+            None
+        """
+        progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size),
+                           leave=False, desc="Optimizing")
+        policy_loss_history, value_loss_history, entropy_history = [], [], []
+        for epoch in range(epochs):
+            # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
+            # dataset = dataset.shuffle(10000)
+            batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+            actor_epoch_losses, value_epoch_losses, entropies = [], [], []
+            for b in batched_dataset:
+                # use the dataset to optimize the model
+                with tf.device(self.device):
+                    if not self.is_recurrent:
+                        ent, pi_loss, v_loss = self._learn_on_batch(b)
+                        progressbar.update(1)
+                    else:
+                        # truncated back propagation through time
+                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
+                        split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
+                        for i in range(len(b["advantage"])):
+                            partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
+                            ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                            progressbar.update(1)
+
+                entropies.append(ent)
+                actor_epoch_losses.append(pi_loss)
+                value_epoch_losses.append(v_loss)
+
+            # reset RNN states after an epoch if there are any
+            self.joint.reset_states()
+
+            # remember some statistics
+            policy_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
+            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+
+        # store statistics in agent history
+        self.policy_loss_history.extend(policy_loss_history)
+        self.value_loss_history.extend(value_loss_history)
+        self.entropy_history.extend(entropy_history)
+
+        progressbar.close()
 
     def evaluate(self, n: int, ray_already_initialized: bool = False) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to

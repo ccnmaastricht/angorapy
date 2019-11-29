@@ -13,7 +13,7 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_ffn_distinct_models
+from models import build_ffn_distinct_models, build_rnn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
 from utilities.util import parse_state, add_state_dims, is_recurrent_model
@@ -31,7 +31,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     is_continuous = isinstance(env.action_space, Box)
     act = act_continuous if is_continuous else act_discrete
 
-    # load policy TODO only one builder here
+    # load policy
     if isinstance(model, str):
         joint = tfl.keras.models.load_model(f"{model}/model")
     elif isinstance(model, ModelTuple):
@@ -61,7 +61,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         # based on the given state, predict action distribution and state value
         action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
         states.append(state)
-        values.append(np.squeeze(value).item())
+        values.append(np.squeeze(value))
 
         # from the action distribution sample an action and remember both the action and its probability
         action, action_probability = act(action_distribution)
@@ -75,13 +75,14 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
         # depending on whether the state is terminal, choose the next state
         if done:
-            state = parse_state(env.reset())
-
             # calculate advantages for the finished episode, where the last value is 0 since it refers to the terminal
             # state that we just observed
-            advantages.append(
-                estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0], discount, lam)
-            )
+            advantages.append(estimate_episode_advantages(rewards[-episode_steps:],
+                                                          values[-episode_steps:] + [0],
+                                                          discount, lam))
+
+            # reset environment to receive next episodes initial state
+            state = parse_state(env.reset())
 
             # update/reset some statistics and trackers
             episode_lengths.append(episode_steps)
@@ -89,12 +90,15 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
+
+            joint.reset_states()
         else:
             state = parse_state(observation)
             episode_steps += 1
     env.close()
 
-    values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1].numpy().item())
+    # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
+    values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[1]))
     if episode_steps > 1:
         advantages.append(estimate_episode_advantages(rewards[-episode_steps + 1:],
                                                       values[-episode_steps:],
@@ -118,12 +122,10 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
         # states
         if is_shadow_brain:
-            feature_tensors = [np.stack(list(map(lambda x: x[feature], states))) for feature in
-                               range(len(states[0]))]
-            states = tuple(map(lambda x: np.expand_dims(np.stack(np.split(x, num_sub_sequences)), axis=0),
-                               feature_tensors))
+            features = [np.stack(list(map(lambda x: x[feature], states))) for feature in range(len(states[0]))]
+            states = tuple(map(lambda x: np.expand_dims(np.stack(np.split(x, num_sub_sequences)), axis=0), features))
         else:
-            states = np.expand_dims(np.stack(np.split(np.array(states), num_sub_sequences, axis=0)), axis=0)
+            states = np.expand_dims(np.stack(np.split(np.array(states), num_sub_sequences)), axis=0)
 
         # others, expanding dims to inject batch dimension
         actions = np.expand_dims(np.stack(np.split(actions, num_sub_sequences)), axis=0)
@@ -196,8 +198,9 @@ if __name__ == "__main__":
     #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
     env_n = "CartPole-v1"
-    p, v, j = build_ffn_distinct_models(gym.make(env_n))
-    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
+    p, v, j = build_rnn_distinct_models(gym.make(env_n), 1)
+    joint_tuple = ModelTuple(build_rnn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
-    ray.get(collect.remote(joint_tuple, 256, env_n, 0.99, 0.95, 2, 0))
+    for i in range(10000):
+        outs = [ray.get(collect.remote(joint_tuple, 1024, env_n, 0.99, 0.95, 2, 0)) for _ in range(8)]

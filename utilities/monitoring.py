@@ -32,11 +32,12 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None):
         self.agent = agent
         self.env = env
 
         self.frequency = frequency
+        self.gif_every = gif_every
         self.continuous_control = isinstance(self.env.action_space, Box)
 
         if id is None:
@@ -163,14 +164,14 @@ class Monitor:
             l_line = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange", label="Episode Length")
 
         # average rewards
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3)
+        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3, zorder=10)
         if len(self.agent.cycle_reward_history) > 11:
             r_line = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red", label="Average Reward")
 
         if self.agent.env.spec.reward_threshold is not None:
             ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
 
-        lines = r_line + l_line
+        lines = l_line + r_line
         labels = [l.get_label() for l in lines]
 
         self._make_graph(ax, lines, labels, "reward_plot")

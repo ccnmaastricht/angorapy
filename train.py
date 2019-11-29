@@ -67,7 +67,7 @@ def run_experiment(settings: argparse.Namespace):
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    monitor = Monitor(agent, env, frequency=settings.gif_every)
+    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
@@ -110,8 +110,10 @@ if __name__ == "__main__":
     parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
     parser.add_argument("--save-every", type=int, default=0,
                         help=f"save agent every given number of iterations (0 for no saving)")
+    parser.add_argument("--monitor-frequency", type=int, default=1,
+                        help=f"Update the monitoring stats every given number of iterations.")
     parser.add_argument("--gif-every", type=int, default=0,
-                        help=f"make three gifs of the agent in the environment every given number of iterations "
+                        help=f"make a gif of the agent in the environment every given number of iterations "
                              f"(0 for never).")
 
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
