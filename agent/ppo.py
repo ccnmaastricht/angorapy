@@ -21,12 +21,12 @@ from tqdm import tqdm
 
 import models
 from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
-from agent.gather import collect, read_dataset_from_storage, condense_stats
-from agent.policy import act_discrete, act_continuous
+from agent.dataio import read_dataset_from_storage
+from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple
-from utilities.util import flat_print, env_extract_dims, parse_state, add_state_dims, merge_into_batch, \
-    is_recurrent_model
+from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, \
+    is_recurrent_model, condense_stats
 
 
 class PPOAgent:
@@ -105,6 +105,8 @@ class PPOAgent:
             model_builder).args else {}))
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
+        if not self.is_recurrent:
+            self.tbptt_length = 1
 
         # passing one sample, which for some reason prevents cuDNN init error
         if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
@@ -223,7 +225,12 @@ class PPOAgent:
             self
         """
         assert self.horizon * self.workers >= batch_size, "Batch Size is larger than the number of transitions."
-        # TODO check if batch can even be created for recurrent
+        if self.is_recurrent and batch_size > self.workers:
+            logging.warning(
+                f"Batchsize is larger than possible with the available number of independent sequences for "
+                f"Truncated BPTT. Setting batchsize to {self.workers}, which means {self.workers * self.tbptt_length} "
+                f"transitions per batch.")
+            batch_size = self.workers
 
         ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
@@ -282,7 +289,7 @@ class PPOAgent:
                                                  else statistics.mean(stats.episode_rewards))
             else:
                 flat_print("Evaluating...")
-                eval_lengths, eval_rewards = self.evaluate(10)
+                eval_lengths, eval_rewards = self.evaluate(8, ray_already_initialized=True)
                 self.episode_length_history.extend(eval_lengths)
                 self.episode_reward_history.extend(eval_rewards)
                 self.cycle_length_history.append(statistics.mean(eval_lengths))
@@ -303,22 +310,20 @@ class PPOAgent:
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
-            # calculate processing speed in fps
-            self.time_dicts.append(time_dict)
-            fps_multiplier = self.tbptt_length if self.is_recurrent else 1
-            self.current_fps = stats.numb_processed_frames * fps_multiplier / (
-                sum([v for v in time_dict.values() if v is not None]))
-
             if monitor is not None and monitor.frequency != 0 and (
                     self.iteration + 1) % monitor.frequency == 0:
                 print("Creating Episode GIFs for current state of policy...")
-                monitor.create_episode_gif(n=3)
+                monitor.create_episode_gif(n=1)
             monitor.update()
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 self.save_agent_state()
 
             time_dict["finalizing"] = time.time() - subprocess_start
+
+            # calculate processing speed in fps
+            self.time_dicts.append(time_dict)
+            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
 
         return self
 
@@ -351,13 +356,22 @@ class PPOAgent:
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
-                    ent, pi_loss, v_loss = self._learn_on_batch(b)
+                    if not self.is_recurrent:
+                        ent, pi_loss, v_loss = self._learn_on_batch(b)
+                        progressbar.update(1)
+                    else:
+                        # truncated back propagation through time
+                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
+                        split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
+                        for i in range(len(b["advantage"])):
+                            partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
+                            ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                            progressbar.update(1)
 
                 entropies.append(ent)
                 actor_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
 
-                progressbar.update(1)
 
             # reset RNN states after an epoch if there are any
             self.joint.reset_states()
@@ -412,36 +426,24 @@ class PPOAgent:
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
-    def evaluate(self, n: int, render=False) -> Tuple[List[int], List[int]]:
+    def evaluate(self, n: int, ray_already_initialized: bool = False) -> Tuple[List[int], List[int]]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
-            render (bool): whether to render it
+            ray_already_initialized (bool): if True, do not initialize ray again (default False)
 
         Returns:
             two lists of length n, giving episode lengths and rewards respectively
         """
-        rewards, lengths = [], []
-        is_recurrent = is_recurrent_model(self.policy)
-        policy_act = act_discrete if not self.continuous_control else act_continuous
-        for episode in range(n):
-            done = False
-            reward_trajectory = []
-            length = 0
-            state = parse_state(self.env.reset())
-            while not done:
-                probabilities = self.policy(add_state_dims(state, dims=2 if is_recurrent else 1))
-                action, action_prob = policy_act(probabilities)
-                self.env.render() if render else None
-                observation, reward, done, _ = self.env.step(action)
-                state = parse_state(observation)
-                reward_trajectory.append(reward)
-                length += 1
+        if not ray_already_initialized:
+            ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
-            lengths.append(length)
-            rewards.append(sum(reward_trajectory))
+        model_representation = ModelTuple(self.builder_function_name, self.policy.get_weights())
+        result_ids = [evaluate.remote(model_representation, self.env_name) for _ in range(n)]
+
+        lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])
 
         return lengths, rewards
 

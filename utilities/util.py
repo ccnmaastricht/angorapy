@@ -11,6 +11,8 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.python.client import device_lib
 
+from utilities.datatypes import StatBundle
+
 
 def get_available_gpus():
     """Get list of available GPUs."""
@@ -108,3 +110,13 @@ def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
 
 if __name__ == "__main__":
     pass
+
+
+def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
+    """Infer a single StatBundle from a list of StatBundles."""
+    return StatBundle(
+        numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
+        numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
+        episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
+        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles]))
+    )

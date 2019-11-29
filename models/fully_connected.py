@@ -16,17 +16,17 @@ def build_ffn_distinct_models(env: gym.Env):
     state_dimensionality, n_actions = env_extract_dims(env)
 
     inputs = tf.keras.Input(shape=(state_dimensionality,))
+    normalized = RunningNormalization()(inputs)
 
     # policy network
-    normalized = RunningNormalization()(inputs)
-    x = _build_encoding_sub_model(normalized)
-    out_policy = _build_continuous_head(n_actions, x) if continuous_control else _build_discrete_head(n_actions, x)
+    x = _build_encoding_sub_model(normalized.shape[1:], None, name="policy_encoder")(normalized)
+    out_policy = _build_continuous_head(n_actions, (64, ), None)(x) if continuous_control \
+        else _build_discrete_head(n_actions, (64, ), None)(x)
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
 
     # value network
-    normalized = RunningNormalization()(inputs)
-    x = _build_encoding_sub_model(normalized)
-    x = tf.keras.layers.Dense(1, input_dim=64)(x)
+    x = _build_encoding_sub_model(normalized.shape[1:], None, name="value_encoder")(normalized)
+    x = tf.keras.layers.Dense(1)(x)
     out_value = tf.keras.layers.Activation("linear")(x)
 
     value = tf.keras.Model(inputs=inputs, outputs=out_value, name="value")
@@ -72,7 +72,6 @@ if __name__ == "__main__":
 
     pi, vn, pv = build_ffn_distinct_models(gym.make(env))
     s_pi, s_vn, s_pv = build_ffn_shared_models(gym.make(env))
-    pi.summary()
 
     plot_model(pv, "policy_value.png", show_shapes=True)
     plot_model(s_pv, "shared_policy_value.png", show_shapes=True)

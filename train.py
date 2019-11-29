@@ -4,11 +4,12 @@ import os
 
 import argcomplete
 from gym.spaces import Box
-from models.hybrid import build_shadow_brain
+from models.hybrid import build_shadow_brain_v1
 
 from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
+from models.recurrent import build_rnn_distinct_models
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
@@ -21,9 +22,14 @@ def run_experiment(settings: argparse.Namespace):
 
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
-        build_models = build_shadow_brain
+        build_models = build_shadow_brain_v1
     else:
-        build_models = build_ffn_distinct_models
+        if settings.model == "ffn":
+            build_models = build_ffn_distinct_models
+        elif settings.model == "rnn":
+            build_models = build_rnn_distinct_models
+        else:
+            raise ValueError("Unknown Model Type.")
 
     if settings.debug:
         logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
@@ -91,10 +97,11 @@ if __name__ == "__main__":
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
-    parser.add_argument("--tbptt", type=int, default=8, help=f"length of subsequences in truncated BPTT")
+    parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping")
     parser.add_argument("--no-value-clip", action="store_false",
                         help=f"deactivate clipping in value network's objective")
+    parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
 
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
