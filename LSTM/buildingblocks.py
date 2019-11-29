@@ -3,7 +3,7 @@ import tensorflow as tf
 
 def _buildingblock_network(input_dim: int, output_dim: int, hidden_neurons: int,
                            batch_size: int = None, name: str = None):
-    inputs = tf.keras.Input(batch_shape = (batch_size, input_dim))
+    inputs = tf.keras.Input(batch_shape = (input_dim, batch_size))
 
     x = tf.keras.layers.Dense(hidden_neurons)(inputs)
     x = tf.keras.layers.ReLU()(x)

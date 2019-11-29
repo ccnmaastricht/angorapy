@@ -27,12 +27,14 @@ class DQNSolver:
         self.observation_space = observation_space
         self.action_space = action_space
         self.memory = deque(maxlen=MEMORY_SIZE)
+        self.batch_size = BATCH_SIZE
 
         self.model = Sequential()
         self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
         self.model.add(Dense(16, activation="relu"))
         self.model.add(Dense(self.action_space, activation="linear"))
-        #self.model = _buildingblock_network(self.observation_space, self.action_space, 24)
+        #self.model = _buildingblock_network(self.observation_space, self.action_space,
+        #                                    24, self.batch_size)
         self.model.compile(loss="mse",
                            optimizer=Adam(lr=LEARNING_RATE))
         utils.plot_model(self.model, 'lunarlander_network.png', show_shapes=True)
@@ -49,7 +51,7 @@ class DQNSolver:
     def experience_replay(self):
         if len(self.memory) < BATCH_SIZE:
             return
-        batch = random.sample(self.memory, BATCH_SIZE)
+        batch = np.array(random.sample(self.memory, BATCH_SIZE))
         for state, action, reward, state_next, terminal in batch:
             q_update = reward
             if not terminal:
@@ -85,8 +87,7 @@ while True:
         dqn_solver.remember(state, action, reward, state_next, terminal)
         state = state_next
         if terminal:
-            print
-            "Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step)
+            print("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step))
             #score_logger.add_score(step, run)
             break
         dqn_solver.experience_replay()

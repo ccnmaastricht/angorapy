@@ -42,7 +42,7 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    environment = gym.make("LunarLanderContinuous-v2")
+    environment = gym.make("LunarLander-v2")
     pi, v, pv = build_rnn_distinct_models(environment, bs=3)
 
     tf.keras.utils.plot_model(pv)

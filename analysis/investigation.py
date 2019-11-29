@@ -3,9 +3,12 @@ import os
 from pprint import pprint
 from typing import List
 
+import sklearn.manifold as sklm
 import gym
 import tensorflow as tf
 from gym.spaces import Discrete, Box
+import matplotlib.pyplot as plt
+import numpy as np
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
@@ -65,11 +68,14 @@ class Investigator:
             env.render() if render else ""
 
             action, action_prob = policy_act(probabilities)
+            #env.render()
             observation, reward, done, _ = env.step(action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
         return list(zip(states, activations, reward_trajectory))
+        #return reward_trajectory
+
 
 
 if __name__ == "__main__":
@@ -81,6 +87,24 @@ if __name__ == "__main__":
 
     # print(inv.get_layer_activations("lstm", tf.convert_to_tensor([[[1, 2, 3, 4]]])))
 
-    tuples = inv.get_activations_over_episode("lstm", env, True)
+    tuples = inv.get_activations_over_episode("lstm", env, False)
     print(len(tuples))
     pprint(tuples)
+
+    #tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
+    state_data = np.empty((len(np.array(tuples)[:,0]),8))
+
+    for l in np.array(tuples)[:,0]:
+        state_data += l
+
+    plt.plot(list(range(len(state_data))), state_data)
+    plt.show()
+
+    # rewards
+    all_rewards = np.array(tuples)[:,2]
+
+    plt.plot(list(range(len(all_rewards))), all_rewards)
+    plt.xlabel('Step in episode')
+    plt.ylabel('Numerical reward')
+    plt.title('Reward history over one episode')
+    plt.show()
