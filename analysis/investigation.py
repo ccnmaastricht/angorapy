@@ -3,6 +3,8 @@ import os
 from pprint import pprint
 from typing import List
 
+import numpy as np
+
 import gym
 import tensorflow as tf
 from gym.spaces import Discrete, Box
@@ -87,3 +89,9 @@ if __name__ == "__main__":
     tuples = inv.get_activations_over_episode("lstm", env, True)
     print(len(tuples))
     pprint(tuples)
+
+    # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
+    state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
+
+    for l in np.array(tuples)[:, 0]:
+        state_data += l
