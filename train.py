@@ -10,6 +10,7 @@ from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
 from models.recurrent import build_rnn_distinct_models
+from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
@@ -85,12 +86,29 @@ if __name__ == "__main__":
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
+    # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
-    parser.add_argument("-w", "--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
+    parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
+    parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
+
+    # meta arguments
+    parser.add_argument("--config", type=str, default=None, help="config name (utilities/configs.py) to be loaded")
+    parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
+    parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
+    parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
+    parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
+    parser.add_argument("--save-every", type=int, default=0, help=f"save agent every given number of iterations")
+    parser.add_argument("--monitor-frequency", type=int, default=1, help=f"update the monitor every n iterations.")
+    parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
+    parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
+
+    # gathering parameters
+    parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
-    parser.add_argument("-i", "--iterations", type=int, default=1000, help=f"number of iterations before training ends")
-    parser.add_argument("-b", "--batch-size", type=int, default=64, help=f"minibatch size during optimization")
+
+    # optimization parameters
+    parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
+    parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=3e-4, help=f"learning rate of the policy")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
@@ -98,27 +116,21 @@ if __name__ == "__main__":
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
     parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
-    parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping")
-    parser.add_argument("--no-value-clip", action="store_false",
-                        help=f"deactivate clipping in value network's objective")
-    parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
+    parser.add_argument("--grad-norm", type=float, default=0, help=f"norm for gradient clipping")
+    parser.add_argument("--no-value-clip", action="store_false", help=f"deactivate clipping in value objective")
 
-    parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
-    parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
-    parser.add_argument("--export-file", type=int, default=None,
-                        help=f"save/read policy to be loaded in workers into file")
-    parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
-    parser.add_argument("--save-every", type=int, default=0,
-                        help=f"save agent every given number of iterations (0 for no saving)")
-    parser.add_argument("--monitor-frequency", type=int, default=1,
-                        help=f"Update the monitoring stats every given number of iterations.")
-    parser.add_argument("--gif-every", type=int, default=0,
-                        help=f"make a gif of the agent in the environment every given number of iterations "
-                             f"(0 for never).")
-
-    parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
+    # read arguments
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
+
+    # if config is given load it as default, then overwrite with any other given parameters
+    if args.config is not None:
+        try:
+            parser.set_defaults(**vars(getattr(configs, args.config)))
+            args = parser.parse_args()
+            print(f"Loaded Config {args.config}.")
+        except AttributeError as err:
+            raise ImportError("Cannot find config under given name. Does it exist in utilities/configs.py?")
 
     args.debug = False
 

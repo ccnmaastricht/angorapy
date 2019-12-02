@@ -87,7 +87,7 @@ class PPOAgent:
         self.c_entropy = tf.constant(c_entropy, dtype=tf.float32)
         self.c_value = tf.constant(c_value, dtype=tf.float32)
         self.lam = lam
-        self.gradient_clipping = gradient_clipping
+        self.gradient_clipping = gradient_clipping if gradient_clipping != 0 else None
         self.clip_values = clip_values
         self.tbptt_length = tbptt_length
 

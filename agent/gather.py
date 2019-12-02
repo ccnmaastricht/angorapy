@@ -113,7 +113,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # get returns from advantages and values
     returns = advantages + values[:-1]
 
-    # normalize advantages
+    # normalize advantages # TODO better to do this once across workers, not per worker
     advantages = (advantages - advantages.mean()) / np.maximum(advantages.std(), 1e-6)
 
     # make TBPTT-compatible subsequences from transition vectors if model is recurrent
@@ -134,8 +134,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         returns = np.expand_dims(np.stack(np.split(returns, num_sub_sequences)), axis=0)
 
     # store this worker's gathering in a experience buffer
-    buffer = ExperienceBuffer(states, actions, action_probabilities, returns,
-                              advantages, episodes_completed, episode_rewards, episode_lengths)
+    buffer = ExperienceBuffer(states=states, actions=actions, action_probabilities=action_probabilities,
+                              returns=returns, advantages=advantages, episodes_completed=episodes_completed,
+                              episode_rewards=episode_rewards, episode_lengths=episode_lengths)
 
     dataset, stats = make_dataset_and_stats(buffer)
 
