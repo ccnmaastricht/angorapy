@@ -30,7 +30,10 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
 <body>
 <div class="container">
     <div class="row justify-content-center">
-        <h1 class="main-title display-3">Experiment: <?php echo $meta["environment"]["name"] ?></h1>
+        <div class="main-title">
+            <h1 class="display-3"><?php echo $meta["environment"]["name"] ?><br></h1>
+            <h3> <?php echo $_GET["id"]; ?> </h3>
+        </div>
     </div>
 
     <div class="row justify-content-center mt-3">

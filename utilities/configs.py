@@ -8,7 +8,7 @@ def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, 
                 workers=4):
     """Make a config."""
 
-    return Namespace(**locals())
+    return dict(**locals())
 
 
 discrete = make_config(
@@ -23,7 +23,15 @@ discrete = make_config(
 )
 
 continuous = make_config(
-    grad_norm=None
+    batch_size=32,
+    horizon=1024,
+    c_entropy=0.0,
+    lr_pi=0.0003,
+    epochs=10,
+    clip=0.1,
+    lam=0.95,
+    discount=0.99,
+    grad_norm=0.5,
 )
 
 bipedal = make_config(
@@ -35,5 +43,5 @@ bipedal = make_config(
     clip=0.1,
     lam=0.95,
     discount=0.99,
-    grad_norm=0,
+    grad_norm=0.5,
 )

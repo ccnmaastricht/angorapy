@@ -15,6 +15,8 @@ from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 
+from pprint import pprint
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -51,7 +53,7 @@ def run_experiment(settings: argparse.Namespace):
           f"Model: {build_models.__name__}\n"
           f"-----------------------------------------\n")
 
-    print(f"{wn}HyperParameters{ec}: {args}\n")
+    print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
 
     if settings.cpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -105,13 +107,12 @@ if __name__ == "__main__":
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
-
+    parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
+    parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     # optimization parameters
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=3e-4, help=f"learning rate of the policy")
-    parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
-    parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
@@ -126,12 +127,10 @@ if __name__ == "__main__":
     # if config is given load it as default, then overwrite with any other given parameters
     if args.config is not None:
         try:
-            parser.set_defaults(**vars(getattr(configs, args.config)))
+            parser.set_defaults(**getattr(configs, args.config))
             args = parser.parse_args()
             print(f"Loaded Config {args.config}.")
         except AttributeError as err:
             raise ImportError("Cannot find config under given name. Does it exist in utilities/configs.py?")
-
-    args.debug = False
 
     run_experiment(args)
