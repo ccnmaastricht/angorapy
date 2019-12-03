@@ -61,53 +61,69 @@ class Investigator:
         is_recurrent = is_recurrent_model(self.network)
         policy_act = act_discrete if not continuous_control else act_continuous
 
-        done = False
         reward_trajectory = []
+        env.render() if render else ""
+
         state = parse_state(env.reset())
+        done = False
         while not done:
             activation, probabilities = dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
             states.append(state)
             activations.append(activation)
-            env.render() if render else ""
 
             action, action_prob = policy_act(probabilities)
-            #env.render()
             observation, reward, done, _ = env.step(action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
         return list(zip(states, activations, reward_trajectory))
-        #return reward_trajectory
 
+        # return reward_trajectory
 
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env = gym.make("LunarLanderContinuous-v2")
-    network, _, _ = build_rnn_distinct_models(env, 1)
+    env = gym.make("LunarLander-v2")
+    network, _, _ = build_rnn_distinct_models(env, 1)  # load model here
+
     inv = Investigator(network)
 
     # print(inv.get_layer_activations("lstm", tf.convert_to_tensor([[[1, 2, 3, 4]]])))
 
-    tuples = inv.get_activations_over_episode("lstm", env, False)
+    tuples = inv.get_activations_over_episode("lstm", env, True)
     print(len(tuples))
     pprint(tuples)
 
-    #tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
-    state_data = np.empty((len(np.array(tuples)[:,0]),8))
+    # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
+    state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
 
-    for l in np.array(tuples)[:,0]:
-        state_data += l
+    for l in range(len(np.array(tuples)[:, 0])):
+        state_data[l, :] = np.array(tuples)[l, 0]
 
     plt.plot(list(range(len(state_data))), state_data)
     plt.show()
 
     # rewards
-    all_rewards = np.array(tuples)[:,2]
+    all_rewards = np.array(tuples)[:, 2]
 
     plt.plot(list(range(len(all_rewards))), all_rewards)
     plt.xlabel('Step in episode')
     plt.ylabel('Numerical reward')
     plt.title('Reward history over one episode')
+    plt.show()
+
+    # activations
+    activation_data = np.empty((len(np.array(tuples)[:, 0]), 32))
+
+    for k in range(len(np.array(tuples)[:, 1])):
+        activation_data[k, :] = np.array(tuples)[k, 1]
+
+    plt.plot(list(range(len(activation_data))), activation_data)
+    plt.show()
+    x_activation_data = activation_data
+    RS = 123
+    tsne_results = sklm.TSNE(random_state=RS).fit_transform(x_activation_data)
+
+    plt.scatter(tsne_results[:, 0], tsne_results[:, 1])
     plt.show()
