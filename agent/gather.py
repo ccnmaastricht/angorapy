@@ -13,7 +13,7 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_ffn_distinct_models, build_rnn_distinct_models
+from models import build_rnn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
 from utilities.util import parse_state, add_state_dims, is_recurrent_model
@@ -92,6 +92,23 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             current_episode_return = 0
 
             joint.reset_states()
+
+            # if recurrent policy, pad zeros until subsequence length
+            if is_recurrent:
+                remaining_subsequence_steps = t % sub_sequence_length
+
+                # pad the zeros
+                for _ in range(remaining_subsequence_steps):
+                    states.extend([0])  # TODO proper "0" action
+                    values.extend([0])
+                    actions.extend([0])  # TODO proper "0" action
+                    action_probabilities.extend([0])
+                    rewards.extend([0])
+                    advantages.append([0])
+
+                # skip as many steps as were padded
+                episode_steps += remaining_subsequence_steps
+
         else:
             state = parse_state(observation)
             episode_steps += 1

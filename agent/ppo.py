@@ -45,7 +45,8 @@ class PPOAgent:
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate: float = 0.001,
                  discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
                  c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
-                 clip_values: bool = True, tbptt_length: int = 16, _make_dirs=True, debug: bool = False):
+                 clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
+                 _make_dirs=True, debug: bool = False):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
@@ -61,11 +62,16 @@ class PPOAgent:
             c_value (float): coefficient fot value in the combined loss
             gradient_clipping (float): max norm for the gradient clipping, set None to deactivate (default)
             clip_values (bool): boolean switch to turn off or on the clipping of the value loss
+            lr_schedule (str): type of scheduler for the learning rate, default None (constant learning rate). Can be
+                either None or 'exponential'
             _make_dirs (bool): internal parameter to indicate whether or not to recreate the directories
             debug (bool): turn on/off debugging mode
         """
         super().__init__()
         self.debug = debug
+
+        # checkups
+        assert lr_schedule is None or isinstance(lr_schedule, str)
 
         # environment info
         self.env = environment
@@ -92,11 +98,16 @@ class PPOAgent:
         self.tbptt_length = tbptt_length
 
         # learning rate schedule
-        self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=self.learning_rate,
-            decay_steps=1000,
-            decay_rate=0.98
-        )
+        if lr_schedule is None:
+            self.lr_schedule = learning_rate
+        elif lr_schedule.lower() == "exponential":
+            self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+                initial_learning_rate=self.learning_rate,
+                decay_steps=1000,
+                decay_rate=0.98
+            )
+        else:
+            raise ValueError("Unknown Schedule type. Choose one of (None, exponential)")
 
         # models and optimizers
         self.model_builder = model_builder
@@ -455,12 +466,16 @@ class PPOAgent:
             jobs = [job[0] for job, time in self.time_dicts[-1].items() if time is not None]
             time_percentages = [str(round(100 * t / sum(times))) + jobs[i] for i, t in enumerate(times)]
             time_distribution_string = "[" + "|".join(map(str, time_percentages)) + "]"
+        if isinstance(self.lr_schedule, tf.keras.optimizers.schedules.LearningRateSchedule):
+            current_lr = self.lr_schedule(self.optimizer.iterations)
+        else:
+            current_lr = self.lr_schedule
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"AvgRew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
                    f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
                    f"AvgEnt.: {nc}{0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2):5.2f}{ec}; "
                    f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
-                   f"Lr: {nc}{self.lr_schedule(self.optimizer.iterations):.2e}{ec}; "
+                   f"Lr: {nc}{current_lr:.2e}{ec}; "
                    f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                    f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                    f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
