@@ -89,7 +89,7 @@ class Monitor:
 
             anim = animation.FuncAnimation(plt.gcf(), animate, frames=len(frames), interval=50)
             anim.save(f"{self.story_directory}/iteration_{self.agent.iteration}_{episode_letter}.gif",
-                      writer='imagemagick', fps=30)
+                      writer='pillow', fps=30)
 
             plt.close()
 

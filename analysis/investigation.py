@@ -47,6 +47,7 @@ class Investigator:
     def get_activations_over_episode(self, layer_name, env, render: bool = False):
         states = []
         activations = []
+        actions = []
 
         layer = self.network.get_layer(layer_name)
         dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
@@ -72,13 +73,15 @@ class Investigator:
             activations.append(activation)
 
             action, action_prob = policy_act(probabilities)
+            actions.append(action)
             observation, reward, done, _ = env.step(action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
-        return list(zip(states, activations, reward_trajectory))
+        return list(zip(states, activations, reward_trajectory, actions))
 
         # return reward_trajectory
+
 
 
 if __name__ == "__main__":
