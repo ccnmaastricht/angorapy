@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 """Custom datatypes form simplifying data communication."""
+import itertools
+import logging
 from collections import namedtuple
 from typing import List, Union
 
 import numpy as np
-import tensorflow as tf
 from keras_preprocessing.sequence import pad_sequences
 from numpy import ndarray as arr
+
+from utilities.util import add_state_dims
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths"])
@@ -32,13 +35,13 @@ class ExperienceBuffer:
 
     def fill(self, s, a, ap, ret, adv):
         """Fill the buffer with 5-tuple of experience."""
-        assert np.all([len(s), len(a), len(ap), len(ret), len(adv)] == len(s)), "Inconsistent input sizes."
+        assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv)]) == len(s)), "Inconsistent input sizes."
 
         self.buffer_size = len(adv)
         self.advantages, self.returns, self.action_probabilities, self.actions, self.states = adv, ret, ap, a, s
 
     def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr],
-                           advantages: List[arr], is_multi_feature: bool, is_continuous: bool):
+                           advantages: List[arr], returns: List[arr], is_multi_feature: bool, is_continuous: bool):
         """Push a sequence to the buffer, constructed from given lists of values."""
         if is_multi_feature:
             self.states.append([np.stack(list(map(lambda s: s[f_id], states))) for f_id in range(len(states[0]))])
@@ -47,18 +50,30 @@ class ExperienceBuffer:
 
         self.actions.append(np.array(actions, dtype=np.float32 if is_continuous else np.int32))
         self.action_probabilities.append(np.array(action_probabilities, dtype=np.float32))
-        self.advantages.append(advantages)  # TODO correct last value
+        self.advantages.append(advantages)
+        self.returns.append(returns)
 
     def pad_buffer(self):
         """Pad the buffer with zeros to an equal sequence length."""
         assert np.all([isinstance(f, list) for f in [self.states, self.actions, self.action_probabilities,
-                                                     self.returns, self.advantages]])
+                                                     self.returns,
+                                                     self.advantages]]), "Some part of the experience " \
+                                                                         "is not a list but you want to pad."
 
-        self.states = pad_sequences(self.states, padding="post", dtype=tf.float32)
-        self.action_probabilities = pad_sequences(self.action_probabilities, padding="post", dtype=tf.float32)
-        self.actions = pad_sequences(self.actions, padding="post", dtype=tf.float32)
-        self.returns = pad_sequences(self.returns, padding="post", dtype=tf.float32)
-        self.advantages = pad_sequences(self.advantages, padding="post", dtype=tf.float32)
+        assert np.all([len(f) > 0 for f in [self.states, self.actions, self.action_probabilities,
+                                            self.returns,
+                                            self.advantages]]), "There cannot be an empty s/a/ap/r/adv when padding."
+
+        size_diffs = np.array([len(self.actions), len(self.action_probabilities), len(self.returns),
+                      len(self.advantages)]) == len(self.states)
+        if not np.all(size_diffs):
+            logging.warning(f"Buffer contains inconsistent lengths of s/a/ap/r/adv prior to padding [{size_diffs}].")
+
+        self.states = pad_sequences(self.states, padding="post", dtype=np.float32)
+        self.action_probabilities = pad_sequences(self.action_probabilities, padding="post", dtype=np.float32)
+        self.actions = pad_sequences(self.actions, padding="post")
+        self.returns = pad_sequences(self.returns, padding="post", dtype=np.float32)
+        self.advantages = pad_sequences(self.advantages, padding="post", dtype=np.float32)
 
     def normalize_advantages(self):
         """Normalize the buffered advantages using z-scores. This requires the sequences to be of equal lengths,
@@ -71,14 +86,29 @@ class ExperienceBuffer:
 
         mean = np.mean(self.advantages)
         std = np.maximum(np.std(self.advantages), 1e-6)
+        self.advantages = (self.advantages - mean) / std
+        # TODO deal with padded
 
-        if is_recurrent:
-            self.advantages = list(map(lambda adv: (adv - mean) / std, self.advantages))
-        else:
-            self.advantages = (self.advantages - mean) / std
+    def inject_batch_dimension(self):
+        """Add a batch dimension to the buffered experience."""
+        self.states = add_state_dims(self.states, axis=0)
+        self.actions = np.expand_dims(self.actions, axis=0)
+        self.action_probabilities = np.expand_dims(self.action_probabilities, axis=0)
+        self.returns = np.expand_dims(self.returns, axis=0)
+        self.advantages = np.expand_dims(self.advantages, axis=0)
 
     @staticmethod
     def new_empty():
         """Return an empty buffer."""
         return ExperienceBuffer(states=[], actions=[], action_probabilities=[], returns=[], advantages=[],
                                 episodes_completed=0, episode_rewards=[], episode_lengths=[])
+
+
+def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
+    """Infer a single StatBundle from a list of StatBundles."""
+    return StatBundle(
+        numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
+        numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
+        episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
+        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles]))
+    )

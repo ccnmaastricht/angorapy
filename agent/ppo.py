@@ -24,9 +24,8 @@ from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extr
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH
-from utilities.datatypes import ModelTuple
-from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, \
-    is_recurrent_model, condense_stats
+from utilities.datatypes import ModelTuple, condense_stats
+from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model
 
 
 class PPOAgent:
@@ -168,6 +167,7 @@ class PPOAgent:
           the value of the objective function
 
         """
+        # TODO need to deal with the fact that old_action_prob fucks me
         r = action_prob / old_action_prob
         return tf.reduce_mean(tf.maximum(
             - tf.math.multiply(r, advantage),
@@ -340,6 +340,7 @@ class PPOAgent:
 
     @tf.function
     def _learn_on_batch(self, batch):
+        print("new_batch")
         # optimize policy and value network simultaneously
         with tf.GradientTape() as tape:
             state_batch = batch["state"] if "state" in batch else (batch["in_vision"], batch["in_proprio"],
@@ -410,7 +411,7 @@ class PPOAgent:
                         progressbar.update(1)
                     else:
                         # truncated back propagation through time
-                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *[STATE_DIMS])
+                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
                         split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
                         for i in range(len(b["advantage"])):
                             partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}

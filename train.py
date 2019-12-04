@@ -5,6 +5,7 @@ import os
 import argcomplete
 from gym.spaces import Box
 from models.hybrid import build_shadow_brain_v1
+import tensorflow as tf
 
 from agent.ppo import PPOAgent
 from environments import *
@@ -14,10 +15,6 @@ from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
-
-from pprint import pprint
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 def run_experiment(settings: argparse.Namespace):
@@ -83,6 +80,8 @@ def run_experiment(settings: argparse.Namespace):
 
 
 if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
     all_envs = [e.id for e in list(gym.envs.registry.all())]
 
     # parse commandline arguments
@@ -132,5 +131,8 @@ if __name__ == "__main__":
             print(f"Loaded Config {args.config}.")
         except AttributeError as err:
             raise ImportError("Cannot find config under given name. Does it exist in utilities/configs.py?")
+
+    if args.debug:
+        tf.config.experimental_run_functions_eagerly(True)
 
     run_experiment(args)

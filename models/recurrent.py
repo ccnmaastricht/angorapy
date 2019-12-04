@@ -18,9 +18,10 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
     state_dimensionality, n_actions = env_extract_dims(env)
 
     inputs = tf.keras.Input(batch_shape=(bs, None, state_dimensionality,))
+    masked = tf.keras.layers.Masking()(inputs)
 
     # policy network
-    x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="policy_encoder"), name="TD_policy")(inputs)
+    x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="policy_encoder"), name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
     x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
     if continuous_control:
@@ -29,7 +30,7 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
         out_policy = _build_discrete_head(n_actions, x.shape[1:], bs)(x)
 
     # value network
-    x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="value_encoder"), name="TD_value")(inputs)
+    x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="value_encoder"), name="TD_value")(masked)
     x.set_shape([bs] + x.shape[1:])
     x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
     out_value = tf.keras.layers.Dense(1)(x)
