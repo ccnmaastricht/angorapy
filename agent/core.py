@@ -89,7 +89,7 @@ def gaussian_entropy(stdevs: tf.Tensor):
 @tf.function
 def categorical_entropy(pmf: tf.Tensor):
     """Calculate entropy of a categorical distribution."""
-    return - tf.reduce_sum(pmf * tf.math.log(pmf), axis=-1)
+    return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
 
 
 # MANIPULATION

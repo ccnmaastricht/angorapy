@@ -9,18 +9,18 @@ import tensorflow as tf
 from agent.core import gaussian_pdf
 
 
-def act_discrete(probabilities: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
+def act_discrete(log_probabilities: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:
     """Sample an action from a discrete action distribution predicted by the given policy for a given state."""
-    if tf.rank(probabilities) == 3:
+    if tf.rank(log_probabilities) == 3:
         # there appears to be a sequence dimension
-        assert probabilities.shape[1] == 1, "Policy actions can only be selected for a single timestep, but the " \
+        assert log_probabilities.shape[1] == 1, "Policy actions can only be selected for a single timestep, but the " \
                                             "dimensionality of the given tensor is more than 1 at rank 1."
 
-        probabilities = tf.squeeze(probabilities, axis=1)
+        log_probabilities = tf.squeeze(log_probabilities, axis=1)
 
-    action = tf.random.categorical(tf.math.log(probabilities), 1)[0][0]
+    action = tf.random.categorical(log_probabilities, 1)[0][0]
 
-    return action.numpy(), probabilities[0][action]
+    return action.numpy(), log_probabilities[0][action]
 
 
 def act_continuous(multivariates: tf.Tensor) -> Tuple[numpy.ndarray, numpy.ndarray]:

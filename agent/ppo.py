@@ -169,7 +169,7 @@ class PPOAgent:
           the value of the objective function
 
         """
-        r = action_prob / old_action_prob
+        r = tf.exp(action_prob - old_action_prob)
         clipped = tf.maximum(
             - tf.math.multiply(r, advantage),
             - tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)

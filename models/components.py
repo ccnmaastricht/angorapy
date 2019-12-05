@@ -49,6 +49,6 @@ def _build_discrete_head(n_actions, input_shape, batch_size):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
     x = tf.keras.layers.Dense(n_actions)(inputs)
-    x = tf.keras.layers.Activation("softmax", name="actions")(x)
+    x = tf.nn.log_softmax(x)
 
-    return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
+    return tf.keras.Model(inputs=inputs, outputs=x, name="log_likelihoods")
