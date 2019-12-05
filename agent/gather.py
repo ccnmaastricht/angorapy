@@ -69,7 +69,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         # from the action distribution sample an action and remember both the action and its probability
         action, action_probability = act(action_distribution)
         actions.append(action)
-        action_probabilities.append(action_probability)
+        action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
         # make a step based on the chosen action and collect the reward for this state
         observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)

@@ -24,6 +24,7 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
     x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="policy_encoder"), name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
     x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
+
     if continuous_control:
         out_policy = _build_continuous_head(n_actions, x.shape[1:], bs)(x)
     else:
@@ -33,6 +34,7 @@ def build_rnn_distinct_models(env: gym.Env, bs: int):
     x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="value_encoder"), name="TD_value")(masked)
     x.set_shape([bs] + x.shape[1:])
     x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
+
     out_value = tf.keras.layers.Dense(1)(x)
 
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="simple_rnn_policy")

@@ -22,9 +22,9 @@ def _build_fcn_component(input_dim: int, hidden_dim: int, output_dim: int, batch
 def _build_encoding_sub_model(shape, batch_size, name=None):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
-    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(inputs)
+    x = tf.keras.layers.Dense(64)(inputs)
     x = tf.keras.layers.Activation("tanh")(x)
-    x = tf.keras.layers.Dense(64, kernel_initializer=DENSE_INIT)(x)
+    x = tf.keras.layers.Dense(64)(x)
     x = tf.keras.layers.Activation("tanh")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
@@ -35,9 +35,9 @@ def _build_encoding_sub_model(shape, batch_size, name=None):
 def _build_continuous_head(n_actions, input_shape, batch_size):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
-    means = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT, name="means")(inputs)
+    means = tf.keras.layers.Dense(n_actions, name="means")(inputs)
 
-    stdevs = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    stdevs = tf.keras.layers.Dense(n_actions)(inputs)
     stdevs = tf.keras.layers.Activation("softplus", name="stdevs")(stdevs)
 
     concat = tf.keras.layers.Concatenate(name="multivariates")([means, stdevs])
@@ -48,10 +48,7 @@ def _build_continuous_head(n_actions, input_shape, batch_size):
 def _build_discrete_head(n_actions, input_shape, batch_size):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
-    x = tf.keras.layers.Dense(n_actions, kernel_initializer=DENSE_INIT)(inputs)
+    x = tf.keras.layers.Dense(n_actions)(inputs)
     x = tf.keras.layers.Activation("softmax", name="actions")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
-
-
-DENSE_INIT = tf.keras.initializers.orthogonal(gain=math.sqrt(2))

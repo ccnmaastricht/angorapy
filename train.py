@@ -20,6 +20,11 @@ from utilities.util import env_extract_dims
 def run_experiment(settings: argparse.Namespace):
     """Run an experiment with the given settings."""
 
+    if __debug__:
+        logging.warning("You are training this agent in the default debugging mode. This means that assert checks are "
+                        "executed, which may slow down training. In a production setting, deactive this by adding the -O"
+                        "flag to the python command.")
+
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
         build_models = build_shadow_brain_v1
@@ -116,7 +121,7 @@ if __name__ == "__main__":
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
     parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
-    parser.add_argument("--grad-norm", type=float, default=0, help=f"norm for gradient clipping")
+    parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping, 0 deactivates")
     parser.add_argument("--no-value-clip", action="store_false", help=f"deactivate clipping in value objective")
 
     # read arguments

@@ -113,7 +113,8 @@ class PPOAgent:
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
-        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5,
+                                                             clipvalue=self.gradient_clipping)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -156,7 +157,9 @@ class PPOAgent:
 
     def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
-        (as given in the paper), but this is the negated objective to be minimized!
+        (as given in the paper), but this is the negated objective to be minimized! In the recurrent version
+        a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied in the mean
+        operation of the loss.
 
         Args:
           action_prob (tf.Tensor): the probability of the action for the state under the current policy
@@ -167,16 +170,26 @@ class PPOAgent:
           the value of the objective function
 
         """
-        # TODO need to deal with the fact that old_action_prob fucks me
         r = action_prob / old_action_prob
-        return tf.reduce_mean(tf.maximum(
+        clipped = tf.maximum(
             - tf.math.multiply(r, advantage),
             - tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
-        ))
+        )
+
+        if self.is_recurrent:
+            # build and apply a mask over the probabilities (recurrent)
+            mask = tf.not_equal(old_action_prob, 0)
+            clipped_safe = tf.where(mask, clipped, tf.zeros_like(clipped))
+            clipped_masked = tf.where(mask, clipped_safe, 0)  # masking with tf.where because inf * 0 = nan...
+            return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
+        else:
+            return tf.reduce_mean(clipped)
 
     def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
                    clip: bool = True) -> tf.Tensor:
-        """Loss of the critic network as squared error between the prediction and the sampled future return.
+        """Loss of the critic network as squared error between the prediction and the sampled future return. In the
+        recurrent case a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied
+        in the mean operation of the loss.
 
         Args:
           value_predictions (tf.Tensor): value prediction by the current critic network
@@ -193,9 +206,15 @@ class PPOAgent:
             clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
             clipped_error = tf.square(clipped_values - returns)
 
-            return tf.maximum(clipped_error, error) * 0.5
+            error = tf.maximum(clipped_error, error) * 0.5
 
-        return tf.reduce_mean(error)
+        if self.is_recurrent:
+            # build and apply a mask over the old values (recurrent)
+            mask = old_values != 0
+            error_masked = tf.where(mask, error, 0)  # masking with tf.where because inf * 0 = nan...
+            return tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
+        else:
+            return tf.reduce_mean(error)
 
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
         """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
@@ -340,7 +359,6 @@ class PPOAgent:
 
     @tf.function
     def _learn_on_batch(self, batch):
-        print("new_batch")
         # optimize policy and value network simultaneously
         with tf.GradientTape() as tape:
             state_batch = batch["state"] if "state" in batch else (batch["in_vision"], batch["in_proprio"],
@@ -359,18 +377,15 @@ class PPOAgent:
                 action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
             # calculate the clipped loss
-            policy_loss = self.policy_loss(action_prob=action_probabilities,
-                                           old_action_prob=batch["action_prob"],
+            policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
                                            advantage=batch["advantage"])
-            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output),
-                                         old_values=old_values,
-                                         returns=batch["return"],
-                                         clip=self.clip_values)
+            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output), old_values=old_values,
+                                         returns=batch["return"], clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy,
-                                                                                           entropy)
+            total_loss = policy_loss #+ tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
+        # clip gradients to avoid gradient explosion and stabilize learning
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
@@ -417,6 +432,14 @@ class PPOAgent:
                             partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
                             ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
                             progressbar.update(1)
+
+                # check loss legality
+                assert not tf.reduce_any(tf.math.is_nan(ent)), "Entropy became NaN during training. " \
+                                                               "Something is going horribly wrong."
+                assert not tf.reduce_any(tf.math.is_nan(pi_loss)), "Policy Loss became NaN during training. " \
+                                                                   "Something is going horribly wrong."
+                assert not tf.reduce_any(tf.math.is_nan(v_loss)), "Value Loss became NaN during training. " \
+                                                                  "Something is going horribly wrong."
 
                 entropies.append(ent)
                 actor_epoch_losses.append(pi_loss)
