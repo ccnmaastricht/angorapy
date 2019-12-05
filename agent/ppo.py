@@ -113,8 +113,7 @@ class PPOAgent:
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
-        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5,
-                                                             clipvalue=self.gradient_clipping)
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -382,7 +381,7 @@ class PPOAgent:
             value_loss = self.value_loss(value_predictions=tf.squeeze(value_output), old_values=old_values,
                                          returns=batch["return"], clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss #+ tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
         # clip gradients to avoid gradient explosion and stabilize learning

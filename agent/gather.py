@@ -14,7 +14,7 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_rnn_distinct_models
+from models import build_rnn_distinct_models, build_ffn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
 from utilities.util import parse_state, add_state_dims, is_recurrent_model
@@ -142,8 +142,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # normalize advantages
     buffer.normalize_advantages()
 
-    # add batch dimension for optimization
-    buffer.inject_batch_dimension()
+    if is_recurrent:
+        # add batch dimension for optimization
+        buffer.inject_batch_dimension()
 
     # convert buffer to dataset and save it to tf record
     dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
@@ -205,8 +206,8 @@ if __name__ == "__main__":
     #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
     env_n = "CartPole-v1"
-    p, v, j = build_rnn_distinct_models(gym.make(env_n), 1)
-    joint_tuple = ModelTuple(build_rnn_distinct_models.__name__, j.get_weights())
+    p, v, j = build_ffn_distinct_models(gym.make(env_n))
+    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
     for i in tqdm(range(10000)):
