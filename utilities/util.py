@@ -104,7 +104,7 @@ def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
 def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
     """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
     return list(itertools.chain(*[extract_layers(layer)
-                                  if isinstance(layer, tf.keras.Sequential)
+                                  if isinstance(layer, tf.keras.Model)
                                   else [layer] for layer in network.layers]))
 
 

@@ -27,8 +27,12 @@ class Investigator:
         else:
             return [layer.name for layer in extract_layers(self.network)]
 
+    def get_layer_by_name(self, layer_name):
+        """Retrieve the layer object identified from the model by its unique string representation."""
+        return extract_layers(self.network)[self.list_layer_names().index(layer_name)]
+
     def get_layer_weights(self, layer_name):
-        return self.network.get_layer(layer_name).get_weights()
+        return self.get_layer_by_name(layer_name).get_weights()
 
     def get_weight_dict(self):
         out = {}
@@ -38,7 +42,7 @@ class Investigator:
         return out
 
     def get_layer_activations(self, layer_name, input_tensor):
-        layer = self.network.get_layer(layer_name)
+        layer = self.get_layer_by_name(layer_name)
         sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
         return sub_model.predict(input_tensor)
@@ -47,7 +51,7 @@ class Investigator:
         states = []
         activations = []
 
-        layer = self.network.get_layer(layer_name)
+        layer = self.get_layer_by_name(layer_name)
         dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
 
         if isinstance(env.action_space, Discrete):
