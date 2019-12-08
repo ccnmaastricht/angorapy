@@ -6,7 +6,7 @@ import tensorflow as tf
 from scipy.signal import lfilter
 from scipy.stats import norm, entropy
 
-from agent.core import extract_discrete_action_probabilities, gaussian_pdf, gaussian_entropy, categorical_entropy, \
+from agent.core import extract_discrete_action_probabilities, gaussian_log_pdf, gaussian_entropy, categorical_entropy, \
     estimate_advantage, estimate_episode_advantages
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -47,7 +47,7 @@ class ProbabilityTest(unittest.TestCase):
         sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
 
         result_reference = numpy.prod(norm.pdf(x, loc=mu, scale=sig))
-        result = gaussian_pdf(x, mu, sig).numpy().item()
+        result = gaussian_log_pdf(x, mu, sig).numpy().item()
 
         self.assertTrue(numpy.allclose(result_reference, result))
 

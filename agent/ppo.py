@@ -20,7 +20,7 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from agent.core import gaussian_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
+from agent.core import gaussian_log_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH
@@ -171,8 +171,8 @@ class PPOAgent:
         """
         r = tf.exp(action_prob - old_action_prob)
         clipped = tf.maximum(
-            - tf.math.multiply(r, advantage),
-            - tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), advantage)
+            tf.math.multiply(r, -advantage),
+            tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), -advantage)
         )
 
         if self.is_recurrent:
@@ -228,7 +228,7 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(gaussian_entropy(stdevs=tf.split(policy_output, 2, axis=-1)))
+            return tf.reduce_mean(gaussian_entropy(policy_output[1]))
         else:
             return tf.reduce_mean(categorical_entropy(policy_output))
 
@@ -367,10 +367,8 @@ class PPOAgent:
 
             if self.continuous_control:
                 # if action space is continuous, calculate PDF at chosen action value
-                means, stdevs = tf.split(policy_output, 2, axis=-1)
-                action_probabilities = gaussian_pdf(batch["action"],
-                                                    means=means,
-                                                    stdevs=stdevs)
+                means, stdevs = policy_output
+                action_probabilities = gaussian_log_pdf(batch["action"], means=means, log_stdevs=stdevs)
             else:
                 # if the action space is discrete, extract the probabilities of actions actually chosen
                 action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
@@ -381,13 +379,24 @@ class PPOAgent:
             value_loss = self.value_loss(value_predictions=tf.squeeze(value_output), old_values=old_values,
                                          returns=batch["return"], clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+            total_loss = policy_loss + tf.multiply(self.c_value, value_loss)  # - tf.multiply(self.c_entropy, entropy)
 
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
         # clip gradients to avoid gradient explosion and stabilize learning
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
+
+        if tf.reduce_any(list(map(lambda x: tf.reduce_any(tf.math.is_nan(x)), gradients))):
+            print("At least part of the gradients were NaN. That sucks big time.")
+
+        # check loss legality
+        if tf.reduce_any(tf.math.is_nan(entropy)):
+            print("Entropy became NaN during training. Something is going horribly wrong.")
+        if tf.reduce_any(tf.math.is_nan(policy_loss)):
+            print("Policy Loss became NaN during training. Something is going horribly wrong.")
+        if tf.reduce_any(tf.math.is_nan(value_loss)):
+            print("Value Loss became NaN during training. Something is going horribly wrong.")
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
@@ -416,7 +425,7 @@ class PPOAgent:
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
             # dataset = dataset.shuffle(10000)
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
-            actor_epoch_losses, value_epoch_losses, entropies = [], [], []
+            policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
@@ -432,30 +441,22 @@ class PPOAgent:
                             ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
                             progressbar.update(1)
 
-                # check loss legality
-                assert not tf.reduce_any(tf.math.is_nan(ent)), "Entropy became NaN during training. " \
-                                                               "Something is going horribly wrong."
-                assert not tf.reduce_any(tf.math.is_nan(pi_loss)), "Policy Loss became NaN during training. " \
-                                                                   "Something is going horribly wrong."
-                assert not tf.reduce_any(tf.math.is_nan(v_loss)), "Value Loss became NaN during training. " \
-                                                                  "Something is going horribly wrong."
-
                 entropies.append(ent)
-                actor_epoch_losses.append(pi_loss)
+                policy_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
 
             # reset RNN states after an epoch if there are any
             self.joint.reset_states()
 
             # remember some statistics
-            policy_loss_history.append(tf.reduce_mean(actor_epoch_losses).numpy().item())
+            policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
             value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
             entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         # store statistics in agent history
-        self.policy_loss_history.extend(policy_loss_history)
-        self.value_loss_history.extend(value_loss_history)
-        self.entropy_history.extend(entropy_history)
+        self.policy_loss_history.append(statistics.mean(policy_loss_history))
+        self.value_loss_history.append(statistics.mean(value_loss_history))
+        self.entropy_history.append(statistics.mean(entropy_history))
 
         progressbar.close()
 
@@ -493,10 +494,13 @@ class PPOAgent:
             current_lr = self.lr_schedule(self.optimizer.iterations)
         else:
             current_lr = self.lr_schedule
+        pi_loss = 0 if len(self.policy_loss_history) == 0 else round(self.policy_loss_history[-1], 2)
+        v_loss = 0 if len(self.value_loss_history) == 0 else round(self.value_loss_history[-1], 2)
+        ent = 0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2)
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"AvgRew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
                    f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
-                   f"AvgEnt.: {nc}{0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2):5.2f}{ec}; "
+                   f"Loss.: [{nc}{pi_loss:6.2f}{ec}|{nc}{v_loss:6.2f}{ec}|{nc}{ent:6.2f}{ec}]; "
                    f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
                    f"Lr: {nc}{current_lr:.2e}{ec}; "
                    f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "

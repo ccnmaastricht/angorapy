@@ -37,18 +37,15 @@ def _build_continuous_head(n_actions, input_shape, batch_size):
 
     means = tf.keras.layers.Dense(n_actions, name="means")(inputs)
 
-    stdevs = tf.keras.layers.Dense(n_actions)(inputs)
-    stdevs = tf.keras.layers.Activation("softplus", name="stdevs")(stdevs)
+    stdevs = tf.keras.layers.Dense(n_actions, name="log_stdevs")(inputs)
 
-    concat = tf.keras.layers.Concatenate(name="multivariates")([means, stdevs])
-
-    return tf.keras.Model(inputs=inputs, outputs=concat, name="continuous_action_head")
+    return tf.keras.Model(inputs=inputs, outputs=[means, stdevs], name="continuous_action_head")
 
 
 def _build_discrete_head(n_actions, input_shape, batch_size):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
     x = tf.keras.layers.Dense(n_actions)(inputs)
-    x = tf.nn.log_softmax(x)
+    x = tf.nn.log_softmax(x, name="log_likelihoods")
 
-    return tf.keras.Model(inputs=inputs, outputs=x, name="log_likelihoods")
+    return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")

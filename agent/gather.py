@@ -4,6 +4,7 @@ import os
 from inspect import getfullargspec as fargs
 from typing import Tuple
 
+import tensorflow as tf
 import numpy as np
 import ray
 from gym.spaces import Box, Discrete
@@ -14,10 +15,10 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_rnn_distinct_models, build_ffn_distinct_models
+from models import build_ffn_distinct_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
-from utilities.util import parse_state, add_state_dims, is_recurrent_model
+from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -30,7 +31,6 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     is_continuous = isinstance(env.action_space, Box)
-    act = act_continuous if is_continuous else act_discrete
 
     # load policy
     if isinstance(model, str):
@@ -51,7 +51,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
                                              " observations."
     is_shadow_brain = "ShadowHand" in env_name
 
-    # buffer storing the experience and stats
+    # buffer storing the experience and stats # TODO actually make this bufferable where the size is predefined
     buffer: ExperienceBuffer = ExperienceBuffer.new_empty()
 
     # go for it
@@ -61,13 +61,14 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     while t < horizon:
         current_subseq_length += 1
 
-        # based on the given state, predict action distribution and state value
-        action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
+        # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
+        policy_out = flatten(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+        a_distr, value = policy_out[:-1], policy_out[-1]
         states.append(state)
         values.append(np.squeeze(value))
 
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = act(action_distribution)
+        action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
         actions.append(action)
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
@@ -122,7 +123,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # non-recurrent and recurrent wrap up
     if not is_recurrent:
         # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[1]))
+        values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[-1]))
         if episode_steps > 1:
             advantages.append(estimate_episode_advantages(rewards[-episode_steps + 1:],
                                                           values[-episode_steps:],
@@ -204,6 +205,7 @@ if __name__ == "__main__":
     # joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
     # if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
     #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
+    # tf.config.experimental_run_functions_eagerly(True)
 
     env_n = "CartPole-v1"
     p, v, j = build_ffn_distinct_models(gym.make(env_n))
