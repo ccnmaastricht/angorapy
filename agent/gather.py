@@ -156,6 +156,8 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # convert buffer to dataset and save it to tf record
     dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
     dataset = dataset.map(tf_serialize_example)
+
+    # TODO I have the suspicion that the writer leaks memory if we wouldnt reset the workers
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
