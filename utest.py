@@ -1,13 +1,14 @@
 import os
 import unittest
 
-import numpy
+import numpy as np
 import tensorflow as tf
 from scipy.signal import lfilter
 from scipy.stats import norm, entropy
 
-from agent.core import extract_discrete_action_probabilities, gaussian_log_pdf, gaussian_entropy, categorical_entropy, \
-    estimate_advantage, estimate_episode_advantages
+from agent.core import extract_discrete_action_probabilities, gaussian_log_pdf, gaussian_entropy_from_log, \
+    categorical_entropy_from_log, \
+    estimate_advantage, gaussian_pdf, gaussian_entropy, categorical_entropy
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -37,36 +38,42 @@ class CoreTest(unittest.TestCase):
         self.assertTrue(tf.reduce_all(tf.equal(result, result_reference)).numpy().item())
 
 
-
-
 class ProbabilityTest(unittest.TestCase):
 
     def test_gaussian_pdf(self):
-        x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-        mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-        sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
+        x = tf.convert_to_tensor([[2, 3], [4, 3], [2, 1]], dtype=tf.float32)
+        mu = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
+        sig = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
 
-        result_reference = numpy.prod(norm.pdf(x, loc=mu, scale=sig))
-        result = gaussian_log_pdf(x, mu, sig).numpy().item()
+        result_reference = np.prod(norm.pdf(x, loc=mu, scale=sig), axis=-1)
+        result_pdf = gaussian_pdf(x, mu, sig).numpy()
+        result_log_pdf = np.exp(gaussian_log_pdf(x, mu, np.log(sig)).numpy())
 
-        self.assertTrue(numpy.allclose(result_reference, result))
+        self.assertTrue(np.allclose(result_reference, result_pdf), msg="Gaussian PDF returns wrong Result")
+        self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
 
     def test_gaussian_entropy(self):
-        mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-        sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
+        mu = tf.convert_to_tensor([[2.0, 3.0], [2.0, 1.0]], dtype=tf.float32)
+        sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
 
-        result_reference = numpy.sum(norm.entropy(loc=mu, scale=sig))
-        result = gaussian_entropy(sig).numpy().item()
+        result_reference = np.sum(norm.entropy(loc=mu, scale=sig), axis=-1)
+        result_log = gaussian_entropy_from_log(np.log(sig)).numpy()
+        result = gaussian_entropy(sig).numpy()
 
-        self.assertTrue(numpy.allclose(result_reference, result))
+        self.assertTrue(np.allclose(result_reference, result), msg="Gaussian entropy returns wrong result")
+        self.assertTrue(np.allclose(result_log, result_reference), msg="Gaussian entropy from log returns wrong result")
 
     def test_categorical_entropy(self):
-        probs = tf.convert_to_tensor([[0.1, 0.4, 0.2, 0.25, 0.05]], dtype=tf.float32)
+        probs = tf.convert_to_tensor([[0.1, 0.4, 0.2, 0.25, 0.05],
+                                      [0.1, 0.4, 0.2, 0.2, 0.1],
+                                      [0.1, 0.35, 0.3, 0.24, 0.01]], dtype=tf.float32)
 
-        result_reference = entropy(probs[0].numpy())
-        result = categorical_entropy(probs).numpy().item()
+        result_reference = [entropy(probs[i]) for i in range(len(probs))]
+        result_log = categorical_entropy_from_log(np.log(probs)).numpy()
+        result = categorical_entropy(probs).numpy()
 
-        self.assertTrue(numpy.allclose(result_reference, result))
+        self.assertTrue(np.allclose(result_reference, result), msg="Discrete entropy returns wrong result")
+        self.assertTrue(np.allclose(result_log, result_reference), msg="Discrete entropy from log returns wrong result")
 
 
 class AdvantageTest(unittest.TestCase):
@@ -75,15 +82,15 @@ class AdvantageTest(unittest.TestCase):
         def discount(x, gamma):
             return lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
 
-        rewards = numpy.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0, 10, 10, 4, 9, 4])
-        values = numpy.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 4, 10, 5, 7, 8, 9])
-        terminals = numpy.array(
+        rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0, 10, 10, 4, 9, 4])
+        values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 4, 10, 5, 7, 8, 9])
+        terminals = np.array(
             [False, False, False, False, False, False, False, False, False, False, True,
              False, False, False, False, False])
 
-        rewards = numpy.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0])
-        values = numpy.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 0])
-        terminals = numpy.array([False, False, False, False, False, False, False, False, False, False, True])
+        rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0])
+        values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 0])
+        terminals = np.array([False, False, False, False, False, False, False, False, False, False, True])
 
         gamma = 1
         lamb = 1
@@ -92,10 +99,6 @@ class AdvantageTest(unittest.TestCase):
 
         prep = rewards + gamma * values[1:] * (1 - terminals) - values[:-1]
         result_reference = discount(prep, gamma * lamb)
-
-        print(result)
-        print(result_reference)
-        print(estimate_episode_advantages(rewards, values, gamma, lamb))
 
 
 if __name__ == '__main__':

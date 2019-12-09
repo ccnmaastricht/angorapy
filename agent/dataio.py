@@ -76,7 +76,7 @@ def tf_serialize_example(sample):
 def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
     """Make dataset object and StatBundle from ExperienceBuffer."""
     completed_episodes = buffer.episodes_completed
-    numb_processed_frames = buffer.buffer_size
+    numb_processed_frames = buffer.size
 
     # expand dims when constructing dataset to inject batch dimension
     if is_shadow_brain:

@@ -20,7 +20,7 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from agent.core import gaussian_log_pdf, gaussian_entropy, categorical_entropy, extract_discrete_action_probabilities
+from agent.core import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log, extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH
@@ -228,9 +228,9 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(gaussian_entropy(policy_output[1]))
+            return tf.reduce_mean(gaussian_entropy_from_log(policy_output[1]))
         else:
-            return tf.reduce_mean(categorical_entropy(policy_output))
+            return tf.reduce_mean(categorical_entropy_from_log(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False) -> "PPOAgent":

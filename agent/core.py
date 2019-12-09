@@ -67,6 +67,8 @@ def estimate_episode_advantages(rewards, values, gamma, lam):
 
 
 # PROBABILITY
+
+
 @tf.function
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
     """Calculate probability density for a given batch of potentially joint Gaussian PDF."""
@@ -96,7 +98,7 @@ def gaussian_log_pdf(samples: tf.Tensor, means: tf.Tensor, log_stdevs: tf.Tensor
 
 
 @tf.function
-def gaussian_entropy(log_stdevs: tf.Tensor):
+def gaussian_entropy(stdevs: tf.Tensor):
     """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
 
     Input Shape: (B, A) or (B, S, A) for recurrent
@@ -104,12 +106,31 @@ def gaussian_entropy(log_stdevs: tf.Tensor):
     Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
     of the joint entropy and the sum of marginal entropies.
     """
-    entropy = .5 * tf.math.log(math.pi * math.e * tf.pow(tf.exp(log_stdevs), 2))
+    entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
+    return tf.reduce_sum(entropy, axis=-1)
+
+
+@tf.function
+def gaussian_entropy_from_log(log_stdevs: tf.Tensor):
+    """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
+
+    Input Shape: (B, A) or (B, S, A) for recurrent
+
+    Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+    of the joint entropy and the sum of marginal entropies.
+    """
+    entropy = .5 * (tf.math.log(math.pi * 2) + (tf.multiply(2.0, log_stdevs) + 1.0))
     return tf.reduce_sum(entropy, axis=-1)
 
 
 @tf.function
 def categorical_entropy(pmf: tf.Tensor):
+    """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
+    return - tf.reduce_sum(tf.math.log(pmf) * pmf, axis=-1)
+
+
+@tf.function
+def categorical_entropy_from_log(pmf: tf.Tensor):
     """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
     return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
 

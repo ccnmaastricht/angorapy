@@ -7,7 +7,7 @@ from typing import Tuple
 import tensorflow as tf
 import numpy as np
 import ray
-from gym.spaces import Box, Discrete
+from gym.spaces import Box, Discrete, Dict
 from tqdm import tqdm
 
 import models
@@ -15,10 +15,10 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_ffn_distinct_models
+from models import build_ffn_distinct_models, build_shadow_brain_v1
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple
-from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten
+from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, merge_into_batch
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -31,6 +31,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     is_continuous = isinstance(env.action_space, Box)
+    is_shadow_brain = "ShadowHand" in env_name
 
     # load policy
     if isinstance(model, str):
@@ -46,13 +47,14 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     # check if there is a recurrent layer inside the model
     is_recurrent = is_recurrent_model(joint)
-    if is_recurrent:
-        assert horizon % subseq_length == 0, "Subsequence length for TBPTT would require cutting of part of the" \
-                                             " observations."
-    is_shadow_brain = "ShadowHand" in env_name
 
     # buffer storing the experience and stats # TODO actually make this bufferable where the size is predefined
-    buffer: ExperienceBuffer = ExperienceBuffer.new_empty()
+    buffer: ExperienceBuffer
+    if is_recurrent:
+        assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the observations."
+        buffer = ExperienceBuffer.new_recurrent(env, horizon // subseq_length, subseq_length)
+    else:
+        buffer = ExperienceBuffer.new_empty()
 
     # go for it
     t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
@@ -198,18 +200,18 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
 if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-    # env_n = "ShadowHand-v1"
-    # env = gym.make(env_n)
-    # p, v, j = build_shadow_brain(env, 1)
-    # joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
-    # if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
-    #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
     # tf.config.experimental_run_functions_eagerly(True)
 
-    env_n = "CartPole-v1"
-    p, v, j = build_ffn_distinct_models(gym.make(env_n))
-    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
+    env_n = "ShadowHand-v1"
+    env = gym.make(env_n)
+    p, v, j = build_shadow_brain_v1(env, 1)
+    joint_tuple = ModelTuple(build_shadow_brain_v1.__name__, j.get_weights())
+    if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
+        j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
+
+    # env_n = "CartPole-v1"
+    # p, v, j = build_ffn_distinct_models(gym.make(env_n))
+    # joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
     for i in tqdm(range(10000)):

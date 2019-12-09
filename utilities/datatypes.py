@@ -5,11 +5,12 @@ import logging
 from collections import namedtuple
 from typing import List, Union
 
+import gym
 import numpy as np
 from keras_preprocessing.sequence import pad_sequences
 from numpy import ndarray as arr
 
-from utilities.util import add_state_dims
+from utilities.util import add_state_dims, env_extract_dims
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths"])
@@ -23,7 +24,9 @@ class ExperienceBuffer:
                  returns: Union[List, arr], advantages: Union[List, arr], episodes_completed: int,
                  episode_rewards: List[int], episode_lengths: List[int]):
 
-        self.buffer_size = 0
+        self.size = actions.shape[0]
+        self.filled = 0
+
         self.episode_lengths = episode_lengths
         self.episode_rewards = episode_rewards
         self.episodes_completed = episodes_completed
@@ -33,11 +36,14 @@ class ExperienceBuffer:
         self.actions = actions
         self.states = states
 
+    def __repr__(self):
+        return f"ExperienceBuffer[{self.filled}/{self.size}]"
+
     def fill(self, s, a, ap, ret, adv):
         """Fill the buffer with 5-tuple of experience."""
         assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv)]) == len(s)), "Inconsistent input sizes."
 
-        self.buffer_size = len(adv)
+        self.size = len(adv)
         self.advantages, self.returns, self.action_probabilities, self.actions, self.states = adv, ret, ap, a, s
 
     def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr],
@@ -65,7 +71,7 @@ class ExperienceBuffer:
                                             self.advantages]]), "There cannot be an empty s/a/ap/r/adv when padding."
 
         size_diffs = np.array([len(self.actions), len(self.action_probabilities), len(self.returns),
-                      len(self.advantages)]) == len(self.states)
+                               len(self.advantages)]) == len(self.states)
         if not np.all(size_diffs):
             logging.warning(f"Buffer contains inconsistent lengths of s/a/ap/r/adv prior to padding [{size_diffs}].")
 
@@ -82,7 +88,6 @@ class ExperienceBuffer:
                                                  "You should call pad_buffer first."
         rank = len(self.advantages.shape)
         assert rank in [1, 2], f"Illegal rank of advantage tensor, should be 1 or 2 but is {rank}."
-        is_recurrent = rank == 2
 
         mean = np.mean(self.advantages)
         std = np.maximum(np.std(self.advantages), 1e-6)
@@ -100,7 +105,43 @@ class ExperienceBuffer:
     @staticmethod
     def new_empty():
         """Return an empty buffer."""
-        return ExperienceBuffer(states=[], actions=[], action_probabilities=[], returns=[], advantages=[],
+        return ExperienceBuffer(states=[],
+                                actions=[],
+                                action_probabilities=[],
+                                returns=[],
+                                advantages=[],
+                                episodes_completed=0, episode_rewards=[], episode_lengths=[])
+
+    @staticmethod
+    def new(env: gym.Env, size: int):
+        """Return an empty buffer."""
+        state_dim, action_dim = env_extract_dims(env)
+
+        if isinstance(state_dim, int):
+            state_buffer = np.zeros((size, action_dim))
+        else:
+            state_buffer = tuple(np.zeros((size,) + shape) for shape in state_dim)
+        return ExperienceBuffer(states=state_buffer,
+                                actions=np.zeros((size, action_dim)),
+                                action_probabilities=np.zeros((size,)),
+                                returns=np.zeros((size,)),
+                                advantages=np.zeros((size,)),
+                                episodes_completed=0, episode_rewards=[], episode_lengths=[])
+
+    @staticmethod
+    def new_recurrent(env: gym.Env, size: int, seq_len):
+        """Return an empty buffer for sequences."""
+        state_dim, action_dim = env_extract_dims(env)
+
+        if isinstance(state_dim, int):
+            state_buffer = np.zeros((size, action_dim))
+        else:
+            state_buffer = tuple(np.zeros((size, seq_len) + shape) for shape in state_dim)
+        return ExperienceBuffer(states=state_buffer,
+                                actions=np.zeros((size, seq_len, action_dim)),
+                                action_probabilities=np.zeros((size, seq_len,)),
+                                returns=np.zeros((size, seq_len)),
+                                advantages=np.zeros((size, seq_len)),
                                 episodes_completed=0, episode_rewards=[], episode_lengths=[])
 
 
@@ -112,3 +153,11 @@ def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
         episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
         episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles]))
     )
+
+
+if __name__ == '__main__':
+    from environments import *
+
+    environment = gym.make("ShadowHand-v1")
+    buffer = ExperienceBuffer.new_empty_recurrent(environment, 10, 16)
+    print(buffer)
