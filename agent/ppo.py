@@ -178,8 +178,7 @@ class PPOAgent:
         if self.is_recurrent:
             # build and apply a mask over the probabilities (recurrent)
             mask = tf.not_equal(old_action_prob, 0)
-            clipped_safe = tf.where(mask, clipped, tf.zeros_like(clipped))
-            clipped_masked = tf.where(mask, clipped_safe, 0)  # masking with tf.where because inf * 0 = nan...
+            clipped_masked = tf.where(mask, clipped, 0)
             return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
         else:
             return tf.reduce_mean(clipped)
@@ -233,7 +232,7 @@ class PPOAgent:
             return tf.reduce_mean(categorical_entropy_from_log(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
-              separate_eval: bool = False) -> "PPOAgent":
+              separate_eval: bool = False, ray_already_initialized: bool = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -268,7 +267,9 @@ class PPOAgent:
         self.joint.set_weights(weights)
 
         available_cpus = multiprocessing.cpu_count()
-        ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+        if not ray_already_initialized:
+            ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR,
+                     object_store_memory=1e+9, memory=1e+9)
         print(f"Parallelizing {self.workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()

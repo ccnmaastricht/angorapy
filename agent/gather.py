@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
+import cProfile
 import os
 from inspect import getfullargspec as fargs
 from typing import Tuple
@@ -9,19 +10,20 @@ import numpy as np
 import ray
 from gym.spaces import Box, Discrete, Dict
 from tqdm import tqdm
+import guppy
 
 import models
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_ffn_distinct_models, build_shadow_brain_v1
+from models import build_ffn_distinct_models, build_shadow_brain_v1, build_rnn_distinct_models
 from utilities.const import STORAGE_DIR
-from utilities.datatypes import ExperienceBuffer, ModelTuple
+from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, merge_into_batch
 
 
-@ray.remote(num_cpus=1, num_gpus=0)
+@ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
 
@@ -49,12 +51,15 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     is_recurrent = is_recurrent_model(joint)
 
     # buffer storing the experience and stats # TODO actually make this bufferable where the size is predefined
-    buffer: ExperienceBuffer
     if is_recurrent:
         assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the observations."
-        buffer = ExperienceBuffer.new_recurrent(env, horizon // subseq_length, subseq_length)
+        buffer: TimeSequenceExperienceBuffer = TimeSequenceExperienceBuffer.new(env=env,
+                                                                                size=horizon // subseq_length,
+                                                                                seq_len=subseq_length,
+                                                                                is_continuous=is_continuous,
+                                                                                is_multi_feature=is_shadow_brain)
     else:
-        buffer = ExperienceBuffer.new_empty()
+        buffer: ExperienceBuffer = ExperienceBuffer.new_empty(is_continuous, is_shadow_brain)
 
     # go for it
     t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
@@ -81,12 +86,13 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
         # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
         if is_recurrent and (current_subseq_length == subseq_length or done):
+            # TODO next value is inefficient
+            next_value = np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[-1])
             subseq_advantages = estimate_episode_advantages(rewards[-current_subseq_length:],
-                                                            values[-current_subseq_length:] + [0],  # TODO proper last v
+                                                            values[-current_subseq_length:] + [next_value],
                                                             discount, lam)
             subseq_returns = subseq_advantages + values[-current_subseq_length:]
-            buffer.push_seq_to_buffer(states, actions, action_probabilities, subseq_advantages, subseq_returns,
-                                      is_multi_feature=is_shadow_brain, is_continuous=is_continuous)
+            buffer.push_seq_to_buffer(states, actions, action_probabilities, subseq_advantages, subseq_returns)
 
             # reset the buffered information
             states, actions, action_probabilities = [], [], []
@@ -139,8 +145,6 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
                     np.array(action_probabilities, dtype=np.float32),
                     advantages,
                     advantages + values[:-1])
-    else:
-        buffer.pad_buffer()
 
     # normalize advantages
     buffer.normalize_advantages()
@@ -154,6 +158,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     dataset = dataset.map(tf_serialize_example)
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
+
+    # h = guppy.hpy()
+    # print(h.heap())
 
     return stats
 
@@ -200,18 +207,19 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
 if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # tf.config.experimental_run_functions_eagerly(True)
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # need to deactivate GPU in Debugger mode!
+    tf.config.experimental_run_functions_eagerly(True)
 
-    env_n = "ShadowHand-v1"
-    env = gym.make(env_n)
-    p, v, j = build_shadow_brain_v1(env, 1)
-    joint_tuple = ModelTuple(build_shadow_brain_v1.__name__, j.get_weights())
-    if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
-        j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
+    # env_n = "ShadowHand-v1"
+    # env = gym.make(env_n)
+    # p, v, j = build_shadow_brain_v1(env, 1)
+    # joint_tuple = ModelTuple(build_shadow_brain_v1.__name__, j.get_weights())
+    # if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
+    #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
-    # env_n = "CartPole-v1"
-    # p, v, j = build_ffn_distinct_models(gym.make(env_n))
-    # joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
+    env_n = "CartPole-v1"
+    p, v, j = build_rnn_distinct_models(gym.make(env_n))
+    joint_tuple = ModelTuple(build_rnn_distinct_models.__name__, j.get_weights())
 
     ray.init(local_mode=True)
     for i in tqdm(range(10000)):

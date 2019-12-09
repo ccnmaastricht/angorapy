@@ -17,7 +17,7 @@ from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 
 
-def run_experiment(settings: argparse.Namespace):
+def run_experiment(settings: argparse.Namespace, verbose=True):
     """Run an experiment with the given settings."""
 
     if __debug__:
@@ -45,20 +45,22 @@ def run_experiment(settings: argparse.Namespace):
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
-    print(f"-----------------------------------------\n"
-          f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
-          f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
-          f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
-          f"Model: {build_models.__name__}\n"
-          f"-----------------------------------------\n")
+    if verbose:
+        print(f"-----------------------------------------\n"
+              f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
+              f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
+              f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
+              f"Model: {build_models.__name__}\n"
+              f"-----------------------------------------\n")
 
-    print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
+        print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
 
     if settings.cpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     if settings.load_from is not None:
-        print(f"{wn}Loading{ec} from state {settings.load_from}")
+        if verbose:
+            print(f"{wn}Loading{ec} from state {settings.load_from}")
         agent = PPOAgent.from_agent_state(settings.load_from)
     else:
         # set up the agent and a reporting module
@@ -68,7 +70,8 @@ def run_experiment(settings: argparse.Namespace):
                          gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
                          tbptt_length=settings.tbptt, debug=settings.debug)
 
-        print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
+        if verbose:
+            print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
     monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
