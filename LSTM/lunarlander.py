@@ -1,16 +1,14 @@
 import gym
 import numpy as np
 import random
-from keras import utils
+from tensorflow.keras import utils
 from collections import deque
-from keras.models import Sequential
-from keras.layers import Dense, Conv2D, MaxPool2D
-from keras.optimizers import Adam
-from LSTM.buildingblocks import _buildingblock_network
-from models.convolutional import _build_visual_encoder
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
 import tensorflow as tfl
 
-ENV_NAME = "Breakout-v0"
+ENV_NAME = "LunarLander-v2"
 
 GAMMA = 0.95
 LEARNING_RATE = 0.001
@@ -31,17 +29,12 @@ class DQNSolver:
         self.memory = deque(maxlen=MEMORY_SIZE)
         self.batch_size = BATCH_SIZE
 
-        #self.model = Sequential()
-        #self.model.add(Conv2D(24, 3))
-        #self.model.add(MaxPool2D())
-        #self.model.add(Dense(16, activation="relu"))
-        #self.model.add(Dense(self.action_space, activation="linear"))
-        #self.model = _buildingblock_network(self.observation_space, self.action_space,
-        #                                    24, self.batch_size)
-        self.model = _build_visual_encoder(observation_space)
-        self.model.compile(loss="mse",
-                           optimizer="Adam")
-        #utils.plot_model(self.model, 'breakout_network.png', show_shapes=True)
+        self.model = Sequential()
+        self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(24, activation="relu"))
+        self.model.add(Dense(self.action_space, activation="linear"))
+        self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
+        utils.plot_model(self.model, 'lunarlander_network.png', show_shapes=True)
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -55,8 +48,7 @@ class DQNSolver:
     def experience_replay(self):
         if len(self.memory) < BATCH_SIZE:
             return
-        batch = np.array(random.sample(self.memory, BATCH_SIZE))
-        batch = np.array(self.memory)
+        batch = random.sample(self.memory, BATCH_SIZE)
         for state, action, reward, state_next, terminal in batch:
             q_update = reward
             if not terminal:
@@ -73,33 +65,27 @@ env = gym.make(ENV_NAME)
 
 #env = gym.make("CartPole-v1")
 #score_logger = ScoreLogger("CartPole-v1")
-observation_space = env.observation_space.shape
+observation_space = env.observation_space.shape[0]
 action_space = env.action_space.n
 dqn_solver = DQNSolver(observation_space, action_space)
 run = 0
 while True:
     run += 1
     state = env.reset()
-    state = tfl.expand_dims(state, 0)
-    state = tfl.dtypes.cast(state, tfl.float32)
-    #state = np.reshape(state, [1, observation_space])
+    state = np.reshape(state, [1, observation_space])
     step = 0
     while True:
         step += 1
         env.render()
-        #state.reshape(1, 210, 160, 3)
         action = dqn_solver.act(state)
         state_next, reward, terminal, info = env.step(action)
         reward = reward if not terminal else -reward
-        #state_next.reshape(1, 210, 160, 3)
-        state_next = tfl.expand_dims(state_next, 0)
-        state_next = tfl.dtypes.cast(state_next, tfl.float32)
-        #state_next = np.reshape(state_next, [1, observation_space])
+        state_next = np.reshape(state_next, [1, observation_space])
         dqn_solver.remember(state, action, reward, state_next, terminal)
         state = state_next
         if terminal:
             print("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(step))
             #score_logger.add_score(step, run)
             break
-    dqn_solver.experience_replay()
+        dqn_solver.experience_replay()
 env.close()

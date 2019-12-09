@@ -9,13 +9,13 @@ from utilities.monitoring import Monitor
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-env = gym.make("CartPole-v1")
+env = gym.make("LunarLander-v2")
 #model_builder = build_rnn_distinct_models
-model_builder = build_ffn_distinct_models
-agent = PPOAgent(model_builder, env, horizon=1024, workers=8)
+model_builder = build_rnn_distinct_models
+agent = PPOAgent(model_builder, env, horizon=1024, workers=4)
 monitor = Monitor(agent, env, 5)
 
-agent.drill(2, 3, 2, monitor=monitor)
+agent.drill(15, 3, 2, monitor=monitor)
 agent.save_agent_state()
 
 new_agent = PPOAgent.from_agent_state(agent.agent_id)

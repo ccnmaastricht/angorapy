@@ -3,12 +3,8 @@ import os
 from pprint import pprint
 from typing import List
 
-import sklearn.manifold as sklm
-import gym
 import tensorflow as tf
 from gym.spaces import Discrete, Box
-import matplotlib.pyplot as plt
-import numpy as np
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
@@ -87,46 +83,4 @@ class Investigator:
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env = gym.make("LunarLander-v2")
-    network, _, _ = build_rnn_distinct_models(env, 1)  # load model here
 
-    inv = Investigator(network)
-
-    # print(inv.get_layer_activations("lstm", tf.convert_to_tensor([[[1, 2, 3, 4]]])))
-
-    tuples = inv.get_activations_over_episode("lstm", env, True)
-    print(len(tuples))
-    pprint(tuples)
-
-    # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
-    state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
-
-    for l in range(len(np.array(tuples)[:, 0])):
-        state_data[l, :] = np.array(tuples)[l, 0]
-
-    plt.plot(list(range(len(state_data))), state_data)
-    plt.show()
-
-    # rewards
-    all_rewards = np.array(tuples)[:, 2]
-
-    plt.plot(list(range(len(all_rewards))), all_rewards)
-    plt.xlabel('Step in episode')
-    plt.ylabel('Numerical reward')
-    plt.title('Reward history over one episode')
-    plt.show()
-
-    # activations
-    activation_data = np.empty((len(np.array(tuples)[:, 0]), 32))
-
-    for k in range(len(np.array(tuples)[:, 1])):
-        activation_data[k, :] = np.array(tuples)[k, 1]
-
-    plt.plot(list(range(len(activation_data))), activation_data)
-    plt.show()
-    x_activation_data = activation_data
-    RS = 123
-    tsne_results = sklm.TSNE(random_state=RS).fit_transform(x_activation_data)
-
-    plt.scatter(tsne_results[:, 0], tsne_results[:, 1])
-    plt.show()
