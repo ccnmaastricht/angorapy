@@ -21,9 +21,9 @@ def run_experiment(settings: argparse.Namespace):
     """Run an experiment with the given settings."""
 
     if __debug__:
-        logging.warning("You are training this agent in the default debugging mode. This means that assert checks are "
-                        "executed, which may slow down training. In a production setting, deactive this by adding the -O"
-                        "flag to the python command.")
+        logging.warning("You are training this agent in python's default debugging mode. "
+                        "This means that assert checks are executed, which may slow down training. "
+                        "In a final experiment setting, deactive this by adding the -O flag to the python command.")
 
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
@@ -35,9 +35,6 @@ def run_experiment(settings: argparse.Namespace):
             build_models = build_rnn_distinct_models
         else:
             raise ValueError("Unknown Model Type.")
-
-    if settings.debug:
-        logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
     # setup environment and extract and report information
     env = gym.make(settings.env)
@@ -116,7 +113,7 @@ if __name__ == "__main__":
     # optimization parameters
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
-    parser.add_argument("--lr-pi", type=float, default=3e-4, help=f"learning rate of the policy")
+    parser.add_argument("--lr-pi", type=float, default=1e-3, help=f"learning rate of the policy")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
@@ -139,5 +136,6 @@ if __name__ == "__main__":
 
     if args.debug:
         tf.config.experimental_run_functions_eagerly(True)
+        logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
     run_experiment(args)

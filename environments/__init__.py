@@ -10,25 +10,25 @@ from environments.evasionwalls import EvasionWalls
 from environments.race import Race
 from environments.tunnel import Tunnel, TunnelRAM
 
-# try:
-#     with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-#         from environments.shadowhand import ShadowHandBlock
-#
-#         # SHADOW HAND #
-#
-#         gym.envs.register(
-#             id='ShadowHand-v0',
-#             entry_point='environments:ShadowHandBlock',
-#             kwargs={"visual_input": False},
-#         )
-#
-#         gym.envs.register(
-#             id='ShadowHand-v1',
-#             entry_point='environments:ShadowHandBlock',
-#             kwargs={"visual_input": True, "max_steps": 100},
-#         )
-# except Exception as e:
-#     print("Could not import mujoco environments, as the MuJoCo license is unavailable.")
+try:
+    with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+        from environments.shadowhand import ShadowHandBlock
+
+        # SHADOW HAND #
+
+        gym.envs.register(
+            id='ShadowHand-v0',
+            entry_point='environments:ShadowHandBlock',
+            kwargs={"visual_input": False},
+        )
+
+        gym.envs.register(
+            id='ShadowHand-v1',
+            entry_point='environments:ShadowHandBlock',
+            kwargs={"visual_input": True, "max_steps": 100},
+        )
+except Exception as e:
+    print("Could not import mujoco environments, as the MuJoCo license is unavailable.")
 
 # MODIFIED ENVIRONMENTS
 

@@ -379,7 +379,7 @@ class PPOAgent:
             value_loss = self.value_loss(value_predictions=tf.squeeze(value_output), old_values=old_values,
                                          returns=batch["return"], clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss + tf.multiply(self.c_value, value_loss)  # - tf.multiply(self.c_entropy, entropy)
+            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
         # clip gradients to avoid gradient explosion and stabilize learning
