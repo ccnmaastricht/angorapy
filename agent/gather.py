@@ -159,9 +159,6 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
-    # h = guppy.hpy()
-    # print(h.heap())
-
     return stats
 
 
