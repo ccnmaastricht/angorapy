@@ -387,16 +387,16 @@ class PPOAgent:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
-        if tf.reduce_any(list(map(lambda x: tf.reduce_any(tf.math.is_nan(x)), gradients))):
-            print("At least part of the gradients were NaN. That sucks big time.")
-
-        # check loss legality
-        if tf.reduce_any(tf.math.is_nan(entropy)):
-            print("Entropy became NaN during training. Something is going horribly wrong.")
-        if tf.reduce_any(tf.math.is_nan(policy_loss)):
-            print("Policy Loss became NaN during training. Something is going horribly wrong.")
-        if tf.reduce_any(tf.math.is_nan(value_loss)):
-            print("Value Loss became NaN during training. Something is going horribly wrong.")
+        # check for NaNs to detect errors early
+        if tf.executing_eagerly():
+            if __debug__ and tf.reduce_any(list(map(lambda x: tf.reduce_any(tf.math.is_nan(x)), gradients))):
+                print("At least part of the gradients were NaN. That sucks big time.")
+            if __debug__ and tf.reduce_any(tf.math.is_nan(entropy)):
+                print("Entropy became NaN during training. Something is going horribly wrong.")
+            if __debug__ and tf.reduce_any(tf.math.is_nan(policy_loss)):
+                print("Policy Loss became NaN during training. Something is going horribly wrong.")
+            if __debug__ and tf.reduce_any(tf.math.is_nan(value_loss)):
+                print("Value Loss became NaN during training. Something is going horribly wrong.")
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
