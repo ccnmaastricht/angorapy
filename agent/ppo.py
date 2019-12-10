@@ -25,7 +25,8 @@ from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH
 from utilities.datatypes import ModelTuple, condense_stats
-from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model
+from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
+    reset_states_masked, detect_finished_episodes
 
 
 class PPOAgent:
@@ -442,12 +443,16 @@ class PPOAgent:
                             ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
                             progressbar.update(1)
 
+                            # make partial RNN state resets
+                            reset_mask = detect_finished_episodes(partial_batch["action_prob"])
+                            reset_states_masked(self.joint, reset_mask)
+
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
 
-            # reset RNN states after an epoch if there are any
-            self.joint.reset_states()
+                # reset RNN states after each outer batch
+                self.joint.reset_states()
 
             # remember some statistics
             policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())

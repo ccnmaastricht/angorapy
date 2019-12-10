@@ -110,38 +110,40 @@ def reset_states_masked(model: tf.keras.Model, mask: List):
     """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
 
     The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
-    and zeros otherwise."""
+    and zeros otherwise (booleans possible too)."""
 
     # extract recurrent layers by their superclass RNN
     recurrent_layers = [layer for layer in extract_layers(model) if isinstance(layer, tf.keras.layers.RNN)]
 
     for layer in recurrent_layers:
         current_states = [state.numpy() for state in layer.states]
+        initial_states = 0
         new_states = []
         for current_state in current_states:
             expanded_mask = numpy.tile(numpy.rot90(numpy.expand_dims(mask, axis=0)), (1, current_state.shape[-1]))
-            masked_reset_state = np.where(expanded_mask, 0, current_state)
+            masked_reset_state = np.where(expanded_mask, initial_states, current_state)
             new_states.append(masked_reset_state)
 
         layer.reset_states(new_states)
 
 
+def detect_finished_episodes(action_probabilities: tf.Tensor):
+    """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the action
+    probabilities and return a 1D boolean tensor.
+
+    Input Shape:
+        action_probabilities: (B, S)
+    """
+    # TODO sanity check
+    # TODO wont work for episodes that finish exactly at end of sequence
+    finished = tf.reduce_any(action_probabilities == 0, axis=-1)
+    return tf.squeeze(finished)
+
+
 if __name__ == "__main__":
     import os
+
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    model = tf.keras.Sequential((
-        tf.keras.layers.Dense(2, batch_input_shape=(7, None, 2)),
-        tf.keras.layers.LSTM(5, stateful=True, name="larry", return_sequences=True),
-        tf.keras.layers.LSTM(5, stateful=True, name="harry"))
-    )
-
-    l_layer = model.get_layer("larry")
-    h_layer = model.get_layer("harry")
-    l_layer.reset_states([s.numpy() + 9 for s in l_layer.states])
-    h_layer.reset_states([s.numpy() + 9 for s in h_layer.states])
-    reset_states_masked(model, [1, 0, 0, 1, 0, 0, 1])
-
-    print(model.get_layer("larry").states)
-    print(model.get_layer("harry").states)
+    detect_finished_episodes(tf.convert_to_tensor([[1, 1, 1, 1, 0], [1, 1, 1, 1, 1]]))

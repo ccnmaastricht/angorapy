@@ -140,7 +140,9 @@ def approximate_kl_divergence(log_pa, log_pb):
     """Approximate KL-divergence between distributions a and b where some sample has probability pa in a and pb in b."""
     return .5 * tf.reduce_mean(tf.square(log_pa - log_pb))
 
+
 # MANIPULATION
+
 
 @tf.function
 def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Tensor) -> tf.Tensor:
