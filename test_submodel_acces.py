@@ -1,7 +1,5 @@
 import os
-
 import tensorflow as tf
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # NOT NESTED
@@ -18,7 +16,6 @@ sub_model = tf.keras.Model(inputs=[final_model.input], outputs=[final_model.get_
 sub_model.summary()
 
 # NESTED
-
 inp_1 = tf.keras.Input(shape=(2,))
 x = tf.keras.layers.Dense(4, name="id_1")(inp_1)
 inner_model = tf.keras.Model(inputs=[inp_1], outputs=[x], name="inner_model")
