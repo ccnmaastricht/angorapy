@@ -106,5 +106,42 @@ def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
                                   else [layer] for layer in network.layers]))
 
 
+def reset_states_masked(model: tf.keras.Model, mask: List):
+    """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
+
+    The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
+    and zeros otherwise."""
+
+    # extract recurrent layers by their superclass RNN
+    recurrent_layers = [layer for layer in extract_layers(model) if isinstance(layer, tf.keras.layers.RNN)]
+
+    for layer in recurrent_layers:
+        current_states = [state.numpy() for state in layer.states]
+        new_states = []
+        for current_state in current_states:
+            expanded_mask = numpy.tile(numpy.rot90(numpy.expand_dims(mask, axis=0)), (1, current_state.shape[-1]))
+            masked_reset_state = np.where(expanded_mask, 0, current_state)
+            new_states.append(masked_reset_state)
+
+        layer.reset_states(new_states)
+
+
 if __name__ == "__main__":
-    pass
+    import os
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+    model = tf.keras.Sequential((
+        tf.keras.layers.Dense(2, batch_input_shape=(7, None, 2)),
+        tf.keras.layers.LSTM(5, stateful=True, name="larry", return_sequences=True),
+        tf.keras.layers.LSTM(5, stateful=True, name="harry"))
+    )
+
+    l_layer = model.get_layer("larry")
+    h_layer = model.get_layer("harry")
+    l_layer.reset_states([s.numpy() + 9 for s in l_layer.states])
+    h_layer.reset_states([s.numpy() + 9 for s in h_layer.states])
+    reset_states_masked(model, [1, 0, 0, 1, 0, 0, 1])
+
+    print(model.get_layer("larry").states)
+    print(model.get_layer("harry").states)
