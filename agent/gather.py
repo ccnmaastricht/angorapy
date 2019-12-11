@@ -24,15 +24,12 @@ from utilities.util import parse_state, add_state_dims, is_recurrent_model, flat
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
 
-    # TODO remove
-    # set_all_seeds(1)
 
     # import here to avoid pickling errors
     import tensorflow as tfl
 
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
-    # env.seed(0)  # TODO REMOVE
     is_continuous = isinstance(env.action_space, Box)
     is_shadow_brain = "ShadowHand" in env_name
 
@@ -75,11 +72,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         a_distr, value = policy_out[:-1], policy_out[-1]
         states.append(state)
         values.append(np.squeeze(value))
-        # values.append(random.random())  # TODO remove
 
         # from the action distribution sample an action and remember both the action and its probability
         action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
-        # action = random.choice([0, 1])  # TODO remove
         actions.append(action)
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
@@ -92,7 +87,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         if is_recurrent and (current_subseq_length == subseq_length or done):
             buffer.push_seq_to_buffer(states, actions, action_probabilities)
 
-            # reset the buffered information
+            # clear the buffered information
             states, actions, action_probabilities = [], [], []
             current_subseq_length = 0
 
@@ -102,8 +97,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
             # calculate advantages for the finished episode, where the last value is 0 since it refers to the
             # terminal state that we just observed
-            episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
-                                                             values[-episode_steps:] + [0],
+            episode_advantages = estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0],
                                                              discount, lam)
             episode_returns = episode_advantages + values[-episode_steps:]
 
@@ -133,20 +127,22 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     env.close()
 
-    # non-recurrent and recurrent wrap up
+    # WRAP UP
+
+    # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
     values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[-1]))
+
+    # if there was at least one step in the environment after the last episode end, calculate advantages for them
     if episode_steps > 1:
-        # values.append(0)  # TODO remove
         leftover_advantages = estimate_episode_advantages(rewards[-episode_steps + 1:], values[-episode_steps:],
                                                           discount, lam)
-
         if not is_recurrent:
-            # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
             advantages.append(leftover_advantages)
         else:
             leftover_returns = leftover_advantages + values[-len(leftover_advantages) - 1:-1]
             buffer.push_adv_ret_to_buffer(leftover_advantages, leftover_returns)
 
+    # if not recurrent, fill the buffer with everything we gathered
     if not is_recurrent:
         values = np.array(values, dtype=np.float32)
 
