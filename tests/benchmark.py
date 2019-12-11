@@ -38,8 +38,8 @@ if __name__ == '__main__':
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     benchmarking_settings = [("CartPole-v1", "ffn"), ("CartPole-v1", "rnn")]
-    n_iterations = 2
-    repetitions = 1
+    n_iterations = 100
+    repetitions = 10
 
     results = {}
     should_init = True

@@ -2,6 +2,7 @@
 """Custom data types for simplifying data communication."""
 import itertools
 import logging
+import statistics
 from collections import namedtuple
 from typing import List, Union
 
@@ -13,7 +14,7 @@ from numpy import ndarray as arr
 from utilities.util import add_state_dims, env_extract_dims
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
-                                       "episode_rewards", "episode_lengths"])
+                                       "episode_rewards", "episode_lengths", "tbptt_underflow"])
 ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
 
 
@@ -22,12 +23,13 @@ class ExperienceBuffer:
 
     def __init__(self, states: Union[List, arr], actions: Union[List, arr], action_probabilities: Union[List, arr],
                  returns: Union[List, arr], advantages: Union[List, arr], episodes_completed: int,
-                 episode_rewards: List[int], episode_lengths: List[int], is_multi_feature: bool, is_continuous: bool):
+                 episode_rewards: List[int], capacity: int, episode_lengths: List[int], is_multi_feature: bool,
+                 is_continuous: bool):
 
         self.is_continuous = is_continuous
         self.is_multi_feature = is_multi_feature
 
-        self.size = actions.shape[0] if actions != [] else 0
+        self.capacity = capacity
         self.filled = 0
 
         self.episode_lengths = episode_lengths
@@ -40,13 +42,13 @@ class ExperienceBuffer:
         self.states = states
 
     def __repr__(self):
-        return f"{self.__class__.__name__}[{self.filled}/{self.size}]"
+        return f"{self.__class__.__name__}[{self.filled}/{self.capacity}]"
 
-    def fill(self, s, a, ap, ret, adv):
+    def fill(self, s, a, ap, adv, ret):
         """Fill the buffer with 5-tuple of experience."""
         assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv)]) == len(s)), "Inconsistent input sizes."
 
-        self.size = len(adv)
+        self.capacity = len(adv)
         self.advantages, self.returns, self.action_probabilities, self.actions, self.states = adv, ret, ap, a, s
 
     def normalize_advantages(self):
@@ -75,7 +77,9 @@ class ExperienceBuffer:
                                 action_probabilities=[],
                                 returns=[],
                                 advantages=[],
-                                episodes_completed=0, episode_rewards=[], episode_lengths=[],
+                                episodes_completed=0, episode_rewards=[],
+                                capacity=0,
+                                episode_lengths=[],
                                 is_continuous=is_continuous,
                                 is_multi_feature=is_multi_feature)
 
@@ -94,6 +98,7 @@ class ExperienceBuffer:
                                 returns=np.zeros((size,)),
                                 advantages=np.zeros((size,)),
                                 episodes_completed=0, episode_rewards=[], episode_lengths=[],
+                                capacity=size,
                                 is_continuous=is_continuous,
                                 is_multi_feature=is_multi_feature)
 
@@ -103,35 +108,61 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
 
     def __init__(self, states: Union[List, arr], actions: Union[List, arr], action_probabilities: Union[List, arr],
                  returns: Union[List, arr], advantages: Union[List, arr], episodes_completed: int,
-                 episode_rewards: List[int], episode_lengths: List[int], is_multi_feature: bool, is_continuous: bool):
+                 episode_rewards: List[int], capacity: int, seq_length: int, episode_lengths: List[int],
+                 is_multi_feature: bool, is_continuous: bool):
 
         super().__init__(states, actions, action_probabilities, returns, advantages, episodes_completed,
-                         episode_rewards, episode_lengths, is_multi_feature, is_continuous)
+                         episode_rewards, capacity, episode_lengths, is_multi_feature, is_continuous)
 
+        self.seq_length = seq_length
         self.true_number_of_transitions = 0
+        self.number_of_subsequences_pushed = 0
         self.advantage_mask = np.ones(advantages.shape)
 
-    def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr],
-                           advantages: List[arr], returns: List[arr]):
+        self.last_advantage_stop = 0
+
+    def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr]):
         """Push a sequence to the buffer, constructed from given lists of values."""
         seq_length = len(actions)
-        self.true_number_of_transitions += seq_length
-
         if self.is_multi_feature:
-            # can I point out for a second that numpy slicing is beautiful as fu**
             states = [np.stack(list(map(lambda s: s[f_id], states))) for f_id in range(len(states[0]))]
         else:
             states = np.stack(states)
-        advantages = np.stack(advantages)
 
-        self.states[self.filled, :seq_length, ...] = states
-        self.actions[self.filled, :seq_length, ...] = np.stack(actions)
-        self.action_probabilities[self.filled, :seq_length] = action_probabilities
-        self.advantages[self.filled, :seq_length] = advantages
-        self.advantage_mask[self.filled, :seq_length] = np.zeros(advantages.shape)
-        self.returns[self.filled, :seq_length] = returns
+        # TODO fix for multi feature
+        # can I point out for a second that numpy slicing is beautiful as fu**
+        self.states[self.number_of_subsequences_pushed, :seq_length, ...] = states
+        self.actions[self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(actions)
+        self.action_probabilities[self.number_of_subsequences_pushed, :seq_length] = action_probabilities
 
-        self.filled += 1
+        self.number_of_subsequences_pushed += 1
+        self.filled += self.actions.shape[1]
+        self.true_number_of_transitions += seq_length
+
+    def push_adv_ret_to_buffer(self, advantages: arr, returns: arr):
+        """Push advantages and returns of a whole episode."""
+        overhang = len(advantages) % self.seq_length
+
+        # split advantages if necessary
+        if overhang == 0:
+            advantage_chunks = np.split(advantages, indices_or_sections=len(advantages) // self.seq_length)
+            return_chunks = np.split(returns, indices_or_sections=len(advantages) // self.seq_length)
+        elif len(advantages) > self.seq_length:
+            advantage_chunks = (np.split(advantages[:-overhang], indices_or_sections=len(advantages) // self.seq_length)
+                                + [advantages[-overhang:]])
+            return_chunks = (np.split(returns[:-overhang], indices_or_sections=len(advantages) // self.seq_length)
+                             + [returns[-overhang:]])
+        else:
+            advantage_chunks = [advantages]
+            return_chunks = [returns]
+
+        for adv_sub_seq, ret_sub_seq in zip(advantage_chunks, return_chunks):
+            seq_length = len(adv_sub_seq)
+            self.advantages[self.last_advantage_stop, :seq_length] = adv_sub_seq
+            self.advantage_mask[self.last_advantage_stop, :seq_length] = np.zeros(adv_sub_seq.shape)
+            self.returns[self.last_advantage_stop, :seq_length] = ret_sub_seq
+
+            self.last_advantage_stop += 1
 
     def normalize_advantages(self):
         """Normalize the buffered advantages using z-scores. This requires the sequences to be of equal lengths,
@@ -178,12 +209,14 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         else:
             state_buffer = tuple(np.zeros((size, seq_len) + shape) for shape in state_dim)
         return TimeSequenceExperienceBuffer(states=state_buffer,
-                                            actions=np.zeros((size, seq_len) + ((action_dim, ) if is_continuous else ()),
+                                            actions=np.zeros((size, seq_len) + ((action_dim,) if is_continuous else ()),
                                                              dtype=np.float32 if is_continuous else np.int32),
                                             action_probabilities=np.zeros((size, seq_len,), dtype=np.float32),
                                             returns=np.zeros((size, seq_len), dtype=np.float32),
                                             advantages=np.zeros((size, seq_len), dtype=np.float32),
-                                            episodes_completed=0, episode_rewards=[], episode_lengths=[],
+                                            episodes_completed=0, episode_rewards=[],
+                                            capacity=size * seq_len, seq_length=seq_len,
+                                            episode_lengths=[],
                                             is_continuous=is_continuous, is_multi_feature=is_multi_feature)
 
 
@@ -193,7 +226,9 @@ def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
         numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
         numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
         episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
-        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles]))
+        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles])),
+        tbptt_underflow=round(statistics.mean(map(lambda x: x.tbptt_underflow, stat_bundles)), 2) if (
+                stat_bundles[0].tbptt_underflow is not None) else None
     )
 
 

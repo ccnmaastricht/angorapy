@@ -21,12 +21,12 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
     masked = tf.keras.layers.Masking()(inputs)
 
     # policy network
-    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, name="policy_encoder"), name="TD_policy")(masked)
+    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="policy_encoder"),
+           name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x = tf.keras.layers.SimpleRNN(32, stateful=True, return_sequences=True, batch_size=bs,
-                                  activation="tanh",
-                                  recurrent_initializer=tf.keras.initializers.zeros,
+    x = tf.keras.layers.SimpleRNN(64, stateful=True, return_sequences=True, batch_size=bs,
                                   # TODO remove debugging constraint
+                                  recurrent_initializer=tf.keras.initializers.zeros,
                                   recurrent_constraint=tf.keras.constraints.MinMaxNorm(0, 0),
                                   name="policy_recurrent_layer")(x)
 
@@ -36,12 +36,12 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
         out_policy = _build_discrete_head(n_actions, x.shape[1:], bs)(x)
 
     # value network
-    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, name="value_encoder"), name="TD_value")(masked)
+    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="value_encoder"),
+           name="TD_value")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x = tf.keras.layers.SimpleRNN(32, stateful=True, return_sequences=True, batch_size=bs,
-                                  activation="tanh",
-                                  recurrent_initializer=tf.keras.initializers.zeros,
+    x = tf.keras.layers.SimpleRNN(64, stateful=True, return_sequences=True, batch_size=bs,
                                   # TODO remove debugging constraint
+                                  recurrent_initializer=tf.keras.initializers.zeros,
                                   recurrent_constraint=tf.keras.constraints.MinMaxNorm(0, 0),
                                   name="value_recurrent_layer")(x)
 
@@ -56,10 +56,10 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    environment = gym.make("LunarLanderContinuous-v2")
+    environment = gym.make("CartPole-v1")
     pi, v, pv = build_rnn_distinct_models(environment, bs=3)
 
-    tf.keras.utils.plot_model(pv)
+    tf.keras.utils.plot_model(pv, expand_nested=True)
 
-    for i in tqdm(range(100000000)):
-        out_pi, out_v = pv.predict(tf.random.normal((3, 16, 8)))
+    for i in tqdm(range(10)):
+        out_pi, out_v = pv.predict(tf.random.normal((3, 16, 4)))

@@ -130,6 +130,12 @@ class UtilTest(unittest.TestCase):
         ]))
 
 
+class GatheringTest(unittest.TestCase):
+
+    def test_type_equivalence(self):
+        """Test if recurrent and non-recurrent gathering both produce the same experience."""
+        pass
+
 if __name__ == '__main__':
     tf.config.experimental_run_functions_eagerly(True)
 

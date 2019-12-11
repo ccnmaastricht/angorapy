@@ -19,13 +19,17 @@ def _build_fcn_component(input_dim: int, hidden_dim: int, output_dim: int, batch
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
 
-def _build_encoding_sub_model(shape, batch_size, name=None):
+def _build_encoding_sub_model(shape, batch_size, layer_sizes=(64, 64), name=None):
+    assert len(layer_sizes) > 0, "You need at least one layer in an encoding submodel."
+
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
-    x = tf.keras.layers.Dense(64)(inputs)
+    x = tf.keras.layers.Dense(layer_sizes[0])(inputs)
     x = tf.keras.layers.Activation("tanh")(x)
-    x = tf.keras.layers.Dense(64)(x)
-    x = tf.keras.layers.Activation("tanh")(x)
+
+    for i in range(1, len(layer_sizes)):
+        x = tf.keras.layers.Dense(layer_sizes[i])(x)
+        x = tf.keras.layers.Activation("tanh")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 

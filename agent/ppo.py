@@ -150,6 +150,7 @@ class PPOAgent:
         self.policy_loss_history = []
         self.value_loss_history = []
         self.time_dicts = []
+        self.underflow_history = []
 
     def set_gpu(self, activated: bool):
         """Set GPU usage mode."""
@@ -185,7 +186,7 @@ class PPOAgent:
             return tf.reduce_mean(clipped)
 
     def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
-                   clip: bool = True) -> tf.Tensor:
+                   old_action_prob: tf.Tensor, clip: bool = True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return. In the
         recurrent case a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied
         in the mean operation of the loss.
@@ -194,6 +195,7 @@ class PPOAgent:
           value_predictions (tf.Tensor): value prediction by the current critic network
           old_values (tf.Tensor): value prediction by the old critic network during gathering
           returns (tf.Tensor): discounted return estimation
+          old_action_prob (tf.Tensor): probabilities from old policy, used to determine mask
           clip (object): (Default value = True) value loss can be clipped by same range as policy loss
 
         Returns:
@@ -209,7 +211,7 @@ class PPOAgent:
 
         if self.is_recurrent:
             # build and apply a mask over the old values (recurrent)
-            mask = old_values != 0
+            mask = tf.not_equal(old_action_prob, 0)
             error_masked = tf.where(mask, error, 0)  # masking with tf.where because inf * 0 = nan...
             return tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
         else:
@@ -306,6 +308,7 @@ class PPOAgent:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
             # process stats from actors
+            self.underflow_history.append(stats.tbptt_underflow)
             if not separate_eval:
                 if stats.numb_completed_episodes == 0:
                     print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
@@ -379,7 +382,8 @@ class PPOAgent:
             policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
                                            advantage=batch["advantage"])
             value_loss = self.value_loss(value_predictions=tf.squeeze(value_output), old_values=old_values,
-                                         returns=batch["return"], clip=self.clip_values)
+                                         returns=batch["return"], old_action_prob=batch["action_prob"],
+                                         clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
             total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
@@ -438,7 +442,7 @@ class PPOAgent:
                         # truncated back propagation through time
                         # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
                         split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
-                        for i in range(len(b["advantage"])):
+                        for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
                             ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
@@ -504,6 +508,7 @@ class PPOAgent:
         pi_loss = 0 if len(self.policy_loss_history) == 0 else round(self.policy_loss_history[-1], 2)
         v_loss = 0 if len(self.value_loss_history) == 0 else round(self.value_loss_history[-1], 2)
         ent = 0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2)
+        underflow = f"Waste: {self.underflow_history[-1]}; " if self.underflow_history[-1] is not None else ""
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"AvgRew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
                    f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
@@ -512,6 +517,7 @@ class PPOAgent:
                    f"Lr: {nc}{current_lr:.2e}{ec}; "
                    f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                    f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+                   f"{underflow}"
                    f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
 
     def save_agent_state(self):

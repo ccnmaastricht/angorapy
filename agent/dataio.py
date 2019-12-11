@@ -8,7 +8,7 @@ import numpy
 import tensorflow as tf
 
 from utilities.const import STORAGE_DIR
-from utilities.datatypes import ExperienceBuffer, StatBundle
+from utilities.datatypes import ExperienceBuffer, StatBundle, TimeSequenceExperienceBuffer
 
 if __name__ == "__main__":
     pass
@@ -76,7 +76,7 @@ def tf_serialize_example(sample):
 def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
     """Make dataset object and StatBundle from ExperienceBuffer."""
     completed_episodes = buffer.episodes_completed
-    numb_processed_frames = buffer.size
+    numb_processed_frames = buffer.capacity
 
     # expand dims when constructing dataset to inject batch dimension
     if is_shadow_brain:
@@ -99,11 +99,16 @@ def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
             "advantage": buffer.advantages
         })
 
+    underflow = None
+    if isinstance(buffer, TimeSequenceExperienceBuffer):
+        underflow = round(1 - buffer.true_number_of_transitions / buffer.capacity, 2)
+
     stats = StatBundle(
         completed_episodes,
         numb_processed_frames,
         buffer.episode_rewards,
-        buffer.episode_lengths
+        buffer.episode_lengths,
+        tbptt_underflow=underflow
     )
 
     return dataset, stats
