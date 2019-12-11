@@ -127,16 +127,16 @@ def reset_states_masked(model: tf.keras.Model, mask: List):
         layer.reset_states(new_states)
 
 
-def detect_finished_episodes(action_probabilities: tf.Tensor):
+def detect_finished_episodes(action_log_probabilities: tf.Tensor):
     """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the action
-    probabilities and return a 1D boolean tensor.
+    log probabilities and return a 1D boolean tensor.
 
     Input Shape:
         action_probabilities: (B, S)
     """
-    # TODO sanity check
     # TODO wont work for episodes that finish exactly at end of sequence
-    finished = tf.reduce_any(action_probabilities == 0, axis=-1)
+    # need to check only last one, as checking any might catch (albeit unlikely) true 0 in the sequence
+    finished = action_log_probabilities[:, -1] == 0
     return tf.squeeze(finished)
 
 
@@ -146,4 +146,4 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    detect_finished_episodes(tf.convert_to_tensor([[1, 1, 1, 1, 0], [1, 1, 1, 1, 1]]))
+    print(detect_finished_episodes(tf.convert_to_tensor([[1, 1, 1, 1, 0], [1, 0, 1, 1, 1]])))

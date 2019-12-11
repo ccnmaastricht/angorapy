@@ -439,7 +439,8 @@ class PPOAgent:
                         # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
                         split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
                         for i in range(len(b["advantage"])):
-                            partial_batch = {k: tf.squeeze(v[i]) for k, v in split_batch.items()}
+                            # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
+                            partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
                             ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
                             progressbar.update(1)
 

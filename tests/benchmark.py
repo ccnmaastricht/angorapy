@@ -27,7 +27,7 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
 
     # train
     agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,
-                ray_already_initialized=init_ray)
+                ray_already_initialized=not init_ray)
     env.close()
 
     return agent.cycle_reward_history
@@ -37,23 +37,28 @@ if __name__ == '__main__':
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    simple_envs = ["CartPole-v1", "LunarLander-v2"]
-    n_iterations = 30
-    repetitions = 10
+    benchmarking_settings = [("CartPole-v1", "ffn"), ("CartPole-v1", "rnn")]
+    n_iterations = 2
+    repetitions = 1
 
     results = {}
-    for simple_env_name in simple_envs:
+    should_init = True
+    for env_name, model_type in benchmarking_settings:
         reward_histories = []
         for i in range(repetitions):
-            print(f"Repetition {i}/{repetitions} in environment {simple_env_name}.")
-            reward_histories.append(test_environment(simple_env_name, configs.discrete, model_type="ffn",
-                                                     n=n_iterations, init_ray=i > 0))
+            print(f"Repetition {i}/{repetitions} in environment {env_name}.")
+            reward_histories.append(test_environment(env_name, configs.discrete, model_type=model_type,
+                                                     n=n_iterations, init_ray=should_init))
+            should_init = False
 
         x = list(range(1, n_iterations + 1))
         means = np.mean(reward_histories, axis=0)
         stdevs = np.std(reward_histories, axis=0)
-        results.update({simple_env_name: (means, stdevs)})
+        results.update({env_name: (means, stdevs)})
 
-        plt.plot(x, means, 'k-')
+        plt.plot(x, means, 'k-', label=f"{env_name} ({model_type})")
         plt.fill_between(x, means - stdevs, means + stdevs)
-        plt.show()
+
+    plt.legend()
+    plt.savefig("../docs/figures/benchmarking_rnn_fnn_CartPole.pdf", format="pdf")
+    plt.show()

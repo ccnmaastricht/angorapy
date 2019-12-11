@@ -3,8 +3,8 @@
 import os
 
 import gym
-from gym.spaces import Box
 import tensorflow as tf
+from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
 from tqdm import tqdm
 
@@ -21,9 +21,14 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
     masked = tf.keras.layers.Masking()(inputs)
 
     # policy network
-    x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="policy_encoder"), name="TD_policy")(masked)
+    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, name="policy_encoder"), name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
+    x = tf.keras.layers.SimpleRNN(32, stateful=True, return_sequences=True, batch_size=bs,
+                                  activation="tanh",
+                                  recurrent_initializer=tf.keras.initializers.zeros,
+                                  # TODO remove debugging constraint
+                                  recurrent_constraint=tf.keras.constraints.MinMaxNorm(0, 0),
+                                  name="policy_recurrent_layer")(x)
 
     if continuous_control:
         out_policy = _build_continuous_head(n_actions, x.shape[1:], bs)(x)
@@ -31,9 +36,14 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
         out_policy = _build_discrete_head(n_actions, x.shape[1:], bs)(x)
 
     # value network
-    x = TD(_build_encoding_sub_model((state_dimensionality, ), bs, name="value_encoder"), name="TD_value")(masked)
+    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, name="value_encoder"), name="TD_value")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x = tf.keras.layers.LSTM(32, stateful=True, return_sequences=True, batch_size=bs)(x)
+    x = tf.keras.layers.SimpleRNN(32, stateful=True, return_sequences=True, batch_size=bs,
+                                  activation="tanh",
+                                  recurrent_initializer=tf.keras.initializers.zeros,
+                                  # TODO remove debugging constraint
+                                  recurrent_constraint=tf.keras.constraints.MinMaxNorm(0, 0),
+                                  name="value_recurrent_layer")(x)
 
     out_value = tf.keras.layers.Dense(1)(x)
 

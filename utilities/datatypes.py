@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """Custom data types for simplifying data communication."""
 import itertools
+import logging
 from collections import namedtuple
 from typing import List, Union
 
 import gym
 import numpy as np
+from keras_preprocessing.sequence import pad_sequences
 from numpy import ndarray as arr
 
 from utilities.util import add_state_dims, env_extract_dims
@@ -143,27 +145,28 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         std = np.maximum(masked_advantages.std(), 1e-6)
         self.advantages = (self.advantages - mean) / std
 
-    # def pad_buffer(self):
-    #     """Pad the buffer with zeros to an equal sequence length."""
-    #     assert np.all([isinstance(f, list) for f in [self.states, self.actions, self.action_probabilities,
-    #                                                  self.returns,
-    #                                                  self.advantages]]), "Some part of the experience " \
-    #                                                                      "is not a list but you want to pad."
-    #
-    #     assert np.all([len(f) > 0 for f in [self.states, self.actions, self.action_probabilities,
-    #                                         self.returns,
-    #                                         self.advantages]]), "There cannot be an empty s/a/ap/r/adv when padding."
-    #
-    #     size_diffs = np.array([len(self.actions), len(self.action_probabilities), len(self.returns),
-    #                            len(self.advantages)]) == len(self.states)
-    #     if not np.all(size_diffs):
-    #         logging.warning(f"Buffer contains inconsistent lengths of s/a/ap/r/adv prior to padding [{size_diffs}].")
-    #
-    #     self.states = pad_sequences(self.states, padding="post", dtype=np.float32)
-    #     self.action_probabilities = pad_sequences(self.action_probabilities, padding="post", dtype=np.float32)
-    #     self.actions = pad_sequences(self.actions, padding="post")
-    #     self.returns = pad_sequences(self.returns, padding="post", dtype=np.float32)
-    #     self.advantages = pad_sequences(self.advantages, padding="post", dtype=np.float32)
+    @DeprecationWarning
+    def pad_buffer(self):
+        """Pad the buffer with zeros to an equal sequence length."""
+        assert np.all([isinstance(f, list) for f in [self.states, self.actions, self.action_probabilities,
+                                                     self.returns,
+                                                     self.advantages]]), "Some part of the experience " \
+                                                                         "is not a list but you want to pad."
+
+        assert np.all([len(f) > 0 for f in [self.states, self.actions, self.action_probabilities,
+                                            self.returns,
+                                            self.advantages]]), "There cannot be an empty s/a/ap/r/adv when padding."
+
+        size_diffs = np.array([len(self.actions), len(self.action_probabilities), len(self.returns),
+                               len(self.advantages)]) == len(self.states)
+        if not np.all(size_diffs):
+            logging.warning(f"Buffer contains inconsistent lengths of s/a/ap/r/adv prior to padding [{size_diffs}].")
+
+        self.states = pad_sequences(self.states, padding="post", dtype=np.float32)
+        self.action_probabilities = pad_sequences(self.action_probabilities, padding="post", dtype=np.float32)
+        self.actions = pad_sequences(self.actions, padding="post")
+        self.returns = pad_sequences(self.returns, padding="post", dtype=np.float32)
+        self.advantages = pad_sequences(self.advantages, padding="post", dtype=np.float32)
 
     @staticmethod
     def new(env: gym.Env, size: int, seq_len: int, is_continuous, is_multi_feature):
@@ -198,5 +201,5 @@ if __name__ == '__main__':
     from environments import *
 
     environment = gym.make("ShadowHand-v1")
-    buffer = ExperienceBuffer.new_empty_recurrent(environment, 10, 16)
+    buffer = TimeSequenceExperienceBuffer.new(environment, 10, 16, True, True)
     print(buffer)
