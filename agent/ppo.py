@@ -381,7 +381,7 @@ class PPOAgent:
             # calculate the clipped loss
             policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
                                            advantage=batch["advantage"])
-            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output), old_values=old_values,
+            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
                                          returns=batch["return"], old_action_prob=batch["action_prob"],
                                          clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)

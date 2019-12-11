@@ -126,12 +126,12 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         seq_length = len(actions)
         if self.is_multi_feature:
             states = [np.stack(list(map(lambda s: s[f_id], states))) for f_id in range(len(states[0]))]
+            for feature_array, features in zip(self.states, states):
+                feature_array[self.number_of_subsequences_pushed, :seq_length, ...] = features
         else:
-            states = np.stack(states)
+            self.states[self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(states)
 
-        # TODO fix for multi feature
         # can I point out for a second that numpy slicing is beautiful as fu**
-        self.states[self.number_of_subsequences_pushed, :seq_length, ...] = states
         self.actions[self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(actions)
         self.action_probabilities[self.number_of_subsequences_pushed, :seq_length] = action_probabilities
 
@@ -156,6 +156,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
             advantage_chunks = [advantages]
             return_chunks = [returns]
 
+        # fill in the subsequences one by on
         for adv_sub_seq, ret_sub_seq in zip(advantage_chunks, return_chunks):
             seq_length = len(adv_sub_seq)
             self.advantages[self.last_advantage_stop, :seq_length] = adv_sub_seq
@@ -176,29 +177,6 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         std = np.maximum(masked_advantages.std(), 1e-6)
         self.advantages = (self.advantages - mean) / std
 
-    @DeprecationWarning
-    def pad_buffer(self):
-        """Pad the buffer with zeros to an equal sequence length."""
-        assert np.all([isinstance(f, list) for f in [self.states, self.actions, self.action_probabilities,
-                                                     self.returns,
-                                                     self.advantages]]), "Some part of the experience " \
-                                                                         "is not a list but you want to pad."
-
-        assert np.all([len(f) > 0 for f in [self.states, self.actions, self.action_probabilities,
-                                            self.returns,
-                                            self.advantages]]), "There cannot be an empty s/a/ap/r/adv when padding."
-
-        size_diffs = np.array([len(self.actions), len(self.action_probabilities), len(self.returns),
-                               len(self.advantages)]) == len(self.states)
-        if not np.all(size_diffs):
-            logging.warning(f"Buffer contains inconsistent lengths of s/a/ap/r/adv prior to padding [{size_diffs}].")
-
-        self.states = pad_sequences(self.states, padding="post", dtype=np.float32)
-        self.action_probabilities = pad_sequences(self.action_probabilities, padding="post", dtype=np.float32)
-        self.actions = pad_sequences(self.actions, padding="post")
-        self.returns = pad_sequences(self.returns, padding="post", dtype=np.float32)
-        self.advantages = pad_sequences(self.advantages, padding="post", dtype=np.float32)
-
     @staticmethod
     def new(env: gym.Env, size: int, seq_len: int, is_continuous, is_multi_feature):
         """Return an empty buffer for sequences."""
@@ -207,7 +185,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         if isinstance(state_dim, int):
             state_buffer = np.zeros((size, seq_len, state_dim), dtype=np.float32)
         else:
-            state_buffer = tuple(np.zeros((size, seq_len) + shape) for shape in state_dim)
+            state_buffer = tuple(np.zeros((size, seq_len) + shape, dtype=np.float32) for shape in state_dim)
         return TimeSequenceExperienceBuffer(states=state_buffer,
                                             actions=np.zeros((size, seq_len) + ((action_dim,) if is_continuous else ()),
                                                              dtype=np.float32 if is_continuous else np.int32),

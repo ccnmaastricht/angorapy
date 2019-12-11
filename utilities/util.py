@@ -137,7 +137,7 @@ def detect_finished_episodes(action_log_probabilities: tf.Tensor):
     # TODO wont work for episodes that finish exactly at end of sequence
     # need to check only last one, as checking any might catch (albeit unlikely) true 0 in the sequence
     finished = action_log_probabilities[:, -1] == 0
-    return tf.squeeze(finished)
+    return finished
 
 
 if __name__ == "__main__":
