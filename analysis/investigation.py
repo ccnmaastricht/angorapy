@@ -3,6 +3,9 @@ import os
 from pprint import pprint
 from typing import List
 
+import numpy as np
+
+import gym
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 import gym
@@ -26,8 +29,12 @@ class Investigator:
         else:
             return [layer.name for layer in extract_layers(self.network)]
 
+    def get_layer_by_name(self, layer_name):
+        """Retrieve the layer object identified from the model by its unique string representation."""
+        return extract_layers(self.network)[self.list_layer_names().index(layer_name)]
+
     def get_layer_weights(self, layer_name):
-        return self.network.get_layer(layer_name).get_weights()
+        return self.get_layer_by_name(layer_name).get_weights()
 
     def get_weight_dict(self):
         out = {}
@@ -37,7 +44,7 @@ class Investigator:
         return out
 
     def get_layer_activations(self, layer_name, input_tensor):
-        layer = self.network.get_layer(layer_name)
+        layer = self.get_layer_by_name(layer_name)
         sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
 
         return sub_model.predict(input_tensor)
@@ -47,7 +54,7 @@ class Investigator:
         activations = []
         actions = []
 
-        layer = self.network.get_layer(layer_name)
+        layer = self.get_layer_by_name(layer_name)
         dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
 
         if isinstance(env.action_space, Discrete):
@@ -97,4 +104,17 @@ if __name__ == "__main__":
     weights = investi.get_layer_weights("lstm")
     print(weights)
 
+
     activations = investi.get_layer_activations("lstm", )
+
+    tuples = inv.get_activations_over_episode("lstm", env, True)
+    print(len(tuples))
+    pprint(tuples)
+
+    # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
+    state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
+
+    for l in np.array(tuples)[:, 0]:
+        state_data += l
+
+

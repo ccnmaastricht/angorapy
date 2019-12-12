@@ -18,7 +18,8 @@ from scipy.signal import savgol_filter
 
 from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
-from utilities.util import parse_state, add_state_dims
+from utilities import const
+from utilities.util import parse_state, add_state_dims, flatten
 
 PATH_TO_EXPERIMENTS = "monitor/experiments/"
 matplotlib.use('Agg')
@@ -26,17 +27,19 @@ matplotlib.use('Agg')
 
 def scale(vector):
     """Min Max scale a vector."""
-    return (numpy.array(vector) - min(vector)) / (max(vector) - min(vector))
+    divisor = max(vector) - min(vector)
+    return (numpy.array(vector) - min(vector)) / (divisor if divisor != 0 else const.EPS)
 
 
 class Monitor:
     """Monitor for learning progress."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, id=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None):
         self.agent = agent
         self.env = env
 
         self.frequency = frequency
+        self.gif_every = gif_every
         self.continuous_control = isinstance(self.env.action_space, Box)
 
         if id is None:
@@ -56,12 +59,11 @@ class Monitor:
 
     def create_episode_gif(self, n: int):
         """Make n GIFs with the current policy."""
-        act = act_continuous if self.continuous_control else act_discrete
 
         # rebuild model with batch size of 1
-        policy, _, _ = self.agent.model_builder(self.env,
-                                                **({"bs": 1} if "bs" in fargs(self.agent.model_builder).args else {}))
-        policy.set_weights(self.agent.policy.get_weights())
+        pi, _, _ = self.agent.model_builder(self.env,
+                                            **({"bs": 1} if "bs" in fargs(self.agent.model_builder).args else {}))
+        pi.set_weights(self.agent.policy.get_weights())
 
         for i in range(n):
             episode_letter = chr(97 + i)
@@ -73,8 +75,8 @@ class Monitor:
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
-                probabilities = policy.predict(add_state_dims(state, dims=2 if self.agent.is_recurrent else 1))
-                action, _ = act(probabilities)
+                probabilities = flatten(pi.predict(add_state_dims(state, dims=2 if self.agent.is_recurrent else 1)))
+                action, _ = act_continuous(*probabilities) if self.continuous_control else act_discrete(*probabilities)
                 observation, reward, done, _ = self.env.step(
                     numpy.atleast_1d(action) if self.continuous_control else action)
                 state = parse_state(observation)
@@ -84,12 +86,17 @@ class Monitor:
             patch = plt.imshow(frames[0], cmap="Greys" if len(frames[0].shape) == 2 else None)
             plt.axis('off')
 
-            def animate(i):
+            def _animate(i):
                 patch.set_data(frames[i])
 
-            anim = animation.FuncAnimation(plt.gcf(), animate, frames=len(frames), interval=50)
+            anim = animation.FuncAnimation(plt.gcf(), _animate, frames=len(frames), interval=50)
             anim.save(f"{self.story_directory}/iteration_{self.agent.iteration}_{episode_letter}.gif",
+<<<<<<< HEAD
                       writer='pillow', fps=30)
+=======
+                      writer='pillow',
+                      fps=25)
+>>>>>>> master
 
             plt.close()
 
@@ -160,17 +167,18 @@ class Monitor:
         # average lengths
         l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
         if len(self.agent.cycle_reward_history) > 11:
-            l_line = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange", label="Episode Length")
+            l_line = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange",
+                                  label="Episode Length")
 
         # average rewards
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3)
+        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3, zorder=10)
         if len(self.agent.cycle_reward_history) > 11:
             r_line = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red", label="Average Reward")
 
         if self.agent.env.spec.reward_threshold is not None:
             ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
 
-        lines = r_line + l_line
+        lines = l_line + r_line
         labels = [l.get_label() for l in lines]
 
         self._make_graph(ax, lines, labels, "reward_plot")

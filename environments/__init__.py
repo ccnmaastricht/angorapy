@@ -1,4 +1,8 @@
 """Module for additional environments as well as registering modified environments."""
+import contextlib
+import os
+import sys
+
 import gym
 
 from environments.evasion import Evasion

@@ -11,8 +11,6 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.python.client import device_lib
 
-from utilities.datatypes import StatBundle
-
 
 def get_available_gpus():
     """Get list of available GPUs."""
@@ -104,19 +102,48 @@ def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
 def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
     """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
     return list(itertools.chain(*[extract_layers(layer)
-                                  if isinstance(layer, tf.keras.Sequential)
+                                  if isinstance(layer, tf.keras.Model)
                                   else [layer] for layer in network.layers]))
 
 
+def reset_states_masked(model: tf.keras.Model, mask: List):
+    """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
+
+    The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
+    and zeros otherwise (booleans possible too)."""
+
+    # extract recurrent layers by their superclass RNN
+    recurrent_layers = [layer for layer in extract_layers(model) if isinstance(layer, tf.keras.layers.RNN)]
+
+    for layer in recurrent_layers:
+        current_states = [state.numpy() for state in layer.states]
+        initial_states = 0
+        new_states = []
+        for current_state in current_states:
+            expanded_mask = numpy.tile(numpy.rot90(numpy.expand_dims(mask, axis=0)), (1, current_state.shape[-1]))
+            masked_reset_state = np.where(expanded_mask, initial_states, current_state)
+            new_states.append(masked_reset_state)
+
+        layer.reset_states(new_states)
+
+
+def detect_finished_episodes(action_log_probabilities: tf.Tensor):
+    """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the action
+    log probabilities and return a 1D boolean tensor.
+
+    Input Shape:
+        action_probabilities: (B, S)
+    """
+    # TODO wont work for episodes that finish exactly at end of sequence
+    # need to check only last one, as checking any might catch (albeit unlikely) true 0 in the sequence
+    finished = action_log_probabilities[:, -1] == 0
+    return finished
+
+
 if __name__ == "__main__":
-    pass
+    import os
 
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-def condense_stats(stat_bundles: List[StatBundle]) -> StatBundle:
-    """Infer a single StatBundle from a list of StatBundles."""
-    return StatBundle(
-        numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
-        numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
-        episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
-        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles]))
-    )
+    print(detect_finished_episodes(tf.convert_to_tensor([[1, 1, 1, 1, 0], [1, 0, 1, 1, 1]])))

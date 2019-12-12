@@ -13,14 +13,15 @@ To install all required python packages run
 pip install -r requirements.txt
 ```
 
-Additionally fome libraries will be required:
+Additionally some libraries and permissions will be required. Run
 
 ```bash
-sudo apt-get install graphviz
+sudo bash install.sh
 ```
 
 To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) as well as mujoco-py.
 
+To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`. 
 
 ### Main Scripts
 

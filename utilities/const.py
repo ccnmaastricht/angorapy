@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Constants."""
 
+EPS = 1e-7
+
 COLORS = dict(
     HEADER='\033[95m',
     OKBLUE='\033[94m',

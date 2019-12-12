@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Core methods providing functionality to the agent."""
 import math
-import os
 from itertools import accumulate
+from pprint import pprint
 from typing import List
 
 import numpy as np
@@ -61,11 +61,13 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
 
 def estimate_episode_advantages(rewards, values, gamma, lam):
     """Estimate advantage of a single episode (or part of it), taken from Open AI's spinning up repository."""
-    deltas = np.array(rewards, dtype=np.float32) + gamma * np.array(values[1:], dtype=np.float32) - np.array(values[:-1], dtype=np.float32)
+    deltas = np.array(rewards, dtype=np.float32) + gamma * np.array(values[1:], dtype=np.float32) - np.array(
+        values[:-1], dtype=np.float32)
     return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(np.float32)
 
 
 # PROBABILITY
+
 
 @tf.function
 def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
@@ -76,8 +78,30 @@ def gaussian_pdf(samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
 
 
 @tf.function
+def gaussian_log_pdf(samples: tf.Tensor, means: tf.Tensor, log_stdevs: tf.Tensor):
+    """Calculate log probability density for a given batch of potentially joint Gaussian PDF.
+
+    Input Shapes:
+        - all: (B, A) or (B, S, A)
+
+    Output Shapes:
+        - all: (B) or (B, S)
+
+        """
+    log_likelihoods = (- tf.reduce_sum(log_stdevs, axis=-1)
+                       - tf.math.log(2 * np.pi)
+                       - (0.5 * tf.reduce_sum(tf.square(((samples - means) / tf.exp(log_stdevs))), axis=-1)))
+
+    # log_likelihoods = tf.math.log(gaussian_pdf(samples, means, tf.exp(log_stdevs)))
+
+    return log_likelihoods
+
+
+@tf.function
 def gaussian_entropy(stdevs: tf.Tensor):
-    """Calculate the joint entropy of Gaussian random variables described by their standard deviations.
+    """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
+
+    Input Shape: (B, A) or (B, S, A) for recurrent
 
     Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
     of the joint entropy and the sum of marginal entropies.
@@ -87,12 +111,38 @@ def gaussian_entropy(stdevs: tf.Tensor):
 
 
 @tf.function
+def gaussian_entropy_from_log(log_stdevs: tf.Tensor):
+    """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
+
+    Input Shape: (B, A) or (B, S, A) for recurrent
+
+    Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+    of the joint entropy and the sum of marginal entropies.
+    """
+    entropy = .5 * (tf.math.log(math.pi * 2) + (tf.multiply(2.0, log_stdevs) + 1.0))
+    return tf.reduce_sum(entropy, axis=-1)
+
+
+@tf.function
 def categorical_entropy(pmf: tf.Tensor):
-    """Calculate entropy of a categorical distribution."""
-    return - tf.reduce_sum(pmf * tf.math.log(pmf), axis=-1)
+    """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
+    return - tf.reduce_sum(tf.math.log(pmf) * pmf, axis=-1)
+
+
+@tf.function
+def categorical_entropy_from_log(pmf: tf.Tensor):
+    """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
+    return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
+
+
+@tf.function
+def approximate_kl_divergence(log_pa, log_pb):
+    """Approximate KL-divergence between distributions a and b where some sample has probability pa in a and pb in b."""
+    return .5 * tf.reduce_mean(tf.square(log_pa - log_pb))
 
 
 # MANIPULATION
+
 
 @tf.function
 def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Tensor) -> tf.Tensor:
@@ -121,15 +171,18 @@ def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Te
 
 if __name__ == "__main__":
     from scipy.stats import norm
+    import os
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    tf.config.experimental_run_functions_eagerly(True)
 
-    x = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-    mu = tf.convert_to_tensor([[2, 3]], dtype=tf.float32)
-    sig = tf.convert_to_tensor([[1, 1]], dtype=tf.float32)
+    x = tf.convert_to_tensor([[5, 1], [2, 3]], dtype=tf.float32)
+    mu = tf.convert_to_tensor([[2, 3], [2, 1]], dtype=tf.float32)
+    sig = tf.convert_to_tensor([[1, 1], [4, 1]], dtype=tf.float32)
 
-    print(gaussian_pdf(x, mu, sig))
-    print(norm.pdf(x, loc=mu, scale=sig))
+    out_np = np.sum(norm.logpdf(x, loc=mu, scale=sig), axis=-1)
+    out_logged = tf.math.log(gaussian_pdf(x, mu, sig)).numpy()
+    out_log_pdf = gaussian_log_pdf(x, mu, tf.math.log(sig)).numpy()
 
-    print("\n")
-    print(gaussian_entropy(tf.convert_to_tensor([[1, 2]], dtype=tf.float32)))
+    pprint((out_np, out_logged, out_log_pdf))
+    print(out_logged - out_log_pdf)

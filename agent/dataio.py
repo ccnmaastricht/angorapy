@@ -8,7 +8,7 @@ import numpy
 import tensorflow as tf
 
 from utilities.const import STORAGE_DIR
-from utilities.datatypes import ExperienceBuffer, StatBundle
+from utilities.datatypes import ExperienceBuffer, StatBundle, TimeSequenceExperienceBuffer
 
 if __name__ == "__main__":
     pass
@@ -73,26 +73,14 @@ def tf_serialize_example(sample):
     return tf.reshape(tf_string, ())
 
 
-def make_dataset_and_stats(buffer: ExperienceBuffer):
+def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
     """Make dataset object and StatBundle from ExperienceBuffer."""
     completed_episodes = buffer.episodes_completed
-    numb_processed_frames = numpy.prod(buffer.advantages.shape)
+    numb_processed_frames = buffer.capacity
 
     # expand dims when constructing dataset to inject batch dimension
-    if isinstance(buffer.states, list) or isinstance(buffer.states, numpy.ndarray):
+    if is_shadow_brain:
         dataset = tf.data.Dataset.from_tensor_slices({
-            "state": buffer.states,
-            "action": buffer.actions,
-            "action_prob": buffer.action_probabilities,
-            "return": buffer.returns,
-            "advantage": buffer.advantages
-        })
-    elif isinstance(buffer.states, Tuple):
-        dataset = tf.data.Dataset.from_tensor_slices({
-            # "in_vision": [x[0] for x in buffer.states],
-            # "in_proprio": [x[1] for x in buffer.states],
-            # "in_touch": [x[2] for x in buffer.states],
-            # "in_goal": [x[3] for x in buffer.states],
             "in_vision": buffer.states[0],
             "in_proprio": buffer.states[1],
             "in_touch": buffer.states[2],
@@ -103,13 +91,24 @@ def make_dataset_and_stats(buffer: ExperienceBuffer):
             "advantage": buffer.advantages,
         })
     else:
-        raise NotImplementedError(f"Cannot handle state type {type(buffer.states[0])}")
+        dataset = tf.data.Dataset.from_tensor_slices({
+            "state": buffer.states,
+            "action": buffer.actions,
+            "action_prob": buffer.action_probabilities,
+            "return": buffer.returns,
+            "advantage": buffer.advantages
+        })
+
+    underflow = None
+    if isinstance(buffer, TimeSequenceExperienceBuffer):
+        underflow = round(1 - buffer.true_number_of_transitions / buffer.capacity, 2)
 
     stats = StatBundle(
         completed_episodes,
         numb_processed_frames,
         buffer.episode_rewards,
-        buffer.episode_lengths
+        buffer.episode_lengths,
+        tbptt_underflow=underflow
     )
 
     return dataset, stats
