@@ -24,7 +24,6 @@ from utilities.util import parse_state, add_state_dims, is_recurrent_model, flat
 def collect(model, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
 
-
     # import here to avoid pickling errors
     import tensorflow as tfl
 
@@ -194,15 +193,14 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
         raise ValueError("Unknown action space.")
 
     is_recurrent = is_recurrent_model(policy)
-    policy_act = act_discrete if not continuous_control else act_continuous
-
     done = False
     reward_trajectory = []
     length = 0
     state = parse_state(environment.reset())
     while not done:
-        probabilities = policy(add_state_dims(state, dims=2 if is_recurrent else 1))
-        action, action_prob = policy_act(probabilities)
+        probabilities = flatten(policy.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+
+        action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
         observation, reward, done, _ = environment.step(action)
         state = parse_state(observation)
         reward_trajectory.append(reward)
