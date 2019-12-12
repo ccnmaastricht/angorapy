@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
-import os
+import random
 from inspect import getfullargspec as fargs
 from typing import Tuple
 
 import numpy as np
 import ray
+import tensorflow as tf
 from gym.spaces import Box, Discrete
 
 import models
@@ -13,15 +14,16 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_ffn_distinct_models
+from models import build_ffn_distinct_models, build_rnn_distinct_models
 from utilities.const import STORAGE_DIR
-from utilities.datatypes import ExperienceBuffer, ModelTuple
-from utilities.util import parse_state, add_state_dims, is_recurrent_model
+from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
+from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, set_all_seeds
 
 
-@ray.remote(num_cpus=1, num_gpus=0)
-def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub_sequence_length: int, pid: int):
+@ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
+def collect(model, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
+
 
     # import here to avoid pickling errors
     import tensorflow as tfl
@@ -29,9 +31,9 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
     is_continuous = isinstance(env.action_space, Box)
-    act = act_continuous if is_continuous else act_discrete
+    is_shadow_brain = "ShadowHand" in env_name
 
-    # load policy TODO only one builder here
+    # load policy
     if isinstance(model, str):
         joint = tfl.keras.models.load_model(f"{model}/model")
     elif isinstance(model, ModelTuple):
@@ -45,100 +47,125 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     # check if there is a recurrent layer inside the model
     is_recurrent = is_recurrent_model(joint)
-    if is_recurrent:
-        assert horizon % sub_sequence_length == 0, "Subsequence length for TBPTT would require cutting of part of the" \
-                                                   " observations."
-    is_shadow_brain = "ShadowHand" in env_name
 
-    # trackers
-    episodes_completed, current_episode_return, episode_steps = 0, 0, 1
-    episode_rewards, episode_lengths = [], []
+    # buffer storing the experience and stats # TODO actually make this bufferable where the size is predefined
+    if is_recurrent:
+        assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the observations."
+        buffer: TimeSequenceExperienceBuffer = TimeSequenceExperienceBuffer.new(env=env,
+                                                                                size=horizon // subseq_length,
+                                                                                seq_len=subseq_length,
+                                                                                is_continuous=is_continuous,
+                                                                                is_multi_feature=is_shadow_brain)
+    else:
+        buffer: ExperienceBuffer = ExperienceBuffer.new_empty(is_continuous, is_shadow_brain)
 
     # go for it
+    t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
     states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
+    episode_endpoints = []
     state = parse_state(env.reset())
-    for t in range(horizon):
-        # based on the given state, predict action distribution and state value
-        action_distribution, value = joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
+    while t < horizon:
+        current_subseq_length += 1
+
+        # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
+        policy_out = flatten(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+        a_distr, value = policy_out[:-1], policy_out[-1]
         states.append(state)
-        values.append(np.squeeze(value).item())
+        values.append(np.squeeze(value))
 
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = act(action_distribution)
+        action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
         actions.append(action)
-        action_probabilities.append(action_probability)
+        action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
         # make a step based on the chosen action and collect the reward for this state
         observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
         rewards.append(reward)
         current_episode_return += reward
 
+        # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
+        if is_recurrent and (current_subseq_length == subseq_length or done):
+            buffer.push_seq_to_buffer(states, actions, action_probabilities)
+
+            # clear the buffered information
+            states, actions, action_probabilities = [], [], []
+            current_subseq_length = 0
+
         # depending on whether the state is terminal, choose the next state
         if done:
+            episode_endpoints.append(t)
+
+            # calculate advantages for the finished episode, where the last value is 0 since it refers to the
+            # terminal state that we just observed
+            episode_advantages = estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0],
+                                                             discount, lam)
+            episode_returns = episode_advantages + values[-episode_steps:]
+
+            if not is_recurrent:
+                advantages.append(episode_advantages)
+            else:
+                buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
+
+                # skip as many steps as are missing to fill the subsequence, then reset rnn states for next episode
+                t += subseq_length - (t % subseq_length) - 1
+                joint.reset_states()
+
+            # reset environment to receive next episodes initial state
             state = parse_state(env.reset())
 
-            # calculate advantages for the finished episode, where the last value is 0 since it refers to the terminal
-            # state that we just observed
-            advantages.append(
-                estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0], discount, lam)
-            )
-
             # update/reset some statistics and trackers
-            episode_lengths.append(episode_steps)
-            episode_rewards.append(current_episode_return)
-            episodes_completed += 1
+            buffer.episode_lengths.append(episode_steps)
+            buffer.episode_rewards.append(current_episode_return)
+            buffer.episodes_completed += 1
             episode_steps = 1
             current_episode_return = 0
         else:
             state = parse_state(observation)
             episode_steps += 1
+
+        t += 1
+
     env.close()
 
-    values.append(joint(add_state_dims(state, dims=2 if is_recurrent else 1))[1].numpy().item())
+    # WRAP UP
+
+    # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
+    values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[-1]))
+
+    # if there was at least one step in the environment after the last episode end, calculate advantages for them
     if episode_steps > 1:
-        advantages.append(estimate_episode_advantages(rewards[-episode_steps + 1:],
-                                                      values[-episode_steps:],
-                                                      discount, lam))
+        leftover_advantages = estimate_episode_advantages(rewards[-episode_steps + 1:], values[-episode_steps:],
+                                                          discount, lam)
+        if not is_recurrent:
+            advantages.append(leftover_advantages)
+        else:
+            leftover_returns = leftover_advantages + values[-len(leftover_advantages) - 1:-1]
+            buffer.push_adv_ret_to_buffer(leftover_advantages, leftover_returns)
 
-    # convert lists to numpy arrays, excluding states as it can be multi-component
-    actions = np.array(actions, dtype=np.float32 if is_continuous else np.int32)
-    action_probabilities = np.array(action_probabilities, dtype=np.float32)
-    advantages = np.hstack(advantages)
-    values = np.array(values, dtype=np.float32)
+    # if not recurrent, fill the buffer with everything we gathered
+    if not is_recurrent:
+        values = np.array(values, dtype=np.float32)
 
-    # get returns from advantages and values
-    returns = advantages + values[:-1]
+        # write to the buffer
+        advantages = np.hstack(advantages)
+        buffer.fill(np.array(states, dtype=np.float32),
+                    np.array(actions, dtype=np.float32 if is_continuous else np.int32),
+                    np.array(action_probabilities, dtype=np.float32),
+                    advantages,
+                    advantages + values[:-1])
 
     # normalize advantages
-    advantages = (advantages - advantages.mean()) / np.maximum(advantages.std(), 1e-6)
+    buffer.normalize_advantages()
 
-    # make TBPTT-compatible subsequences from transition vectors if model is recurrent
     if is_recurrent:
-        num_sub_sequences = horizon // sub_sequence_length
+        # add batch dimension for optimization
+        buffer.inject_batch_dimension()
 
-        # states
-        if is_shadow_brain:
-            feature_tensors = [np.stack(list(map(lambda x: x[feature], states))) for feature in
-                               range(len(states[0]))]
-            states = tuple(map(lambda x: np.expand_dims(np.stack(np.split(x, num_sub_sequences)), axis=0),
-                               feature_tensors))
-        else:
-            states = np.expand_dims(np.stack(np.split(np.array(states), num_sub_sequences, axis=0)), axis=0)
-
-        # others, expanding dims to inject batch dimension
-        actions = np.expand_dims(np.stack(np.split(actions, num_sub_sequences)), axis=0)
-        action_probabilities = np.expand_dims(np.stack(np.split(action_probabilities, num_sub_sequences)), axis=0)
-        advantages = np.expand_dims(np.stack(np.split(advantages, num_sub_sequences)), axis=0)
-        returns = np.expand_dims(np.stack(np.split(returns, num_sub_sequences)), axis=0)
-
-    # store this worker's gathering in a experience buffer
-    buffer = ExperienceBuffer(states, actions, action_probabilities, returns,
-                              advantages, episodes_completed, episode_rewards, episode_lengths)
-
-    dataset, stats = make_dataset_and_stats(buffer)
-
-    # save to tf record
+    # convert buffer to dataset and save it to tf record
+    dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
     dataset = dataset.map(tf_serialize_example)
+
+    # TODO I have the suspicion that the writer leaks memory if we wouldn't reset the workers
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
@@ -187,17 +214,26 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
 if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # need to deactivate GPU in Debugger mode!
+    tf.config.experimental_run_functions_eagerly(True)
 
     # env_n = "ShadowHand-v1"
     # env = gym.make(env_n)
-    # p, v, j = build_shadow_brain(env, 1)
-    # joint_tuple = ModelTuple(build_shadow_brain.__name__, j.get_weights())
+    # p, v, j = build_shadow_brain_v1(env, 1)
+    # joint_tuple = ModelTuple(build_shadow_brain_v1.__name__, j.get_weights())
     # if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
     #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
+
+    set_all_seeds(1)
 
     env_n = "CartPole-v1"
     p, v, j = build_ffn_distinct_models(gym.make(env_n))
     joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
+    rp, rv, rj = build_rnn_distinct_models(gym.make(env_n))
+    rjoint_tuple = ModelTuple(build_rnn_distinct_models.__name__, rj.get_weights())
 
     ray.init(local_mode=True)
-    ray.get(collect.remote(joint_tuple, 256, env_n, 0.99, 0.95, 2, 0))
+    print("FFN")
+    outs_ffn = [ray.get(collect.remote(joint_tuple, 32, env_n, 0.99, 0.95, 16, 0)) for _ in range(1)]
+    print("\nRNN")
+    outs_rnn = [ray.get(collect.remote(rjoint_tuple, 32, env_n, 0.99, 0.95, 16, 0)) for _ in range(1)]

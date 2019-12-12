@@ -99,3 +99,4 @@ if __name__ == "__main__":
 
     for l in np.array(tuples)[:, 0]:
         state_data += l
+
