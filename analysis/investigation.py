@@ -5,6 +5,8 @@ from typing import List
 
 import tensorflow as tf
 from gym.spaces import Discrete, Box
+import gym
+from agent.ppo import PPOAgent
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
@@ -83,4 +85,16 @@ class Investigator:
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+    env_name = "CartPole-v1"
+    agent_id: int = 1575394142
+    env = gym.make(env_name)
+    new_agent = PPOAgent.from_agent_state(agent_id)
 
+    investi = Investigator(new_agent.policy)
+
+    print(investi.list_layer_names())
+
+    weights = investi.get_layer_weights("lstm")
+    print(weights)
+
+    activations = investi.get_layer_activations("lstm", )
