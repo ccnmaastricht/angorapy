@@ -37,8 +37,8 @@ if __name__ == '__main__':
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    benchmarking_settings = [("CartPole-v1", "ffn"), ("CartPole-v1", "rnn")]
-    n_iterations = 100
+    benchmarking_settings = [("BipedalWalker-v2", "ffn"), ("BipedalWalker-v2", "rnn")]
+    n_iterations = 200
     repetitions = 10
 
     results = {}
@@ -46,8 +46,8 @@ if __name__ == '__main__':
     for env_name, model_type in benchmarking_settings:
         reward_histories = []
         for i in range(repetitions):
-            print(f"Repetition {i}/{repetitions} in environment {env_name}.")
-            reward_histories.append(test_environment(env_name, configs.discrete, model_type=model_type,
+            print(f"Repetition {i + 1}/{repetitions} in environment {env_name}.")
+            reward_histories.append(test_environment(env_name, configs.bipedal, model_type=model_type,
                                                      n=n_iterations, init_ray=should_init))
             should_init = False
 
@@ -56,9 +56,9 @@ if __name__ == '__main__':
         stdevs = np.std(reward_histories, axis=0)
         results.update({env_name: (means, stdevs)})
 
-        plt.plot(x, means, 'k-', label=f"{env_name} ({model_type})")
-        plt.fill_between(x, means - stdevs, means + stdevs)
+        plt.plot(x, means, 'k-')
+        plt.fill_between(x, means - stdevs, means + stdevs, label=f"{env_name} ({model_type})")
 
     plt.legend()
-    plt.savefig("../docs/figures/benchmarking_rnn_fnn_CartPole.pdf", format="pdf")
+    plt.savefig("../docs/figures/benchmarking_rnn_fnn_bipedal.pdf", format="pdf")
     plt.show()
