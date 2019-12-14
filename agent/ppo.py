@@ -133,7 +133,7 @@ class PPOAgent:
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
-            os.makedirs(self.agent_directory)
+            os.makedirs(self.agent_directory, exist_ok=True)
 
         if os.path.isdir("storage/experience"):
             shutil.rmtree("storage/experience/")

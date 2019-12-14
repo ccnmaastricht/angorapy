@@ -10,6 +10,8 @@ import os
 from matplotlib.lines import Line2D
 from matplotlib import animation
 from sklearn.svm import SVC
+from scipy.optimize import minimize
+from tensorflow import matmul
 import tensorflow as tf
 
 class Chiefinvestigator:
@@ -128,6 +130,13 @@ class Chiefinvestigator:
         clf.predict(x_test)
         score = clf.score(x_test, y_test[:, 0])
         print(score)
+
+    def minimiz(self):
+        dx = -x+matmul(weights, max(x,0))+matmul(inputweights, max(input,0))
+
+        optimisedResults = minimize(dx, state)
+
+        return optimisedResults
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
                                      # -> construct small amounts of points (perhaps belonging to one action into
                                      # -> dimensionality reduced space -> add them over time and see where they end up
