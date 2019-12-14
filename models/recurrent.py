@@ -6,13 +6,6 @@ import gym
 import tensorflow as tf
 from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
-<<<<<<< HEAD
-from tensorflow.keras import utils
-# import keras
-import numpy as np
-import random
-from collections import deque
-from agent.policy import act_continuous
 
 from tqdm import tqdm
 
@@ -53,83 +46,12 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="simple_rnn_policy")
     value = tf.keras.Model(inputs=inputs, outputs=out_value, name="simple_rnn_value")
 
-<<<<<<< HEAD
-    return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="policy_value")
-# hyperparameters for lunarlander
-
-
-GAMMA = 0.95
-LEARNING_RATE = 0.001
-
-MEMORY_SIZE = 10000
-BATCH_SIZE = 3
-
-EXPLORATION_MAX = 1.0
-EXPLORATION_MIN = 0.01
-EXPLORATION_DECAY = 0.995
-
-
-class RecurrentLander:
-
-    def __init__(self):
-        # self.exploration_rate = EXPLORATION_MAX
-        # self.observation_space = observation_space
-        # self.action_space = action_space
-        self.memory = deque(maxlen=MEMORY_SIZE)
-        self.batch_size = BATCH_SIZE
-
-    # def act(self, pv, state):
-    # if np.random.rand() < self.exploration_rate:
-
-        # else:
-            # out_pi, out_v = pv.predict(state)
-            # return out_pi, out_v
-
-    def gather(self, pi, environment):
-        state = environment.reset()
-        environment.render()
-        terminal = False
-        for l in range(120):
-            while not terminal:
-                policy_out = pi.predict(tf.random.normal((1, 1, 8)))
-                action = act_continuous(policy_out)
-                state_next, reward, terminal, info = environment.step(action)
-                self.memory.append((state, action, state_next, reward, terminal))
-                state = state_next
-
-    def learn(self, pi):
-        batch = np.array(random.sample(self.memory, self.batch_size))
-        batch = np.array(batch)
-        for state, action, reward, state_next, terminal, value_out in batch:
-            q_update = reward
-            if not terminal:
-                q_update = (reward + GAMMA * np.amax(pi.predict(state_next)[0]))
-            q_values = pi.predict(state)
-            q_values[0][action] = q_update
-            pi.model.fit(state, q_values, verbose=0)
-
-        return pv
-=======
     return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="simple_rnn")
->>>>>>> master
+
 
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-<<<<<<< HEAD
-    lander = RecurrentLander()
-    environment = gym.make("LunarLanderContinuous-v2")
-    pi, v, pv = build_rnn_distinct_models(environment, bs=3)
-
-    utils.plot_model(pi)
-
-    lander.gather(pi, environment)
-    pi = lander.learn(pi)
-
-    # out_pi, out_v = pv.predict(tf.random.normal((3, 16, 8)))
-    # print(out_pi.shape)
-    # print(out_v.shape)
-=======
 
     environment = gym.make("CartPole-v1")
     pi, v, pv = build_rnn_distinct_models(environment, bs=3)
@@ -138,4 +60,4 @@ if __name__ == "__main__":
 
     for i in tqdm(range(10)):
         out_pi, out_v = pv.predict(tf.random.normal((3, 16, 4)))
->>>>>>> master
+
