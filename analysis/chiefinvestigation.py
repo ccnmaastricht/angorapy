@@ -9,6 +9,7 @@ import scipy as sp
 import os
 from matplotlib.lines import Line2D
 from matplotlib import animation
+from sklearn.svm import SVC
 import tensorflow as tf
 
 class Chiefinvestigator:
@@ -114,6 +115,19 @@ class Chiefinvestigator:
         anim = animation.FuncAnimation(fig, update, frames = int(len(X_pca)-1), interval=100)
         anim.save("moving_pca.gif",
                 writer='pillow')
+
+    def svm_classifier(self, x_activation_data, action_data):
+        x_train = x_activation_data[0:130, :]
+        x_test = x_activation_data[-60:-1, :]
+        y_train = action_data[0:130, :]
+        y_test = action_data[-60:-1, :]
+        # classify actions based on activation in lstm using SVM
+
+        clf = SVC(gamma='auto')
+        clf.fit(x_train, y_train[:, 0])
+        clf.predict(x_test)
+        score = clf.score(x_test, y_test[:, 0])
+        print(score)
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
                                      # -> construct small amounts of points (perhaps belonging to one action into
                                      # -> dimensionality reduced space -> add them over time and see where they end up
@@ -128,12 +142,8 @@ class Chiefinvestigator:
 # TODO: dynamical systems and eigengrasps
 
 if __name__ == "__main__":
-
-
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # 1575469824  <- cartpole ffn 500 reward
-    # 1575394142  <- cartpole, recurrent 20 iterations trained
-    # 1575396604 <- cartpole trained for two iterations, recurrent
+
     env_name = "CartPole-v1"
     agent_id: int = 1575394142
     chiefinvesti = Chiefinvestigator(agent_id, env_name)
@@ -168,19 +178,7 @@ if __name__ == "__main__":
     plt.title('Loadings plot')
     plt.show()
 
+    # chiefinvesti.svm_classifier(x_activation_data, action_data)
 
-    x_train = x_activation_data[0:130, :]
-    x_test = x_activation_data[-60:-1,:]
-    y_train = action_data[0:130, :]
-    y_test = action_data[-60:-1, :]
-
-# classify actions based on activation in lstm using SVM
-    from sklearn.svm import SVC
-
-    clf = SVC(gamma='auto')
-    clf.fit(x_train, y_train[:, 0])
-    clf.predict(x_test)
-    score = clf.score(x_test, y_test[:, 0])
-    print(score)
     # timestepwise pca
     chiefinvesti.timestepwise_pca(x_activation_data, action_data, 'PCA')
