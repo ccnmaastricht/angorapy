@@ -3,13 +3,13 @@ import logging
 import os
 
 import argcomplete
-from gym.spaces import Box
-from models.hybrid import build_shadow_brain_v1
 import tensorflow as tf
+from gym.spaces import Box
 
 from agent.ppo import PPOAgent
 from environments import *
 from models.fully_connected import build_ffn_distinct_models
+from models.hybrid import build_shadow_brain_v1, build_blind_shadow_brain_v1
 from models.recurrent import build_rnn_distinct_models
 from utilities import configs
 from utilities.const import COLORS
@@ -25,9 +25,15 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                         "This means that assert checks are executed, which may slow down training. "
                         "In a final experiment setting, deactive this by adding the -O flag to the python command.")
 
+    # setup environment
+    env = gym.make(settings.env)
+
     # setting appropriate model building function
-    if settings.env == "ShadowHand-v1":
-        build_models = build_shadow_brain_v1
+    if "ShadowHand" in settings.env:
+        if env.visual_input:
+            build_models = build_shadow_brain_v1
+        else:
+            build_models = build_blind_shadow_brain_v1
     else:
         if settings.model == "ffn":
             build_models = build_ffn_distinct_models
@@ -37,7 +43,6 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
             raise ValueError("Unknown Model Type.")
 
     # setup environment and extract and report information
-    env = gym.make(settings.env)
     state_dimensionality, number_of_actions = env_extract_dims(env)
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
@@ -72,11 +77,10 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
 
         if verbose:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
-    # train
+    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
@@ -93,7 +97,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     # general parameters
-    parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
+    parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
     parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
 
@@ -113,6 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
+
     # optimization parameters
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
