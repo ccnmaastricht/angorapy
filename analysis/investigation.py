@@ -58,7 +58,6 @@ class Investigator:
         states = []
         activations = []
         actions = []
-        is_continuous = isinstance(env.action_space, Box)
 
         layer = self.get_layer_by_name(layer_name)
         dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
@@ -86,6 +85,7 @@ class Investigator:
             activations.append(activation)
 
             action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
+            actions.append(action)
             observation, reward, done, _ = env.step(action)
 
             state = parse_state(observation)
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     activation_rec = inv.get_layer_activations("policy_recurrent_layer")
     print(activation_rec)
 
-    tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
+    tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, False)
 
     print(len(tuples))
     pprint(tuples)

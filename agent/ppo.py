@@ -556,9 +556,10 @@ class PPOAgent:
 
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID's save history is empty.")
-        print(agent_path)
-        print(os.listdir(agent_path))
-        latest = max([int(re.match("([0-9]+)", fn).group(0)) for fn in os.listdir(agent_path)])
+
+        latest_matches = [re.match("([0-9]+)", fn) for fn in os.listdir(agent_path)]
+        latest = max([int(m.group(0)) for m in latest_matches if m is not None])
+        print(f"Loading from most recent iteration {latest}.")
         with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
             parameters = json.load(f)
 

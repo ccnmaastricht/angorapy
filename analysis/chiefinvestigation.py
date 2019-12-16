@@ -45,29 +45,9 @@ class Chiefinvestigator:
         """
         investi = Investigator(self.new_agent.policy)
         activations_lstm = investi.get_activations_over_episode(layer_name, self.env, True)
+        states, activations, rewards, actions = map(lambda x: np.array(x), zip(*activations_lstm))
 
-        # lengths, rewards = new_agent.evaluate(5, ray_already_initialized=True)
-
-        # activations
-        activation_data = np.empty((len(np.array(activations_lstm)[:, 1]), 32))
-
-        for k in range(len(np.array(activations_lstm)[:, 1])):
-            activation_data[k, :] = np.array(activations_lstm)[k, 1]
-
-        action_data = np.empty((len(np.array(activations_lstm)[:, 3]), 1))
-
-        for m in range(len(np.array(activations_lstm)[:, 3])):
-            action_data[m, :] = np.array(activations_lstm)[m, 3]
-        action_data = action_data > 0
-
-        # states
-        state_data = np.empty((len(np.array(activations_lstm)[:, 0]), 4))
-        for l in range(len(np.array(activations_lstm)[:, 0])):
-            state_data[l, :] = np.array(activations_lstm)[l, 0]
-        # rewards
-        all_rewards = np.array(activations_lstm)[:, 2]
-
-        return activation_data, action_data, state_data, all_rewards
+        return states, activations, rewards, actions
 
     def return_weights(self, layer_name):
         investi = Investigator(self.new_agent.policy)
@@ -170,10 +150,10 @@ if __name__ == "__main__":
 
     inv = Investigator(new_agent.policy)
 
-    # activ = inv.get_layer_activations(layer_names[3], None)
+    # activ = inv.get_layer_activations(layer_names[3])
     x_activation_data, action_data, state_data, all_rewards = chiefinvesti.parse_data(layer_names[3])
-    weights = chiefinvesti.return_weights(layer_names[3])
-    print(weights)
+    #weights = chiefinvesti.return_weights(layer_names[3])
+    #print(weights)
 
     #zscores = sp.stats.zscore(x_activation_data) # normalization
 
