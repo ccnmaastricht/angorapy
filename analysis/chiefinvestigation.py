@@ -169,8 +169,8 @@ if __name__ == "__main__":
 
     inv = Investigator(new_agent.policy)
 
-    activ = inv.get_layer_activations(layer_names[3], tf.convert_to_tensor([[[1, 2, 3, 4]]]))
-    # x_activation_data, action_data, state_data, all_rewards = chiefinvesti.parse_data(layer_names[3])
+    # activ = inv.get_layer_activations(layer_names[3], tf.convert_to_tensor([[[1, 2, 3, 4]]]))
+    x_activation_data, action_data, state_data, all_rewards = chiefinvesti.parse_data(layer_names[3])
     weights = chiefinvesti.return_weights(layer_names[3])
     print(weights)
 
