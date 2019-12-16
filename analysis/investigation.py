@@ -11,7 +11,8 @@ from gym.spaces import Discrete, Box
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
-from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten
+from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, \
+    insert_unknown_shape_dimensions
 
 
 class Investigator:
@@ -41,9 +42,13 @@ class Investigator:
 
         return out
 
-    def get_layer_activations(self, layer_name, input_tensor):
+    def get_layer_activations(self, layer_name, input_tensor=None):
+        """Get activations of a layer. If no input tensor is given, a random tensor is used."""
         layer = self.get_layer_by_name(layer_name)
         sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
+
+        if input_tensor is None:
+            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(sub_model.input_shape))
 
         return sub_model.predict(input_tensor)
 
@@ -85,11 +90,14 @@ class Investigator:
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env = gym.make("LunarLander-v2")
+    env = gym.make("LunarLanderContinuous-v2")
     network, _, _ = build_rnn_distinct_models(env, 1)
     inv = Investigator(network)
 
     print(inv.list_layer_names())
+
+    activation_rec = inv.get_layer_activations("policy_recurrent_layer")
+    print(activation_rec)
 
     tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
     print(len(tuples))

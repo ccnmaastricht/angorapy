@@ -106,6 +106,11 @@ def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
                                   else [layer] for layer in network.layers]))
 
 
+def insert_unknown_shape_dimensions(shape, none_replacer: int = 1):
+    """Replace Nones in a shape tuple with 1 or a given other value."""
+    return tuple(map(lambda s: none_replacer if s is None else s, shape))
+
+
 def reset_states_masked(model: tf.keras.Model, mask: List):
     """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
 
