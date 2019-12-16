@@ -12,6 +12,7 @@ from matplotlib import animation
 from sklearn.svm import SVC
 from scipy.optimize import minimize
 from tensorflow import matmul
+import numdifftools as nd
 import tensorflow as tf
 
 class Chiefinvestigator:
@@ -66,6 +67,10 @@ class Chiefinvestigator:
         all_rewards = np.array(activations_lstm)[:, 2]
 
         return activation_data, action_data, state_data, all_rewards
+
+    def return_weights(self, layer_name):
+        investi = Investigator(self.new_agent.policy)
+        return investi.get_layer_weights(layer_name)
 
     def plot_results(self, results, action_data, title: str="Results"):
         """Plot results of analysis performed by chiefinvestigator
@@ -131,10 +136,13 @@ class Chiefinvestigator:
         score = clf.score(x_test, y_test[:, 0])
         print(score)
 
-    def minimiz(self):
-        dx = -x+matmul(weights, max(x,0))+matmul(inputweights, max(input,0))
-
-        optimisedResults = minimize(dx, state)
+    def minimiz(self, weights, inputweights, input, activation, method: str='trust-krylov'):
+        id = np.random.randint(activation.shape[0])
+        x0 = activation[id, :]
+        fun = lambda x: -x+matmul(weights, max(x,0))+matmul(inputweights, max(input,0))
+        Jac = nd.Jacobian(fun)
+        Hes = nd.Hessian(fun)
+        optimisedResults = minimize(fun, x0, method=method, jac=Jac, hess=Hes)
 
         return optimisedResults
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
@@ -153,41 +161,43 @@ class Chiefinvestigator:
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    env_name = "CartPole-v1"
-    agent_id: int = 1575394142
+    env_name = "LunarLanderContinuous-v2"
+    agent_id: int = 1576489378 # 1575394142
     chiefinvesti = Chiefinvestigator(agent_id, env_name)
     layer_names = chiefinvesti.print_layer_names()
 
-    x_activation_data, action_data, state_data, all_rewards = chiefinvesti.parse_data(layer_names[2])
+    x_activation_data, action_data, state_data, all_rewards = chiefinvesti.parse_data(layer_names[3])
+    weights = chiefinvesti.return_weights(layer_names[3])
+    print(weights)
 
-    zscores = sp.stats.zscore(x_activation_data) # normalization
+    #zscores = sp.stats.zscore(x_activation_data) # normalization
 
-    plt.plot(list(range(len(x_activation_data))), x_activation_data)
-    plt.title('.')
-    plt.show()
+    #plt.plot(list(range(len(x_activation_data))), x_activation_data)
+    #plt.title('.')
+    #plt.show()
 
     # t-SNE
-    RS = 12
-    tsne_results = sklm.TSNE(random_state=RS).fit_transform(zscores)
+    #RS = 12
+    #tsne_results = sklm.TSNE(random_state=RS).fit_transform(zscores)
     # plot t-SNE results
-    plt.figure()
-    chiefinvesti.plot_results(tsne_results, action_data[:, 0], "t-SNE")
+    #plt.figure()
+    #chiefinvesti.plot_results(tsne_results, action_data[:, 0], "t-SNE")
 
-    pca = skld.PCA(3)
-    pca.fit(zscores)
-    X_pca = pca.transform(zscores)
-    plt.figure()
-    chiefinvesti.plot_results(X_pca, action_data[:, 0], "PCA")  # plot pca results
+    #pca = skld.PCA(3)
+    #pca.fit(zscores)
+    #X_pca = pca.transform(zscores)
+    #plt.figure()
+    #chiefinvesti.plot_results(X_pca, action_data[:, 0], "PCA")  # plot pca results
 
     # chiefinvesti.plot_rewards(all_rewards)
 
     # loadings plot
-    fig = plt.figure()
-    plt.scatter(pca.components_[1, :], pca.components_[0, :])
-    plt.title('Loadings plot')
-    plt.show()
+    #fig = plt.figure()
+    #plt.scatter(pca.components_[1, :], pca.components_[0, :])
+    #plt.title('Loadings plot')
+    #plt.show()
 
     # chiefinvesti.svm_classifier(x_activation_data, action_data)
 
     # timestepwise pca
-    chiefinvesti.timestepwise_pca(x_activation_data, action_data, 'PCA')
+    #chiefinvesti.timestepwise_pca(x_activation_data, action_data, 'PCA')

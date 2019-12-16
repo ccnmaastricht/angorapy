@@ -10,10 +10,11 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box
 import gym
 from agent.ppo import PPOAgent
+from environments import *
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
-from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims
+from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten
 
 
 class Investigator:
@@ -53,6 +54,7 @@ class Investigator:
         states = []
         activations = []
         actions = []
+        is_continuous = isinstance(env.action_space, Box)
 
         layer = self.get_layer_by_name(layer_name)
         dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
@@ -73,13 +75,15 @@ class Investigator:
         state = parse_state(env.reset())
         done = False
         while not done:
-            activation, probabilities = dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
+            policy_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+            a_distr, value = policy_out[:-1], policy_out[-1]
             states.append(state)
-            activations.append(activation)
+            action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
+            activations.append(a_distr)
 
-            action, action_prob = policy_act(probabilities)
+            # action, action_prob = policy_act(action_probability)
             actions.append(action)
-            observation, reward, done, _ = env.step(action)
+            observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
@@ -107,7 +111,7 @@ if __name__ == "__main__":
 
     activations = investi.get_layer_activations("lstm", )
 
-    tuples = inv.get_activations_over_episode("lstm", env, True)
+    tuples = investi.get_activations_over_episode("lstm", env, True)
     print(len(tuples))
     pprint(tuples)
 
