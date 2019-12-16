@@ -67,7 +67,6 @@ class Investigator:
             raise ValueError("Unknown action space.")
 
         is_recurrent = is_recurrent_model(self.network)
-        policy_act = act_discrete if not continuous_control else act_continuous
 
         reward_trajectory = []
         env.render() if render else ""
@@ -75,15 +74,16 @@ class Investigator:
         state = parse_state(env.reset())
         done = False
         while not done:
-            policy_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
-            a_distr, value = policy_out[:-1], policy_out[-1]
-            states.append(state)
-            action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
-            activations.append(a_distr)
+            dual_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+            activation, probabilities = dual_out[0], dual_out[1:]
 
-            # action, action_prob = policy_act(action_probability)
-            actions.append(action)
-            observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
+            states.append(state)
+            # action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
+            activations.append(activation)
+
+            action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
+            observation, reward, done, _ = env.step(action)
+
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
@@ -95,6 +95,7 @@ class Investigator:
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
     env_name = "CartPole-v1"
     agent_id: int = 1575394142
@@ -112,6 +113,15 @@ if __name__ == "__main__":
     activations = investi.get_layer_activations("lstm", )
 
     tuples = investi.get_activations_over_episode("lstm", env, True)
+
+    env = gym.make("LunarLander-v2")
+    network, _, _ = build_rnn_distinct_models(env, 1)
+    inv = Investigator(network)
+
+    print(inv.list_layer_names())
+
+    tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
+
     print(len(tuples))
     pprint(tuples)
 
