@@ -14,7 +14,7 @@ from environments import *
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
-from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten
+from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 
 
 class Investigator:
@@ -44,9 +44,13 @@ class Investigator:
 
         return out
 
-    def get_layer_activations(self, layer_name, input_tensor):
+    def get_layer_activations(self, layer_name, input_tensor=None):
+        """Get activations of a layer. If no input tensor is given, a random tensor is used."""
         layer = self.get_layer_by_name(layer_name)
         sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
+
+        if input_tensor is None:
+            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(sub_model.input_shape))
 
         return sub_model.predict(input_tensor)
 
@@ -97,28 +101,35 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-    env_name = "CartPole-v1"
-    agent_id: int = 1575394142
-    env = gym.make(env_name)
-    new_agent = PPOAgent.from_agent_state(agent_id)
 
-    investi = Investigator(new_agent.policy)
+    # env_name = "CartPole-v1"
+    # agent_id: int = 1575394142
+    # env = gym.make(env_name)
+    # new_agent = PPOAgent.from_agent_state(agent_id)
 
-    print(investi.list_layer_names())
+    # investi = Investigator(new_agent.policy)
 
-    weights = investi.get_layer_weights("lstm")
-    print(weights)
+    # print(investi.list_layer_names())
+
+    # weights = investi.get_layer_weights("lstm")
+    # print(weights)
 
 
-    activations = investi.get_layer_activations("lstm", )
+    # activations = investi.get_layer_activations("lstm", )
 
-    tuples = investi.get_activations_over_episode("lstm", env, True)
+    # tuples = investi.get_activations_over_episode("lstm", env, True)
 
-    env = gym.make("LunarLander-v2")
+    # env = gym.make("LunarLander-v2")
+
+    env = gym.make("LunarLanderContinuous-v2")
+
     network, _, _ = build_rnn_distinct_models(env, 1)
     inv = Investigator(network)
 
     print(inv.list_layer_names())
+
+    activation_rec = inv.get_layer_activations("policy_recurrent_layer")
+    print(activation_rec)
 
     tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
 
