@@ -128,11 +128,11 @@ class PPOAgent:
                 if component.name in get_layer_names(self.joint):
                     try:
                         get_component(self.joint, component.name).set_weights(component.get_weights())
-                        print(f"\tSuccessfully loaded component {component.name}")
+                        print(f"\tSuccessfully loaded component '{component.name}'")
                     except ValueError as e:
                         print(f"Could not load weights into component: {e}")
                 else:
-                    print(f"\tNo outer component {component.name} in model. Skipping.")
+                    print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
