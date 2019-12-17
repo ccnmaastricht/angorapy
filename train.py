@@ -78,7 +78,8 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                          learning_rate=settings.lr_pi, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
                          gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
-                         tbptt_length=settings.tbptt, pretrained_components=[args.preload], debug=settings.debug)
+                         tbptt_length=settings.tbptt,
+                         pretrained_components=None if args.preload is None else [args.preload], debug=settings.debug)
 
         if verbose:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")

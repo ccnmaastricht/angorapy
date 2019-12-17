@@ -22,12 +22,12 @@ discrete = make_config(
 )
 
 continuous = make_config(
-    batch_size=32,
-    horizon=1024,
+    batch_size=64,
+    horizon=2048,
     c_entropy=0.0,
     lr_pi=0.0003,
     epochs=10,
-    clip=0.1,
+    clip=0.2,
     lam=0.95,
     discount=0.99,
     grad_norm=0.5,
@@ -40,6 +40,20 @@ bipedal = make_config(
     lr_pi=0.0003,
     epochs=10,
     clip=0.1,
+    lam=0.95,
+    discount=0.99,
+    grad_norm=0.5,
+)
+
+mujoco = make_config(
+    iterations=1000000//2048,   # one million timesteps
+    workers=1,
+    batch_size=64,
+    horizon=2048,
+    c_entropy=0.0,
+    lr_pi=0.0003,
+    epochs=10,
+    clip=0.2,
     lam=0.95,
     discount=0.99,
     grad_norm=0.5,

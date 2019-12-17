@@ -26,8 +26,9 @@ def build_ffn_distinct_models(env: gym.Env):
 
     # value network
     x = _build_encoding_sub_model(normalized.shape[1:], None, name="value_encoder")(normalized)
-    x = tf.keras.layers.Dense(1)(x)
-    out_value = tf.keras.layers.Activation("linear")(x)
+    out_value = tf.keras.layers.Dense(1,
+                                      kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+                                      bias_initializer=tf.keras.initializers.Constant(0.0))(x)
 
     value = tf.keras.Model(inputs=inputs, outputs=out_value, name="value")
 
@@ -41,24 +42,19 @@ def build_ffn_shared_models(env: gym.Env):
     # shared encoding layers
     inputs = tf.keras.Input(shape=(state_dimensionality,))
     normalized = RunningNormalization()(inputs)
-    latent = _build_encoding_sub_model(normalized)
+    latent = _build_encoding_sub_model(normalized.shape[1:], None)(normalized)
 
     # policy head
     if continuous_control:
-        means = tf.keras.layers.Dense(n_actions)(latent)
-        means = tf.keras.layers.Activation("linear")(means)
-        stdevs = tf.keras.layers.Dense(n_actions)(latent)
-        stdevs = tf.keras.layers.Activation("softplus")(stdevs)
-
-        policy_out = tf.keras.layers.Concatenate()([means, stdevs])
+        policy_out = _build_continuous_head(n_actions, (64, ), None)(latent)
     else:
-        x = tf.keras.layers.Dense(n_actions)(latent)
-        policy_out = tf.keras.layers.Activation("softmax")(x)
+        policy_out = _build_discrete_head(n_actions, (64, ), None)(latent)
     policy = tf.keras.Model(inputs=inputs, outputs=policy_out)
 
     # value head
-    x = tf.keras.layers.Dense(1, input_dim=64)(latent)
-    value_out = tf.keras.layers.Activation("linear")(x)
+    value_out = tf.keras.layers.Dense(1, input_dim=64,
+                                      kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+                                      bias_initializer=tf.keras.initializers.Constant(0.0))(latent)
     value = tf.keras.Model(inputs=inputs, outputs=value_out)
 
     return policy, value, tf.keras.Model(inputs=inputs, outputs=[policy_out, value_out])
@@ -73,5 +69,5 @@ if __name__ == "__main__":
     pi, vn, pv = build_ffn_distinct_models(gym.make(env))
     s_pi, s_vn, s_pv = build_ffn_shared_models(gym.make(env))
 
-    plot_model(pv, "policy_value.png", show_shapes=True)
-    plot_model(s_pv, "shared_policy_value.png", show_shapes=True)
+    plot_model(pv, "policy_value.png", show_shapes=True, expand_nested=True)
+    plot_model(s_pv, "shared_policy_value.png", show_shapes=True, expand_nested=True)

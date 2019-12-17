@@ -40,10 +40,11 @@ if __name__ == '__main__':
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    experiment_name = "bipedal"
-    benchmarking_settings = [("BipedalWalker-v2", "ffn"), ("BipedalWalker-v2", "rnn")]
-    n_iterations = 2
-    repetitions = 1
+    experiment_name = "mujoco"
+    config = configs.mujoco
+    benchmarking_settings = [("Reacher-v2", "ffn"), ("Reacher-v2", "rnn")]
+    n_iterations = 60
+    repetitions = 5
 
     results: Dict[str, Tuple[List, List]] = {}
     should_init = True
@@ -53,7 +54,7 @@ if __name__ == '__main__':
         reward_histories = []
         for i in range(repetitions):
             print(f"Repetition {i + 1}/{repetitions} in environment {env_name} with model {model_type}.")
-            reward_histories.append(test_environment(env_name, configs.bipedal, model_type=model_type,
+            reward_histories.append(test_environment(env_name, config, model_type=model_type,
                                                      n=n_iterations, init_ray=should_init))
             should_init = False
 

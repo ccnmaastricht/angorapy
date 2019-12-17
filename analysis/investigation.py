@@ -10,7 +10,7 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box
 
 from agent.policy import act_discrete, act_continuous
-from models import build_rnn_distinct_models
+from models import build_rnn_distinct_models, build_ffn_distinct_models
 from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
 
@@ -91,15 +91,15 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     env = gym.make("LunarLanderContinuous-v2")
-    network, _, _ = build_rnn_distinct_models(env, 1)
+    network, _, _ = build_ffn_distinct_models(env)
     inv = Investigator(network)
 
     print(inv.list_layer_names())
 
-    activation_rec = inv.get_layer_activations("policy_recurrent_layer")
+    activation_rec = inv.get_layer_activations("dense_1")
     print(activation_rec)
 
-    tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
+    tuples = inv.get_activations_over_episode("dense_1", env, True)
     print(len(tuples))
     pprint(list(zip(*tuples))[1])
 
