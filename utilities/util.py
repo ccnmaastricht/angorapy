@@ -10,6 +10,7 @@ import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.python.client import device_lib
+from tensorflow.keras.layers import TimeDistributed
 
 
 def get_available_gpus():
@@ -143,6 +144,23 @@ def detect_finished_episodes(action_log_probabilities: tf.Tensor):
     # need to check only last one, as checking any might catch (albeit unlikely) true 0 in the sequence
     finished = action_log_probabilities[:, -1] == 0
     return finished
+
+
+def get_layer_names(model: tf.keras.Model):
+    """Get names of all (outer) layers in the model."""
+    return [layer.name if not isinstance(layer, TimeDistributed) else layer.layer.name for layer in model.layers]
+
+
+def get_component(model: tf.keras.Model, name: str):
+    """Get outer layer/component by name."""
+    for layer in model.layers:
+        layer_name = layer.name
+        if isinstance(layer, TimeDistributed):
+            layer_name = layer.layer.name
+
+        if layer_name == name:
+            return layer
+
 
 
 if __name__ == "__main__":

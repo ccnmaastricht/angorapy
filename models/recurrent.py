@@ -36,8 +36,8 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
     x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="value_encoder"),
            name="TD_value")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x = tf.keras.layers.SimpleRNN(64, stateful=True, return_sequences=True, batch_size=bs,
-                                  name="value_recurrent_layer")(x)
+    x, _ = tf.keras.layers.SimpleRNN(64, stateful=True, return_sequences=True, batch_size=bs,
+                                     return_state=True, name="value_recurrent_layer")(x)
 
     out_value = tf.keras.layers.Dense(1)(x)
 

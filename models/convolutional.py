@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 """Convolutional components/networks."""
+import math
+
+import numpy
 import tensorflow as tf
 
 
 # VISUAL ENCODING
 
-def _build_visual_encoder(shape, batch_size=None, name=None):
+def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
     """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory."""
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
@@ -49,26 +52,13 @@ def _build_visual_encoder(shape, batch_size=None, name=None):
 
 # VISUAL DECODING
 
-@DeprecationWarning
-def _build_visual_decoder(shape, batch_size=None):
-    inputs = tf.keras.Input(batch_shape=(batch_size,) + shape)
+def _build_visual_decoder(input_dim, spatial_dims):
+    inputs = tf.keras.Input((input_dim,))
 
-    spatial_reshape_size = 7 * 7 * 64
-    x = tf.keras.layers.Dense(64)(inputs)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Dense(spatial_reshape_size)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Reshape([7, 7, 64])(x)
-    x = tf.keras.layers.Conv2DTranspose(64, 3, 3)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2DTranspose(32, 3, 3, output_padding=1)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2DTranspose(32, 3, 3, output_padding=2)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2DTranspose(32, 3, 1)(x)
-    x = tf.keras.layers.ReLU()(x)
-    x = tf.keras.layers.Conv2DTranspose(3, 5, 1)(x)
-    x = tf.keras.layers.Activation("sigmoid")(x)
+    x = tf.keras.layers.Dense(input_dim * 2, activation="tanh")(inputs)
+    x = tf.keras.layers.Dense(input_dim * 4, activation="tanh")(x)
+    x = tf.keras.layers.Dense(input_dim * 4, activation="tanh")(x)
+    x = tf.keras.layers.Dense(numpy.prod(spatial_dims) * 3, activation="sigmoid")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x)
 

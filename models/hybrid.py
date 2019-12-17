@@ -29,7 +29,7 @@ def build_shadow_brain_v1(env: gym.Env, bs: int):
     goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
 
     # abstractions of perceptive inputs
-    visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs, name="latent_vision"))(visual_in)
+    visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs))(visual_in)
     proprio_latent = TD(_build_fcn_component(48, 12, 8, batch_size=bs, name="latent_proprio"))(proprio_in)
     touch_latent = TD(_build_fcn_component(92, 24, 8, batch_size=bs, name="latent_touch"))(touch_in)
 
@@ -76,7 +76,7 @@ def build_shadow_brain_v2(env: gym.Env, bs: int):
     goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
 
     # abstractions of perceptive inputs
-    visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs, name="latent_vision"))(visual_in)
+    visual_latent = TD(_build_visual_encoder(shape=(224, 224, 3), batch_size=bs))(visual_in)
     visual_latent = TD(tf.keras.layers.Dense(128))(visual_latent)
     visual_latent = TD(tf.keras.layers.ReLU())(visual_latent)
     visual_latent.set_shape([bs] + visual_latent.shape[1:])
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     batch_size = 256
 
     env = gym.make("ShadowHand-v1")
-    _, _, joint = build_shadow_brain_v2(env, bs=batch_size)
+    _, _, joint = build_shadow_brain_v1(env, bs=batch_size)
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 

@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
     tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
     print(len(tuples))
-    pprint(tuples)
+    pprint(list(zip(*tuples))[1])
 
     # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
     state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
