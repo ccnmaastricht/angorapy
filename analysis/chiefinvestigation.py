@@ -34,7 +34,7 @@ class Chiefinvestigator:
         print(investi.list_layer_names())
         return investi.list_layer_names()
 
-    def parse_data(self, layer_name: str):
+    def parse_data(self, layer_name: str, previous_layer_name: str):
         """Get state, activation, action, reward over one episode. Parse data to output.
 
         Args:
@@ -44,10 +44,12 @@ class Chiefinvestigator:
             activation_data, action_data, state_data, all_rewards
         """
         investi = Investigator(self.new_agent.policy)
-        activations_lstm = investi.get_activations_over_episode(layer_name, self.env, True)
-        states, activations, rewards, actions = map(lambda x: np.array(x), zip(*activations_lstm))
+        activations_lstm = investi.get_activations_over_episode(layer_name, previous_layer_name, self.env, True)
+        states, activations, previous_activation, rewards, actions = map(lambda x: np.array(x), zip(*activations_lstm))
+        activations = np.reshape(activations, (activations.shape[0], 64))
+        previous_activation = np.reshape(previous_activation, (previous_activation.shape[0], 64))
 
-        return states, activations, rewards, actions
+        return states, activations, previous_activation, rewards, actions
 
     def return_weights(self, layer_name):
         investi = Investigator(self.new_agent.policy)
@@ -119,11 +121,20 @@ class Chiefinvestigator:
 
     def minimiz(self, weights, inputweights, input, activation, method: str='trust-krylov'):
         id = np.random.randint(activation.shape[0])
+        print(id)
         x0 = activation[id, :]
-        fun = lambda x: -x+matmul(weights, max(x,0))+matmul(inputweights, max(input,0))
-        Jac = nd.Jacobian(fun)
+        input = input[id, :]
+        fun = lambda x: 0.5*abs(sum(- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)))**2
+        der = lambda x: -1 + np.matmul(weights, (1-np.tanh(x[0:64])**2))# - np.eye(64, 64) + weights*x[0:64]
+        options = {'gtol': 1e-5, 'disp': True}
+        #Jac = nd.Jacobian(fun)
+        #print(Jac.shape)
         Hes = nd.Hessian(fun)
-        optimisedResults = minimize(fun, x0, method=method, jac=Jac, hess=Hes)
+        print(Hes)
+        y = fun(x0)
+        print(y)
+        optimisedResults = minimize(fun, x0, method=method, jac=der, hess=Hes,
+                                    options=options)
 
         return optimisedResults
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
@@ -151,15 +162,20 @@ if __name__ == "__main__":
     inv = Investigator(new_agent.policy)
 
     # activ = inv.get_layer_activations(layer_names[3])
-    x_activation_data, action_data, state_data, all_rewards = chiefinvesti.parse_data(layer_names[3])
-    #weights = chiefinvesti.return_weights(layer_names[3])
+    states, activations, previous_activations, rewards, actions = chiefinvesti.parse_data("policy_recurrent_layer",
+                                                                                          layer_names[2])
+    weights = chiefinvesti.return_weights(layer_names[3])
     #print(weights)
+    method = "trust-ncg"
+    optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
+                                            input=previous_activations, activation=activations,
+                                            method=method)
 
-    #zscores = sp.stats.zscore(x_activation_data) # normalization
+    # zscores = sp.stats.zscore(activations) # normalization
 
-    #plt.plot(list(range(len(x_activation_data))), x_activation_data)
-    #plt.title('.')
-    #plt.show()
+    plt.plot(list(range(len(activations))), activations)
+    plt.title('.')
+    plt.show()
 
     # t-SNE
     #RS = 12
@@ -168,12 +184,12 @@ if __name__ == "__main__":
     #plt.figure()
     #chiefinvesti.plot_results(tsne_results, action_data[:, 0], "t-SNE")
 
-    #pca = skld.PCA(3)
-    #pca.fit(zscores)
-    #X_pca = pca.transform(zscores)
-    #plt.figure()
-    #chiefinvesti.plot_results(X_pca, action_data[:, 0], "PCA")  # plot pca results
-
+    pca = skld.PCA(3)
+    pca.fit(activations)
+    X_pca = pca.transform(activations)
+    plt.figure()
+    chiefinvesti.plot_results(X_pca, actions[:, 0], "PCA")  # plot pca results
+    new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
     # chiefinvesti.plot_rewards(all_rewards)
 
     # loadings plot

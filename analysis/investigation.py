@@ -54,13 +54,17 @@ class Investigator:
 
         return sub_model.predict(input_tensor)
 
-    def get_activations_over_episode(self, layer_name, env, render: bool = False):
+    def get_activations_over_episode(self, layer_name, previous_layer_name, env, render: bool = False):
         states = []
         activations = []
         actions = []
+        previous_activations = []
 
         layer = self.get_layer_by_name(layer_name)
-        dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
+        previous_layer = self.get_layer_by_name(previous_layer_name)
+        dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output,
+                                                                        previous_layer.output,
+                                                                        self.network.output])
 
         if isinstance(env.action_space, Discrete):
             continuous_control = False
@@ -78,11 +82,12 @@ class Investigator:
         done = False
         while not done:
             dual_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
-            activation, probabilities = dual_out[0], dual_out[1:]
+            activation, previous_activation, probabilities = dual_out[0], dual_out[1], dual_out[2:]
 
             states.append(state)
             # action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
             activations.append(activation)
+            previous_activations.append(previous_activation)
 
             action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
             actions.append(action)
@@ -91,7 +96,7 @@ class Investigator:
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
-        return list(zip(states, activations, reward_trajectory, actions))
+        return list(zip(states, activations, previous_activations, reward_trajectory, actions))
 
         # return reward_trajectory
 
