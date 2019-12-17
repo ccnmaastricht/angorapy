@@ -17,6 +17,11 @@ from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 
 
+class InconsistentArgumentError(Exception):
+    """Arguments given to a process were inconsistent."""
+    pass
+
+
 def run_experiment(settings: argparse.Namespace, verbose=True):
     """Run an experiment with the given settings."""
 
@@ -24,6 +29,11 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
         logging.warning(" You are training this agent in python's default debugging mode. "
                         "This means that assert checks are executed, which may slow down training. "
                         "In a final experiment setting, deactive this by adding the -O flag to the python command.")
+
+    # sanity checks and warnings for given parameters
+    if args.preload is not None and args.load_from is not None:
+        raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
+                                        "agent state. This cannot be resolved.")
 
     # setting appropriate model building function
     if settings.env == "ShadowHand-v1":
@@ -68,7 +78,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                          learning_rate=settings.lr_pi, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
                          gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
-                         tbptt_length=settings.tbptt, debug=settings.debug)
+                         tbptt_length=settings.tbptt, pretrained_components=[args.preload], debug=settings.debug)
 
         if verbose:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
@@ -101,6 +111,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default=None, help="config name (utilities/configs.py) to be loaded")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
+    parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
     parser.add_argument("--save-every", type=int, default=0, help=f"save agent every given number of iterations")
@@ -113,6 +124,7 @@ if __name__ == "__main__":
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
+
     # optimization parameters
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")

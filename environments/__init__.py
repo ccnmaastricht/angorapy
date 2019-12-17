@@ -1,15 +1,12 @@
 """Module for additional environments as well as registering modified environments."""
-import contextlib
-import os
-import sys
 
 import gym
 
 from environments.evasion import Evasion
 from environments.evasionwalls import EvasionWalls
 from environments.race import Race
-from environments.tunnel import Tunnel, TunnelRAM
 from environments.shadowhand import ShadowHandBlock
+from environments.tunnel import Tunnel, TunnelRAM
 
 # SHADOW HAND #
 

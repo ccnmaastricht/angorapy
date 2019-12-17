@@ -23,10 +23,10 @@ import models
 from agent.core import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log, extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
-from utilities.const import COLORS, BASE_SAVE_PATH
+from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
-    reset_states_masked, detect_finished_episodes
+    reset_states_masked, detect_finished_episodes, get_layer_names, get_component
 
 
 class PPOAgent:
@@ -46,7 +46,7 @@ class PPOAgent:
                  discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
                  c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
                  clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
-                 _make_dirs=True, debug: bool = False):
+                 pretrained_components: list = None, _make_dirs=True, debug: bool = False):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
@@ -114,6 +114,26 @@ class PPOAgent:
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
+
+        if pretrained_components is not None:
+            print("Loading pretrained components:")
+            for pretraining_name in pretrained_components:
+                component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
+                if os.path.isfile(component_path):
+                    component = tf.keras.models.load_model(component_path, compile=False)
+                else:
+                    print(f"\tNo such pretraining found at {component_path}. Skipping.")
+                    continue
+
+                if component.name in get_layer_names(self.joint):
+                    try:
+                        get_component(self.joint, component.name).set_weights(component.get_weights())
+                        print(f"\tSuccessfully loaded component {component.name}")
+                    except ValueError as e:
+                        print(f"Could not load weights into component: {e}")
+                else:
+                    print(f"\tNo outer component {component.name} in model. Skipping.")
+
         self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
@@ -557,7 +577,8 @@ class PPOAgent:
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID's save history is empty.")
 
-        latest = max([int(re.match("([0-9]+)", fn).group(0)) for fn in os.listdir(agent_path)])
+        latest_matches = [re.match("([0-9]+)", fn) for fn in os.listdir(agent_path)]
+        latest = max([int(m.group(0)) for m in latest_matches if m is not None])
         print(f"Loading from most recent iteration {latest}.")
         with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
             parameters = json.load(f)

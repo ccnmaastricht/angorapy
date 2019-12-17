@@ -16,3 +16,4 @@ COLORS = dict(
 
 BASE_SAVE_PATH = "storage/saved_models/states/"
 STORAGE_DIR = "storage/experience/"
+PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"

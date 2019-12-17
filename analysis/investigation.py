@@ -11,7 +11,8 @@ from gym.spaces import Discrete, Box
 
 from agent.policy import act_discrete, act_continuous
 from models import build_rnn_distinct_models
-from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims
+from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, \
+    insert_unknown_shape_dimensions
 
 
 class Investigator:
@@ -41,9 +42,13 @@ class Investigator:
 
         return out
 
-    def get_layer_activations(self, layer_name, input_tensor):
+    def get_layer_activations(self, layer_name, input_tensor=None):
+        """Get activations of a layer. If no input tensor is given, a random tensor is used."""
         layer = self.get_layer_by_name(layer_name)
         sub_model = tf.keras.Model(inputs=self.network.input, outputs=layer.output)
+
+        if input_tensor is None:
+            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(sub_model.input_shape))
 
         return sub_model.predict(input_tensor)
 
@@ -62,18 +67,19 @@ class Investigator:
             raise ValueError("Unknown action space.")
 
         is_recurrent = is_recurrent_model(self.network)
-        policy_act = act_discrete if not continuous_control else act_continuous
 
         done = False
         reward_trajectory = []
         state = parse_state(env.reset())
         while not done:
-            activation, probabilities = dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1))
+            dual_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+            activation, probabilities = dual_out[0], dual_out[1:]
+
             states.append(state)
             activations.append(activation)
             env.render() if render else ""
 
-            action, action_prob = policy_act(probabilities)
+            action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
             observation, reward, done, _ = env.step(action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
@@ -88,11 +94,14 @@ if __name__ == "__main__":
     network, _, _ = build_rnn_distinct_models(env, 1)
     inv = Investigator(network)
 
-    # print(inv.get_layer_activations("lstm", tf.convert_to_tensor([[[1, 2, 3, 4]]])))
+    print(inv.list_layer_names())
 
-    tuples = inv.get_activations_over_episode("lstm", env, True)
+    activation_rec = inv.get_layer_activations("policy_recurrent_layer")
+    print(activation_rec)
+
+    tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, True)
     print(len(tuples))
-    pprint(tuples)
+    pprint(list(zip(*tuples))[1])
 
     # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
     state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
