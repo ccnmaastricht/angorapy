@@ -125,7 +125,7 @@ class Chiefinvestigator:
         x0 = activation[id, :]
         input = input[id, :]
         fun = lambda x: 0.5*abs(sum(- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)))**2
-        der = lambda x: -1 + np.matmul(weights, (1-np.tanh(x[0:64])**2))# - np.eye(64, 64) + weights*x[0:64]
+        der = lambda x: np.sum((- np.eye(64, 64) + weights * (1-np.tanh(x[0:64])**2)), axis=1)# - np.eye(64, 64) + weights*x[0:64]
         options = {'gtol': 1e-5, 'disp': True}
         #Jac = nd.Jacobian(fun)
         #print(Jac.shape)
@@ -202,3 +202,10 @@ if __name__ == "__main__":
 
     # timestepwise pca
     #chiefinvesti.timestepwise_pca(x_activation_data, action_data, 'PCA')
+
+    # pca of actions to identify unique actions
+    pca = skld.PCA(2)
+    pca.fit(actions)
+    action_pca = pca.transform(actions)
+    plt.scatter(list(range(len(action_pca))), action_pca[:, 0])
+    plt.show()
