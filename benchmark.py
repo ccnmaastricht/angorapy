@@ -1,3 +1,6 @@
+import json
+from typing import Dict, Tuple, Mapping, List
+
 import gym
 import numpy as np
 
@@ -37,28 +40,36 @@ if __name__ == '__main__':
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+    experiment_name = "bipedal"
     benchmarking_settings = [("BipedalWalker-v2", "ffn"), ("BipedalWalker-v2", "rnn")]
-    n_iterations = 200
-    repetitions = 10
+    n_iterations = 2
+    repetitions = 1
 
-    results = {}
+    results: Dict[str, Tuple[List, List]] = {}
     should_init = True
     for env_name, model_type in benchmarking_settings:
+        identifier = str((env_name, model_type))
+
         reward_histories = []
         for i in range(repetitions):
-            print(f"Repetition {i + 1}/{repetitions} in environment {env_name}.")
+            print(f"Repetition {i + 1}/{repetitions} in environment {env_name} with model {model_type}.")
             reward_histories.append(test_environment(env_name, configs.bipedal, model_type=model_type,
                                                      n=n_iterations, init_ray=should_init))
             should_init = False
 
-        x = list(range(1, n_iterations + 1))
-        means = np.mean(reward_histories, axis=0)
-        stdevs = np.std(reward_histories, axis=0)
-        results.update({env_name: (means, stdevs)})
+            means = np.mean(reward_histories, axis=0)
+            stdevs = np.std(reward_histories, axis=0)
+            results.update({identifier: (means.tolist(), stdevs.tolist())})
 
-        plt.plot(x, means, 'k-')
-        plt.fill_between(x, means - stdevs, means + stdevs, label=f"{env_name} ({model_type})")
+            with open(f"docs/benchmarks/{experiment_name}.json", "w") as f:
+                json.dump(results, f, indent=2)
+
+        x = list(range(1, n_iterations + 1))
+        plt.plot(x, results[identifier][0], 'k-')
+        plt.fill_between(x,
+                         np.array(results[identifier][0]) - np.array(results[identifier][1]),
+                         np.array(results[identifier][0]) + np.array(results[identifier][1]),
+                         label=f"{env_name} ({model_type})")
 
     plt.legend()
-    plt.savefig("../docs/figures/benchmarking_rnn_fnn_bipedal.pdf", format="pdf")
-    plt.show()
+    plt.savefig(f"docs/figures/benchmarking_rnn_fnn_{experiment_name}.pdf", format="pdf")
