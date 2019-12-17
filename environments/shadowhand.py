@@ -109,7 +109,7 @@ class ShadowHand(manipulate.ManipulateEnv):
         # "primary" information, either this is the visual frame or the object position and velocity
         achieved_goal = self._get_achieved_goal().ravel()
         if self.visual_input:
-            primary = self.render(mode="rgb_array", height=224, width=224)
+            primary = self.render(mode="rgb_array", height=227, width=227)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
             primary = numpy.concatenate([achieved_goal, object_vel])

@@ -16,14 +16,12 @@ def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
     x = tf.keras.layers.Conv2D(32, 11, 4)(inputs)
     x = tf.keras.layers.ReLU()(x)
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
-    x = tf.keras.layers.ReLU()(x)
 
     # second layer
     x = tf.keras.layers.Conv2D(32, 5, 1, padding="same")(x)
     x = tf.keras.layers.ReLU()(x)
 
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
-    x = tf.keras.layers.ReLU()(x)
 
     # third layer
     x = tf.keras.layers.Conv2D(64, 3, 1, padding="same")(x)
@@ -38,7 +36,6 @@ def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
     x = tf.keras.layers.ReLU()(x)
 
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
-    x = tf.keras.layers.ReLU()(x)
 
     # fully connected layers
     x = tf.keras.layers.Flatten()(x)
@@ -52,16 +49,28 @@ def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
 
 # VISUAL DECODING
 
-def _build_visual_decoder(input_dim, spatial_dims):
-    inputs = tf.keras.Input((input_dim,))
+def _build_visual_decoder(input_dim):
+    model = tf.keras.Sequential((
+        tf.keras.layers.Dense(512, input_dim=input_dim, activation="relu"),
+        tf.keras.layers.Dense(512, activation="relu"),
+        tf.keras.layers.Dense(1152, activation="relu"),
 
-    x = tf.keras.layers.Dense(input_dim * 2, activation="tanh")(inputs)
-    x = tf.keras.layers.Dense(input_dim * 4, activation="tanh")(x)
-    x = tf.keras.layers.Dense(input_dim * 4, activation="tanh")(x)
-    x = tf.keras.layers.Dense(numpy.prod(spatial_dims) * 3, activation="sigmoid")(x)
+        tf.keras.layers.Reshape((6, 6, 32)),
+        tf.keras.layers.Conv2DTranspose(32, 3, 2),
+        tf.keras.layers.Conv2DTranspose(64, 3, 1, activation="relu", padding="same"),
+        tf.keras.layers.Conv2DTranspose(64, 3, 1, activation="relu", padding="same"),
+        tf.keras.layers.Conv2DTranspose(32, 3, 2),
+        tf.keras.layers.Conv2DTranspose(32, 5, 1, activation="relu", padding="same"),
+        tf.keras.layers.Conv2DTranspose(32, 3, 2),
+        tf.keras.layers.Conv2DTranspose(3, 11, 4, activation="sigmoid"),
+    ))
 
-    return tf.keras.Model(inputs=inputs, outputs=x)
+    model.build()
+    return model
 
 
 if __name__ == "__main__":
     conv_comp = _build_visual_encoder((227, 227, 3))
+    conv_dec = _build_visual_decoder(512)
+    conv_comp.summary()
+    conv_dec.summary()

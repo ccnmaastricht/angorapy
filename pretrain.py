@@ -27,7 +27,7 @@ def pretrain_on_reconstruction(pretrainable_component: Union[tf.keras.Model, str
         lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255,) * 2).batch(128)
 
     # model is constructed from visual component and a decoder
-    decoder = _build_visual_decoder(pretrainable_component.output_shape[-1], spatial_dimensions)
+    decoder = _build_visual_decoder(pretrainable_component.output_shape[-1])
     model = tf.keras.Sequential((
         pretrainable_component,
         decoder
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    visual_component = _build_visual_encoder(shape=(224, 224, 3), name="visual_component")
+    visual_component = _build_visual_encoder(shape=(227, 227, 3), name="visual_component")
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
 
