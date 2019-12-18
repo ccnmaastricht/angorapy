@@ -6,7 +6,7 @@ from typing import Tuple, Union
 import numpy as np
 import tensorflow as tf
 
-from agent.core import gaussian_log_pdf
+from agent.probability import gaussian_log_pdf
 
 
 def act_discrete(log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:

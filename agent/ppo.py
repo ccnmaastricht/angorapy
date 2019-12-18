@@ -20,8 +20,8 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from agent.core import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log, \
-    extract_discrete_action_probabilities
+from agent.core import extract_discrete_action_probabilities
+from agent.probability import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
