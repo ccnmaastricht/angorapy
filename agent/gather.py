@@ -84,7 +84,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
         # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
         if is_recurrent and (current_subseq_length == subseq_length or done):
-            buffer.push_seq_to_buffer(states, actions, action_probabilities)
+            buffer.push_seq_to_buffer(states, actions, action_probabilities, values[-current_subseq_length:])
 
             # clear the buffered information
             states, actions, action_probabilities = [], [], []

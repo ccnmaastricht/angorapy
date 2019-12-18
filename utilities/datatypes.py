@@ -113,11 +113,11 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
     """Experience Buffer for TimeSequence Data"""
 
     def __init__(self, states: Union[List, arr], actions: Union[List, arr], action_probabilities: Union[List, arr],
-                 returns: Union[List, arr], advantages: Union[List, arr], episodes_completed: int,
-                 episode_rewards: List[int], capacity: int, seq_length: int, episode_lengths: List[int],
-                 is_multi_feature: bool, is_continuous: bool):
+                 returns: Union[List, arr], advantages: Union[List, arr], values: Union[List, arr],
+                 episodes_completed: int, episode_rewards: List[int], capacity: int, seq_length: int,
+                 episode_lengths: List[int], is_multi_feature: bool, is_continuous: bool):
 
-        super().__init__(states, actions, action_probabilities, returns, advantages, episodes_completed,
+        super().__init__(states, actions, action_probabilities, returns, advantages, values, episodes_completed,
                          episode_rewards, capacity, episode_lengths, is_multi_feature, is_continuous)
 
         self.seq_length = seq_length
@@ -127,8 +127,11 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
 
         self.last_advantage_stop = 0
 
-    def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr]):
+    def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr], values: List[arr]):
         """Push a sequence to the buffer, constructed from given lists of values."""
+        assert np.all(np.array([len(states), len(actions), len(action_probabilities), len(values)]) == len(states)), \
+            "Inconsistent input sizes."
+
         seq_length = len(actions)
         if self.is_multi_feature:
             states = [np.stack(list(map(lambda s: s[f_id], states))) for f_id in range(len(states[0]))]
@@ -140,6 +143,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         # can I point out for a second that numpy slicing is beautiful as fu**
         self.actions[self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(actions)
         self.action_probabilities[self.number_of_subsequences_pushed, :seq_length] = action_probabilities
+        self.values[self.number_of_subsequences_pushed, :seq_length] = values
 
         self.number_of_subsequences_pushed += 1
         self.filled += self.actions.shape[1]
@@ -198,6 +202,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
                                             action_probabilities=np.zeros((size, seq_len,), dtype=np.float32),
                                             returns=np.zeros((size, seq_len), dtype=np.float32),
                                             advantages=np.zeros((size, seq_len), dtype=np.float32),
+                                            values=np.zeros((size, seq_len), dtype=np.float32),
                                             episodes_completed=0, episode_rewards=[],
                                             capacity=size * seq_len, seq_length=seq_len,
                                             episode_lengths=[],
