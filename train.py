@@ -5,11 +5,12 @@ import argcomplete
 
 from agent.ppo import PPOAgent
 from models import *
+from models import get_model_builder
+from models.hybrid import build_shadow_brain_v1, build_blind_shadow_brain_v1
 from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
-from models import get_model_builder
 
 
 class InconsistentArgumentError(Exception):
@@ -30,20 +31,21 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
         raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
                                         "agent state. This cannot be resolved.")
 
-    # setting appropriate model building function
-    if settings.env == "ShadowHand-v0":
-        build_models = build_shadow_brain_v1
-    elif settings.env == "ShadowHandBlind-v0":
-        build_models = build_shadow_brain_v1
-    else:
-        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
-
     # setup environment and extract and report information
     env = gym.make(settings.env)
     state_dimensionality, number_of_actions = env_extract_dims(env)
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
+
+    # setting appropriate model building function
+    if "ShadowHand" in settings.env:
+        if env.visual_input:
+            build_models = build_shadow_brain_v1
+        else:
+            build_models = build_blind_shadow_brain_v1
+    else:
+        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
@@ -75,11 +77,10 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
 
         if verbose:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
-    # train
+    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
@@ -97,8 +98,10 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
-    parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn", help=f"model type if not shadowhand")
-    parser.add_argument("--shared", action="store_true", help=f"make the model share part of the network for policy and value")
+    parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
+                        help=f"model type if not shadowhand")
+    parser.add_argument("--shared", action="store_true",
+                        help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
 
     # meta arguments

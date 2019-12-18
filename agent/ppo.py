@@ -20,7 +20,8 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from agent.core import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log, extract_discrete_action_probabilities
+from agent.core import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log, \
+    extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
@@ -291,8 +292,7 @@ class PPOAgent:
 
         available_cpus = multiprocessing.cpu_count()
         if not ray_already_initialized:
-            ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR,
-                     object_store_memory=1e+9, memory=1e+9)
+            ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
         print(f"Parallelizing {self.workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()

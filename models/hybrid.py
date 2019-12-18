@@ -13,7 +13,7 @@ from tqdm import tqdm
 from environments import *
 from models.components import _build_fcn_component, _build_continuous_head, _build_discrete_head
 from models.convolutional import _build_visual_encoder
-from utilities.util import env_extract_dims
+from utilities.util import env_extract_dims, calc_max_memory_usage
 
 
 def build_shadow_brain_v1(env: gym.Env, bs: int):
@@ -59,6 +59,53 @@ def build_shadow_brain_v1(env: gym.Env, bs: int):
                            outputs=[value_out], name="shadow_brain_v1_value")
     joint = tf.keras.Model(inputs=[visual_in, proprio_in, touch_in, goal_in],
                            outputs=[policy_out, value_out], name="shadow_brain_v1")
+
+    return policy, value, joint
+
+
+def build_blind_shadow_brain_v1(env: gym.Env, bs: int):
+    """Build network for the shadow hand task but without visual inputs."""
+    continuous_control = isinstance(env.action_space, Box)
+    state_dimensionality, n_actions = env_extract_dims(env)
+    hidden_dimensions = 32
+
+    # inputs
+    object_in = tf.keras.Input(batch_shape=(bs, None, 13), name="object_pos_input")
+    proprio_in = tf.keras.Input(batch_shape=(bs, None, 48,), name="proprioceptive_input")
+    touch_in = tf.keras.Input(batch_shape=(bs, None, 92,), name="somatosensory_input")
+    goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
+
+    # abstractions of perceptive inputs
+    object_latent = TD(_build_fcn_component(13, 12, 8, batch_size=bs, name="latent_object_pos"))(object_in)
+    proprio_latent = TD(_build_fcn_component(48, 12, 8, batch_size=bs, name="latent_proprio"))(proprio_in)
+    touch_latent = TD(_build_fcn_component(92, 24, 8, batch_size=bs, name="latent_touch"))(touch_in)
+
+    # concatenation of perceptive abstractions
+    concatenation = tf.keras.layers.Concatenate()([object_latent, proprio_latent, touch_latent])
+
+    # fully connected layer integrating perceptive representations
+    x = TD(tf.keras.layers.Dense(48))(concatenation)
+    x = TD(tf.keras.layers.ReLU())(x)
+
+    # concatenation of goal and perception
+    x.set_shape([bs] + x.shape[1:])
+    x = tf.keras.layers.Concatenate()([x, goal_in])
+
+    # recurrent layer
+    o = tf.keras.layers.SimpleRNN(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
+
+    # output heads
+    policy_out = _build_continuous_head(n_actions, o.shape[1:], bs)(o) if continuous_control else _build_discrete_head(
+        n_actions, o.shape[1:], bs)(o)
+    value_out = tf.keras.layers.Dense(1, name="value")(o)
+
+    # define models
+    policy = tf.keras.Model(inputs=[object_in, proprio_in, touch_in, goal_in],
+                            outputs=[policy_out], name="blind_shadow_brain_v1_policy")
+    value = tf.keras.Model(inputs=[object_in, proprio_in, touch_in, goal_in],
+                           outputs=[value_out], name="blind_shadow_brain_v1_value")
+    joint = tf.keras.Model(inputs=[object_in, proprio_in, touch_in, goal_in],
+                           outputs=[policy_out, value_out], name="blind_shadow_brain_v1")
 
     return policy, value, joint
 

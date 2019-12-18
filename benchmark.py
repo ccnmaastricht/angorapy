@@ -1,13 +1,16 @@
+import colorsys
 import json
-from typing import Dict, Tuple, Mapping, List
+import os
+from typing import Dict, Tuple, List
 
 import gym
+import matplotlib.colors as mc
+import matplotlib.pyplot as plt
 import numpy as np
 
 from agent.ppo import PPOAgent
 from models import build_ffn_models, build_rnn_models
 from utilities import configs
-import matplotlib.pyplot as plt
 
 
 def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool = True):
@@ -24,7 +27,8 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     # set up the agent and a reporting module
     agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
                      learning_rate=settings["lr_pi"], discount=settings["discount"],
-                     clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"], lam=settings["lam"],
+                     clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
+                     lam=settings["lam"],
                      gradient_clipping=settings["grad_norm"], clip_values=settings["no_value_clip"],
                      tbptt_length=settings["tbptt"])
 
@@ -36,13 +40,23 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     return agent.cycle_reward_history
 
 
+def lighten_color(color, amount=0.5):
+    """Lightens the given color by multiplying (1-luminosity) by the given amount."""
+    try:
+        c = mc.cnames[color]
+    except Exception:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
+
+
 if __name__ == '__main__':
-    import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     experiment_name = "half_cheetah"
     config = configs.mujoco
-    benchmarking_settings = [("HalfCheetah-v2", "ffn")]  #, ("HalfCheetah-v2", "rnn")]
+    benchmarking_settings = [("HalfCheetah-v2", "ffn")]  # , ("HalfCheetah-v2", "rnn")]
     n_iterations = 100
     repetitions = 10
 

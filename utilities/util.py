@@ -11,6 +11,7 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.client import device_lib
+from tensorflow.keras import backend as K
 
 
 def get_available_gpus():
@@ -102,9 +103,19 @@ def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
 
 def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
     """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
-    return list(itertools.chain(*[extract_layers(layer)
-                                  if isinstance(layer, tf.keras.Model)
-                                  else [layer] for layer in network.layers]))
+    layers = []
+    for l in network.layers:
+        if isinstance(l, tf.keras.Model) or isinstance(l, tf.keras.Sequential):
+            layers.append(extract_layers(l))
+        elif isinstance(l, tf.keras.layers.TimeDistributed):
+            if isinstance(l.layer, tf.keras.Model) or isinstance(l.layer, tf.keras.Sequential):
+                layers.append(extract_layers(l.layer))
+            else:
+                layers.append(l.layer)
+        else:
+            layers.append(l)
+
+    return flatten(layers)
 
 
 def insert_unknown_shape_dimensions(shape, none_replacer: int = 1):
@@ -162,10 +173,36 @@ def get_component(model: tf.keras.Model, name: str):
             return layer
 
 
+def calc_max_memory_usage(model: tf.keras.Model):
+    """Calculate memory requirement of a model per sample in bits."""
+    layers = extract_layers(model)
+    n_shapes = int(numpy.sum(
+        [numpy.prod(numpy.array([s if isinstance(s, int) else 1 for s in l.output_shape])) for l in layers]))
+    n_parameters = model.count_params()
+
+    # memory needed for saving activations during gradient calculation
+    n_activations = 0
+    for l in layers:
+        if len(l.trainable_variables) == 0 or l.output_shape is None:
+            continue
+
+        activation_shapes = l.output_shape
+        if not isinstance(activation_shapes[0], tuple):
+            activation_shapes = [tuple(activation_shapes)]
+
+        print(activation_shapes)
+
+    print(n_activations)
+
+    total_memory = (n_shapes + n_parameters + n_activations) * 32
+
+    return total_memory * 1.1641532182693481*10**-10
+
+
+
 if __name__ == "__main__":
     import os
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    print(detect_finished_episodes(tf.convert_to_tensor([[1, 1, 1, 1, 0], [1, 0, 1, 1, 1]])))

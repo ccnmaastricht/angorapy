@@ -13,7 +13,7 @@ from environments.tunnel import Tunnel, TunnelRAM
 gym.envs.register(
     id='ShadowHandBlind-v0',
     entry_point='environments:ShadowHandBlock',
-    kwargs={"visual_input": False},
+    kwargs={"visual_input": False, "max_steps": 500},
 )
 
 gym.envs.register(
