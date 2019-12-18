@@ -11,13 +11,13 @@ from environments.tunnel import Tunnel, TunnelRAM
 # SHADOW HAND #
 
 gym.envs.register(
-    id='ShadowHand-v0',
+    id='ShadowHandBlind-v0',
     entry_point='environments:ShadowHandBlock',
     kwargs={"visual_input": False},
 )
 
 gym.envs.register(
-    id='ShadowHand-v1',
+    id='ShadowHand-v0',
     entry_point='environments:ShadowHandBlock',
     kwargs={"visual_input": True, "max_steps": 100},
 )

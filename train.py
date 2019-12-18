@@ -31,7 +31,9 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                                         "agent state. This cannot be resolved.")
 
     # setting appropriate model building function
-    if settings.env == "ShadowHand-v1":
+    if settings.env == "ShadowHand-v0":
+        build_models = build_shadow_brain_v1
+    elif settings.env == "ShadowHandBlind-v0":
         build_models = build_shadow_brain_v1
     else:
         build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
@@ -94,7 +96,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     # general parameters
-    parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
+    parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn", help=f"model type if not shadowhand")
     parser.add_argument("--shared", action="store_true", help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
