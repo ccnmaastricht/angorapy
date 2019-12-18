@@ -20,13 +20,3 @@ class StdevLayer(tf.keras.layers.Layer):
 
     def call(self, input, **kwargs):
         return tf.matmul(tf.ones_like(input), self.log_stdevs)
-
-
-class SpatialSoftmax(tf.keras.Model):
-    """Spatial Softmax Layer."""
-
-    def __init__(self):
-        super().__init__()
-
-    def call(self, inputs, training=None, mask=None):
-        pass
