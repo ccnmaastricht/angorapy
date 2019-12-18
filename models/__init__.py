@@ -1,7 +1,13 @@
 """A collection of builder functions for models usable with different environments in PPO."""
 
 from models.convolutional import *
-from models.fully_connected import *
-from models.recurrent import *
+from models.simple import *
 from models.hybrid import *
 from models.components import *
+
+from models.mighty_maker import *
+
+
+def get_model_builder(model_type: str, shared: bool):
+    params = [str(val) for key, val in sorted(locals().items(), key=lambda x: x[0])]
+    return globals()[f"build_{'_'.join(params)}_models"]

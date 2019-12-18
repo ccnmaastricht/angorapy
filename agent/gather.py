@@ -14,7 +14,7 @@ from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policy import act_discrete, act_continuous
 from environments import *
-from models import build_ffn_distinct_models, build_rnn_distinct_models
+from models import build_ffn_models, build_rnn_models
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, set_all_seeds
@@ -225,10 +225,10 @@ if __name__ == "__main__":
     set_all_seeds(1)
 
     env_n = "CartPole-v1"
-    p, v, j = build_ffn_distinct_models(gym.make(env_n))
-    joint_tuple = ModelTuple(build_ffn_distinct_models.__name__, j.get_weights())
-    rp, rv, rj = build_rnn_distinct_models(gym.make(env_n))
-    rjoint_tuple = ModelTuple(build_rnn_distinct_models.__name__, rj.get_weights())
+    p, v, j = build_ffn_models(gym.make(env_n))
+    joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights())
+    rp, rv, rj = build_rnn_models(gym.make(env_n))
+    rjoint_tuple = ModelTuple(build_rnn_models.__name__, rj.get_weights())
 
     ray.init(local_mode=True)
     print("FFN")

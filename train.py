@@ -1,20 +1,15 @@
 import argparse
 import logging
-import os
 
 import argcomplete
-from gym.spaces import Box
-from models.hybrid import build_shadow_brain_v1
-import tensorflow as tf
 
 from agent.ppo import PPOAgent
-from environments import *
-from models.fully_connected import build_ffn_distinct_models
-from models.recurrent import build_rnn_distinct_models
+from models import *
 from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
+from models import get_model_builder
 
 
 class InconsistentArgumentError(Exception):
@@ -39,12 +34,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     if settings.env == "ShadowHand-v1":
         build_models = build_shadow_brain_v1
     else:
-        if settings.model == "ffn":
-            build_models = build_ffn_distinct_models
-        elif settings.model == "rnn":
-            build_models = build_rnn_distinct_models
-        else:
-            raise ValueError("Unknown Model Type.")
+        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
 
     # setup environment and extract and report information
     env = gym.make(settings.env)
@@ -105,7 +95,8 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
-    parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
+    parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn", help=f"model type if not shadowhand")
+    parser.add_argument("--shared", action="store_true", help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
 
     # meta arguments

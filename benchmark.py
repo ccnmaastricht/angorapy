@@ -5,7 +5,7 @@ import gym
 import numpy as np
 
 from agent.ppo import PPOAgent
-from models import build_ffn_distinct_models, build_rnn_distinct_models
+from models import build_ffn_models, build_rnn_models
 from utilities import configs
 import matplotlib.pyplot as plt
 
@@ -15,9 +15,9 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     env = gym.make(env_name)
 
     if model_type == "ffn":
-        build_models = build_ffn_distinct_models
+        build_models = build_ffn_models
     elif model_type == "rnn":
-        build_models = build_rnn_distinct_models
+        build_models = build_rnn_models
     else:
         raise ValueError("Unknown Model Type.")
 
@@ -40,11 +40,11 @@ if __name__ == '__main__':
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    experiment_name = "mujoco"
+    experiment_name = "half_cheetah"
     config = configs.mujoco
-    benchmarking_settings = [("Reacher-v2", "ffn"), ("Reacher-v2", "rnn")]
-    n_iterations = 60
-    repetitions = 5
+    benchmarking_settings = [("HalfCheetah-v2", "ffn")]  #, ("HalfCheetah-v2", "rnn")]
+    n_iterations = 100
+    repetitions = 10
 
     results: Dict[str, Tuple[List, List]] = {}
     should_init = True
@@ -73,4 +73,4 @@ if __name__ == '__main__':
                          label=f"{env_name} ({model_type})")
 
     plt.legend()
-    plt.savefig(f"docs/figures/benchmarking_rnn_fnn_{experiment_name}.pdf", format="pdf")
+    plt.savefig(f"docs/figures/benchmarking_{experiment_name}.pdf", format="pdf")

@@ -9,8 +9,8 @@ import numpy
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
-from tensorflow.python.client import device_lib
 from tensorflow.keras.layers import TimeDistributed
+from tensorflow.python.client import device_lib
 
 
 def get_available_gpus():
@@ -160,7 +160,6 @@ def get_component(model: tf.keras.Model, name: str):
 
         if layer_name == name:
             return layer
-
 
 
 if __name__ == "__main__":

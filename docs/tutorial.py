@@ -4,7 +4,7 @@ import gym
 
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
-from models import build_rnn_distinct_models, build_ffn_distinct_models, plot_model
+from models import build_rnn_models, build_ffn_models, plot_model
 from utilities.monitoring import Monitor
 import tensorflow as tf
 
@@ -13,7 +13,7 @@ from utilities.util import extract_layers
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 env = gym.make("CartPole-v1")
-model_builder = build_rnn_distinct_models
+model_builder = build_rnn_models
 agent = PPOAgent(model_builder, env, horizon=1024, workers=8)
 monitor = Monitor(agent, env, frequency=1, gif_every=0)
 
