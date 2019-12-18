@@ -151,7 +151,8 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
                     np.array(actions, dtype=np.float32 if is_continuous else np.int32),
                     np.array(action_probabilities, dtype=np.float32),
                     advantages,
-                    advantages + values[:-1])
+                    advantages + values[:-1],
+                    np.array(values[:-1]))
 
     # normalize advantages
     buffer.normalize_advantages()

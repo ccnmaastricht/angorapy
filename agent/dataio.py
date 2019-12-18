@@ -2,9 +2,7 @@
 """TODO Module Docstring."""
 import os
 import random
-from typing import Tuple
 
-import numpy
 import tensorflow as tf
 
 from utilities.const import STORAGE_DIR
@@ -26,14 +24,15 @@ def _bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 
-def serialize_flat_sample(s, a, ap, r, adv):
+def serialize_flat_sample(s, a, ap, r, adv, v):
     """Serialize a sample from a dataset."""
     feature = {
         "state": _bytes_feature(tf.io.serialize_tensor(s)),
         "action": _bytes_feature(tf.io.serialize_tensor(a)),
         "action_prob": _bytes_feature(tf.io.serialize_tensor(ap)),
         "return": _bytes_feature(tf.io.serialize_tensor(r)),
-        "advantage": _bytes_feature(tf.io.serialize_tensor(adv))
+        "advantage": _bytes_feature(tf.io.serialize_tensor(adv)),
+        "value": _bytes_feature(tf.io.serialize_tensor(v))
     }
 
     # Create a Features message using tf.train.Example.
@@ -41,7 +40,7 @@ def serialize_flat_sample(s, a, ap, r, adv):
     return example_proto.SerializeToString()
 
 
-def serialize_shadow_hand_sample(sv, sp, st, sg, a, ap, r, adv):
+def serialize_shadow_hand_sample(sv, sp, st, sg, a, ap, r, adv, v):
     """Serialize a multi-input (shadow hand) sample from a dataset."""
     feature = {
         "in_vision": _bytes_feature(tf.io.serialize_tensor(sv)),
@@ -51,7 +50,8 @@ def serialize_shadow_hand_sample(sv, sp, st, sg, a, ap, r, adv):
         "action": _bytes_feature(tf.io.serialize_tensor(a)),
         "action_prob": _bytes_feature(tf.io.serialize_tensor(ap)),
         "return": _bytes_feature(tf.io.serialize_tensor(r)),
-        "advantage": _bytes_feature(tf.io.serialize_tensor(adv))
+        "advantage": _bytes_feature(tf.io.serialize_tensor(adv)),
+        "value": _bytes_feature(tf.io.serialize_tensor(v))
     }
 
     # Create a Features message using tf.train.Example.
@@ -67,7 +67,7 @@ def tf_serialize_example(sample):
     else:
         inputs = (sample["in_vision"], sample["in_proprio"], sample["in_touch"], sample["in_goal"])
         serializer = serialize_shadow_hand_sample
-    inputs += (sample["action"], sample["action_prob"], sample["return"], sample["advantage"])
+    inputs += (sample["action"], sample["action_prob"], sample["return"], sample["advantage"], sample["value"])
 
     tf_string = tf.py_function(serializer, inputs, tf.string)
     return tf.reshape(tf_string, ())
@@ -89,6 +89,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
             "action_prob": buffer.action_probabilities,
             "return": buffer.returns,
             "advantage": buffer.advantages,
+            "value": buffer.advantages,
         })
     else:
         dataset = tf.data.Dataset.from_tensor_slices({
@@ -96,7 +97,8 @@ def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
             "action": buffer.actions,
             "action_prob": buffer.action_probabilities,
             "return": buffer.returns,
-            "advantage": buffer.advantages
+            "advantage": buffer.advantages,
+            "value": buffer.advantages,
         })
 
     underflow = None
@@ -120,7 +122,8 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
         "action": tf.io.FixedLenFeature([], tf.string),
         "action_prob": tf.io.FixedLenFeature([], tf.string),
         "return": tf.io.FixedLenFeature([], tf.string),
-        "advantage": tf.io.FixedLenFeature([], tf.string)
+        "advantage": tf.io.FixedLenFeature([], tf.string),
+        "value": tf.io.FixedLenFeature([], tf.string)
     }
 
     # add states
@@ -148,6 +151,7 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
         parsed["action_prob"] = tf.io.parse_tensor(parsed["action_prob"], out_type=tf.float32)
         parsed["return"] = tf.io.parse_tensor(parsed["return"], out_type=tf.float32)
         parsed["advantage"] = tf.io.parse_tensor(parsed["advantage"], out_type=tf.float32)
+        parsed["value"] = tf.io.parse_tensor(parsed["value"], out_type=tf.float32)
 
         return parsed
 

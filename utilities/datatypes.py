@@ -22,9 +22,9 @@ class ExperienceBuffer:
     """Buffer for experience gathered in an environment."""
 
     def __init__(self, states: Union[List, arr], actions: Union[List, arr], action_probabilities: Union[List, arr],
-                 returns: Union[List, arr], advantages: Union[List, arr], episodes_completed: int,
-                 episode_rewards: List[int], capacity: int, episode_lengths: List[int], is_multi_feature: bool,
-                 is_continuous: bool):
+                 returns: Union[List, arr], advantages: Union[List, arr], values: Union[List, arr],
+                 episodes_completed: int, episode_rewards: List[int], capacity: int, episode_lengths: List[int],
+                 is_multi_feature: bool, is_continuous: bool):
 
         self.is_continuous = is_continuous
         self.is_multi_feature = is_multi_feature
@@ -40,16 +40,19 @@ class ExperienceBuffer:
         self.action_probabilities = action_probabilities
         self.actions = actions
         self.states = states
+        self.values = values
 
     def __repr__(self):
         return f"{self.__class__.__name__}[{self.filled}/{self.capacity}]"
 
-    def fill(self, s, a, ap, adv, ret):
+    def fill(self, s, a, ap, adv, ret, v):
         """Fill the buffer with 5-tuple of experience."""
-        assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv)]) == len(s)), "Inconsistent input sizes."
+        assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv), len(v)]) == len(s)), \
+            "Inconsistent input sizes."
 
         self.capacity = len(adv)
         self.advantages, self.returns, self.action_probabilities, self.actions, self.states = adv, ret, ap, a, s
+        self.values = v
 
     def normalize_advantages(self):
         """Normalize the buffered advantages using z-scores. This requires the sequences to be of equal lengths,
@@ -67,6 +70,7 @@ class ExperienceBuffer:
         self.actions = np.expand_dims(self.actions, axis=0)
         self.action_probabilities = np.expand_dims(self.action_probabilities, axis=0)
         self.returns = np.expand_dims(self.returns, axis=0)
+        self.values = np.expand_dims(self.values, axis=0)
         self.advantages = np.expand_dims(self.advantages, axis=0)
 
     @staticmethod
@@ -77,6 +81,7 @@ class ExperienceBuffer:
                                 action_probabilities=[],
                                 returns=[],
                                 advantages=[],
+                                values=[],
                                 episodes_completed=0, episode_rewards=[],
                                 capacity=0,
                                 episode_lengths=[],
@@ -97,6 +102,7 @@ class ExperienceBuffer:
                                 action_probabilities=np.zeros((size,)),
                                 returns=np.zeros((size,)),
                                 advantages=np.zeros((size,)),
+                                values=np.zeros((size,)),
                                 episodes_completed=0, episode_rewards=[], episode_lengths=[],
                                 capacity=size,
                                 is_continuous=is_continuous,
