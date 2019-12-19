@@ -13,8 +13,10 @@ from agent.ppo import PPOAgent
 from environments import *
 
 from agent.policy import act_discrete, act_continuous
-from models import build_rnn_distinct_models
-from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
+
+from models import build_rnn_models, build_ffn_models
+from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, \
+    insert_unknown_shape_dimensions
 
 
 class Investigator:
@@ -128,18 +130,19 @@ if __name__ == "__main__":
 
     env = gym.make("LunarLanderContinuous-v2")
 
-    network, _, _ = build_rnn_distinct_models(env, 1)
+    network, _, _ = build_ffn_models(env)
+
     inv = Investigator(network)
 
     print(inv.list_layer_names())
 
-    activation_rec = inv.get_layer_activations("policy_recurrent_layer")
+    activation_rec = inv.get_layer_activations("dense_1")
     print(activation_rec)
 
-    tuples = inv.get_activations_over_episode("policy_recurrent_layer", env, False)
+    tuples = inv.get_activations_over_episode("dense_1", env, True)
 
     print(len(tuples))
-    pprint(tuples)
+    pprint(list(zip(*tuples))[1])
 
     # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
     state_data = np.empty((len(np.array(tuples)[:, 0]), 8))

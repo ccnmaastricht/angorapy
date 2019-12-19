@@ -6,9 +6,9 @@ import tensorflow as tf
 from scipy.signal import lfilter
 from scipy.stats import norm, entropy
 
-from agent.core import extract_discrete_action_probabilities, gaussian_log_pdf, gaussian_entropy_from_log, \
-    categorical_entropy_from_log, \
-    estimate_advantage, gaussian_pdf, gaussian_entropy, categorical_entropy
+from agent.core import extract_discrete_action_probabilities, estimate_advantage
+from agent.probability import gaussian_pdf, gaussian_log_pdf, gaussian_entropy, gaussian_entropy_from_log, \
+    categorical_entropy, categorical_entropy_from_log
 from utilities.util import reset_states_masked
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

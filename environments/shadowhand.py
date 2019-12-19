@@ -2,7 +2,7 @@
 """ShadowHand Environment Wrappers."""
 import os
 
-import numpy
+import numpy as np
 from gym import utils, spaces
 from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.manipulate_touch_sensors import MANIPULATE_BLOCK_XML, MANIPULATE_EGG_XML
@@ -33,16 +33,18 @@ class ShadowHand(manipulate.ManipulateEnv):
                 position (False)
             max_steps (int): maximum number of steps before episode is ended
         """
-        # init rendering [IMPORTANT]
-        GlfwContext(offscreen=True, quiet=True)
+
+        if visual_input:
+            # init rendering [IMPORTANT]
+            GlfwContext(offscreen=True, quiet=True)
 
         self.touch_visualisation = touch_visualisation
         self.touch_get_obs = touch_get_obs
+        self.visual_input = visual_input
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
         self.touch_color = [1, 0, 0, 0.5]
         self.notouch_color = [0, 0.5, 0, 0.2]
-        self.visual_input = visual_input
         self.total_steps = 0
         self.max_steps = max_steps
 
@@ -71,20 +73,20 @@ class ShadowHand(manipulate.ManipulateEnv):
             pass
 
         # set hand and background colors
-        self.sim.model.mat_rgba[2] = numpy.array([16, 18, 35, 255]) / 255
-        self.sim.model.mat_rgba[4] = numpy.array([104, 143, 71, 255]) / 255
-        self.sim.model.geom_rgba[48] = numpy.array([0.5, 0.5, 0.5, 0])
+        self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255
+        self.sim.model.mat_rgba[4] = np.array([104, 143, 71, 255]) / 255
+        self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
         # set observation space
         obs = self._get_obs()
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['desired_goal'].shape, dtype='float32'),
-            achieved_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['desired_goal'].shape, dtype='float32'),
+            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             observation=spaces.Tuple((
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][0].shape, dtype='float32'),  # visual/object
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][1].shape, dtype='float32'),  # proprioception
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][2].shape, dtype='float32'),  # touch sensors
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][3].shape, dtype='float32'),  # goal
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][0].shape, dtype='float32'),  # visual/object
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][1].shape, dtype='float32'),  # proprioception
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][2].shape, dtype='float32'),  # touch sensors
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][3].shape, dtype='float32'),  # goal
             ))
         ))
 
@@ -109,14 +111,14 @@ class ShadowHand(manipulate.ManipulateEnv):
         # "primary" information, either this is the visual frame or the object position and velocity
         achieved_goal = self._get_achieved_goal().ravel()
         if self.visual_input:
-            primary = self.render(mode="rgb_array", height=224, width=224)
+            primary = self.render(mode="rgb_array", height=227, width=227)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
-            primary = numpy.concatenate([achieved_goal, object_vel])
+            primary = np.concatenate([achieved_goal, object_vel])
 
         # get proprioceptive information (positions of joints)
         robot_pos, robot_vel = manipulate.robot_get_obs(self.sim)
-        proprioception = numpy.concatenate([robot_pos, robot_vel])
+        proprioception = np.concatenate([robot_pos, robot_vel])
 
         # touch sensor information
         if self.touch_get_obs == 'sensordata':
@@ -125,7 +127,7 @@ class ShadowHand(manipulate.ManipulateEnv):
             raise NotImplementedError("Only sensor data supported atm, sorry.")
 
         return {
-            "observation": numpy.array((primary.copy(), proprioception.copy(), touch.copy(), self.goal.ravel().copy())),
+            "observation": np.array((primary.copy(), proprioception.copy(), touch.copy(), self.goal.ravel().copy())),
             "achieved_goal": achieved_goal.copy(),
             "desired_goal": self.goal.ravel().copy(),
         }
@@ -141,6 +143,21 @@ class ShadowHand(manipulate.ManipulateEnv):
         self.total_steps = 0
         return super().reset()
 
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute the reward."""
+        if self.reward_type == 'sparse':
+            success = self._is_success(achieved_goal, goal).astype(np.float32)
+            return success - 1.
+        else:
+            success = self._is_success(achieved_goal, goal).astype(np.float32)
+            d_pos, d_rot = self._goal_distance(achieved_goal, goal)
+            # We weigh the difference in position to avoid that `d_pos` (in meters) is completely
+            # dominated by `d_rot` (in radians).
+            return (- (10. * d_pos + d_rot)     # distance rewards
+                    - 1                         # constant punishment to encourage speed
+                    + success * 5               # reward for finishing
+                    )
+
 
 class ShadowHandBlock(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with a Block as an object."""
@@ -153,7 +170,7 @@ class ShadowHandBlock(ShadowHand, utils.EzPickle):
                             touch_get_obs=touch_get_obs,
                             target_rotation=target_rotation,
                             target_position=target_position,
-                            target_position_range=numpy.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                            target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                             reward_type=reward_type,
                             visual_input=visual_input,
                             max_steps=max_steps)
@@ -170,7 +187,7 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
                             touch_get_obs=touch_get_obs,
                             target_rotation=target_rotation,
                             target_position=target_position,
-                            target_position_range=numpy.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                            target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                             reward_type=reward_type,
                             visual_input=visual_input,
                             max_steps=max_steps)

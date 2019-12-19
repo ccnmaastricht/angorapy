@@ -1,20 +1,21 @@
 import argparse
 import logging
-import os
 
 import argcomplete
-from gym.spaces import Box
-from models.hybrid import build_shadow_brain_v1
-import tensorflow as tf
 
 from agent.ppo import PPOAgent
-from environments import *
-from models.fully_connected import build_ffn_distinct_models
-from models.recurrent import build_rnn_distinct_models
+from models import *
+from models import get_model_builder
+from models.hybrid import build_shadow_brain_v1, build_blind_shadow_brain_v1
 from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
+
+
+class InconsistentArgumentError(Exception):
+    """Arguments given to a process were inconsistent."""
+    pass
 
 
 def run_experiment(settings: argparse.Namespace, verbose=True):
@@ -25,16 +26,10 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                         "This means that assert checks are executed, which may slow down training. "
                         "In a final experiment setting, deactive this by adding the -O flag to the python command.")
 
-    # setting appropriate model building function
-    if settings.env == "ShadowHand-v1":
-        build_models = build_shadow_brain_v1
-    else:
-        if settings.model == "ffn":
-            build_models = build_ffn_distinct_models
-        elif settings.model == "rnn":
-            build_models = build_rnn_distinct_models
-        else:
-            raise ValueError("Unknown Model Type.")
+    # sanity checks and warnings for given parameters
+    if args.preload is not None and args.load_from is not None:
+        raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
+                                        "agent state. This cannot be resolved.")
 
     # setup environment and extract and report information
     env = gym.make(settings.env)
@@ -42,6 +37,15 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
+
+    # setting appropriate model building function
+    if "ShadowHand" in settings.env:
+        if env.visual_input:
+            build_models = build_shadow_brain_v1
+        else:
+            build_models = build_blind_shadow_brain_v1
+    else:
+        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
@@ -68,15 +72,15 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                          learning_rate=settings.lr_pi, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
                          gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
-                         tbptt_length=settings.tbptt, debug=settings.debug)
+                         tbptt_length=settings.tbptt,
+                         pretrained_components=None if args.preload is None else [args.preload], debug=settings.debug)
 
         if verbose:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
-    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
 
     agent.set_gpu(not settings.cpu)
 
-    # train
+    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
@@ -93,14 +97,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     # general parameters
-    parser.add_argument("env", nargs='?', type=str, default="ShadowHand-v1", choices=all_envs)
-    parser.add_argument("--model", choices=["ffn", "rnn"], default="ffn", help=f"model type if not shadowhand")
+    parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
+    parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
+                        help=f"model type if not shadowhand")
+    parser.add_argument("--shared", action="store_true",
+                        help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
 
     # meta arguments
     parser.add_argument("--config", type=str, default=None, help="config name (utilities/configs.py) to be loaded")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
+    parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
     parser.add_argument("--save-every", type=int, default=0, help=f"save agent every given number of iterations")
@@ -113,6 +121,7 @@ if __name__ == "__main__":
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
+
     # optimization parameters
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
