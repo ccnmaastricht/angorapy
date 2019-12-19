@@ -12,7 +12,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 env = gym.make("LunarLanderContinuous-v2")
 #model_builder = build_rnn_distinct_models
 model_builder = build_rnn_distinct_models
-agent = PPOAgent(model_builder, env, horizon=1024, workers=4)
+agent = PPOAgent(model_builder, env, horizon=1024, workers=8)
 monitor = Monitor(agent, env, 25, 25)
 
 agent.drill(200, 10, 64, monitor=monitor)

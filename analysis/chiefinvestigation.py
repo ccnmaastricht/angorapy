@@ -124,8 +124,8 @@ class Chiefinvestigator:
         print(id)
         x0 = activation[id, :]
         input = input[id, :]
-        fun = lambda x: 0.5*abs(sum(- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)))**2
-        der = lambda x: np.sum((- np.eye(64, 64) + weights * (1-np.tanh(x[0:64])**2)), axis=1)# - np.eye(64, 64) + weights*x[0:64]
+        fun = lambda x: 0.5*sum((- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input))**2)
+        # der = lambda x: np.sum((- np.eye(64, 64) + weights * (1-np.tanh(x[0:64])**2)), axis=1)# - np.eye(64, 64) + weights*x[0:64]
         options = {'gtol': 1e-5, 'disp': True}
         #Jac = nd.Jacobian(fun)
         #print(Jac.shape)
@@ -133,7 +133,7 @@ class Chiefinvestigator:
         print(Hes)
         y = fun(x0)
         print(y)
-        optimisedResults = minimize(fun, x0, method=method, jac=der, hess=Hes,
+        optimisedResults = minimize(fun, x0, method=method, jac=False, hess=Hes,
                                     options=options)
 
         return optimisedResults
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     env_name = "LunarLanderContinuous-v2"
-    agent_id: int = 1576489378 # 1575394142
+    agent_id: int = 1576655668 #1576489378 # 1575394142
     chiefinvesti = Chiefinvestigator(agent_id, env_name)
     layer_names = chiefinvesti.print_layer_names()
     new_agent = PPOAgent.from_agent_state(agent_id)
