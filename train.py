@@ -21,11 +21,6 @@ class InconsistentArgumentError(Exception):
 def run_experiment(settings: argparse.Namespace, verbose=True):
     """Run an experiment with the given settings."""
 
-    if __debug__:
-        logging.warning(" You are training this agent in python's default debugging mode. "
-                        "This means that assert checks are executed, which may slow down training. "
-                        "In a final experiment setting, deactive this by adding the -O flag to the python command.")
-
     # sanity checks and warnings for given parameters
     if args.preload is not None and args.load_from is not None:
         raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "

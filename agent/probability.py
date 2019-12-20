@@ -47,6 +47,19 @@ def gaussian_entropy(stdevs: tf.Tensor):
 
 
 @tf.function
+def approx_gaussian_entropy_from_log(log_stdevs: tf.Tensor):
+    """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
+
+    Input Shape: (B, A) or (B, S, A) for recurrent
+
+    Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+    of the joint entropy and the sum of marginal entropies.
+    """
+    entropy = log_stdevs
+    return tf.reduce_sum(entropy, axis=-1)
+
+
+@tf.function
 def gaussian_entropy_from_log(log_stdevs: tf.Tensor):
     """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
 

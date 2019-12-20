@@ -12,7 +12,11 @@ from collections import OrderedDict
 from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
+import matplotlib
+import matplotlib.pyplot as plt
+
 import gym
+import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -21,7 +25,7 @@ from tqdm import tqdm
 
 import models
 from agent.core import extract_discrete_action_probabilities
-from agent.probability import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log
+from agent.probability import gaussian_log_pdf, approx_gaussian_entropy_from_log, categorical_entropy_from_log
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
@@ -148,6 +152,8 @@ class PPOAgent:
         # miscellaneous
         self.iteration = 0
         self.current_fps = 0
+        self.gathering_fps = 0
+        self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
         self.agent_id = round(time.time())
@@ -228,7 +234,7 @@ class PPOAgent:
             clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
             clipped_error = tf.square(clipped_values - returns)
 
-            error = tf.maximum(clipped_error, error) * 0.5
+            error = tf.maximum(clipped_error, error)
 
         if self.is_recurrent:
             # build and apply a mask over the old values (recurrent)
@@ -236,7 +242,7 @@ class PPOAgent:
             error_masked = tf.where(mask, error, 0)  # masking with tf.where because inf * 0 = nan...
             return tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
         else:
-            return tf.reduce_mean(error)
+            return tf.reduce_mean(error) * 0.5
 
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
         """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
@@ -251,7 +257,7 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(gaussian_entropy_from_log(policy_output[1]))
+            return tf.reduce_mean(approx_gaussian_entropy_from_log(policy_output[1]))
         else:
             return tf.reduce_mean(categorical_entropy_from_log(policy_output))
 
@@ -377,6 +383,8 @@ class PPOAgent:
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (time_dict["gathering"])
+            self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 
         return self
@@ -388,7 +396,7 @@ class PPOAgent:
             state_batch = batch["state"] if "state" in batch else (batch["in_vision"], batch["in_proprio"],
                                                                    batch["in_touch"], batch["in_goal"])
             policy_output, value_output = self.joint(state_batch, training=True)
-            old_values = batch["return"] - batch["advantage"]
+            old_values = batch["value"]
 
             if self.continuous_control:
                 # if action space is continuous, calculate PDF at chosen action value
@@ -449,7 +457,8 @@ class PPOAgent:
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
-            # dataset = dataset.shuffle(10000)
+            if not self.is_recurrent:
+                dataset = dataset.shuffle(10000)
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
@@ -514,7 +523,9 @@ class PPOAgent:
 
     def report(self):
         """Print a report of the current state of the training."""
-        sc, nc, ec = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"]
+        sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
+
+        # calculate percentages of computation spend on different phases of the iteration
         time_distribution_string = ""
         if len(self.time_dicts) > 0:
             times = [time for time in self.time_dicts[-1].values() if time is not None]
@@ -525,20 +536,29 @@ class PPOAgent:
             current_lr = self.lr_schedule(self.optimizer.iterations)
         else:
             current_lr = self.lr_schedule
+
+        # make fps string
+        fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]fps"
+
+        # losses
         pi_loss = 0 if len(self.policy_loss_history) == 0 else round(self.policy_loss_history[-1], 2)
         v_loss = 0 if len(self.value_loss_history) == 0 else round(self.value_loss_history[-1], 2)
         ent = 0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2)
-        underflow = f"Waste: {self.underflow_history[-1]}; " if self.underflow_history[-1] is not None else ""
+
+        # tbptt underflow
+        underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
+
+        # print the report
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
-                   f"AvgRew.: {nc}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
-                   f"AvgLen.: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
-                   f"Loss.: [{nc}{pi_loss:6.2f}{ec}|{nc}{v_loss:6.2f}{ec}|{nc}{ent:6.2f}{ec}]; "
-                   f"Eps.: {nc}{self.total_episodes_seen:5d}{ec}; "
-                   f"Lr: {nc}{current_lr:.2e}{ec}; "
-                   f"Updates: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
-                   f"Frames: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+                   f"r: {ac}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
+                   f"len: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
+                   f"loss: [{nc}{pi_loss:6.2f}{ec}|{nc}{v_loss:8.2f}{ec}|{nc}{ent:6.2f}{ec}]; "
+                   f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
+                   f"lr: {nc}{current_lr:.2e}{ec}; "
+                   f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
+                   f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                    f"{underflow}"
-                   f"Speed: {nc}{self.current_fps:7.2f}{ec}fps {time_distribution_string}\n")
+                   f"fps: {fps_string} {time_distribution_string}\n")
 
     def save_agent_state(self):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""

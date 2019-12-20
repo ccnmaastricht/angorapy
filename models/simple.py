@@ -15,6 +15,8 @@ from utilities.util import env_extract_dims
 
 
 def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
+    """Build simple two-layer model."""
+
     # preparation
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
@@ -50,7 +52,7 @@ def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
 
 
 def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type: str = "rnn"):
-    """Build simple policy and value models having an LSTM before their heads."""
+    """Build simple policy and value models having a recurrent layer before their heads."""
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
     RNNChoice = {"rnn": tf.keras.layers.SimpleRNN, "lstm": tf.keras.layers.LSTM, "gru": tf.keras.layers.GRU}[model_type]
@@ -75,7 +77,8 @@ def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type
                name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
         x = RNNChoice(64, stateful=True, return_sequences=True, batch_size=bs, name="value_recurrent_layer")(x)
-        out_value = tf.keras.layers.Dense(1)(x)
+        out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+                                          bias_initializer=tf.keras.initializers.Constant(0.0))(x)
     else:
         out_value = tf.keras.layers.Dense(1, input_dim=64, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(x)

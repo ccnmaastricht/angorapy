@@ -7,7 +7,7 @@ from scipy.signal import lfilter
 from scipy.stats import norm, entropy
 
 from agent.core import extract_discrete_action_probabilities, estimate_advantage
-from agent.probability import gaussian_pdf, gaussian_log_pdf, gaussian_entropy, gaussian_entropy_from_log, \
+from agent.probability import gaussian_pdf, gaussian_log_pdf, gaussian_entropy, approx_gaussian_entropy_from_log, \
     categorical_entropy, categorical_entropy_from_log
 from utilities.util import reset_states_masked
 
@@ -58,7 +58,7 @@ class ProbabilityTest(unittest.TestCase):
         sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
 
         result_reference = np.sum(norm.entropy(loc=mu, scale=sig), axis=-1)
-        result_log = gaussian_entropy_from_log(np.log(sig)).numpy()
+        result_log = approx_gaussian_entropy_from_log(np.log(sig)).numpy()
         result = gaussian_entropy(sig).numpy()
 
         self.assertTrue(np.allclose(result_reference, result), msg="Gaussian entropy returns wrong result")

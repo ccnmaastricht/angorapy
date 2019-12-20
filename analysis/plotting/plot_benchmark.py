@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 parser = argparse.ArgumentParser()
-parser.add_argument("exp", nargs="?", type=str, default="reacher", help="name of the experiment")
+parser.add_argument("exp", nargs="?", type=str, default="cheetah", help="name of the experiment")
 
 args = parser.parse_args()
 
