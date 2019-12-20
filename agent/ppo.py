@@ -12,7 +12,11 @@ from collections import OrderedDict
 from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
+import matplotlib
+import matplotlib.pyplot as plt
+
 import gym
+import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -21,7 +25,7 @@ from tqdm import tqdm
 
 import models
 from agent.core import extract_discrete_action_probabilities
-from agent.probability import gaussian_log_pdf, gaussian_entropy_from_log, categorical_entropy_from_log
+from agent.probability import gaussian_log_pdf, approx_gaussian_entropy_from_log, categorical_entropy_from_log
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
@@ -253,7 +257,7 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(gaussian_entropy_from_log(policy_output[1]))
+            return tf.reduce_mean(approx_gaussian_entropy_from_log(policy_output[1]))
         else:
             return tf.reduce_mean(categorical_entropy_from_log(policy_output))
 
@@ -379,7 +383,7 @@ class PPOAgent:
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // available_cpus) / (time_dict["gathering"])
+            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (time_dict["gathering"])
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 

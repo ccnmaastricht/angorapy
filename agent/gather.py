@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
+import os
 import random
 from inspect import getfullargspec as fargs
 from typing import Tuple
@@ -29,6 +30,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
+
     is_continuous = isinstance(env.action_space, Box)
     is_shadow_brain = "ShadowHand" in env_name
 
@@ -47,7 +49,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     # check if there is a recurrent layer inside the model
     is_recurrent = is_recurrent_model(joint)
 
-    # buffer storing the experience and stats # TODO actually make this bufferable where the size is predefined
+    # buffer storing the experience and stats
     if is_recurrent:
         assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the observations."
         buffer: TimeSequenceExperienceBuffer = TimeSequenceExperienceBuffer.new(env=env,
@@ -152,7 +154,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
                     np.array(action_probabilities, dtype=np.float32),
                     advantages,
                     advantages + values[:-1],
-                    np.array(values[:-1]))
+                    values[:-1])
 
     # normalize advantages
     buffer.normalize_advantages()
@@ -160,6 +162,18 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     if is_recurrent:
         # add batch dimension for optimization
         buffer.inject_batch_dimension()
+
+    # import matplotlib.pyplot as plt
+    # import matplotlib
+    # plt.hist(buffer.values, label="value")
+    # plt.hist(buffer.returns, label="return")
+    # plt.hist(rewards, label="rewards")
+    # plt.hist(buffer.advantages, label="adv")
+    # plt.hist(np.mean(buffer.actions, axis=-1), label="act")
+    # plt.hist(np.abs(buffer.values - buffer.returns), label="squared diff")
+    # matplotlib.use('TkAgg')
+    # plt.legend()
+    # plt.show()
 
     # convert buffer to dataset and save it to tf record
     dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
@@ -225,7 +239,7 @@ if __name__ == "__main__":
 
     set_all_seeds(1)
 
-    env_n = "CartPole-v1"
+    env_n = "HalfCheetah-v2"
     p, v, j = build_ffn_models(gym.make(env_n))
     joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights())
     rp, rv, rj = build_rnn_models(gym.make(env_n))
