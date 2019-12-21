@@ -13,6 +13,7 @@ from sklearn.svm import SVC
 from scipy.optimize import minimize
 from tensorflow import matmul
 import numdifftools as nd
+from sklearn.decomposition import NMF
 #from utilities.util import insert_unknown_shape_dimensions
 import tensorflow as tf
 
@@ -135,8 +136,15 @@ class Chiefinvestigator:
         print(y)
         optimisedResults = minimize(fun, x0, method=method, jac=False, hess=Hes,
                                     options=options)
-
+        # masking hinders extraction of activations from previous layer!!
         return optimisedResults
+
+    def curve_fit_minimization(self):
+        pass
+
+    def nmfactor(self):
+        pass
+
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
                                      # -> construct small amounts of points (perhaps belonging to one action into
                                      # -> dimensionality reduced space -> add them over time and see where they end up
@@ -150,11 +158,15 @@ class Chiefinvestigator:
 # TODO: look at weights
 # TODO: dynamical systems and eigengrasps
 
+#maximally active -> NMF
+#nonlinear dynamical systems analysis
+
+
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     env_name = "LunarLanderContinuous-v2"
-    agent_id: int = 1576655668 #1576489378 # 1575394142
+    agent_id: int = 1576849128 # 1576692646 from tonio
     chiefinvesti = Chiefinvestigator(agent_id, env_name)
     layer_names = chiefinvesti.print_layer_names()
     new_agent = PPOAgent.from_agent_state(agent_id)

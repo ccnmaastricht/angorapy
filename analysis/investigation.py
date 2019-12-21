@@ -106,8 +106,16 @@ class Investigator:
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    env_name = "LunarLanderContinuous-v2"
+    agent_id = 1576849128
+    env = gym.make(env_name)
+    new_agent = PPOAgent.from_agent_state(agent_id)
 
+    investi = Investigator(new_agent.policy)
+    layer_names = investi.list_layer_names()
+    print(investi.list_layer_names())
 
+    activations = investi.get_layer_activations("policy_recurrent_layer")
 
     # env_name = "CartPole-v1"
     # agent_id: int = 1575394142
@@ -128,26 +136,26 @@ if __name__ == "__main__":
 
     # env = gym.make("LunarLander-v2")
 
-    env = gym.make("LunarLanderContinuous-v2")
+    #env = gym.make("LunarLanderContinuous-v2")
 
-    network, _, _ = build_ffn_models(env)
+    #network, _, _ = build_ffn_models(env)
 
-    inv = Investigator(network)
+    #inv = Investigator(network)
 
-    print(inv.list_layer_names())
+    #print(inv.list_layer_names())
 
-    activation_rec = inv.get_layer_activations("dense_1")
-    print(activation_rec)
+    #activation_rec = inv.get_layer_activations("dense_1")
+    #print(activation_rec)
 
-    tuples = inv.get_activations_over_episode("dense_1", env, True)
+    #tuples = inv.get_activations_over_episode("dense_1", env, True)
 
-    print(len(tuples))
-    pprint(list(zip(*tuples))[1])
+    #print(len(tuples))
+    #pprint(list(zip(*tuples))[1])
 
     # tsne_results = sklm.TSNE.fit_transform(np.array(tuples[0]))
-    state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
+    #state_data = np.empty((len(np.array(tuples)[:, 0]), 8))
 
-    for l in np.array(tuples)[:, 0]:
-        state_data += l
+    #for l in np.array(tuples)[:, 0]:
+    #    state_data += l
 
 

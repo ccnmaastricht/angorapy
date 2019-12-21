@@ -4,14 +4,15 @@ import gym
 # import tensorflow as tf
 from agent.ppo import PPOAgent
 # from analysis.investigation import Investigator
-from models import build_rnn_distinct_models, build_ffn_distinct_models
+#from models import build_rnn_distinct_models, build_ffn_distinct_models
 from utilities.monitoring import Monitor
+from models.simple import build_rnn_models
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 env = gym.make("LunarLanderContinuous-v2")
 #model_builder = build_rnn_distinct_models
-model_builder = build_rnn_distinct_models
+model_builder = build_rnn_models
 agent = PPOAgent(model_builder, env, horizon=1024, workers=8)
 monitor = Monitor(agent, env, 25, 25)
 
