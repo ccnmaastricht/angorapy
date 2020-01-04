@@ -32,6 +32,7 @@ from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
     reset_states_masked, detect_finished_episodes, get_layer_names, get_component
+from utilities.wrappers import StateNormalizationWrapper, _Wrapper
 
 
 class PPOAgent:
@@ -89,6 +90,7 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
+        self.preprocessor = StateNormalizationWrapper(self.state_dim)
 
         # hyperparameters
         self.horizon = horizon
@@ -322,9 +324,14 @@ class PPOAgent:
                                                   self.distribution.__class__.__name__)
 
             # create processes and execute them
-            split_stats = ray.get([collect.remote(model_representation, self.horizon, self.env_name, self.discount,
-                                                  self.lam, self.tbptt_length, pid) for pid in range(self.workers)])
+            split_stats, split_preprocessors = zip(*ray.get([collect.remote(model_representation, self.horizon,
+                                                                            self.env_name, self.discount, self.lam,
+                                                                            self.tbptt_length, pid, self.preprocessor)
+                                                             for pid in range(self.workers)]))
             stats = condense_stats(split_stats)
+            old_n = self.preprocessor.n
+            self.preprocessor = _Wrapper.from_collection(split_preprocessors)
+            self.preprocessor.n -= (self.workers - 1) * old_n  # adjust for overcounting
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
@@ -406,7 +413,7 @@ class PPOAgent:
 
             if self.continuous_control:
                 # if action space is continuous, calculate PDF at chosen action value
-                action_probabilities = self.distribution.log_pdf(batch["action"], *policy_output)
+                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
             else:
                 # if the action space is discrete, extract the probabilities of actions actually chosen
                 action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])

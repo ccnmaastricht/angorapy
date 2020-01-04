@@ -21,7 +21,7 @@ from utilities.util import parse_state, add_state_dims, is_recurrent_model, flat
 
 
 @ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
-def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
+def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int, preprocessor):
     """Collect a batch shard of experience for a given number of timesteps."""
 
     # import here to avoid pickling errors
@@ -78,7 +78,7 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
         # make a step based on the chosen action and collect the reward for this state
-        observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
+        observation, reward, done, _ = preprocessor.wrap_a_step(env.step(np.atleast_1d(action) if is_continuous else action))
         rewards.append(reward)
         current_episode_return += reward
 
@@ -181,7 +181,7 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
-    return stats
+    return stats, preprocessor
 
 
 @ray.remote(num_cpus=1, num_gpus=0)

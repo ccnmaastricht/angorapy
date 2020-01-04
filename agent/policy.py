@@ -27,11 +27,17 @@ class _PolicyDistribution(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def pdf(self, **kwargs):
+    def probability(self, **kwargs):
+        """Get the probability of given sample with given distribution parameters. For continuous distributions this is
+        the probability density function."""
         pass
 
     @abc.abstractmethod
-    def log_pdf(self, **kwargs):
+    def log_probability(self, **kwargs):
+        """Get the logarithmic probability of given sample with given distribution parameters. For continuous
+        distributions this is the probability density function.
+
+        The logarithmic probability has better numerical stability properties during later calculations."""
         pass
 
     @abc.abstractmethod
@@ -74,10 +80,10 @@ class CategoricalPolicyDistribution(_PolicyDistribution):
         action = tf.random.categorical(log_probabilities, 1)[0][0]
         return action.numpy()
 
-    def pdf(self, **kwargs):
+    def probability(self, **kwargs):
         raise NotImplementedError("A categorical distribution has no pdf.")
 
-    def log_pdf(self, **kwargs):
+    def log_probability(self, **kwargs):
         raise NotImplementedError("A categorical distribution has no pdf.")
 
     @tf.function
@@ -103,7 +109,7 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
     def act(self, means: tf.Tensor, log_stdevs: tf.Tensor) -> Tuple[np.ndarray, np.ndarray]:
         """Sample an action from a gaussian action distribution defined by the means and log standard deviations."""
         actions = tf.random.normal(means.shape, means, tf.exp(log_stdevs))
-        probabilities = self.log_pdf(actions, means=means, log_stdevs=log_stdevs)
+        probabilities = self.log_probability(actions, means=means, log_stdevs=log_stdevs)
 
         return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
@@ -112,14 +118,14 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
         return tf.reshape(action, [-1]).numpy()
 
     @tf.function
-    def pdf(self, samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
+    def probability(self, samples: tf.Tensor, means: tf.Tensor, stdevs: tf.Tensor):
         """Calculate probability density for a given batch of potentially joint Gaussian PDF."""
         samples_transformed = (samples - means) / stdevs
         pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.sqrt(2 * math.pi)) / stdevs
         return tf.math.reduce_prod(pdf, axis=-1)
 
     @tf.function
-    def log_pdf(self, samples: tf.Tensor, means: tf.Tensor, log_stdevs: tf.Tensor):
+    def log_probability(self, samples: tf.Tensor, means: tf.Tensor, log_stdevs: tf.Tensor):
         """Calculate log probability density for a given batch of potentially joint Gaussian PDF.
 
         Input Shapes:
@@ -185,10 +191,10 @@ class BetaPolicyDistribution(_ContinuousPolicyDistribution):
     def prob(self, action, *args, **kwargs):
         pass
 
-    def pdf(self, **kwargs):
+    def probability(self, **kwargs):
         pass
 
-    def log_pdf(self, **kwargs):
+    def log_probability(self, **kwargs):
         pass
 
     def entropy(self):
