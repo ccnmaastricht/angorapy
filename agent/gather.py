@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
 import os
-import random
 from inspect import getfullargspec as fargs
 from typing import Tuple
 
 import numpy as np
 import ray
 import tensorflow as tf
-from gym.spaces import Box, Discrete
+from gym.spaces import Box
 
 import models
+from agent import policy
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
-from agent.policy import act_discrete, act_continuous
 from environments import *
 from models import build_ffn_models, build_rnn_models
 from utilities.const import STORAGE_DIR
@@ -22,7 +21,7 @@ from utilities.util import parse_state, add_state_dims, is_recurrent_model, flat
 
 
 @ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
-def collect(model, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
+def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
     """Collect a batch shard of experience for a given number of timesteps."""
 
     # import here to avoid pickling errors
@@ -35,14 +34,13 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     is_shadow_brain = "ShadowHand" in env_name
 
     # load policy
-    if isinstance(model, str):
-        joint = tfl.keras.models.load_model(f"{model}/model")
-    elif isinstance(model, ModelTuple):
-        model_builder = getattr(models, model.model_builder)
+    if isinstance(policy_tuple, ModelTuple):
+        model_builder = getattr(models, policy_tuple.model_builder)
+        distribution = getattr(policy, policy_tuple.distribution_type)()
 
         # recurrent policy needs batch size for statefulness
         _, _, joint = model_builder(env, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
-        joint.set_weights(model.weights)
+        joint.set_weights(policy_tuple.weights)
     else:
         raise ValueError("Unknown input for model.")
 
@@ -75,7 +73,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
         values.append(np.squeeze(value))
 
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
+        action, action_probability = distribution.act(*a_distr)
         actions.append(action)
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
@@ -193,19 +191,13 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
 
     if isinstance(policy_tuple, ModelTuple):
         model_builder = getattr(models, policy_tuple.model_builder)
+        distribution = getattr(policy, policy_tuple.distribution_type)()
 
         # recurrent policy needs batch size for statefulness
         policy, _, _ = model_builder(environment, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
         policy.set_weights(policy_tuple.weights)
     else:
         raise ValueError("Cannot handle given model type. Should be a ModelTuple.")
-
-    if isinstance(environment.action_space, Discrete):
-        continuous_control = False
-    elif isinstance(environment.action_space, Box):
-        continuous_control = True
-    else:
-        raise ValueError("Unknown action space.")
 
     is_recurrent = is_recurrent_model(policy)
     done = False
@@ -215,7 +207,7 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
     while not done:
         probabilities = flatten(policy.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
 
-        action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
+        action, _ = distribution.act(*probabilities)
         observation, reward, done, _ = environment.step(action)
         state = parse_state(observation)
         reward_trajectory.append(reward)

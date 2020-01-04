@@ -7,7 +7,7 @@ from scipy.signal import lfilter
 from scipy.stats import norm, entropy
 
 from agent.core import extract_discrete_action_probabilities, estimate_advantage
-from agent.probability import gaussian_pdf, gaussian_log_pdf, gaussian_entropy, approx_gaussian_entropy_from_log, \
+from agent.policy import gaussian_pdf, gaussian_log_pdf, gaussian_entropy, approx_gaussian_entropy_from_log, \
     categorical_entropy, categorical_entropy_from_log
 from utilities.util import reset_states_masked
 

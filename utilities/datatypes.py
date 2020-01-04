@@ -15,7 +15,7 @@ from utilities.util import add_state_dims, env_extract_dims
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths", "tbptt_underflow"])
-ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
+ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights", "distribution_type"])
 
 
 class ExperienceBuffer:

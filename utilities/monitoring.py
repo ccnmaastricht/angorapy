@@ -16,7 +16,6 @@ from matplotlib import animation
 from matplotlib.axes import Axes
 from scipy.signal import savgol_filter
 
-from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
 from utilities import const
 from utilities.util import parse_state, add_state_dims, flatten
@@ -76,7 +75,7 @@ class Monitor:
                 frames.append(self.env.render(mode="rgb_array"))
 
                 probabilities = flatten(pi.predict(add_state_dims(state, dims=2 if self.agent.is_recurrent else 1)))
-                action, _ = act_continuous(*probabilities) if self.continuous_control else act_discrete(*probabilities)
+                action, _ = self.agent.distribution.act(*probabilities)
                 observation, reward, done, _ = self.env.step(
                     numpy.atleast_1d(action) if self.continuous_control else action)
                 state = parse_state(observation)

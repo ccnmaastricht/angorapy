@@ -3,22 +3,21 @@ import os
 from pprint import pprint
 from typing import List
 
-import numpy as np
-
 import gym
+import numpy as np
 import tensorflow as tf
-from gym.spaces import Discrete, Box
 
-from agent.policy import act_discrete, act_continuous
-from models import build_rnn_models, build_ffn_models
+from agent.policy import _PolicyDistribution, GaussianPolicyDistribution
+from models import build_ffn_models
 from utilities.util import extract_layers, is_recurrent_model, parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
 
 
 class Investigator:
 
-    def __init__(self, network):
+    def __init__(self, network, distribution: _PolicyDistribution):
         self.network = network
+        self.distribution = distribution
 
     def list_layer_names(self, only_para_layers=False) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
@@ -59,13 +58,6 @@ class Investigator:
         layer = self.get_layer_by_name(layer_name)
         dual_model = tf.keras.Model(inputs=self.network.input, outputs=[layer.output, self.network.output])
 
-        if isinstance(env.action_space, Discrete):
-            continuous_control = False
-        elif isinstance(env.action_space, Box):
-            continuous_control = True
-        else:
-            raise ValueError("Unknown action space.")
-
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
@@ -79,7 +71,7 @@ class Investigator:
             activations.append(activation)
             env.render() if render else ""
 
-            action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
+            action, _ = self.distribution.act(*probabilities)
             observation, reward, done, _ = env.step(action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
@@ -92,7 +84,7 @@ if __name__ == "__main__":
 
     env = gym.make("LunarLanderContinuous-v2")
     network, _, _ = build_ffn_models(env)
-    inv = Investigator(network)
+    inv = Investigator(network, GaussianPolicyDistribution())
 
     print(inv.list_layer_names())
 
@@ -108,4 +100,3 @@ if __name__ == "__main__":
 
     for l in np.array(tuples)[:, 0]:
         state_data += l
-

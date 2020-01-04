@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 import models
 from agent.core import extract_discrete_action_probabilities
-from agent.probability import gaussian_log_pdf, approx_gaussian_entropy_from_log, categorical_entropy_from_log
+from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
@@ -51,7 +51,8 @@ class PPOAgent:
                  discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
                  c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
                  clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
-                 pretrained_components: list = None, _make_dirs=True, debug: bool = False):
+                 distribution: _PolicyDistribution = None, pretrained_components: list = None, _make_dirs=True,
+                 debug: bool = False):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
@@ -119,6 +120,10 @@ class PPOAgent:
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
+        self.distribution = distribution
+        if self.distribution is None:
+            self.distribution = CategoricalPolicyDistribution() if not self.continuous_control else GaussianPolicyDistribution()
+        assert self.continuous_control == self.distribution.is_continuous(), "Invalid distribution for environment."
 
         if pretrained_components is not None:
             print("Loading pretrained components:")
@@ -257,9 +262,8 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(approx_gaussian_entropy_from_log(policy_output[1]))
-        else:
-            return tf.reduce_mean(categorical_entropy_from_log(policy_output))
+            policy_output = policy_output[1]
+        return tf.reduce_mean(self.distribution.entropy_from_log(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False, ray_already_initialized: bool = False) -> "PPOAgent":
@@ -313,7 +317,9 @@ class PPOAgent:
                 self.joint.save(f"{self.model_export_dir}/{name_key}/model")
                 model_representation = f"{self.model_export_dir}/{name_key}/"
             else:
-                model_representation = ModelTuple(self.builder_function_name, self.joint.get_weights())
+                model_representation = ModelTuple(self.builder_function_name,
+                                                  self.joint.get_weights(),
+                                                  self.distribution.__class__.__name__)
 
             # create processes and execute them
             split_stats = ray.get([collect.remote(model_representation, self.horizon, self.env_name, self.discount,
@@ -400,8 +406,7 @@ class PPOAgent:
 
             if self.continuous_control:
                 # if action space is continuous, calculate PDF at chosen action value
-                means, stdevs = policy_output
-                action_probabilities = gaussian_log_pdf(batch["action"], means=means, log_stdevs=stdevs)
+                action_probabilities = self.distribution.log_pdf(batch["action"], *policy_output)
             else:
                 # if the action space is discrete, extract the probabilities of actions actually chosen
                 action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
@@ -514,7 +519,9 @@ class PPOAgent:
         if not ray_already_initialized:
             ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
-        model_representation = ModelTuple(self.builder_function_name, self.policy.get_weights())
+        model_representation = ModelTuple(self.builder_function_name,
+                                          self.policy.get_weights(),
+                                          self.distribution.__class__.__name__)
         result_ids = [evaluate.remote(model_representation, self.env_name) for _ in range(n)]
 
         lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])

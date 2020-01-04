@@ -4,6 +4,7 @@ import logging
 import argcomplete
 
 from agent.ppo import PPOAgent
+from agent.policy import CategoricalPolicyDistribution
 from models import *
 from models import get_model_builder
 from models.hybrid import build_shadow_brain_v1, build_blind_shadow_brain_v1
@@ -42,6 +43,9 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     else:
         build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
 
+    if settings.distribution is None:
+        settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
+
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
     if verbose:
@@ -50,6 +54,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
               f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
               f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
               f"Model: {build_models.__name__}\n"
+              f"Distribution: {settings.distribution}"
               f"-----------------------------------------\n")
 
         print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
@@ -95,6 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if not shadowhand")
+    parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta"])
     parser.add_argument("--shared", action="store_true",
                         help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
