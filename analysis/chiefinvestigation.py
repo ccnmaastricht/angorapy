@@ -10,7 +10,8 @@ import os
 from matplotlib.lines import Line2D
 from matplotlib import animation
 from sklearn.svm import SVC
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
+from sklearn.decomposition import NMF
 from tensorflow import matmul
 import numdifftools as nd
 from sklearn.decomposition import NMF
@@ -139,11 +140,23 @@ class Chiefinvestigator:
         # masking hinders extraction of activations from previous layer!!
         return optimisedResults
 
-    def curve_fit_minimization(self):
-        pass
+    def curve_fit_minimization(self, activation, weights, inputweights, input):
+        id = np.random.randint(activation.shape[0])
+        print(id)
+        x0 = activation[id, :]
+        x = activation[id, :]
+        input = input[id, :]
+        fun = lambda weights: 0.5 * sum((- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
+        ydata = np.zeros(activation.shape[1])
+        popt, pcov = curve_fit(fun, xdata=weights, ydata=ydata, p0=x0)
+        return popt, pcov
 
-    def nmfactor(self):
-        pass
+
+    def nmfactor(self, activation):
+        model = NMF(n_components=3)
+        W = model.fit_transform(activation)
+        H = model.components_
+        return W, H
 
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
                                      # -> construct small amounts of points (perhaps belonging to one action into
@@ -157,10 +170,6 @@ class Chiefinvestigator:
 # TODO: is reward coupled to momentum ?
 # TODO: look at weights
 # TODO: dynamical systems and eigengrasps
-
-#maximally active -> NMF
-#nonlinear dynamical systems analysis
-
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
