@@ -24,6 +24,7 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
+from agent import policy
 from agent.core import extract_discrete_action_probabilities
 from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from agent.dataio import read_dataset_from_storage
@@ -32,7 +33,7 @@ from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
     reset_states_masked, detect_finished_episodes, get_layer_names, get_component
-from utilities.wrappers import StateNormalizationWrapper, _Wrapper
+from utilities.wrappers import StateNormalizationWrapper, _Wrapper, RewardNormalizationWrapper, CombiWrapper
 
 
 class PPOAgent:
@@ -90,7 +91,8 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
-        self.preprocessor = StateNormalizationWrapper(self.state_dim)
+        self.preprocessor = CombiWrapper([StateNormalizationWrapper(self.state_dim), RewardNormalizationWrapper()])
+        self.preprocessor.warmup(self.env)
 
         # hyperparameters
         self.horizon = horizon
@@ -106,6 +108,7 @@ class PPOAgent:
         self.tbptt_length = tbptt_length
 
         # learning rate schedule
+        self.lr_schedule_type = lr_schedule
         if lr_schedule is None:
             self.lr_schedule = learning_rate
         elif lr_schedule.lower() == "exponential":
@@ -125,7 +128,7 @@ class PPOAgent:
         self.distribution = distribution
         if self.distribution is None:
             self.distribution = CategoricalPolicyDistribution() if not self.continuous_control else GaussianPolicyDistribution()
-        assert self.continuous_control == self.distribution.is_continuous(), "Invalid distribution for environment."
+        assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
 
         if pretrained_components is not None:
             print("Loading pretrained components:")
@@ -331,7 +334,7 @@ class PPOAgent:
             stats = condense_stats(split_stats)
             old_n = self.preprocessor.n
             self.preprocessor = _Wrapper.from_collection(split_preprocessors)
-            self.preprocessor.n -= (self.workers - 1) * old_n  # adjust for overcounting
+            self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for overcounting
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
@@ -555,9 +558,9 @@ class PPOAgent:
         fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]fps"
 
         # losses
-        pi_loss = 0 if len(self.policy_loss_history) == 0 else round(self.policy_loss_history[-1], 2)
-        v_loss = 0 if len(self.value_loss_history) == 0 else round(self.value_loss_history[-1], 2)
-        ent = 0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2)
+        pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
+        v_loss = "-" if len(self.value_loss_history) == 0 else f"{round(self.value_loss_history[-1], 2):8.2f}"
+        ent = "-" if len(self.entropy_history) == 0 else f"{round(self.entropy_history[-1], 2):6.2f}"
 
         # tbptt underflow
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
@@ -566,7 +569,7 @@ class PPOAgent:
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"r: {ac}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
                    f"len: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
-                   f"loss: [{nc}{pi_loss:6.2f}{ec}|{nc}{v_loss:8.2f}{ec}|{nc}{ent:6.2f}{ec}]; "
+                   f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
                    f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
                    f"lr: {nc}{current_lr:.2e}{ec}; "
                    f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
@@ -585,11 +588,14 @@ class PPOAgent:
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
         del parameters["env"]
-        del parameters["policy"], parameters["value"], parameters["joint"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"]
+        del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["preprocessor"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
+
+        parameters["preprocessor"] = self.preprocessor.serialize()
+        parameters["distribution"] = self.distribution.__class__.__name__
 
         return parameters
 
@@ -632,12 +638,17 @@ class PPOAgent:
                                 c_entropy=parameters["c_entropy"],
                                 c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"],
+                                distribution=getattr(policy, parameters["distribution"])(),
                                 clip_values=parameters["clip_values"],
                                 tbptt_length=parameters["tbptt_length"],
+                                lr_schedule=parameters["lr_schedule_type"],
                                 _make_dirs=False)
 
         for p, v in parameters.items():
-            loaded_agent.__dict__[p] = v
+            if p == "preprocessor":
+                loaded_agent.__dict__[p] = CombiWrapper.from_serialization(v)
+            else:
+                loaded_agent.__dict__[p] = v
 
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{latest}/weights")
 

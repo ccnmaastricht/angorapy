@@ -15,6 +15,7 @@ class _PolicyDistribution(abc.ABC):
     in standard and in log space. It furthermore gives the characteristic act method that given the probability
     parameters samples the action and provides the actions probability."""
 
+    @property
     def is_continuous(self):
         return False
 
@@ -99,6 +100,7 @@ class CategoricalPolicyDistribution(_PolicyDistribution):
 
 class _ContinuousPolicyDistribution(_PolicyDistribution, abc.ABC):
 
+    @property
     def is_continuous(self):
         return True
 

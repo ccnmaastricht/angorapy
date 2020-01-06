@@ -199,7 +199,6 @@ def calc_max_memory_usage(model: tf.keras.Model):
     return total_memory * 1.1641532182693481*10**-10
 
 
-
 if __name__ == "__main__":
     import os
 

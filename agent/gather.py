@@ -19,6 +19,8 @@ from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
 from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, set_all_seeds
 
+DETERMINISTIC = False
+
 
 @ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
 def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int, preprocessor):
@@ -29,6 +31,8 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
 
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
+    if DETERMINISTIC:
+        env.seed(1)
 
     is_continuous = isinstance(env.action_space, Box)
     is_shadow_brain = "ShadowHand" in env_name
@@ -63,6 +67,7 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
     episode_endpoints = []
     state = parse_state(env.reset())
+    state, _, _, _ = preprocessor.wrap_a_step((state, 1, 1, 1))
     while t < horizon:
         current_subseq_length += 1
 
@@ -74,13 +79,15 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
 
         # from the action distribution sample an action and remember both the action and its probability
         action, action_probability = distribution.act(*a_distr)
+        action = action if not DETERMINISTIC else np.zeros(action.shape)
         actions.append(action)
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
         # make a step based on the chosen action and collect the reward for this state
-        observation, reward, done, _ = preprocessor.wrap_a_step(env.step(np.atleast_1d(action) if is_continuous else action))
+        observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
+        current_episode_return += reward  # true reward for stats
+        observation, reward, done, _ = preprocessor.wrap_a_step((observation, reward, done, None))
         rewards.append(reward)
-        current_episode_return += reward
 
         # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
         if is_recurrent and (current_subseq_length == subseq_length or done):
@@ -157,18 +164,20 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     # normalize advantages
     buffer.normalize_advantages()
 
-    if is_recurrent:
-        # add batch dimension for optimization
-        buffer.inject_batch_dimension()
-
+    # print(buffer.states[:5])
+    #
+    # if is_recurrent:
+    #     # add batch dimension for optimization
+    #     buffer.inject_batch_dimension()
+    #
     # import matplotlib.pyplot as plt
     # import matplotlib
-    # plt.hist(buffer.values, label="value")
-    # plt.hist(buffer.returns, label="return")
+    # # plt.hist(buffer.values, label="value")
+    # # plt.hist(buffer.returns, label="return")
+    # plt.hist(advantages, label="adv")
     # plt.hist(rewards, label="rewards")
-    # plt.hist(buffer.advantages, label="adv")
-    # plt.hist(np.mean(buffer.actions, axis=-1), label="act")
-    # plt.hist(np.abs(buffer.values - buffer.returns), label="squared diff")
+    # # plt.hist(np.mean(buffer.actions, axis=-1), label="act")
+    # # plt.hist(buffer.advantages + buffer.values, label="return after norm")
     # matplotlib.use('TkAgg')
     # plt.legend()
     # plt.show()
