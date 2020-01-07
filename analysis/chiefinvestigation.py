@@ -163,13 +163,14 @@ class Chiefinvestigator:
                                      # -> dimensionality reduced space -> add them over time and see where they end up
 # TODO: investigate role of momentum! take change along a principle component over time and see how that associates with action
 # same for t-SNE
-# TODO: apply unsupervised clustering stuff on the results of these techniques and the dataset
+# TODO: apply unsupervised clustering stuff on the results of these techniques and the dataset -> through time stuff
 # TODO: build neural network to predict grasp -> we trained a simple prediction model fp(z) containing one hidden
                                             # layer with 64 units and ReLU activation, followed by a sigmoid output.
 # TODO: Do fixed points evolve where two clusters (actions) are? -> dynamical systems analysis
 # TODO: is reward coupled to momentum ?
 # TODO: look at weights
 # TODO: dynamical systems and eigengrasps
+# TODO: sequence analysis ideas -> sequence pattern and so forth
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
