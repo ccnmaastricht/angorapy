@@ -26,9 +26,8 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
 
     # set up the agent and a reporting module
     agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
-                     learning_rate=settings["lr_pi"], discount=settings["discount"],
+                     learning_rate=settings["lr_pi"], discount=settings["discount"], lam=settings["lam"],
                      clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
-                     lam=settings["lam"],
                      gradient_clipping=settings["grad_norm"], clip_values=settings["no_value_clip"],
                      tbptt_length=settings["tbptt"])
 

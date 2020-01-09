@@ -19,6 +19,9 @@ class _Wrapper(abc.ABC):
     def __add__(self, other):
         pass
 
+    def __repr__(self):
+        return self.__class__.__name__
+
     @abc.abstractmethod
     def wrap_a_step(self, step_output):
         """Preprocess an environment output."""
@@ -202,12 +205,21 @@ class CombiWrapper(_Wrapper):
     """Combine any number of arbitrary wrappers into one using this interface. Meaningless wrappers (SkipWrappers) will
     be automatically neglected."""
 
+    def __new__(cls, wrappers):
+        # if no wrappers or only SkipWrappers were given, just return one SkipWrapper
+        if len(wrappers) == 0 or len(list(filter(lambda x: not isinstance(x, SkipWrapper), wrappers))) == 0:
+            return SkipWrapper()
+        return CombiWrapper(wrappers)
+
     def __init__(self, wrappers: Iterable[_Wrapper]):
         super().__init__()
         self.wrappers = [w for w in wrappers if not isinstance(w, SkipWrapper)]
 
     def __add__(self, other):
-        return CombiWrapper([self.wrappers[i] + other.wrappers[i] for i in range(len(self.wrappers))])
+        added_wraps = CombiWrapper([self.wrappers[i] + other.wrappers[i] for i in range(len(self.wrappers))])
+        added_wraps.n = self.n + other.n
+
+        return added_wraps
 
     def __len__(self):
         return len(self.wrappers)
@@ -218,12 +230,15 @@ class CombiWrapper(_Wrapper):
     def __iter__(self):
         return self.wrappers
 
+    def __repr__(self):
+        return f"CombiWrapper{tuple(str(w) for w in self.wrappers)}"
+
     def wrap_a_step(self, step_output):
         """Wrap a step by passing it through all contained wrappers."""
         for w in self.wrappers:
             step_output = w.wrap_a_step(step_output)
 
-        self.n = self.wrappers[0].n
+        self.n += 1
         return step_output
 
     def correct_sample_size(self, deduction):

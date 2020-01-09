@@ -185,7 +185,7 @@ class BetaPolicyDistribution(_ContinuousPolicyDistribution):
     """Beta Distribution."""
 
     def __init__(self):
-        raise NotImplementedError("Beta Distribution not yet implemented.")
+        pass
 
     def act(self, *args, **kwargs):
         pass

@@ -50,14 +50,14 @@ class PPOAgent:
     joint: tf.keras.Model
 
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate: float = 0.001,
-                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
-                 c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
-                 clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
-                 distribution: _PolicyDistribution = None, pretrained_components: list = None, _make_dirs=True,
-                 debug: bool = False):
+                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
+                 c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
+                 tbptt_length: int = 16, lr_schedule: str = None, distribution: _PolicyDistribution = None,
+                 preprocessor=None, _make_dirs=True, debug: bool = False, pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
+            preprocessor:
             model_builder: a function creating a policy, value and joint model
             environment (gym.Env): the environment in which the agent will learn 
             horizon (int): the number of timesteps each worker collects 
@@ -91,8 +91,9 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
-        self.preprocessor = CombiWrapper([StateNormalizationWrapper(self.state_dim), RewardNormalizationWrapper()])
+        self.preprocessor = preprocessor
         # self.preprocessor.warmup(self.env)  # TODO activate
+        print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
         self.horizon = horizon
@@ -623,22 +624,14 @@ class PPOAgent:
 
         env = gym.make(parameters["env_name"])
 
-        loaded_agent = PPOAgent(model_builder,
-                                environment=env,
-                                horizon=parameters["horizon"],
-                                workers=parameters["workers"],
-                                learning_rate=parameters["learning_rate"],
-                                discount=parameters["discount"],
-                                lam=parameters["lam"],
-                                clip=parameters["clip"],
-                                c_entropy=parameters["c_entropy"],
-                                c_value=parameters["c_value"],
+        loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
+                                workers=parameters["workers"], learning_rate=parameters["learning_rate"],
+                                discount=parameters["discount"], lam=parameters["lam"], clip=parameters["clip"],
+                                c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"],
-                                distribution=getattr(policy, parameters["distribution"])(),
-                                clip_values=parameters["clip_values"],
-                                tbptt_length=parameters["tbptt_length"],
+                                clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"],
-                                _make_dirs=False)
+                                distribution=getattr(policy, parameters["distribution"])(), _make_dirs=False)
 
         for p, v in parameters.items():
             if p == "preprocessor":
