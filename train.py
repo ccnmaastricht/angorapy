@@ -3,8 +3,8 @@ import logging
 
 import argcomplete
 
+from agent.policy import get_distribution_by_short_name
 from agent.ppo import PPOAgent
-from agent.policy import CategoricalPolicyDistribution
 from models import *
 from models import get_model_builder
 from models.hybrid import build_shadow_brain_v1, build_blind_shadow_brain_v1
@@ -46,6 +46,8 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     if settings.distribution is None:
         settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
 
+    distribution = get_distribution_by_short_name(settings.distribution)
+
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
     if verbose:
@@ -54,7 +56,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
               f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
               f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
               f"Model: {build_models.__name__}\n"
-              f"Distribution: {settings.distribution}"
+              f"Distribution: {settings.distribution}\n"
               f"-----------------------------------------\n")
 
         print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
@@ -72,7 +74,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                          learning_rate=settings.lr_pi, lr_schedule=settings.lr_schedule, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
                          gradient_clipping=settings.grad_norm, clip_values=settings.clip_values,
-                         tbptt_length=settings.tbptt,
+                         tbptt_length=settings.tbptt, distribution=distribution,
                          pretrained_components=None if args.preload is None else [args.preload], debug=settings.debug)
 
         if verbose:
@@ -128,7 +130,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=1e-3, help=f"learning rate of the policy")
-    parser.add_argument("--lr-schedule", type=str, default=None, choices=[None, "exponential"], help=f"lr schedule type")
+    parser.add_argument("--lr-schedule", type=str, default=None, choices=[None, "exponential"],
+                        help=f"lr schedule type")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")

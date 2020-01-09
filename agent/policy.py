@@ -184,6 +184,9 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
 class BetaPolicyDistribution(_ContinuousPolicyDistribution):
     """Beta Distribution."""
 
+    def __init__(self):
+        raise NotImplementedError("Beta Distribution not yet implemented.")
+
     def act(self, *args, **kwargs):
         pass
 
@@ -204,3 +207,19 @@ class BetaPolicyDistribution(_ContinuousPolicyDistribution):
 
     def entropy_from_log(self):
         pass
+
+
+_distribution_short_name_map = {
+    "gaussian": GaussianPolicyDistribution(),
+    "discrete": CategoricalPolicyDistribution(),
+    "categorical": CategoricalPolicyDistribution(),
+    "beta": BetaPolicyDistribution()
+}
+
+
+def get_distribution_by_short_name(name: str) -> _PolicyDistribution:
+    """Get a policy distribution object based on a short name identifier."""
+    if name not in _distribution_short_name_map.keys():
+        raise ValueError("Unknown distribution type.")
+
+    return _distribution_short_name_map[name]
