@@ -47,8 +47,7 @@ class ExperienceBuffer:
 
     def fill(self, s, a, ap, adv, ret, v):
         """Fill the buffer with 5-tuple of experience."""
-        assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv), len(v)]) == len(s)), \
-            "Inconsistent input sizes."
+        assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), "Inconsistent input sizes."
 
         self.capacity = len(adv)
         self.advantages, self.returns, self.action_probabilities, self.actions, self.states = adv, ret, ap, a, s

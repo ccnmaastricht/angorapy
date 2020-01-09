@@ -26,7 +26,7 @@ def _build_encoding_sub_model(shape, batch_size, layer_sizes=(64, 64), name=None
     for i in range(len(layer_sizes)):
         model.add(tf.keras.layers.Dense(layer_sizes[i],
                                         kernel_initializer=tf.keras.initializers.Orthogonal(gain=tf.sqrt(2.0)),
-                                        bias_initializer=tf.keras.initializers.Constant(0.0)))
+                                        bias_initializer=tf.constant_initializer(0.0)))
         model.add(tf.keras.layers.Activation("tanh"))
     model.build(input_shape=(batch_size,) + shape)
 
@@ -39,11 +39,11 @@ def _build_encoding_sub_model(shape, batch_size, layer_sizes=(64, 64), name=None
 def _build_continuous_head(n_actions, input_shape, batch_size, stdevs_from_latent=False):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
     means = tf.keras.layers.Dense(n_actions, name="means",
-                                  kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+                                  kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
     if stdevs_from_latent:
         stdevs = tf.keras.layers.Dense(n_actions, name="log_stdevs",
-                                       kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+                                       kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
                                        bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
     else:
         stdevs = StdevLayer(n_actions, name="log_stdevs")(means)
@@ -55,7 +55,7 @@ def _build_discrete_head(n_actions, input_shape, batch_size):
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
     x = tf.keras.layers.Dense(n_actions,
-                              kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+                              kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
                               bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
     x = tf.nn.log_softmax(x, name="log_likelihoods")
 

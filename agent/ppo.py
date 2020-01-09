@@ -92,7 +92,7 @@ class PPOAgent:
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
         self.preprocessor = CombiWrapper([StateNormalizationWrapper(self.state_dim), RewardNormalizationWrapper()])
-        self.preprocessor.warmup(self.env)
+        # self.preprocessor.warmup(self.env)  # TODO activate
 
         # hyperparameters
         self.horizon = horizon
@@ -114,7 +114,7 @@ class PPOAgent:
         elif lr_schedule.lower() == "exponential":
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                 initial_learning_rate=self.learning_rate,
-                decay_steps=1000,
+                decay_steps=workers * horizon,  # decay after every cycle
                 decay_rate=0.98
             )
         else:
@@ -243,7 +243,6 @@ class PPOAgent:
             # clips value error to reduce variance
             clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
             clipped_error = tf.square(clipped_values - returns)
-
             error = tf.maximum(clipped_error, error)
 
         if self.is_recurrent:
@@ -336,13 +335,10 @@ class PPOAgent:
             self.preprocessor = _Wrapper.from_collection(split_preprocessors)
             self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for overcounting
 
-            time_dict["gathering"] = time.time() - subprocess_start
-            subprocess_start = time.time()
-
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
 
-            time_dict["communication"] = time.time() - subprocess_start
+            time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
             # clean up the saved models
@@ -555,7 +551,7 @@ class PPOAgent:
             current_lr = self.lr_schedule
 
         # make fps string
-        fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]fps"
+        fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]"
 
         # losses
         pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"

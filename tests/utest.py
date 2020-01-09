@@ -152,7 +152,7 @@ class WrapperTest(unittest.TestCase):
     def test_state_normalization(self):
         normalizer = StateNormalizationWrapper(10)
 
-        inputs = [tf.random.normal([10]) for _ in range(10)]
+        inputs = [tf.random.normal([10]) for _ in range(15)]
         true_mean = np.mean(inputs, axis=0)
         true_std = np.std(inputs, axis=0)
 
@@ -165,12 +165,15 @@ class WrapperTest(unittest.TestCase):
     def test_reward_normalization(self):
         normalizer = RewardNormalizationWrapper()
 
-        inputs = [random.random() * 10 for _ in range(10)]
+        inputs = [random.random() * 10 for _ in range(1000)]
         true_mean = np.mean(inputs, axis=0)
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
             o, _, _, _ = normalizer.wrap_a_step((1, sample, 1, 1))
+
+        print(true_mean - normalizer.mean)
+        print(true_std - np.sqrt(normalizer.variance))
 
         self.assertTrue(np.allclose(true_mean, normalizer.mean))
         self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))

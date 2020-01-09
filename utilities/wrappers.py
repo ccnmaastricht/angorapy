@@ -2,16 +2,18 @@
 import abc
 import inspect
 import sys
-from typing import Tuple, List
+from typing import Tuple, List, Iterable
 
 import gym
 import numpy as np
+
+from utilities.const import EPS, NUMPY_FLOAT_PRECISION
 
 
 class _Wrapper(abc.ABC):
 
     def __init__(self):
-        self.n = 0
+        self.n = 1e-4  # make this at least epsilon so that first measure is not all zeros
 
     @abc.abstractmethod
     def __add__(self, other):
@@ -32,7 +34,7 @@ class _Wrapper(abc.ABC):
 
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
-        return {self.__class__.__name__: (self.n, )}
+        return {self.__class__.__name__: (self.n,)}
 
     @staticmethod
     def from_serialization(s: dict):
@@ -64,7 +66,6 @@ class _Wrapper(abc.ABC):
 
 
 class _RunningMeanWrapper(_Wrapper, abc.ABC):
-
     mean: np.ndarray
     variance: np.ndarray
 
@@ -72,7 +73,7 @@ class _RunningMeanWrapper(_Wrapper, abc.ABC):
         super().__init__()
 
     def __add__(self, other) -> "_RunningMeanWrapper":
-        needs_shape = len(inspect.signature(abs).parameters) > 0
+        needs_shape = len(inspect.signature(self.__class__).parameters) > 0
         new_wrapper = self.__class__(self.mean.shape) if needs_shape else self.__class__()
         new_wrapper.n = self.n + other.n
         new_wrapper.mean = (self.n / new_wrapper.n) * self.mean + (other.n / new_wrapper.n) * other.mean
@@ -81,18 +82,16 @@ class _RunningMeanWrapper(_Wrapper, abc.ABC):
 
         return new_wrapper
 
-    def update(self, tracked_measure):
-        """Update the mean and variance of the tracked statistic based on the new sample."""
-        mean_old = self.mean.copy() if isinstance(self.mean, np.ndarray) else self.mean
-
-        # calculate weights based on number of seen examples
-        weight_experience = self.n / (self.n + 1)
-        weight_state = 1 - weight_experience
-
-        # update statistics
+    def update(self, observation):
+        """Update the mean and variance of the tracked statistic based on the new sample.
+        Simplification of https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm"""
         self.n += 1
-        self.mean = np.multiply(weight_experience, self.mean) + np.multiply(weight_state, tracked_measure)
-        self.variance = ((self.n - 1) * self.variance + (tracked_measure - self.mean) * (tracked_measure - mean_old)) / self.n
+
+        delta = observation - self.mean
+        m_a = self.variance * (self.n - 1)
+
+        self.mean = np.array(self.mean + delta * (1 / self.n))
+        self.variance = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n)
 
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
@@ -115,8 +114,8 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
     def __init__(self, state_shape):
         super().__init__()
         self.shape = state_shape
-        self.mean = np.zeros(state_shape)
-        self.variance = np.ones(state_shape)
+        self.mean = np.zeros(state_shape, NUMPY_FLOAT_PRECISION)
+        self.variance = np.ones(state_shape, NUMPY_FLOAT_PRECISION)
 
     def wrap_a_step(self, step_result: Tuple) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
@@ -128,8 +127,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
         self.update(o)
 
         # normalize
-        o = (o - self.mean) / (np.sqrt(self.variance + 1e-8))
-
+        o = np.clip((o - self.mean) / (np.sqrt(self.variance + EPS)), -10., 10., dtype="float32")  # TODO clipping kills precision
         return o, r, done, info
 
     def warmup(self, env: gym.Env, observations=10):
@@ -140,7 +138,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
         serialization = super().serialize()
-        serialization[self.__class__.__name__] += (self.shape, )
+        serialization[self.__class__.__name__] += (self.shape,)
 
         return serialization
 
@@ -150,8 +148,9 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
 
     def __init__(self):
         super().__init__()
-        self.mean = np.array(0)
-        self.variance = np.array(1)
+        self.mean = np.array(0, NUMPY_FLOAT_PRECISION)
+        self.variance = np.array(1, NUMPY_FLOAT_PRECISION)
+        self.ret = np.float64(0)
 
     def wrap_a_step(self, step_result: Tuple) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
@@ -160,10 +159,18 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
         except ValueError:
             raise ValueError("Wrapping did not receive a valid input.")
 
-        self.update(r)
+        if r is None:
+            return o, r, done, info  # skip
+
+        # update based on cumulative discounted reward
+        self.ret = 0.99 * self.ret + r
+        self.update(self.ret)
 
         # normalize
-        r = (r - self.mean) / (np.sqrt(self.variance + 1e-8))
+        r = np.clip(r / (np.sqrt(self.variance + EPS)), -10., 10., dtype="float32")
+
+        if done:
+            self.ret = 0.
 
         return o, r, done, info
 
@@ -195,12 +202,21 @@ class CombiWrapper(_Wrapper):
     """Combine any number of arbitrary wrappers into one using this interface. Meaningless wrappers (SkipWrappers) will
     be automatically neglected."""
 
-    def __init__(self, wrappers: List[_Wrapper]):
+    def __init__(self, wrappers: Iterable[_Wrapper]):
         super().__init__()
         self.wrappers = [w for w in wrappers if not isinstance(w, SkipWrapper)]
 
     def __add__(self, other):
         return CombiWrapper([self.wrappers[i] + other.wrappers[i] for i in range(len(self.wrappers))])
+
+    def __len__(self):
+        return len(self.wrappers)
+
+    def __getitem__(self, item):
+        return self.wrappers[item]
+
+    def __iter__(self):
+        return self.wrappers
 
     def wrap_a_step(self, step_output):
         """Wrap a step by passing it through all contained wrappers."""
@@ -230,5 +246,6 @@ class CombiWrapper(_Wrapper):
         return full
 
     def recover(cls, serialization_data):
+        """Recover CombiWrapper, not supported."""
         raise NotImplementedError("There is no such thing as recovery for CombiWrappers. Create a new wrapper from"
                                   "recovered wrappers instead.")

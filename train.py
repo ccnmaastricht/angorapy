@@ -69,9 +69,9 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings.horizon, workers=settings.workers,
-                         learning_rate=settings.lr_pi, discount=settings.discount,
+                         learning_rate=settings.lr_pi, lr_schedule=settings.lr_schedule, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
-                         gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
+                         gradient_clipping=settings.grad_norm, clip_values=settings.clip_values,
                          tbptt_length=settings.tbptt,
                          pretrained_components=None if args.preload is None else [args.preload], debug=settings.debug)
 
@@ -80,7 +80,8 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
 
     agent.set_gpu(not settings.cpu)
 
-    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
+    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every,
+                      iterations=settings.iterations)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
@@ -127,12 +128,13 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=1e-3, help=f"learning rate of the policy")
+    parser.add_argument("--lr-schedule", type=str, default=None, choices=[None, "exponential"], help=f"lr schedule type")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
     parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping, 0 deactivates")
-    parser.add_argument("--no-value-clip", action="store_false", help=f"deactivate clipping in value objective")
+    parser.add_argument("--clip-values", action="store_true", help=f"clip value objective")
 
     # read arguments
     argcomplete.autocomplete(parser)

@@ -33,9 +33,10 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None):
         self.agent = agent
         self.env = env
+        self.iterations = iterations
 
         self.frequency = frequency
         self.gif_every = gif_every
@@ -138,6 +139,8 @@ class Monitor:
             json.dump(progress, f)
 
     def _make_graph(self, ax, lines, labels, name):
+        if self.iterations is not None:
+            ax.set_xbound(0, self.iterations)
         ax.set_title(ax.get_title(),
                      fontdict={'fontsize': "large",
                                'fontweight': "bold",

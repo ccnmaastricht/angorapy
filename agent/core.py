@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 """Core methods providing functionality to the agent."""
+import random
 from itertools import accumulate
 from typing import List
 
 import numpy as np
 import tensorflow as tf
 from scipy.signal import lfilter
+
+from utilities.const import NUMPY_FLOAT_PRECISION, DETERMINISTIC, DEBUG
 
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):
@@ -57,9 +60,8 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
 
 def estimate_episode_advantages(rewards, values, gamma, lam):
     """Estimate advantage of a single episode (or part of it), taken from Open AI's spinning up repository."""
-    deltas = np.array(rewards, dtype=np.float32) + gamma * np.array(values[1:], dtype=np.float32) - np.array(
-        values[:-1], dtype=np.float32)
-    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(np.float32)
+    deltas = np.array(rewards) + gamma * np.array(values[1:]) - np.array(values[:-1])
+    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(NUMPY_FLOAT_PRECISION)
 
 
 @tf.function
