@@ -1,9 +1,11 @@
+import logging
 import os
 import random
 import unittest
 
 import gym
 import numpy as np
+import ray
 import tensorflow as tf
 from scipy.signal import lfilter
 from scipy.stats import norm, entropy
@@ -12,6 +14,7 @@ from agent.core import extract_discrete_action_probabilities, estimate_advantage
 from agent.policy import GaussianPolicyDistribution, CategoricalPolicyDistribution
 from agent.ppo import PPOAgent
 from models import get_model_builder
+from utilities.const import NUMPY_FLOAT_PRECISION
 from utilities.util import reset_states_masked
 from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
 
@@ -172,9 +175,6 @@ class WrapperTest(unittest.TestCase):
         for sample in inputs:
             o, _, _, _ = normalizer.wrap_a_step((1, sample, 1, 1))
 
-        print(true_mean - normalizer.mean)
-        print(true_std - np.sqrt(normalizer.variance))
-
         self.assertTrue(np.allclose(true_mean, normalizer.mean))
         self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))
 
@@ -183,21 +183,21 @@ class WrapperTest(unittest.TestCase):
         normalizer_b = StateNormalizationWrapper(10)
         normalizer_c = StateNormalizationWrapper(10)
 
-        inputs_a = [tf.random.normal([10]) for _ in range(10)]
-        inputs_b = [tf.random.normal([10]) for _ in range(10)]
-        inputs_c = [tf.random.normal([10]) for _ in range(10)]
+        inputs_a = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
+        inputs_b = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
+        inputs_c = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
 
         true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
         true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
 
         for sample in inputs_a:
-            o, _, _, _ = normalizer_a.wrap_a_step((sample, 1, 1, 1))
+            normalizer_a.update(sample)
 
         for sample in inputs_b:
-            o, _, _, _ = normalizer_b.wrap_a_step((sample, 1, 1, 1))
+            normalizer_b.update(sample)
 
         for sample in inputs_c:
-            o, _, _, _ = normalizer_c.wrap_a_step((sample, 1, 1, 1))
+            normalizer_c.update(sample)
 
         combined_normalizer = normalizer_a + normalizer_b + normalizer_c
 
@@ -209,21 +209,21 @@ class WrapperTest(unittest.TestCase):
         normalizer_b = RewardNormalizationWrapper()
         normalizer_c = RewardNormalizationWrapper()
 
-        inputs_a = [random.random() * 10 for _ in range(10)]
-        inputs_b = [random.random() * 20 for _ in range(10)]
-        inputs_c = [random.random() * 5 for _ in range(10)]
+        inputs_a = [random.random() * 10 for _ in range(1000)]
+        inputs_b = [random.random() * 20 for _ in range(1000)]
+        inputs_c = [random.random() * 5 for _ in range(1000)]
 
         true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
         true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
 
         for sample in inputs_a:
-            o, _, _, _ = normalizer_a.wrap_a_step((1, sample, 1, 1))
+            normalizer_a.update(sample)
 
         for sample in inputs_b:
-            o, _, _, _ = normalizer_b.wrap_a_step((1, sample, 1, 1))
+            normalizer_b.update(sample)
 
         for sample in inputs_c:
-            o, _, _, _ = normalizer_c.wrap_a_step((1, sample, 1, 1))
+            normalizer_c.update(sample)
 
         combined_normalizer = normalizer_a + normalizer_b + normalizer_c
 
@@ -238,6 +238,15 @@ class AgentTest(unittest.TestCase):
             agent = PPOAgent(get_model_builder("ffn", True), gym.make("CartPole-v1"), 100, 8)
             agent.save_agent_state()
             new_agent = PPOAgent.from_agent_state(agent.agent_id)
+        except Exception:
+            self.assertTrue(False)
+
+    def test_evaluate(self):
+        ray.init(local_mode=True, logging_level=logging.CRITICAL)
+
+        try:
+            agent = PPOAgent(get_model_builder("ffn", True), gym.make("CartPole-v1"), 100, 8)
+            agent.evaluate(2, ray_already_initialized=True)
         except Exception:
             self.assertTrue(False)
 

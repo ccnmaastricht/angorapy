@@ -93,8 +93,8 @@ class _RunningMeanWrapper(_Wrapper, abc.ABC):
         delta = observation - self.mean
         m_a = self.variance * (self.n - 1)
 
-        self.mean = np.array(self.mean + delta * (1 / self.n))
-        self.variance = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n)
+        self.mean = np.array(self.mean + delta * (1 / self.n), dtype=NUMPY_FLOAT_PRECISION)
+        self.variance = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n, dtype=NUMPY_FLOAT_PRECISION)
 
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
@@ -130,7 +130,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
         self.update(o)
 
         # normalize
-        o = np.clip((o - self.mean) / (np.sqrt(self.variance + EPS)), -10., 10., dtype="float32")  # TODO clipping kills precision
+        o = np.clip((o - self.mean) / (np.sqrt(self.variance + EPS)), -10., 10.)
         return o, r, done, info
 
     def warmup(self, env: gym.Env, observations=10):
@@ -170,7 +170,7 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
         self.update(self.ret)
 
         # normalize
-        r = np.clip(r / (np.sqrt(self.variance + EPS)), -10., 10., dtype="float32")
+        r = np.clip(r / (np.sqrt(self.variance + EPS)), -10., 10.)
 
         if done:
             self.ret = 0.
@@ -204,12 +204,6 @@ class SkipWrapper(_Wrapper):
 class CombiWrapper(_Wrapper):
     """Combine any number of arbitrary wrappers into one using this interface. Meaningless wrappers (SkipWrappers) will
     be automatically neglected."""
-
-    def __new__(cls, wrappers):
-        # if no wrappers or only SkipWrappers were given, just return one SkipWrapper
-        if len(wrappers) == 0 or len(list(filter(lambda x: not isinstance(x, SkipWrapper), wrappers))) == 0:
-            return SkipWrapper()
-        return CombiWrapper(wrappers)
 
     def __init__(self, wrappers: Iterable[_Wrapper]):
         super().__init__()

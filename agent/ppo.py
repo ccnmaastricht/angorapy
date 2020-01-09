@@ -12,11 +12,7 @@ from collections import OrderedDict
 from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
-import matplotlib
-import matplotlib.pyplot as plt
-
 import gym
-import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -26,14 +22,14 @@ from tqdm import tqdm
 import models
 from agent import policy
 from agent.core import extract_discrete_action_probabilities
-from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
+from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
     reset_states_masked, detect_finished_episodes, get_layer_names, get_component
-from utilities.wrappers import StateNormalizationWrapper, _Wrapper, RewardNormalizationWrapper, CombiWrapper
+from utilities.wrappers import _Wrapper, CombiWrapper, SkipWrapper
 
 
 class PPOAgent:
@@ -91,8 +87,8 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
-        self.preprocessor = preprocessor
-        # self.preprocessor.warmup(self.env)  # TODO activate
+        self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
+        self.preprocessor.warmup(self.env)
         print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
@@ -396,7 +392,8 @@ class PPOAgent:
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (time_dict["gathering"])
+            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (
+            time_dict["gathering"])
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 
