@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from agent.policy import _PolicyDistribution, GaussianPolicyDistribution
+from agent.ppo import PPOAgent
 from models import build_ffn_models, get_model_builder, plot_model
 from utilities.util import parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
@@ -29,6 +30,11 @@ class Investigator:
         """
         self.network: tf.keras.Model = network
         self.distribution: _PolicyDistribution = distribution
+
+    @staticmethod
+    def from_agent(agent: PPOAgent):
+        """Instantiate an investigator from an agent object."""
+        return Investigator(agent.policy, agent.distribution)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
@@ -89,14 +95,32 @@ class Investigator:
 
         return list(zip(states, activations, reward_trajectory))
 
+    def render_episode(self, env: gym.Env):
+        """Render an episode in the given environment."""
+        is_recurrent = is_recurrent_model(self.network)
+
+        done = False
+        state = parse_state(env.reset())
+        cumulative_reward = 0
+        while not done:
+            env.render()
+            probabilities = flatten(self.network.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+
+            action, _ = self.distribution.act(*probabilities)
+            observation, reward, done, _ = env.step(action)
+            state = parse_state(observation)
+            cumulative_reward += reward
+
+        print(f"Achieved a score of {cumulative_reward}. {'Good Boy!' if cumulative_reward > env.spec.reward_threshold else ''}")
+
 
 if __name__ == "__main__":
+    os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    environment = gym.make("LunarLanderContinuous-v2")
-    network, _, _ = get_model_builder("rnn", False)(environment)
-    inv = Investigator(network, GaussianPolicyDistribution())
+    agent_007 = PPOAgent.from_agent_state(1578664065)
+    inv = Investigator.from_agent(agent_007)
 
-    for ln in inv.list_layer_names():
-        tuples = inv.get_activations_over_episode(ln, environment, True)
-        pprint(tuples)
+    inv.render_episode(agent_007.env)
+
+

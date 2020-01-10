@@ -281,6 +281,8 @@ class InvestigatorTest(unittest.TestCase):
         for ln in inv.list_layer_names():
             inv.get_activations_over_episode(ln, environment)
 
+        self.assertTrue(True)
+
 
 if __name__ == '__main__':
     tf.config.experimental_run_functions_eagerly(True)

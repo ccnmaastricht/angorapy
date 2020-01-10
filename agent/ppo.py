@@ -618,7 +618,7 @@ class PPOAgent:
             parameters = json.load(f)
 
         model_builder = getattr(models, parameters["builder_function_name"])
-
+        distribution = getattr(policy, parameters["distribution"])()
         env = gym.make(parameters["env_name"])
 
         loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
@@ -628,9 +628,12 @@ class PPOAgent:
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"],
-                                distribution=getattr(policy, parameters["distribution"])(), _make_dirs=False)
+                                distribution=distribution, _make_dirs=False)
 
         for p, v in parameters.items():
+            if p in ["distribution"]:
+                continue
+
             if p == "preprocessor":
                 loaded_agent.__dict__[p] = CombiWrapper.from_serialization(v)
             else:
