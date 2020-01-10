@@ -273,6 +273,14 @@ class InvestigatorTest(unittest.TestCase):
             except Exception:
                 self.assertTrue(False)
 
+    def test_get_activations_over_episode(self):
+        environment = gym.make("LunarLanderContinuous-v2")
+        network, _, _ = get_model_builder("rnn", False)(environment)
+        inv = Investigator(network, GaussianPolicyDistribution())
+
+        for ln in inv.list_layer_names():
+            inv.get_activations_over_episode(ln, environment)
+
 
 if __name__ == '__main__':
     tf.config.experimental_run_functions_eagerly(True)
