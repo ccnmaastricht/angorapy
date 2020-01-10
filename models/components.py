@@ -20,17 +20,33 @@ def _build_fcn_component(input_dim: int, hidden_dim: int, output_dim: int, batch
 
 
 def _build_encoding_sub_model(shape, batch_size, layer_sizes=(64, 64), name=None):
+    # TODO merge
+    # assert len(layer_sizes) > 0, "You need at least one layer in an encoding submodel."
+    #
+    # model = tf.keras.Sequential(name=name)
+    # for i in range(len(layer_sizes)):
+    #     model.add(tf.keras.layers.Dense(layer_sizes[i],
+    #                                     kernel_initializer=tf.keras.initializers.Orthogonal(gain=tf.sqrt(2.0)),
+    #                                     bias_initializer=tf.constant_initializer(0.0)))
+    #     model.add(tf.keras.layers.Activation("tanh"))
+    # model.build(input_shape=(batch_size,) + shape)
+    #
+    # inputs = tf.keras.layers.Input()
+    #
+    # return model
+
     assert len(layer_sizes) > 0, "You need at least one layer in an encoding submodel."
 
-    model = tf.keras.Sequential(name=name)
-    for i in range(len(layer_sizes)):
-        model.add(tf.keras.layers.Dense(layer_sizes[i],
-                                        kernel_initializer=tf.keras.initializers.Orthogonal(gain=tf.sqrt(2.0)),
-                                        bias_initializer=tf.constant_initializer(0.0)))
-        model.add(tf.keras.layers.Activation("tanh"))
-    model.build(input_shape=(batch_size,) + shape)
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
-    return model
+    x = tf.keras.layers.Dense(layer_sizes[0])(inputs)
+    x = tf.keras.layers.Activation("tanh")(x)
+
+    for i in range(1, len(layer_sizes)):
+        x = tf.keras.layers.Dense(layer_sizes[i])(x)
+        x = tf.keras.layers.Activation("tanh")(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
 
 # POLICY HEADS

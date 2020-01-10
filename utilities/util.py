@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Helper functions."""
-import itertools
 import random
 from typing import Tuple, Union, List
 
@@ -11,7 +10,6 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.client import device_lib
-from tensorflow.keras import backend as K
 
 
 def get_available_gpus():
@@ -101,13 +99,22 @@ def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
                      for i in range(len(list_of_states[0])))
 
 
-def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
+def list_layer_names(network, only_para_layers=True) -> List[str]:
+    """Get a list of unique string representations of all layers in the network."""
+    if only_para_layers:
+        return [layer.name for layer in extract_layers(network) if
+                not isinstance(layer, (tf.keras.layers.Activation, tf.keras.layers.InputLayer))]
+    else:
+        return [layer.name for layer in extract_layers(network)]
+
+
+def extract_layers(network: tf.keras.Model, unfold_tds: bool = False) -> List[tf.keras.layers.Layer]:
     """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
     layers = []
     for l in network.layers:
         if isinstance(l, tf.keras.Model) or isinstance(l, tf.keras.Sequential):
             layers.append(extract_layers(l))
-        elif isinstance(l, tf.keras.layers.TimeDistributed):
+        elif isinstance(l, tf.keras.layers.TimeDistributed) and unfold_tds:
             if isinstance(l.layer, tf.keras.Model) or isinstance(l.layer, tf.keras.Sequential):
                 layers.append(extract_layers(l.layer))
             else:
@@ -196,7 +203,7 @@ def calc_max_memory_usage(model: tf.keras.Model):
 
     total_memory = (n_shapes + n_parameters + n_activations) * 32
 
-    return total_memory * 1.1641532182693481*10**-10
+    return total_memory * 1.1641532182693481 * 10 ** -10
 
 
 if __name__ == "__main__":
@@ -204,4 +211,3 @@ if __name__ == "__main__":
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-

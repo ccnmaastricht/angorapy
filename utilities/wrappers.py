@@ -2,7 +2,7 @@
 import abc
 import inspect
 import sys
-from typing import Tuple, List, Iterable
+from typing import Tuple, Iterable
 
 import gym
 import numpy as np

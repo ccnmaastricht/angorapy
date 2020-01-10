@@ -9,5 +9,6 @@ from models.mighty_maker import *
 
 
 def get_model_builder(model_type: str, shared: bool):
+    # TODO shared seems not to work yet
     params = [str(val) for key, val in sorted(locals().items(), key=lambda x: x[0])]
     return globals()[f"build_{'_'.join(params)}_models"]
