@@ -36,6 +36,21 @@ continuous = make_config(
     clip_values=False
 )
 
+bipedal = make_config(
+    batch_size=32,
+    horizon=2048,
+    c_entropy=0.0,
+    lr_pi=0.0001,
+    epochs=10,
+    clip=0.2,
+    lam=0.95,
+    discount=0.99,
+    grad_norm=0.5,
+    iterations=1000,
+    workers=8,
+    clip_values=False
+)
+
 mujoco = make_config(
     iterations=1000000//2048,   # one million timesteps
     workers=1,
