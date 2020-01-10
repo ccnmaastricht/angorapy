@@ -13,7 +13,8 @@ from tqdm import tqdm
 from environments import *
 from models.components import _build_fcn_component, _build_continuous_head, _build_discrete_head
 from models.convolutional import _build_visual_encoder
-from utilities.util import env_extract_dims, calc_max_memory_usage
+from utilities.util import env_extract_dims
+from utilities.model_management import calc_max_memory_usage
 
 
 def build_shadow_brain_v1(env: gym.Env, bs: int):

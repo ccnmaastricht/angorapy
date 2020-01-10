@@ -17,7 +17,8 @@ from environments import *
 from models import build_ffn_models, build_rnn_models
 from utilities.const import STORAGE_DIR, DETERMINISTIC, COLORS, DEBUG
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
-from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, set_all_seeds, env_extract_dims
+from utilities.util import parse_state, add_state_dims, flatten, set_all_seeds, env_extract_dims
+from utilities.model_management import is_recurrent_model
 from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper
 
 

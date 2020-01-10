@@ -1,3 +1,4 @@
+import itertools
 import logging
 import os
 import random
@@ -13,9 +14,11 @@ from scipy.stats import norm, entropy
 from agent.core import extract_discrete_action_probabilities, estimate_advantage
 from agent.policy import GaussianPolicyDistribution, CategoricalPolicyDistribution
 from agent.ppo import PPOAgent
+from analysis.investigation import Investigator
 from models import get_model_builder
 from utilities.const import NUMPY_FLOAT_PRECISION
-from utilities.util import reset_states_masked
+from utilities.model_management import reset_states_masked
+from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -249,6 +252,26 @@ class AgentTest(unittest.TestCase):
             agent.evaluate(2, ray_already_initialized=True)
         except Exception:
             self.assertTrue(False)
+
+
+class InvestigatorTest(unittest.TestCase):
+
+    def test_get_activations(self):
+        env = gym.make("LunarLanderContinuous-v2")
+
+        for model_type, shared in itertools.product(["ffn", "rnn"], [True, False]):
+            try:
+                network, _, _ = get_model_builder(model_type, shared)(env)
+                inv = Investigator(network, GaussianPolicyDistribution())
+                print(inv.list_layer_names())
+
+                # get activations
+                input_tensor = tf.random.normal(insert_unknown_shape_dimensions(network.input_shape))
+                for layer_name in inv.list_layer_names():
+                    activation_rec = inv.get_layer_activations(layer_name, input_tensor=input_tensor)
+                    print(activation_rec)
+            except Exception:
+                self.assertTrue(False)
 
 
 if __name__ == '__main__':

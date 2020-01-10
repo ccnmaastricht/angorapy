@@ -27,8 +27,8 @@ from agent.gather import collect, evaluate
 from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
-from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
-    reset_states_masked, detect_finished_episodes, get_layer_names, get_component
+from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
+from utilities.model_management import is_recurrent_model, get_layer_names, get_component, reset_states_masked
 from utilities.wrappers import _Wrapper, CombiWrapper, SkipWrapper
 
 

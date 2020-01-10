@@ -12,7 +12,8 @@ from sklearn.manifold import TSNE
 from tqdm import tqdm
 import tensorflow_datasets as tfds
 
-from utilities.util import normalize, extract_layers
+from utilities.util import normalize
+from utilities.model_management import extract_layers
 
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 
