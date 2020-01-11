@@ -15,7 +15,7 @@ from utilities.util import add_state_dims, env_extract_dims
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths", "tbptt_underflow"])
-ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights"])
+ModelTuple = namedtuple("ModelTuple", ["model_builder", "weights", "distribution_type"])
 
 
 class ExperienceBuffer:
@@ -47,8 +47,7 @@ class ExperienceBuffer:
 
     def fill(self, s, a, ap, adv, ret, v):
         """Fill the buffer with 5-tuple of experience."""
-        assert np.all(np.array([len(s), len(a), len(ap), len(ret), len(adv), len(v)]) == len(s)), \
-            "Inconsistent input sizes."
+        assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), "Inconsistent input sizes."
 
         self.capacity = len(adv)
         self.advantages, self.returns, self.action_probabilities, self.actions, self.states = adv, ret, ap, a, s

@@ -2,7 +2,6 @@
 """Normalization methods."""
 import os
 
-import numpy
 import tensorflow as tf
 from tensorflow import Tensor
 
@@ -15,7 +14,7 @@ class RunningNormalization(tf.keras.layers.Layer):
     keeps track of running means and standard deviations, based on which the transformation is applied.
     """
     mu: Tensor
-    std: Tensor
+    variance: Tensor
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -59,7 +58,7 @@ if __name__ == "__main__":
 
     normalizer = RunningNormalization()
 
-    std = tf.convert_to_tensor(list(range(1, 7)), dtype=tf.float32)
+    variance = tf.convert_to_tensor(list(range(1, 7)), dtype=tf.float32)
     mean = tf.convert_to_tensor(list(range(1, 7)), dtype=tf.float32)
     inputs = [tf.random.normal([5, 6]) for _ in range(1000)]
     all = tf.concat(inputs, axis=0)
@@ -68,7 +67,7 @@ if __name__ == "__main__":
     print(tf.math.reduce_std(all))
 
     for batch in inputs:
-        normalizer(batch * std + mean)
+        normalizer(batch * variance + mean)
 
     print(normalizer.mu)
     print(normalizer.std)

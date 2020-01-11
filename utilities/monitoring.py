@@ -16,7 +16,6 @@ from matplotlib import animation
 from matplotlib.axes import Axes
 from scipy.signal import savgol_filter
 
-from agent.policy import act_discrete, act_continuous
 from agent.ppo import PPOAgent
 from utilities import const
 from utilities.util import parse_state, add_state_dims, flatten
@@ -34,9 +33,10 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None):
         self.agent = agent
         self.env = env
+        self.iterations = iterations
 
         self.frequency = frequency
         self.gif_every = gif_every
@@ -76,7 +76,7 @@ class Monitor:
                 frames.append(self.env.render(mode="rgb_array"))
 
                 probabilities = flatten(pi.predict(add_state_dims(state, dims=2 if self.agent.is_recurrent else 1)))
-                action, _ = act_continuous(*probabilities) if self.continuous_control else act_discrete(*probabilities)
+                action, _ = self.agent.distribution.act(*probabilities)
                 observation, reward, done, _ = self.env.step(
                     numpy.atleast_1d(action) if self.continuous_control else action)
                 state = parse_state(observation)
@@ -140,6 +140,8 @@ class Monitor:
             json.dump(progress, f)
 
     def _make_graph(self, ax, lines, labels, name):
+        if self.iterations is not None:
+            ax.set_xbound(0, self.iterations)
         ax.set_title(ax.get_title(),
                      fontdict={'fontsize': "large",
                                'fontweight': "bold",

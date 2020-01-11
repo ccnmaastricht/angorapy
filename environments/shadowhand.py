@@ -6,7 +6,6 @@ import numpy as np
 from gym import utils, spaces
 from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.manipulate_touch_sensors import MANIPULATE_BLOCK_XML, MANIPULATE_EGG_XML
-from mujoco_py import GlfwContext
 
 
 class ShadowHand(manipulate.ManipulateEnv):
@@ -36,6 +35,7 @@ class ShadowHand(manipulate.ManipulateEnv):
 
         if visual_input:
             # init rendering [IMPORTANT]
+            from mujoco_py import GlfwContext
             GlfwContext(offscreen=True, quiet=True)
 
         self.touch_visualisation = touch_visualisation

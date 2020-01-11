@@ -29,6 +29,5 @@ y = tf.keras.layers.Dense(10, name="od_4")(y)
 final_model = tf.keras.Model(inputs=[inp_outer], outputs=[y])
 final_model.summary()
 
-sub_model = tf.keras.Model(inputs=[final_model.input], outputs=[final_model.get_layer("inner_model").get_layer("id_1").output])
+sub_model = tf.keras.Model(inputs=[final_model.input], outputs=[final_model.get_layer("inner_model").get_layer("id_1").get_output_at(0)])
 sub_model.summary()
-

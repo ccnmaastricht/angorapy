@@ -1,28 +1,30 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
 import os
-import random
 from inspect import getfullargspec as fargs
 from typing import Tuple
 
 import numpy as np
 import ray
 import tensorflow as tf
-from gym.spaces import Box, Discrete
+from gym.spaces import Box
 
 import models
+from agent import policy
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
-from agent.policy import act_discrete, act_continuous
 from environments import *
 from models import build_ffn_models, build_rnn_models
-from utilities.const import STORAGE_DIR
+from utilities.const import STORAGE_DIR, DETERMINISTIC, COLORS, DEBUG
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
-from utilities.util import parse_state, add_state_dims, is_recurrent_model, flatten, set_all_seeds
+from utilities.util import parse_state, add_state_dims, flatten, set_all_seeds, env_extract_dims
+from utilities.model_management import is_recurrent_model
+from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper
 
 
 @ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
-def collect(model, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int):
+def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int,
+            preprocessor):
     """Collect a batch shard of experience for a given number of timesteps."""
 
     # import here to avoid pickling errors
@@ -30,19 +32,20 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     # build new environment for each collector to make multiprocessing possible
     env = gym.make(env_name)
+    if DETERMINISTIC:
+        env.seed(1)
 
     is_continuous = isinstance(env.action_space, Box)
     is_shadow_brain = "ShadowHand" in env_name
 
     # load policy
-    if isinstance(model, str):
-        joint = tfl.keras.models.load_model(f"{model}/model")
-    elif isinstance(model, ModelTuple):
-        model_builder = getattr(models, model.model_builder)
+    if isinstance(policy_tuple, ModelTuple):
+        model_builder = getattr(models, policy_tuple.model_builder)
+        distribution = getattr(policy, policy_tuple.distribution_type)()
 
         # recurrent policy needs batch size for statefulness
         _, _, joint = model_builder(env, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
-        joint.set_weights(model.weights)
+        joint.set_weights(policy_tuple.weights)
     else:
         raise ValueError("Unknown input for model.")
 
@@ -64,25 +67,28 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
     states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
     episode_endpoints = []
-    state = parse_state(env.reset())
+    state = env.reset()
+    state = preprocessor.wrap_a_step((state, None, None, None))[0]
     while t < horizon:
         current_subseq_length += 1
 
         # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
-        policy_out = flatten(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+        policy_out = flatten(joint.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
         a_distr, value = policy_out[:-1], policy_out[-1]
         states.append(state)
         values.append(np.squeeze(value))
 
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = act_continuous(*a_distr) if is_continuous else act_discrete(*a_distr)
+        action, action_probability = distribution.act(*a_distr)
+        action = action if not DETERMINISTIC else np.zeros(action.shape)
         actions.append(action)
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
         # make a step based on the chosen action and collect the reward for this state
         observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
+        current_episode_return += reward  # true reward for stats
+        observation, reward, done, _ = preprocessor.wrap_a_step((observation, reward, done, None))
         rewards.append(reward)
-        current_episode_return += reward
 
         # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
         if is_recurrent and (current_subseq_length == subseq_length or done):
@@ -112,7 +118,8 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
                 joint.reset_states()
 
             # reset environment to receive next episodes initial state
-            state = parse_state(env.reset())
+            state = env.reset()
+            state = preprocessor.wrap_a_step((state, None, None, None))[0]
 
             # update/reset some statistics and trackers
             buffer.episode_lengths.append(episode_steps)
@@ -121,7 +128,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
             episode_steps = 1
             current_episode_return = 0
         else:
-            state = parse_state(observation)
+            state = observation
             episode_steps += 1
 
         t += 1
@@ -145,35 +152,62 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
 
     # if not recurrent, fill the buffer with everything we gathered
     if not is_recurrent:
-        values = np.array(values, dtype=np.float32)
+        values = np.array(values, dtype="float32")
 
         # write to the buffer
-        advantages = np.hstack(advantages)
-        buffer.fill(np.array(states, dtype=np.float32),
-                    np.array(actions, dtype=np.float32 if is_continuous else np.int32),
-                    np.array(action_probabilities, dtype=np.float32),
+        advantages = np.hstack(advantages).astype("float32")
+        returns = advantages + values[:-1]
+        buffer.fill(np.array(states, dtype="float32"),
+                    np.array(actions, dtype="float32" if is_continuous else "int32"),
+                    np.array(action_probabilities, dtype="float32"),
                     advantages,
-                    advantages + values[:-1],
+                    returns,
                     values[:-1])
 
     # normalize advantages
     buffer.normalize_advantages()
 
+    if DEBUG:
+        mc = COLORS["FAIL"]
+        ec = COLORS["ENDC"]
+        np.set_printoptions(linewidth=250, floatmode="fixed")
+        print("LAST FIVES\n---------")
+        print(f"{mc}states{ec}: {buffer.states[-5:]}")
+        print(f"{mc}rewards{ec}: {rewards[-5:]}")
+        print(f"{mc}advantages{ec}: {advantages[-5:]}")
+        print(f"{mc}returns{ec}: {returns[-5:]}")
+        print(f"{mc}values{ec}: {buffer.values[-5:]}")
+        print(f"{mc}actions{ec}: {buffer.actions[-5:]}")
+        print(f"{mc}action probabilities{ec}: {buffer.action_probabilities[-5:]}")
+        print(f"{mc}action mean{ec}: {np.mean(actions)}: {np.mean(actions, axis=0)}")
+        print(f"{mc}values mean{ec}: {np.mean(buffer.values)}")
+
+        print("\n\nWRAPPERS\n---------")
+        print(f"{mc}State Wrapper Mean{ec}: {preprocessor[0].mean}")
+        print(f"{mc}State Wrapper Var{ec}: {preprocessor[0].variance}")
+        print(f"{mc}Reward Wrapper Mean{ec}: {preprocessor[1].mean}")
+        print(f"{mc}Reward Wrapper Variance{ec}: {preprocessor[1].variance}")
+
+        import matplotlib.pyplot as plt
+        import matplotlib
+        plt.hist(buffer.values, label="value")
+        plt.hist(buffer.returns, label="return")
+        plt.hist(advantages, label="adv")
+        plt.hist(rewards, label="rewards")
+        plt.hist(tf.square(buffer.values - buffer.returns), label="squared value-return")
+        plt.hist(buffer.action_probabilities, label="aprob")
+        plt.hist(np.mean(buffer.actions, axis=-1), label="action")
+
+        # plt.hist(buffer.advantages + buffer.values, label="return after norm")
+        matplotlib.use('TkAgg')
+        plt.legend()
+        plt.title("GATHER DISTRIBUTION")
+        plt.show()
+        exit()
+
     if is_recurrent:
         # add batch dimension for optimization
         buffer.inject_batch_dimension()
-
-    # import matplotlib.pyplot as plt
-    # import matplotlib
-    # plt.hist(buffer.values, label="value")
-    # plt.hist(buffer.returns, label="return")
-    # plt.hist(rewards, label="rewards")
-    # plt.hist(buffer.advantages, label="adv")
-    # plt.hist(np.mean(buffer.actions, axis=-1), label="act")
-    # plt.hist(np.abs(buffer.values - buffer.returns), label="squared diff")
-    # matplotlib.use('TkAgg')
-    # plt.legend()
-    # plt.show()
 
     # convert buffer to dataset and save it to tf record
     dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
@@ -183,7 +217,7 @@ def collect(model, horizon: int, env_name: str, discount: float, lam: float, sub
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
-    return stats
+    return stats, preprocessor
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -193,19 +227,13 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
 
     if isinstance(policy_tuple, ModelTuple):
         model_builder = getattr(models, policy_tuple.model_builder)
+        distribution = getattr(policy, policy_tuple.distribution_type)()
 
         # recurrent policy needs batch size for statefulness
         policy, _, _ = model_builder(environment, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
         policy.set_weights(policy_tuple.weights)
     else:
         raise ValueError("Cannot handle given model type. Should be a ModelTuple.")
-
-    if isinstance(environment.action_space, Discrete):
-        continuous_control = False
-    elif isinstance(environment.action_space, Box):
-        continuous_control = True
-    else:
-        raise ValueError("Unknown action space.")
 
     is_recurrent = is_recurrent_model(policy)
     done = False
@@ -215,7 +243,7 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
     while not done:
         probabilities = flatten(policy.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
 
-        action, _ = act_continuous(*probabilities) if continuous_control else act_discrete(*probabilities)
+        action, _ = distribution.act(*probabilities)
         observation, reward, done, _ = environment.step(action)
         state = parse_state(observation)
         reward_trajectory.append(reward)
@@ -240,13 +268,17 @@ if __name__ == "__main__":
     set_all_seeds(1)
 
     env_n = "HalfCheetah-v2"
-    p, v, j = build_ffn_models(gym.make(env_n))
-    joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights())
-    rp, rv, rj = build_rnn_models(gym.make(env_n))
-    rjoint_tuple = ModelTuple(build_rnn_models.__name__, rj.get_weights())
+    env = gym.make(env_n)
+    sd, ad = env_extract_dims(env)
+    p, v, j = models.get_model_builder("ffn", False)(env)
+    joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights(), "GaussianPolicyDistribution")
+    rp, rv, rj = models.get_model_builder("rnn", False)(env)
+    rjoint_tuple = ModelTuple(build_rnn_models.__name__, rj.get_weights(), "GaussianPolicyDistribution")
+
+    wrapper = CombiWrapper((StateNormalizationWrapper(sd), RewardNormalizationWrapper()))
 
     ray.init(local_mode=True)
     print("FFN")
-    outs_ffn = [ray.get(collect.remote(joint_tuple, 32, env_n, 0.99, 0.95, 16, 0)) for _ in range(1)]
+    outs_ffn = [ray.get(collect.remote(joint_tuple, 32, env_n, 0.99, 0.95, 16, 0, wrapper)) for _ in range(1)]
     print("\nRNN")
-    outs_rnn = [ray.get(collect.remote(rjoint_tuple, 32, env_n, 0.99, 0.95, 16, 0)) for _ in range(1)]
+    outs_rnn = [ray.get(collect.remote(rjoint_tuple, 32, env_n, 0.99, 0.95, 16, 0, wrapper)) for _ in range(1)]

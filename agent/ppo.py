@@ -12,11 +12,7 @@ from collections import OrderedDict
 from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
-import matplotlib
-import matplotlib.pyplot as plt
-
 import gym
-import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -24,14 +20,16 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
+from agent import policy
 from agent.core import extract_discrete_action_probabilities
-from agent.probability import gaussian_log_pdf, approx_gaussian_entropy_from_log, categorical_entropy_from_log
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
+from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
-from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, is_recurrent_model, \
-    reset_states_masked, detect_finished_episodes, get_layer_names, get_component
+from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
+from utilities.model_management import is_recurrent_model, get_layer_names, get_component, reset_states_masked
+from utilities.wrappers import _Wrapper, CombiWrapper, SkipWrapper
 
 
 class PPOAgent:
@@ -48,13 +46,14 @@ class PPOAgent:
     joint: tf.keras.Model
 
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate: float = 0.001,
-                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
-                 c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
-                 clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
-                 pretrained_components: list = None, _make_dirs=True, debug: bool = False):
+                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
+                 c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
+                 tbptt_length: int = 16, lr_schedule: str = None, distribution: _PolicyDistribution = None,
+                 preprocessor=None, _make_dirs=True, debug: bool = False, pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
+            preprocessor:
             model_builder: a function creating a policy, value and joint model
             environment (gym.Env): the environment in which the agent will learn 
             horizon (int): the number of timesteps each worker collects 
@@ -88,6 +87,9 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
+        self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
+        self.preprocessor.warmup(self.env)
+        print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
         self.horizon = horizon
@@ -103,12 +105,13 @@ class PPOAgent:
         self.tbptt_length = tbptt_length
 
         # learning rate schedule
+        self.lr_schedule_type = lr_schedule
         if lr_schedule is None:
             self.lr_schedule = learning_rate
         elif lr_schedule.lower() == "exponential":
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                 initial_learning_rate=self.learning_rate,
-                decay_steps=1000,
+                decay_steps=workers * horizon,  # decay after every cycle
                 decay_rate=0.98
             )
         else:
@@ -119,6 +122,10 @@ class PPOAgent:
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
             model_builder).args else {}))
+        self.distribution = distribution
+        if self.distribution is None:
+            self.distribution = CategoricalPolicyDistribution() if not self.continuous_control else GaussianPolicyDistribution()
+        assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
 
         if pretrained_components is not None:
             print("Loading pretrained components:")
@@ -233,7 +240,6 @@ class PPOAgent:
             # clips value error to reduce variance
             clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
             clipped_error = tf.square(clipped_values - returns)
-
             error = tf.maximum(clipped_error, error)
 
         if self.is_recurrent:
@@ -257,9 +263,8 @@ class PPOAgent:
           entropy bonus
         """
         if self.continuous_control:
-            return tf.reduce_mean(approx_gaussian_entropy_from_log(policy_output[1]))
-        else:
-            return tf.reduce_mean(categorical_entropy_from_log(policy_output))
+            policy_output = policy_output[1]
+        return tf.reduce_mean(self.distribution.entropy_from_log(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False, ray_already_initialized: bool = False) -> "PPOAgent":
@@ -313,20 +318,24 @@ class PPOAgent:
                 self.joint.save(f"{self.model_export_dir}/{name_key}/model")
                 model_representation = f"{self.model_export_dir}/{name_key}/"
             else:
-                model_representation = ModelTuple(self.builder_function_name, self.joint.get_weights())
+                model_representation = ModelTuple(self.builder_function_name,
+                                                  self.joint.get_weights(),
+                                                  self.distribution.__class__.__name__)
 
             # create processes and execute them
-            split_stats = ray.get([collect.remote(model_representation, self.horizon, self.env_name, self.discount,
-                                                  self.lam, self.tbptt_length, pid) for pid in range(self.workers)])
+            split_stats, split_preprocessors = zip(*ray.get([collect.remote(model_representation, self.horizon,
+                                                                            self.env_name, self.discount, self.lam,
+                                                                            self.tbptt_length, pid, self.preprocessor)
+                                                             for pid in range(self.workers)]))
             stats = condense_stats(split_stats)
-
-            time_dict["gathering"] = time.time() - subprocess_start
-            subprocess_start = time.time()
+            old_n = self.preprocessor.n
+            self.preprocessor = _Wrapper.from_collection(split_preprocessors)
+            self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for overcounting
 
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
 
-            time_dict["communication"] = time.time() - subprocess_start
+            time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
             # clean up the saved models
@@ -383,7 +392,8 @@ class PPOAgent:
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (time_dict["gathering"])
+            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (
+            time_dict["gathering"])
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 
@@ -400,8 +410,7 @@ class PPOAgent:
 
             if self.continuous_control:
                 # if action space is continuous, calculate PDF at chosen action value
-                means, stdevs = policy_output
-                action_probabilities = gaussian_log_pdf(batch["action"], means=means, log_stdevs=stdevs)
+                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
             else:
                 # if the action space is discrete, extract the probabilities of actions actually chosen
                 action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
@@ -514,7 +523,9 @@ class PPOAgent:
         if not ray_already_initialized:
             ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
-        model_representation = ModelTuple(self.builder_function_name, self.policy.get_weights())
+        model_representation = ModelTuple(self.builder_function_name,
+                                          self.policy.get_weights(),
+                                          self.distribution.__class__.__name__)
         result_ids = [evaluate.remote(model_representation, self.env_name) for _ in range(n)]
 
         lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])
@@ -538,12 +549,12 @@ class PPOAgent:
             current_lr = self.lr_schedule
 
         # make fps string
-        fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]fps"
+        fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]"
 
         # losses
-        pi_loss = 0 if len(self.policy_loss_history) == 0 else round(self.policy_loss_history[-1], 2)
-        v_loss = 0 if len(self.value_loss_history) == 0 else round(self.value_loss_history[-1], 2)
-        ent = 0 if len(self.entropy_history) == 0 else round(self.entropy_history[-1], 2)
+        pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
+        v_loss = "-" if len(self.value_loss_history) == 0 else f"{round(self.value_loss_history[-1], 2):8.2f}"
+        ent = "-" if len(self.entropy_history) == 0 else f"{round(self.entropy_history[-1], 2):6.2f}"
 
         # tbptt underflow
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
@@ -552,7 +563,7 @@ class PPOAgent:
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"r: {ac}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
                    f"len: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
-                   f"loss: [{nc}{pi_loss:6.2f}{ec}|{nc}{v_loss:8.2f}{ec}|{nc}{ent:6.2f}{ec}]; "
+                   f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
                    f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
                    f"lr: {nc}{current_lr:.2e}{ec}; "
                    f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
@@ -571,11 +582,14 @@ class PPOAgent:
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
         del parameters["env"]
-        del parameters["policy"], parameters["value"], parameters["joint"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"]
+        del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["preprocessor"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
+
+        parameters["preprocessor"] = self.preprocessor.serialize()
+        parameters["distribution"] = self.distribution.__class__.__name__
 
         return parameters
 
@@ -604,26 +618,26 @@ class PPOAgent:
             parameters = json.load(f)
 
         model_builder = getattr(models, parameters["builder_function_name"])
-
+        distribution = getattr(policy, parameters["distribution"])()
         env = gym.make(parameters["env_name"])
 
-        loaded_agent = PPOAgent(model_builder,
-                                environment=env,
-                                horizon=parameters["horizon"],
-                                workers=parameters["workers"],
-                                learning_rate=parameters["learning_rate"],
-                                discount=parameters["discount"],
-                                lam=parameters["lam"],
-                                clip=parameters["clip"],
-                                c_entropy=parameters["c_entropy"],
-                                c_value=parameters["c_value"],
+        loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
+                                workers=parameters["workers"], learning_rate=parameters["learning_rate"],
+                                discount=parameters["discount"], lam=parameters["lam"], clip=parameters["clip"],
+                                c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"],
-                                clip_values=parameters["clip_values"],
-                                tbptt_length=parameters["tbptt_length"],
-                                _make_dirs=False)
+                                clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
+                                lr_schedule=parameters["lr_schedule_type"],
+                                distribution=distribution, _make_dirs=False)
 
         for p, v in parameters.items():
-            loaded_agent.__dict__[p] = v
+            if p in ["distribution"]:
+                continue
+
+            if p == "preprocessor":
+                loaded_agent.__dict__[p] = CombiWrapper.from_serialization(v)
+            else:
+                loaded_agent.__dict__[p] = v
 
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{latest}/weights")
 

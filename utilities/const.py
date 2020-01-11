@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Constants."""
+import numpy as np
 
-EPS = 1e-7
+EPS = 1e-8
 
 COLORS = dict(
     HEADER='\033[95m',
@@ -17,3 +18,9 @@ COLORS = dict(
 BASE_SAVE_PATH = "storage/saved_models/states/"
 STORAGE_DIR = "storage/experience/"
 PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
+NUMPY_FLOAT_PRECISION = np.float64
+NUMPY_INTEGER_PRECISION = np.int64
+
+# DEBUGGING
+DETERMINISTIC = False
+DEBUG = False

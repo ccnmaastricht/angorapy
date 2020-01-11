@@ -3,6 +3,7 @@ import logging
 
 import argcomplete
 
+from agent.policy import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import *
 from models import get_model_builder
@@ -11,6 +12,7 @@ from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
+from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
 
 
 class InconsistentArgumentError(Exception):
@@ -28,7 +30,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
 
     # setup environment and extract and report information
     env = gym.make(settings.env)
-    state_dimensionality, number_of_actions = env_extract_dims(env)
+    state_dim, number_of_actions = env_extract_dims(env)
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
@@ -42,14 +44,25 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     else:
         build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
 
+    # choose and make policy distribution
+    if settings.distribution is None:
+        settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
+
+    distribution = get_distribution_by_short_name(settings.distribution)
+
+    # make preprocessor
+    preprocessor = CombiWrapper([StateNormalizationWrapper(state_dim) if not settings.no_state_norming else SkipWrapper(),
+                                 RewardNormalizationWrapper() if not settings.no_reward_norming else SkipWrapper()])
+
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
     if verbose:
         print(f"-----------------------------------------\n"
               f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
-              f"{bc}{state_dimensionality}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
+              f"{bc}{state_dim}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
               f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
               f"Model: {build_models.__name__}\n"
+              f"Distribution: {settings.distribution}\n"
               f"-----------------------------------------\n")
 
         print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
@@ -64,10 +77,10 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings.horizon, workers=settings.workers,
-                         learning_rate=settings.lr_pi, discount=settings.discount,
+                         learning_rate=settings.lr_pi, lr_schedule=settings.lr_schedule, discount=settings.discount,
                          clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
-                         gradient_clipping=settings.grad_norm, clip_values=settings.no_value_clip,
-                         tbptt_length=settings.tbptt,
+                         gradient_clipping=settings.grad_norm, clip_values=settings.clip_values,
+                         tbptt_length=settings.tbptt, distribution=distribution, preprocessor=preprocessor,
                          pretrained_components=None if args.preload is None else [args.preload], debug=settings.debug)
 
         if verbose:
@@ -75,7 +88,8 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
 
     agent.set_gpu(not settings.cpu)
 
-    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every)
+    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every,
+                      iterations=settings.iterations)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
 
@@ -95,6 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if not shadowhand")
+    parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta"])
     parser.add_argument("--shared", action="store_true",
                         help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
@@ -116,17 +131,21 @@ if __name__ == "__main__":
     parser.add_argument("--horizon", type=int, default=1024, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
+    parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")
+    parser.add_argument("--no-reward-norming", action="store_true", help=f"do not normalize rewards")
 
     # optimization parameters
     parser.add_argument("--epochs", type=int, default=3, help=f"the number of optimization epochs in each cycle")
     parser.add_argument("--batch-size", type=int, default=64, help=f"minibatch size during optimization")
     parser.add_argument("--lr-pi", type=float, default=1e-3, help=f"learning rate of the policy")
+    parser.add_argument("--lr-schedule", type=str, default=None, choices=[None, "exponential"],
+                        help=f"lr schedule type")
     parser.add_argument("--clip", type=float, default=0.2, help=f"clipping range around 1 for the objective function")
     parser.add_argument("--c-entropy", type=float, default=0.01, help=f"entropy factor in objective function")
     parser.add_argument("--c-value", type=float, default=1, help=f"value factor in objective function")
     parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping, 0 deactivates")
-    parser.add_argument("--no-value-clip", action="store_false", help=f"deactivate clipping in value objective")
+    parser.add_argument("--clip-values", action="store_true", help=f"clip value objective")
 
     # read arguments
     argcomplete.autocomplete(parser)

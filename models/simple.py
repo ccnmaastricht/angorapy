@@ -24,11 +24,10 @@ def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
 
     # input preprocessing
     inputs = tf.keras.Input(shape=(state_dimensionality,))
-    normalized = RunningNormalization()(inputs)
 
     # policy network
-    latent = _build_encoding_sub_model(normalized.shape[1:], None, layer_sizes=encoding_layer_sizes,
-                                       name="policy_encoder")(normalized)
+    latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=encoding_layer_sizes,
+                                       name="policy_encoder")(inputs)
     if continuous_control:
         out_policy = _build_continuous_head(n_actions, (64,), None)(latent)
     else:
@@ -38,8 +37,8 @@ def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
 
     # value network
     if not shared:
-        value_latent = _build_encoding_sub_model(normalized.shape[1:], None, layer_sizes=encoding_layer_sizes,
-                                                 name="value_encoder")(normalized)
+        value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=encoding_layer_sizes,
+                                                 name="value_encoder")(inputs)
         value_out = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(value_latent)
     else:
