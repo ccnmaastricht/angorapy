@@ -127,7 +127,7 @@ class Chiefinvestigator:
         x0 = activation[id, :]
         input = input[id, :]
         fun = lambda x: 0.5*sum((- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input))**2)
-        # der = lambda x: np.sum((- np.eye(64, 64) + weights * (1-np.tanh(x[0:64])**2)), axis=1)# - np.eye(64, 64) + weights*x[0:64]
+        der = lambda x: np.sum((- np.eye(64, 64) + weights * (1-np.tanh(x[0:64])**2)), axis=1)# - np.eye(64, 64) + weights*x[0:64]
         options = {'gtol': 1e-5, 'disp': True}
         #Jac = nd.Jacobian(fun)
         #print(Jac.shape)
@@ -166,11 +166,11 @@ class Chiefinvestigator:
 # TODO: apply unsupervised clustering stuff on the results of these techniques and the dataset -> through time stuff
 # TODO: build neural network to predict grasp -> we trained a simple prediction model fp(z) containing one hidden
                                             # layer with 64 units and ReLU activation, followed by a sigmoid output.
-# TODO: Do fixed points evolve where two clusters (actions) are? -> dynamical systems analysis
-# TODO: is reward coupled to momentum ?
+                                            # perhaps even environmental factors
 # TODO: look at weights
 # TODO: dynamical systems and eigengrasps
-# TODO: sequence analysis ideas -> sequence pattern and so forth
+# TODO: sequence analysis ideas -> sequence pattern and so forth:
+# one possibility could be sequence alignment, time series analysis (datacamp)
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
