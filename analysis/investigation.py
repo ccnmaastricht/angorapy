@@ -79,6 +79,7 @@ class Investigator:
 
         done = False
         reward_trajectory = []
+        action_trajectory = []
         state = parse_state(env.reset())
         while not done:
             dual_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
@@ -89,11 +90,12 @@ class Investigator:
             env.render() if render else ""
 
             action, _ = self.distribution.act(*probabilities)
+            action_trajectory.append(action)
             observation, reward, done, _ = env.step(action)
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
-        return list(zip(states, activations, reward_trajectory))
+        return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
     def render_episode(self, env: gym.Env):
         """Render an episode in the given environment."""
@@ -117,8 +119,9 @@ class Investigator:
 if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1578678450)
+    agent_007 = PPOAgent.from_agent_state(1578740129)
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)

@@ -9,10 +9,10 @@ import numpy as np
 import ray
 import tensorflow as tf
 from scipy.signal import lfilter
-from scipy.stats import norm, entropy
+from scipy.stats import norm, entropy, beta
 
 from agent.core import extract_discrete_action_probabilities, estimate_advantage
-from agent.policy import GaussianPolicyDistribution, CategoricalPolicyDistribution
+from agent.policy import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from models import get_model_builder
@@ -51,6 +51,8 @@ class CoreTest(unittest.TestCase):
 
 class ProbabilityTest(unittest.TestCase):
 
+    # GAUSSIAN
+
     def test_gaussian_pdf(self):
         distro = GaussianPolicyDistribution()
 
@@ -71,12 +73,41 @@ class ProbabilityTest(unittest.TestCase):
         mu = tf.convert_to_tensor([[2.0, 3.0], [2.0, 1.0]], dtype=tf.float32)
         sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
 
-        result_reference = np.sum(norm.entropy(loc=mu, scale=sig), axis=-1)
-        result_log = distro.entropy_from_log(np.log(sig)).numpy()
-        result = distro.entropy(sig).numpy()
+        result_reference = np.sum(norm._entropy_from_params(loc=mu, scale=sig), axis=-1)
+        result_log = distro.entropy(np.log(sig)).numpy()
+        result = distro._entropy_from_params(sig).numpy()
 
         self.assertTrue(np.allclose(result_reference, result), msg="Gaussian entropy returns wrong result")
         self.assertTrue(np.allclose(result_log, result_reference), msg="Gaussian entropy from log returns wrong result")
+
+    # BETA
+
+    def test_beta_pdf(self):
+        distro = BetaPolicyDistribution()
+
+        x = tf.convert_to_tensor([[0.2, 0.3], [0.4, 0.3], [0.2, 0.1]], dtype=tf.float32)
+        alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
+        betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
+
+        result_reference = np.prod(beta.pdf(x, alphas, betas), axis=-1)
+        result_pdf = distro.probability(x, alphas, betas).numpy()
+        result_log_pdf = np.exp(distro.log_probability(x, alphas, betas).numpy())
+
+        self.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
+        self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
+
+    def test_beta_entropy(self):
+        distro = BetaPolicyDistribution()
+
+        alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
+        betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
+
+        result_reference = np.sum(beta._entropy_from_params(alphas, betas), axis=-1)
+        result_pdf = distro._entropy_from_params((alphas, betas)).numpy()
+
+        self.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
+
+    # CATEGORICAL
 
     def test_categorical_entropy(self):
         distro = CategoricalPolicyDistribution()
@@ -86,36 +117,36 @@ class ProbabilityTest(unittest.TestCase):
                                       [0.1, 0.35, 0.3, 0.24, 0.01]], dtype=tf.float32)
 
         result_reference = [entropy(probs[i]) for i in range(len(probs))]
-        result_log = distro.entropy_from_log(np.log(probs)).numpy()
-        result = distro.entropy(probs).numpy()
+        result_log = distro._entropy_from_log_pmf(np.log(probs)).numpy()
+        result = distro._entropy_from_pmf(probs).numpy()
 
         self.assertTrue(np.allclose(result_reference, result), msg="Discrete entropy returns wrong result")
         self.assertTrue(np.allclose(result_log, result_reference), msg="Discrete entropy from log returns wrong result")
 
 
-class AdvantageTest(unittest.TestCase):
-
-    def test_gae_estimation(self):
-        def discount(x, gamma):
-            return lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
-
-        rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0, 10, 10, 4, 9, 4])
-        values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 4, 10, 5, 7, 8, 9])
-        terminals = np.array(
-            [False, False, False, False, False, False, False, False, False, False, True,
-             False, False, False, False, False])
-
-        rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0])
-        values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 0])
-        terminals = np.array([False, False, False, False, False, False, False, False, False, False, True])
-
-        gamma = 1
-        lamb = 1
-
-        result = estimate_advantage(rewards, values, terminals, gamma=gamma, lam=lamb)
-
-        prep = rewards + gamma * values[1:] * (1 - terminals) - values[:-1]
-        result_reference = discount(prep, gamma * lamb)
+# class AdvantageTest(unittest.TestCase):
+#
+#     def test_gae_estimation(self):
+#         def discount(x, gamma):
+#             return lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
+#
+#         rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0, 10, 10, 4, 9, 4])
+#         values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 4, 10, 5, 7, 8, 9])
+#         terminals = np.array(
+#             [False, False, False, False, False, False, False, False, False, False, True,
+#              False, False, False, False, False])
+#
+#         rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0])
+#         values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 0])
+#         terminals = np.array([False, False, False, False, False, False, False, False, False, False, True])
+#
+#         gamma = 1
+#         lamb = 1
+#
+#         result = estimate_advantage(rewards, values, terminals, gamma=gamma, lam=lamb)
+#
+#         prep = rewards + gamma * values[1:] * (1 - terminals) - values[:-1]
+#         result_reference = discount(prep, gamma * lamb)
 
 
 class UtilTest(unittest.TestCase):
@@ -275,11 +306,11 @@ class InvestigatorTest(unittest.TestCase):
 
     def test_get_activations_over_episode(self):
         environment = gym.make("LunarLanderContinuous-v2")
+        environment.seed(1)
         network, _, _ = get_model_builder("rnn", False)(environment)
         inv = Investigator(network, GaussianPolicyDistribution())
-
-        for ln in inv.list_layer_names():
-            inv.get_activations_over_episode(ln, environment)
+        out_group = inv.get_activations_over_episode(inv.list_layer_names(), environment)
+        out_single = inv.get_activations_over_episode(inv.list_layer_names()[0], environment)
 
         self.assertTrue(True)
 

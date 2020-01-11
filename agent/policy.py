@@ -1,11 +1,12 @@
 """Probability distributions used in Stochastic Policies."""
 
+import abc
 import math
 from typing import Union, Tuple
 
 import numpy as np
 import tensorflow as tf
-import abc
+import tensorflow_probability as tfp
 
 
 class _PolicyDistribution(abc.ABC):
@@ -17,14 +18,23 @@ class _PolicyDistribution(abc.ABC):
 
     @property
     def is_continuous(self):
+        """Indicate whether the distribution is continuous."""
         return False
+
+    @property
+    @abc.abstractmethod
+    def has_log_params(self):
+        """Indicate whether the parameters of the distribution are expected to be given in log space."""
+        pass
 
     @abc.abstractmethod
     def act(self, *args, **kwargs):
+        """Sample an action from the distribution and return it alongside its probability."""
         pass
 
     @abc.abstractmethod
     def sample(self, *args, **kwargs):
+        """Sample an action from the distribution."""
         pass
 
     @abc.abstractmethod
@@ -41,12 +51,14 @@ class _PolicyDistribution(abc.ABC):
         The logarithmic probability has better numerical stability properties during later calculations."""
         pass
 
-    @abc.abstractmethod
-    def entropy(self):
-        pass
+    # @abc.abstractmethod
+    # def _entropy_from_params(self, *args, **kwargs):
+    #     """Calculate the entropy of the distribution based on raw parameters."""
+    #     pass
 
     @abc.abstractmethod
-    def entropy_from_log(self):
+    def entropy(self):
+        """Calculate the entropy of the distribution based on log parameters."""
         pass
 
     @tf.function
@@ -60,12 +72,18 @@ class CategoricalPolicyDistribution(_PolicyDistribution):
     """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the action space is discrete and the agent thus predicts a pmf over the possible actions."""
 
+    @property
+    def has_log_params(self):
+        """Categorical distribution expects pmf in log space."""
+        return True
+
     def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         """Sample an action from a discrete action distribution predicted by the given policy for a given state."""
         action = self.sample(log_probabilities)
         return action, log_probabilities[0][action]
 
     def sample(self, log_probabilities):
+        """Sample an action from the distribution."""
         assert isinstance(log_probabilities, tf.Tensor) or isinstance(log_probabilities, np.ndarray), \
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."
@@ -82,31 +100,44 @@ class CategoricalPolicyDistribution(_PolicyDistribution):
         return action.numpy()
 
     def probability(self, **kwargs):
+        """Not Implemented"""
         raise NotImplementedError("A categorical distribution has no pdf.")
 
     def log_probability(self, **kwargs):
+        """Not implemented"""
         raise NotImplementedError("A categorical distribution has no pdf.")
+
+    @tf.function
+    def _entropy_from_pmf(self, pmf: tf.Tensor):
+        """Calculate entropy of a categorical distribution from raw pmf."""
+        return - tf.reduce_sum(tf.math.log(pmf) * pmf, axis=-1)
+
+    @tf.function
+    def _entropy_from_log_pmf(self, pmf: tf.Tensor):
+        """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
+        return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
 
     @tf.function
     def entropy(self, pmf: tf.Tensor):
         """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
-        return - tf.reduce_sum(tf.math.log(pmf) * pmf, axis=-1)
-
-    @tf.function
-    def entropy_from_log(self, pmf: tf.Tensor):
-        """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
-        return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
+        return - self._entropy_from_log_pmf(pmf)
 
 
 class _ContinuousPolicyDistribution(_PolicyDistribution, abc.ABC):
 
     @property
     def is_continuous(self):
+        """Indicate that the distribution is continuous."""
         return True
 
 
 class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
     """Gaussian Probability Distribution."""
+
+    @property
+    def has_log_params(self):
+        """Gaussian Distribution expects standard deviation in log space"""
+        return True
 
     def act(self, means: tf.Tensor, log_stdevs: tf.Tensor) -> Tuple[np.ndarray, np.ndarray]:
         """Sample an action from a gaussian action distribution defined by the means and log standard deviations."""
@@ -116,6 +147,7 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
         return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
     def sample(self, means: tf.Tensor, log_stdevs: tf.Tensor):
+        """Sample from the Gaussian distribution."""
         action = tf.random.normal(means.shape, means, tf.exp(log_stdevs))
         return tf.reshape(action, [-1]).numpy()
 
@@ -145,8 +177,8 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
         return log_likelihoods
 
     @tf.function
-    def entropy(self, stdevs: tf.Tensor):
-        """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
+    def _entropy_from_params(self, stdevs: tf.Tensor):
+        """Calculate the joint entropy of Gaussian random variables described by their standard deviations.
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
@@ -157,19 +189,7 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
         return tf.reduce_sum(entropy, axis=-1)
 
     @tf.function
-    def approx_entropy_from_log(self, log_stdevs: tf.Tensor):
-        """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
-
-        Input Shape: (B, A) or (B, S, A) for recurrent
-
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
-        of the joint entropy and the sum of marginal entropies.
-        """
-        entropy = log_stdevs
-        return tf.reduce_sum(entropy, axis=-1)
-
-    @tf.function
-    def entropy_from_log(self, log_stdevs: tf.Tensor):
+    def _entropy_from_log_params(self, log_stdevs: tf.Tensor):
         """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
 
         Input Shape: (B, A) or (B, S, A) for recurrent
@@ -180,33 +200,86 @@ class GaussianPolicyDistribution(_ContinuousPolicyDistribution):
         entropy = .5 * (tf.math.log(math.pi * 2) + (tf.multiply(2.0, log_stdevs) + 1.0))
         return tf.reduce_sum(entropy, axis=-1)
 
+    @tf.function
+    def _approx_entropy_from_log(self, log_stdevs: tf.Tensor):
+        """Calculate the joint entropy of Gaussian random variables described by their log standard deviations, but in
+        an approximation. Essentially this removes any unnecessary scaling calculations and only leaves the bare
+        log standard deviations as the entropy of the distribution.
+
+        Input Shape: (B, A) or (B, S, A) for recurrent
+
+        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        of the joint entropy and the sum of marginal entropies.
+        """
+        return tf.reduce_sum(log_stdevs, axis=-1)
+
+    @tf.function
+    def entropy(self, log_stdevs: tf.Tensor):
+        """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
+
+        Input Shape: (B, A) or (B, S, A) for recurrent
+
+        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        of the joint entropy and the sum of marginal entropies.
+        """
+        return self._entropy_from_log_params(log_stdevs)
+
 
 class BetaPolicyDistribution(_ContinuousPolicyDistribution):
     """Beta Distribution."""
 
-    def __init__(self):
-        pass
+    @property
+    def has_log_params(self):
+        """Beta Distribution expects all parameters on standard scale."""
+        return False
 
-    def act(self, *args, **kwargs):
-        pass
+    def act(self, alphas: tf.Tensor, betas: tf.Tensor):
+        """Sample an action from a beta distribution."""
+        actions = tfp.distributions.Beta(alphas, betas).sample(alphas.shape)
+        probabilities = self.log_probability(actions, alphas, betas)
 
-    def sample(self, *args, **kwargs):
-        pass
+        return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
-    def prob(self, action, *args, **kwargs):
-        pass
+    def sample(self, alphas: tf.Tensor, betas: tf.Tensor):
+        """Sample from the Beta distribution."""
+        actions = tfp.distributions.Beta(alphas, betas).sample(alphas.shape)
 
-    def probability(self, **kwargs):
-        pass
+        return tf.reshape(actions, [-1]).numpy()
 
-    def log_probability(self, **kwargs):
-        pass
+    @tf.function
+    def probability(self, samples: tf.Tensor, alphas: tf.Tensor, betas: tf.Tensor):
+        """Probability density of the Beta distribution."""
+        top = tf.pow(samples, tf.subtract(alphas, 1.)) * tf.pow(tf.subtract(1., samples), tf.subtract(betas, 1.))
+        bab = tf.multiply(tf.exp(tf.math.lgamma(alphas)),
+                          tf.exp(tf.math.lgamma(betas)) / tf.exp(tf.math.lgamma(tf.add(alphas, betas))))
 
-    def entropy(self):
-        pass
+        return tf.math.reduce_prod(top / bab, axis=-1)
 
-    def entropy_from_log(self):
-        pass
+    @tf.function
+    def log_probability(self, samples: tf.Tensor, alphas: tf.Tensor, betas: tf.Tensor):
+        """Log probability utilizing the fact that tensorflow directly returns log of gamma function."""
+        top = tf.pow(samples, tf.subtract(alphas, 1.)) * tf.pow(tf.subtract(1., samples), tf.subtract(betas, 1.))
+        log_pdf = tf.math.log(top) - tf.math.lgamma(alphas) - tf.math.lgamma(betas) + tf.math.lgamma(alphas + betas)
+
+        return tf.math.reduce_sum(log_pdf, axis=-1)
+
+    @tf.function
+    def entropy(self, params: Tuple[tf.Tensor, tf.Tensor]):
+        """Entropy of the beta distribution."""
+        return self._entropy_from_params(params)
+
+    @tf.function
+    def _entropy_from_params(self, params: Tuple[tf.Tensor, tf.Tensor]):
+        """Entropy of the beta distribution"""
+        alphas, betas = params
+
+        bab = tf.multiply(tf.exp(tf.math.lgamma(alphas)),
+                          tf.exp(tf.math.lgamma(betas)) / tf.exp(tf.math.lgamma(tf.add(alphas, betas))))
+        a = tf.multiply(tf.subtract(alphas, 1.), tf.math.polygamma(0, alphas))
+        b = tf.multiply(tf.subtract(betas, 1.), tf.math.polygamma(0, betas))
+        ab = tf.multiply(tf.subtract(alphas + betas, 2.), tf.math.polygamma(0, tf.add(alphas, betas)))
+
+        return tf.reduce_sum(tf.math.log(bab) - a - b + ab, axis=-1)
 
 
 _distribution_short_name_map = {
