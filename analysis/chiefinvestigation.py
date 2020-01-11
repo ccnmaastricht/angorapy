@@ -46,12 +46,12 @@ class Chiefinvestigator:
             activation_data, action_data, state_data, all_rewards
         """
         investi = Investigator(self.new_agent.policy)
-        activations_lstm = investi.get_activations_over_episode(layer_name, previous_layer_name, self.env, True)
-        states, activations, previous_activation, rewards, actions = map(lambda x: np.array(x), zip(*activations_lstm))
+        activations_lstm = investi.get_activations_over_episode([layer_name, previous_layer_name], self.env, True)
+        states, activations, rewards, actions = map(lambda x: np.array(x), zip(*activations_lstm))
         activations = np.reshape(activations, (activations.shape[0], 64))
-        previous_activation = np.reshape(previous_activation, (previous_activation.shape[0], 64))
+        # previous_activation = np.reshape(previous_activation, (previous_activation.shape[0], 64))
 
-        return states, activations, previous_activation, rewards, actions
+        return states, activations, rewards, actions
 
     def return_weights(self, layer_name):
         investi = Investigator(self.new_agent.policy)
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     env_name = "LunarLanderContinuous-v2"
-    agent_id: int = 1576849128 # 1576692646 from tonio
+    agent_id: int = 1578664065# 1576849128 # 1576692646 from tonio
     chiefinvesti = Chiefinvestigator(agent_id, env_name)
     layer_names = chiefinvesti.print_layer_names()
     new_agent = PPOAgent.from_agent_state(agent_id)
@@ -184,20 +184,20 @@ if __name__ == "__main__":
     inv = Investigator(new_agent.policy)
 
     # activ = inv.get_layer_activations(layer_names[3])
-    states, activations, previous_activations, rewards, actions = chiefinvesti.parse_data("policy_recurrent_layer",
-                                                                                          layer_names[2])
-    weights = chiefinvesti.return_weights(layer_names[3])
+    states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[3],
+                                                                    "policy_recurrent_layer")
+    # weights = chiefinvesti.return_weights(layer_names[3])
     #print(weights)
-    method = "trust-ncg"
-    optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
-                                            input=previous_activations, activation=activations,
-                                            method=method)
+    # method = "trust-ncg"
+    # optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
+                                           #  input=previous_activations, activation=activations,
+                                            # method=method)
 
     # zscores = sp.stats.zscore(activations) # normalization
 
-    plt.plot(list(range(len(activations))), activations)
-    plt.title('.')
-    plt.show()
+    # plt.plot(list(range(len(activations))), activations)
+    # plt.title('.')
+    # plt.show()
 
     # t-SNE
     #RS = 12
@@ -206,12 +206,12 @@ if __name__ == "__main__":
     #plt.figure()
     #chiefinvesti.plot_results(tsne_results, action_data[:, 0], "t-SNE")
 
-    pca = skld.PCA(3)
-    pca.fit(activations)
-    X_pca = pca.transform(activations)
-    plt.figure()
-    chiefinvesti.plot_results(X_pca, actions[:, 0], "PCA")  # plot pca results
-    new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
+    # pca = skld.PCA(3)
+    # pca.fit(activations)
+    # X_pca = pca.transform(activations)
+    # plt.figure()
+    # chiefinvesti.plot_results(X_pca, actions[:, 0], "PCA")  # plot pca results
+    # new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
     # chiefinvesti.plot_rewards(all_rewards)
 
     # loadings plot
@@ -226,8 +226,8 @@ if __name__ == "__main__":
     #chiefinvesti.timestepwise_pca(x_activation_data, action_data, 'PCA')
 
     # pca of actions to identify unique actions
-    pca = skld.PCA(2)
-    pca.fit(actions)
-    action_pca = pca.transform(actions)
-    plt.scatter(list(range(len(action_pca))), action_pca[:, 0])
-    plt.show()
+    # pca = skld.PCA(2)
+    # pca.fit(actions)
+    # action_pca = pca.transform(actions)
+    # plt.scatter(list(range(len(action_pca))), action_pca[:, 0])
+    # plt.show()
