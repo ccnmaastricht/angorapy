@@ -63,7 +63,7 @@ def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type
     x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="policy_encoder"),
            name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x = RNNChoice(64, stateful=True, return_sequences=True, batch_size=bs, name="policy_recurrent_layer")(x)
+    x, *_ = RNNChoice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs, name="policy_recurrent_layer")(x)
 
     if continuous_control:
         out_policy = _build_continuous_head(n_actions, x.shape[1:], bs)(x)
@@ -75,7 +75,7 @@ def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type
         x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="value_encoder"),
                name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
-        x = RNNChoice(64, stateful=True, return_sequences=True, batch_size=bs, name="value_recurrent_layer")(x)
+        x, *_ = RNNChoice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs, name="value_recurrent_layer")(x)
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(x)
     else:

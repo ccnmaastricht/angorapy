@@ -14,6 +14,8 @@ from utilities.util import parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
 from utilities.model_management import is_recurrent_model, list_layer_names, extract_layers, get_layers_by_names, \
     build_sub_model_to
+from utilities.wrappers import RewardNormalizationWrapper, StateNormalizationWrapper, CombiWrapper, _Wrapper, \
+    SkipWrapper
 
 
 class Investigator:
@@ -21,7 +23,7 @@ class Investigator:
 
     The class serves as a wrapper to use a collection of methods that can extract information about the network."""
 
-    def __init__(self, network: tf.keras.Model, distribution: _PolicyDistribution):
+    def __init__(self, network: tf.keras.Model, distribution: _PolicyDistribution, preprocessor: _Wrapper = None):
         """Build an investigator for a network using a distribution.
 
         Args:
@@ -30,11 +32,12 @@ class Investigator:
         """
         self.network: tf.keras.Model = network
         self.distribution: _PolicyDistribution = distribution
+        self.preprocessor: _Wrapper = preprocessor if preprocessor is not None else SkipWrapper()
 
     @staticmethod
     def from_agent(agent: PPOAgent):
         """Instantiate an investigator from an agent object."""
-        return Investigator(agent.policy, agent.distribution)
+        return Investigator(agent.policy, agent.distribution, preprocessor=agent.preprocessor)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
@@ -83,7 +86,7 @@ class Investigator:
         state = parse_state(env.reset())
         while not done:
             dual_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
-            activation, probabilities = dual_out[:len(layer_names)], dual_out[len(layer_names):]
+            activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
 
             states.append(state)
             activations.append(activation)
@@ -92,6 +95,8 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, _ = env.step(action)
+            observation, reward, done, _ = self.preprocessor.wrap_a_step((observation, reward, done, None), update=False)
+
             state = parse_state(observation)
             reward_trajectory.append(reward)
 
@@ -110,8 +115,10 @@ class Investigator:
 
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, _ = env.step(action)
-            state = parse_state(observation)
             cumulative_reward += reward
+            observation, reward, done, _ = self.preprocessor.wrap_a_step((observation, reward, done, None), update=False)
+
+            state = parse_state(observation)
 
         print(f"Achieved a score of {cumulative_reward}. {'Good Boy!' if cumulative_reward > env.spec.reward_threshold else ''}")
 
@@ -121,7 +128,8 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1578740129)
+    agent_007 = PPOAgent.from_agent_state(1578664065)
+    agent_007.preprocessor = CombiWrapper([StateNormalizationWrapper(agent_007.state_dim), RewardNormalizationWrapper()])
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)
