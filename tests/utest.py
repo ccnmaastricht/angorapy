@@ -307,7 +307,7 @@ class InvestigatorTest(unittest.TestCase):
     def test_get_activations_over_episode(self):
         environment = gym.make("LunarLanderContinuous-v2")
         environment.seed(1)
-        network, _, _ = get_model_builder("lstm", False)(environment)
+        network, _, _ = get_model_builder("rnn", False)(environment)
         inv = Investigator(network, GaussianPolicyDistribution())
         out_group = inv.get_activations_over_episode(inv.list_layer_names(), environment)
         out_single = inv.get_activations_over_episode(inv.list_layer_names()[0], environment)

@@ -94,9 +94,10 @@ class ShadowHand(manipulate.ManipulateEnv):
         super()._viewer_setup()
 
         # rotate camera to top down view
-        self.viewer.cam.distance = 0.5
-        self.viewer.cam.azimuth = -90.0
-        self.viewer.cam.elevation = -90.0
+        self.viewer.cam.distance = 0.4  # zoom in
+        self.viewer.cam.azimuth = -90.0  # top down view
+        self.viewer.cam.elevation = -90.0  # top down view
+        self.viewer.cam.lookat[1] -= 0.03  # slightly move forward
 
     def _render_callback(self):
         super()._render_callback()
@@ -199,7 +200,7 @@ if __name__ == "__main__":
     from environments import *
     import matplotlib.pyplot as plt
 
-    env = gym.make("ShadowHand-v1")
+    env = gym.make("ShadowHand-v0")
     d, s = False, env.reset()
     while True:
         # env.render()

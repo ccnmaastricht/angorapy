@@ -74,18 +74,16 @@ class Investigator:
         """Run an episode using the network and get (s, activation, r) tuples for each timestep."""
         layer_names = layer_names if isinstance(layer_names, list) else [layer_names]
 
-        states = []
-        activations = []
+        states, activations, reward_trajectory, action_trajectory = [], [], [], []
 
-        dual_model = build_sub_model_to(self.network, layer_names, include_original=True)
+        # make new model with multiple outputs
+        polymodel = build_sub_model_to(self.network, layer_names, include_original=True)
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        reward_trajectory = []
-        action_trajectory = []
         state = parse_state(env.reset())
         while not done:
-            dual_out = flatten(dual_model.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+            dual_out = flatten(polymodel.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
             activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
 
             states.append(state)
