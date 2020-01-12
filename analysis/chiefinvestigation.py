@@ -46,7 +46,7 @@ class Chiefinvestigator:
             activation_data, action_data, state_data, all_rewards
         """
         investi = Investigator(self.new_agent.policy)
-        activations_lstm = investi.get_activations_over_episode([layer_name, previous_layer_name], self.env, True)
+        activations_lstm = investi.get_activations_over_episode([layer_name, previous_layer_name], self.env, False)
         states, activations, rewards, actions = map(lambda x: np.array(x), zip(*activations_lstm))
         activations = np.reshape(activations, (activations.shape[0], 64))
         # previous_activation = np.reshape(previous_activation, (previous_activation.shape[0], 64))
