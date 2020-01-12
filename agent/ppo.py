@@ -264,7 +264,7 @@ class PPOAgent:
         """
         if self.continuous_control:
             policy_output = policy_output[1]
-        return tf.reduce_mean(self.distribution.entropy_from_log(policy_output))
+        return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False, ray_already_initialized: bool = False) -> "PPOAgent":
@@ -627,8 +627,7 @@ class PPOAgent:
                                 c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
-                                lr_schedule=parameters["lr_schedule_type"],
-                                distribution=distribution, _make_dirs=False)
+                                lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
 
         for p, v in parameters.items():
             if p in ["distribution"]:

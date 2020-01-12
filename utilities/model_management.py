@@ -81,9 +81,12 @@ def build_sub_model_to(network: tf.keras.Model, tos: List[str], include_original
                 else:
                     raise ValueError(f"Cannot use layer {layer.name}. Error: {ve.args}")
             else:
-                outputs.append(layer.get_output_at(layer_input_id))
+                outputs.append([layer.get_output_at(layer_input_id)])
 
-    return tf.keras.Model(inputs=[network.input], outputs=[outputs] + [network.output])
+    if include_original:
+        outputs = outputs + network.output
+
+    return tf.keras.Model(inputs=[network.input], outputs=outputs)
 
 
 def get_component(model: tf.keras.Model, name: str):

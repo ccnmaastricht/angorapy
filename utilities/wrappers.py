@@ -23,7 +23,7 @@ class _Wrapper(abc.ABC):
         return self.__class__.__name__
 
     @abc.abstractmethod
-    def wrap_a_step(self, step_output):
+    def wrap_a_step(self, step_output, update=True):
         """Preprocess an environment output."""
         pass
 
@@ -120,14 +120,15 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
         self.mean = np.zeros(state_shape, NUMPY_FLOAT_PRECISION)
         self.variance = np.ones(state_shape, NUMPY_FLOAT_PRECISION)
 
-    def wrap_a_step(self, step_result: Tuple) -> Tuple:
+    def wrap_a_step(self, step_result: Tuple, update=True) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
         try:
             o, r, done, info = step_result
         except ValueError:
             raise ValueError("Wrapping did not receive a valid input.")
 
-        self.update(o)
+        if update:
+            self.update(o)
 
         # normalize
         o = np.clip((o - self.mean) / (np.sqrt(self.variance + EPS)), -10., 10.)
@@ -155,7 +156,7 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
         self.variance = np.array(1, NUMPY_FLOAT_PRECISION)
         self.ret = np.float64(0)
 
-    def wrap_a_step(self, step_result: Tuple) -> Tuple:
+    def wrap_a_step(self, step_result: Tuple, update=True) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
         try:
             o, r, done, info = step_result
@@ -166,8 +167,9 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
             return o, r, done, info  # skip
 
         # update based on cumulative discounted reward
-        self.ret = 0.99 * self.ret + r
-        self.update(self.ret)
+        if update:
+            self.ret = 0.99 * self.ret + r
+            self.update(self.ret)
 
         # normalize
         r = np.clip(r / (np.sqrt(self.variance + EPS)), -10., 10.)
@@ -193,7 +195,7 @@ class SkipWrapper(_Wrapper):
         """Recovery is just creation of new, no info to be recovered from."""
         return SkipWrapper()
 
-    def wrap_a_step(self, step_output):
+    def wrap_a_step(self, step_output, update=True):
         """Wrap by doing nothing."""
         return step_output
 
@@ -227,12 +229,13 @@ class CombiWrapper(_Wrapper):
     def __repr__(self):
         return f"CombiWrapper{tuple(str(w) for w in self.wrappers)}"
 
-    def wrap_a_step(self, step_output):
+    def wrap_a_step(self, step_output, update=True):
         """Wrap a step by passing it through all contained wrappers."""
         for w in self.wrappers:
-            step_output = w.wrap_a_step(step_output)
+            step_output = w.wrap_a_step(step_output, update=update)
 
-        self.n += 1
+        if update:
+            self.n += 1
         return step_output
 
     def correct_sample_size(self, deduction):

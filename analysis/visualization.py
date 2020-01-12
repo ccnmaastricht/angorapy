@@ -2,13 +2,14 @@
 """Tools to visualize the weights in any network."""
 import math
 import os
-from typing import List, Iterable, Any
+from typing import List, Iterable, Any, Union
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy
 import tensorflow as tf
 from sklearn.manifold import TSNE
+from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 import tensorflow_datasets as tfds
 
@@ -162,6 +163,7 @@ class NetworkAnalyzer:
             final_image = tf.clip_by_value(tf.squeeze(image), 0, 1).numpy()
             feature_maximizations.append(final_image)
 
+        plt.clf()
         plot_image_tiling(feature_maximizations)
         plt.show() if self.mode == "show" else plt.savefig(
             f"{self.figure_directory}/feature_maximization_{layer_name}_{'_'.join(map(str, feature_ids))}.pdf",
@@ -191,6 +193,7 @@ class NetworkAnalyzer:
         feature_maps = sub_model(reference_img)
         n_filters = feature_maps.shape[-1]
 
+        plt.clf()
         if mode == "heat":
             feature_maps = tf.image.resize(feature_maps, size=(reference_width, reference_height), method="bicubic")
             feature_maps = tf.squeeze(feature_maps)
@@ -213,21 +216,22 @@ class NetworkAnalyzer:
                     axis.set_yticks([])
                     i += 1
         elif mode == "gray":
-            plot_image_tiling([tf.squeeze(feature_maps[:, :, :, i]) for i in range(layer.output_shape[-1])],
+            feature_maps = feature_maps.numpy()
+            plot_image_tiling([numpy.squeeze(feature_maps[:, :, :, i]) for i in range(layer.output_shape[-1])],
                               cmap="gray")
         elif mode == "plot":
             feature_maps = tf.squeeze(feature_maps)
             mean_filter_responses = tf.reduce_mean(feature_maps, axis=[0, 1])
             plt.bar(list(range(n_filters)), mean_filter_responses)
 
-        output_format = "png" if mode == "heat" else "pdf"
+        output_format = "png" if mode in ["heat", "gray"] else "pdf"
         plt.show() if self.mode == "show" else plt.savefig(
             f"{self.figure_directory}/feature_maps_{layer_name}{f'_{mode}'}.{output_format}",
             format=output_format, dpi=300)
 
         return feature_maps
 
-    def obtain_saliency_map(self, reference: Any[numpy.ndarray, tf.Tensor]) -> None:
+    def obtain_saliency_map(self, reference: Union[numpy.ndarray, tf.Tensor]) -> None:
         """Create a saliency map indicating the importance of each input pixel for the output, based on gradients.
 
         Args:
@@ -260,10 +264,11 @@ class NetworkAnalyzer:
         output_gradient = tape.gradient(loss, reference)
 
         saliency_map = tf.reduce_mean(tf.keras.activations.relu(output_gradient), axis=-1)
-        plt.imshow(saliency_map, cmap="jet")
 
+        plt.clf()
+        plt.imshow(saliency_map, cmap="jet")
         plt.show() if self.mode == "show" else plt.savefig(
-            f"{self.figure_directory}/saliency_map.pdf", format=format, dpi=300)
+            f"{self.figure_directory}/saliency_map.pdf", format="pdf", dpi=300)
 
     def cluster_inputs(self, layer_name: str, input_images: List[numpy.ndarray], classes: Iterable[int]) -> None:
         """Cluster inputs based on the representation produced by a given layer, using the t-SNE algorithm.
@@ -285,10 +290,11 @@ class NetworkAnalyzer:
         sneezed_datapoints = t_sne.fit_transform(representations)
         x, y = numpy.split(sneezed_datapoints, 2, axis=1)
 
+        plt.clf()
         plt.scatter(x=numpy.squeeze(x), y=numpy.squeeze(y), c=classes, cmap="Paired")
 
         plt.show() if self.mode == "show" else plt.savefig(
-            f"{self.figure_directory}/input_cluster_{layer_name}.pdf", format=format, dpi=300)
+            f"{self.figure_directory}/input_cluster_{layer_name}.pdf", format="pdf", dpi=300)
 
     @staticmethod
     def from_saved_model(model_path: str, mode: str = "show"):
@@ -302,8 +308,9 @@ if __name__ == "__main__":
 
     f_weights = False
     f_max = False
-    f_map = False
-    f_salience = False
+    f_map = True
+    f_salience = True
+    do_tsne = False
 
     tf.random.set_seed(1)
 
@@ -321,16 +328,16 @@ if __name__ == "__main__":
 
     # FEATURE MAPS
     if f_map:
-        reference = mpimg.imread("hase.jpg")
-        analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
+        reference = mpimg.imread("hand.png")
+        analyzer.visualize_activation_map("block1_conv1", reference, mode="gray")
 
     # SALIENCE
     if f_salience:
-        reference = mpimg.imread("hase.jpg")
+        reference = mpimg.imread("hand.png")
         analyzer.obtain_saliency_map(reference)
 
     # T-SNE CLUSTERING
-    if True:
+    if do_tsne:
         data, _ = tfds.load("cifar10", shuffle_files=True).values()
         data = data.map(lambda img: (tf.image.resize(img["image"], (224, 224)) / 255, img["label"]))
         data = list(iter(data.take(100)))

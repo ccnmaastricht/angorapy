@@ -87,11 +87,11 @@ with spacial dimensions close to the input, this gives spatially precise info, b
 these images get smaller and smaller and less interpretable.
 
 ```python
-reference = mpimg.imread("hase.jpg")
-analyzer.visualize_activation_map("block1_conv2", reference, mode="heat")
+reference = mpimg.imread("hand.png")
+analyzer.visualize_activation_map("block1_conv1", reference, mode="gray")
 ```
 
-![](https://i.postimg.cc/65X25NkC/feature-maps-block1-conv2-gray.png)
+![](https://i.postimg.cc/sf92rL46/feature-maps-block1-conv1-gray.png)
 
 #### Heatmap Mode
 To tackle the issue with large receptive fields in deeper layers, the heatmap mode (`mode="heat"`) converts the
@@ -99,11 +99,11 @@ activation into a heatmap contour plot and scales it to the original image size.
 image in greyscale, overlayed by this heatmap.
 
 ```python
-reference = mpimg.imread("hase.jpg")
-analyzer.visualize_activation_map("block1_conv2", reference, mode="heat")
+reference = mpimg.imread("hand.png")
+analyzer.visualize_activation_map("block1_conv1", reference, mode="heat")
 ```
 
-![](https://i.postimg.cc/G3ktf54t/feature-maps-block1-conv2-heat.png)
+![](https://i.postimg.cc/ZnL2Mp3H/feature-maps-block1-conv1-heat.png)
 
 #### Bar Plot Mode
 Lastly, the bar plot mode (`mode="plot"`) shows the activation of a filter as a bar in a bar plot, averaged over the 
