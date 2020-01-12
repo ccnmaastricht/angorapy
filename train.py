@@ -7,7 +7,7 @@ from agent.policy import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import *
 from models import get_model_builder
-from models.hybrid import build_shadow_brain_v1, build_blind_shadow_brain_v1
+from models.shadow import build_shadow_brain_v1, build_blind_shadow_brain_v1
 from utilities import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor

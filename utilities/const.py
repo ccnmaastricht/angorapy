@@ -2,8 +2,7 @@
 """Constants."""
 import numpy as np
 
-EPS = 1e-8
-
+# MISC
 COLORS = dict(
     HEADER='\033[95m',
     OKBLUE='\033[94m',
@@ -15,11 +14,18 @@ COLORS = dict(
     UNDERLINE='\033[4m'
 )
 
+# STORAGE
 BASE_SAVE_PATH = "storage/saved_models/states/"
 STORAGE_DIR = "storage/experience/"
 PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
+
+# NUMERICAL PRECISION
 NUMPY_FLOAT_PRECISION = np.float64
 NUMPY_INTEGER_PRECISION = np.int64
+EPS = 1e-8
+
+# SHAPES
+VISION_WH = 227
 
 # DEBUGGING
 DETERMINISTIC = False

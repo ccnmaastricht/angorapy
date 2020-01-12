@@ -13,6 +13,7 @@ from tqdm import tqdm
 from environments import *
 from models.components import _build_fcn_component, _build_continuous_head, _build_discrete_head
 from models.convolutional import _build_visual_encoder
+from utilities.const import VISION_WH
 from utilities.util import env_extract_dims
 from utilities.model_management import calc_max_memory_usage
 
@@ -24,13 +25,13 @@ def build_shadow_brain_v1(env: gym.Env, bs: int):
     hidden_dimensions = 32
 
     # inputs
-    visual_in = tf.keras.Input(batch_shape=(bs, None, 227, 227, 3), name="visual_input")
+    visual_in = tf.keras.Input(batch_shape=(bs, None, VISION_WH, VISION_WH, 3), name="visual_input")
     proprio_in = tf.keras.Input(batch_shape=(bs, None, 48,), name="proprioceptive_input")
     touch_in = tf.keras.Input(batch_shape=(bs, None, 92,), name="somatosensory_input")
     goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
 
     # abstractions of perceptive inputs
-    visual_latent = TD(_build_visual_encoder(shape=(227, 227, 3), batch_size=bs))(visual_in)
+    visual_latent = TD(_build_visual_encoder(shape=(VISION_WH, VISION_WH, 3), batch_size=bs))(visual_in)
     proprio_latent = TD(_build_fcn_component(48, 12, 8, batch_size=bs, name="latent_proprio"))(proprio_in)
     touch_latent = TD(_build_fcn_component(92, 24, 8, batch_size=bs, name="latent_touch"))(touch_in)
 
@@ -118,13 +119,13 @@ def build_shadow_brain_v2(env: gym.Env, bs: int):
     hidden_dimensions = 32
 
     # inputs
-    visual_in = tf.keras.Input(batch_shape=(bs, None, 227, 227, 3), name="visual_input")
+    visual_in = tf.keras.Input(batch_shape=(bs, None, VISION_WH, VISION_WH, 3), name="visual_input")
     proprio_in = tf.keras.Input(batch_shape=(bs, None, 48,), name="proprioceptive_input")
     touch_in = tf.keras.Input(batch_shape=(bs, None, 92,), name="somatosensory_input")
     goal_in = tf.keras.Input(batch_shape=(bs, None, 7,), name="goal_input")
 
     # abstractions of perceptive inputs
-    visual_latent = TD(_build_visual_encoder(shape=(227, 227, 3), batch_size=bs))(visual_in)
+    visual_latent = TD(_build_visual_encoder(shape=(VISION_WH, VISION_WH, 3), batch_size=bs))(visual_in)
     visual_latent = TD(tf.keras.layers.Dense(128))(visual_latent)
     visual_latent = TD(tf.keras.layers.ReLU())(visual_latent)
     visual_latent.set_shape([bs] + visual_latent.shape[1:])
@@ -177,8 +178,8 @@ if __name__ == "__main__":
     sequence_length = 100
     batch_size = 256
 
-    env = gym.make("ShadowHand-v1")
-    _, _, joint = build_shadow_brain_v1(env, bs=batch_size)
+    env = gym.make("ShadowHand-v0")
+    _, _, joint = build_shadow_brain_v2(env, bs=batch_size)
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
@@ -188,7 +189,7 @@ if __name__ == "__main__":
         start_time = time.time()
 
         for _ in tqdm(range(sequence_length), disable=False):
-            sample_batch = (tf.convert_to_tensor(tf.random.normal([batch_size, 4, 224, 224, 3])),
+            sample_batch = (tf.convert_to_tensor(tf.random.normal([batch_size, 4, VISION_WH, VISION_WH, 3])),
                             tf.convert_to_tensor(tf.random.normal([batch_size, 4, 48])),
                             tf.convert_to_tensor(tf.random.normal([batch_size, 4, 92])),
                             tf.convert_to_tensor(tf.random.normal([batch_size, 4, 7])))

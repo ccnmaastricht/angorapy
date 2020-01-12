@@ -7,6 +7,8 @@ from gym import utils, spaces
 from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.manipulate_touch_sensors import MANIPULATE_BLOCK_XML, MANIPULATE_EGG_XML
 
+from utilities.const import VISION_WH
+
 
 class ShadowHand(manipulate.ManipulateEnv):
     """Adjusted version of ManipulateTouchSensorsEnv Environment in the gym package to fit the projects needs."""
@@ -112,7 +114,7 @@ class ShadowHand(manipulate.ManipulateEnv):
         # "primary" information, either this is the visual frame or the object position and velocity
         achieved_goal = self._get_achieved_goal().ravel()
         if self.visual_input:
-            primary = self.render(mode="rgb_array", height=227, width=227)
+            primary = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
             primary = np.concatenate([achieved_goal, object_vel])

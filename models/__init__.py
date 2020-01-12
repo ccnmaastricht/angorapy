@@ -2,7 +2,7 @@
 
 from models.convolutional import *
 from models.simple import *
-from models.hybrid import *
+from models.shadow import *
 from models.components import *
 
 from models.mighty_maker import *

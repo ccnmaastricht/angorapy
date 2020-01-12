@@ -549,7 +549,7 @@ class PPOAgent:
             current_lr = self.lr_schedule
 
         # make fps string
-        fps_string = f"[{nc}{self.gathering_fps:7.2f}{ec}|{nc}{self.optimization_fps:7.2f}{ec}]"
+        fps_string = f"[{nc}{int(round(self.gathering_fps)):6d}{ec}|{nc}{int(round(self.optimization_fps)):7d}{ec}]"
 
         # losses
         pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"

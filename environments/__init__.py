@@ -6,7 +6,7 @@ from environments.evasion import Evasion
 from environments.evasionwalls import EvasionWalls
 from environments.race import Race
 from environments.shadowhand import ShadowHandBlock
-from environments.tunnel import Tunnel, TunnelRAM
+from environments.tunnel import Tunnel
 
 # SHADOW HAND #
 
@@ -32,28 +32,51 @@ gym.envs.register(
 )
 
 # CUSTOM SIMPLE GAMES FROM RLASPA PROJECT
+
 gym.envs.register(
     id='Race-v0',
     entry_point='environments:Race',
     kwargs={'width': 30, 'height': 30,
             'driver_chance': 0.05},
 )
+
 gym.envs.register(
     id='Evasion-v0',
     entry_point='environments:Evasion',
     kwargs={'width': 30, 'height': 30,
             'obstacle_chance': 0.05},
 )
+
 gym.envs.register(
     id='Tunnel-v0',
     entry_point='environments:Tunnel',
     kwargs={'width': 30, 'height': 30},
+    reward_threshold=4950,
+    max_episode_steps=500,
+)
+
+gym.envs.register(
+    id='TunnelFlat-v0',
+    entry_point='environments:Tunnel',
+    kwargs={'width': 30, 'height': 30, 'mode': 'flat'},
+    reward_threshold=4950,
+    max_episode_steps=500,
+)
+
+gym.envs.register(
+    id='TunnelTwoRows-v0',
+    entry_point='environments:Tunnel',
+    kwargs={'width': 30, 'height': 30, 'mode': 'rows'},
+    reward_threshold=4950,
+    max_episode_steps=500,
 )
 
 gym.envs.register(
     id='TunnelRAM-v0',
-    entry_point='environments:TunnelRAM',
-    kwargs={'width': 30, 'height': 30},
+    entry_point='environments:Tunnel',
+    kwargs={'width': 30, 'height': 30, "mode": "ram"},
+    reward_threshold=4950,
+    max_episode_steps=500,
 )
 
 gym.envs.register(

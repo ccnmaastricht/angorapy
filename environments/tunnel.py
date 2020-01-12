@@ -4,14 +4,40 @@ from environments import *
 
 
 class Tunnel(gym.Env):
+    """A game environment where the player (hence the agent) is tasked with escaping a tunnel.
+
+    The tunnel is a white trail of height 3 pixels, over a black background. The environment scrolls to the left and
+    the tunnel randomly moves upwards or downwards, s.t. the agent has to move in order to not crash into the tunnel.
+
+    There are 4 modes in which the environment can be used, determining the state information.
+
+        - ram:  the arguably easiest mode in which the agent gets the position of the tunnel border above and below and
+                its own position.
+        - rows: the agent gets the flattened first two columns (slight wording-whoopsie), including itself.
+        - flat: the agent gets the entire environment as pixels, flattened to a vector. contains a lot of unnecessary
+                information he needs to lear to ignore.
+        - None: the dungeon is presented as is, i.e. a 2D image.
+    """
+
     AGENT_PIXEL = 100
     OBSTACLE_PIXEL = 255
 
-    def __init__(self, width: int = 30, height: int = 30):
+    def __init__(self, width: int = 30, height: int = 30, mode: str = None):
+        self.mode = mode
         self.width = width
         self.height = height
         self.action_space = gym.spaces.Discrete(3)  # UP, DOWN, STRAIGHT
-        self.observation_space = gym.spaces.Box(low=0, high=1, dtype=numpy.float16, shape=(self.width, self.height))
+
+        if mode is None:
+            self.observation_space = gym.spaces.Box(low=0, high=1, dtype=numpy.float16, shape=(self.width, self.height))
+        elif mode == "flat":
+            self.observation_space = gym.spaces.Box(low=0, high=1, dtype=numpy.float16, shape=(self.width * self.height,))
+        elif mode == "rows":
+            self.observation_space = gym.spaces.Box(low=0, high=1, dtype=numpy.float16, shape=(2 * self.height,))
+        elif mode == "ram":
+            self.observation_space = gym.spaces.Box(low=0, high=32, shape=(3,))
+        else:
+            raise ValueError("Unknown Tunnel Mode.")
 
         self.tunnel_center = numpy.random.randint(low=1, high=self.height, size=(1,)).item()
         self.dungeon, self.pos_agent = self._init_dungeon()
@@ -43,11 +69,14 @@ class Tunnel(gym.Env):
         return track, pos
 
     def reset(self):
+        """Reset the environment and return an initial state."""
         self.steps = 0
         self.dungeon, self.pos_agent = self._init_dungeon()
+
         return self.make_state_representation()
 
     def step(self, action):
+        """Make a step in the environment."""
         self.steps += 1
         done = self.steps >= self.max_steps
 
@@ -79,26 +108,23 @@ class Tunnel(gym.Env):
         return self.make_state_representation(), reward, done, None
 
     def make_state_representation(self):
-        return numpy.expand_dims(self.dungeon, axis=-1)  # add channel dimension
+        """Make a state representation dependent on the mode."""
+        if self.mode == "flat":
+            representation = self.dungeon.reshape([-1])
+        elif self.mode == "rows":
+            representation = self.dungeon[:, :2].reshape([-1])
+        elif self.mode == "ram":
+            empty_pixels = numpy.argwhere(self.dungeon[:, 1] != self.OBSTACLE_PIXEL)
+            top_boundary, bottom_boundary = numpy.max(empty_pixels), numpy.min(empty_pixels)
+            representation = numpy.array([self.pos_agent, top_boundary.item(), bottom_boundary.item()])
+        else:
+            representation = numpy.expand_dims(self.dungeon, axis=-1)  # add channel dimension
+
+        return representation
 
     def render(self, mode='human', close=False):
+        """Render the dungeon. TODO this is not rendering"""
         return self.dungeon
-
-
-class TunnelRAM(Tunnel):
-
-    def __init__(self, width: int = 30, height: int = 30):
-        super().__init__(width, height)
-
-        self.observation_space = gym.spaces.Box(low=0, high=32, shape=(3,))
-        pass
-
-    def make_state_representation(self):
-        empty_pixels = numpy.argwhere(self.dungeon[:, 1] != self.OBSTACLE_PIXEL)
-        top_boundary, bottom_boundary = numpy.max(empty_pixels), numpy.min(empty_pixels)
-        observation = numpy.array([self.pos_agent, top_boundary.item(), bottom_boundary.item()])
-
-        return observation
 
 
 if __name__ == "__main__":
