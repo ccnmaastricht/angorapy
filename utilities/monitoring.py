@@ -132,7 +132,11 @@ class Monitor:
         progress = dict(
             rewards=self.agent.cycle_reward_history,
             lengths=self.agent.cycle_length_history,
-            entropies=self.agent.entropy_history
+            entropies=self.agent.entropy_history,
+            vloss=self.agent.value_loss_history,
+            ploss=self.agent.policy_loss_history,
+            preprocessors={k: [list(map(lambda a: a.tolist() if not isinstance(a, (int, float)) else a, t)) for t in v]
+                           for k, v in self.agent.preprocessor_stat_history.items()}
         )
 
         with open(f"{self.story_directory}/progress.json", "w") as f:
@@ -215,4 +219,4 @@ class Monitor:
     def update(self):
         """Update different components of the Monitor."""
         self.write_progress()
-        self.update_graphs()
+        # self.update_graphs()

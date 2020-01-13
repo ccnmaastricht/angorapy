@@ -22,6 +22,14 @@ class _Wrapper(abc.ABC):
     def __repr__(self):
         return self.__class__.__name__
 
+    def __iter__(self):
+        return iter([self])
+
+    @property
+    def name(self):
+        """The name of the preprocessor."""
+        return self.__class__.__name__
+
     @abc.abstractmethod
     def wrap_a_step(self, step_output, update=True):
         """Preprocess an environment output."""
@@ -224,7 +232,7 @@ class CombiWrapper(_Wrapper):
         return self.wrappers[item]
 
     def __iter__(self):
-        return self.wrappers
+        return iter(self.wrappers)
 
     def __repr__(self):
         return f"CombiWrapper{tuple(str(w) for w in self.wrappers)}"
