@@ -180,6 +180,8 @@ class PPOAgent:
         self.episode_length_history = []
         self.cycle_reward_history = []
         self.cycle_length_history = []
+        self.cycle_reward_std_history = []
+        self.cycle_length_std_history = []
         self.entropy_history = []
         self.policy_loss_history = []
         self.value_loss_history = []
@@ -309,6 +311,7 @@ class PPOAgent:
         available_cpus = multiprocessing.cpu_count()
         if not ray_already_initialized:
             ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+
         print(f"Parallelizing {self.workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
@@ -335,7 +338,7 @@ class PPOAgent:
             stats = condense_stats(split_stats)
             old_n = self.preprocessor.n
             self.preprocessor = _Wrapper.from_collection(split_preprocessors)
-            self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for overcounting
+            self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for over counting
 
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
@@ -360,6 +363,10 @@ class PPOAgent:
                                                  else statistics.mean(stats.episode_lengths))
                 self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
                                                  else statistics.mean(stats.episode_rewards))
+                self.cycle_length_history.append(None if stats.numb_completed_episodes == 0
+                                                 else statistics.stdev(stats.episode_lengths))
+                self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
+                                                 else statistics.stdev(stats.episode_rewards))
             else:
                 flat_print("Evaluating...")
                 eval_lengths, eval_rewards = self.evaluate(8, ray_already_initialized=True)

@@ -26,7 +26,7 @@ class Tunnel(gym.Env):
         self.mode = mode
         self.width = width
         self.height = height
-        self.action_space = gym.spaces.Discrete(3)  # UP, DOWN, STRAIGHT
+        self.action_space = gym.spaces.Discrete(3)  # UP, DOWN, STAY
 
         if mode is None:
             self.observation_space = gym.spaces.Box(low=0, high=1, dtype=numpy.float16, shape=(self.width, self.height))
@@ -105,7 +105,7 @@ class Tunnel(gym.Env):
         self.dungeon = numpy.concatenate((self.dungeon[:, 1:], new_row), 1)
         self.dungeon[self.pos_agent, 0] = Tunnel.AGENT_PIXEL
 
-        return self.make_state_representation(), reward, done, None
+        return self.make_state_representation(), reward, done, {}
 
     def make_state_representation(self):
         """Make a state representation dependent on the mode."""

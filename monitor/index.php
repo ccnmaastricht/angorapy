@@ -63,8 +63,8 @@
             <td><a href="experiment.php?id=<?php echo $agent_id ?>"><?php echo $agent_id ?></a></td>
             <td><?php echo $meta["environment"]["name"] ?></td>
             <td><?php echo $meta["date"] ?></td>
-            <td><?php echo sizeof($progress["rewards"]) ?></td>
-            <td><?php echo max($progress["rewards"]) ?></td>
+            <td><?php echo sizeof($progress["rewards"]["mean"]) ?></td>
+            <td><?php echo max($progress["rewards"]["mean"]) ?></td>
             </tr><?php
 
             $count++;

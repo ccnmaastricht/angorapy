@@ -130,8 +130,12 @@ class Monitor:
     def write_progress(self):
         """Write training statistics into json file."""
         progress = dict(
-            rewards=self.agent.cycle_reward_history,
-            lengths=self.agent.cycle_length_history,
+            rewards=dict(
+                mean=self.agent.cycle_reward_history,
+                stdev=self.agent.cycle_reward_std_history),
+            lengths=dict(
+                mean=self.agent.cycle_length_history,
+                stdev=self.agent.cycle_length_std_history),
             entropies=self.agent.entropy_history,
             vloss=self.agent.value_loss_history,
             ploss=self.agent.policy_loss_history,
