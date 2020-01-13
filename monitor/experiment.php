@@ -16,32 +16,19 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
 
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css?family=Fira+Sans&display=swap" rel="stylesheet">
-    <script defer src="https://use.fontawesome.com/releases/v5.0.13/js/solid.js"
-            integrity="sha384-tzzSw1/Vo+0N5UhStP3bvwWPq+uvzCMfrN1fEFe+xBmv1C/AtVX5K0uZtmcHitFZ"
-            crossorigin="anonymous"></script>
-    <script defer src="https://use.fontawesome.com/releases/v5.0.13/js/fontawesome.js"
-            integrity="sha384-6OIrr52G08NpOFSZdxxz1xdNSndlD4vdcf/q2myIUVO0VsqaGHJsB0RaBE01VTOY"
-            crossorigin="anonymous"></script>
-
-    <!--  JQUERY  -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/malihu-custom-scrollbar-plugin/3.1.5/jquery.mCustomScrollbar.concat.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css"
+          integrity="sha256-46qynGAkLSFpVbEBog43gvNhfrOj+BmwXdxFgVK/Kvc=" crossorigin="anonymous"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/js/all.js"
+            integrity="sha256-2JRzNxMJiS0aHOJjG+liqsEOuBb6++9cY4dSOyiijX4=" crossorigin="anonymous"></script>
 
     <!-- Bootstrap -->
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
-            integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
-            crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
-            integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
-            crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
           integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/malihu-custom-scrollbar-plugin/3.1.5/jquery.mCustomScrollbar.min.css">
 
     <!-- CSS -->
     <link rel="stylesheet" type="text/css" href="./main.css">
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/malihu-custom-scrollbar-plugin/3.1.5/jquery.mCustomScrollbar.min.css">
 
     <!--  PLOTTING LIBRARY  -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -53,7 +40,14 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
     <!-- Sidebar -->
     <nav id="sidebar">
         <div class="sidebar-header">
+            <h3><i class="fas fa-flask"></i></h3>
             <h3>Experiment Monitor</h3>
+        </div>
+
+        <div class="reload-button">
+            <button type="button" id="refresh" class="btn btn-circle btn-md">
+                <i class="fas fa-sync"></i>
+            </button>
         </div>
 
         <ul class="list-unstyled components">
@@ -63,27 +57,39 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
             <li><a href="#model-view">Network Graph</a></li>
         </ul>
 
+        <ul class="list-unstyled CTAs">
+            <li>
+                <a href="index.php" class="button-control">
+                    <i class="fas fa-list"></i> Overview
+                </a>
+            </li>
+            <li>
+                <a href="https://github.com/ccnmaastricht/dexterous-robot-hand" class="button-control" target="_blank">
+                    <i class="fab fa-github"></i> Repository
+                </a>
+            </li>
+        </ul>
+
     </nav>
 
     <!-- Page Content -->
     <div id="content">
-
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
-            <div class="container-fluid">
-
-                <button type="button" id="sidebarCollapse" class="btn btn-info">
-                    <i class="fas fa-align-left"></i>
-                    <span>Toggle Sidebar</span>
-                </button>
-            </div>
-        </nav>
-
-        <div class="row justify-content-center">
-            <div class="main-title">
+        <div class="main-title">
+            <div class="justify-content-center">
                 <h1 class="display-3"><?php echo $meta["environment"]["name"] ?><br></h1>
                 <h3> <?php echo $_GET["id"]; ?> </h3>
             </div>
         </div>
+
+        <!--        <nav class="navbar navbar-expand-lg navbar-light bg-light">-->
+        <!--            <div class="container-fluid">-->
+        <!---->
+        <!--                <button type="button" id="sidebarCollapse" class="btn btn-info">-->
+        <!--                    <i class="fas fa-align-left"></i>-->
+        <!--                    <span>Toggle Sidebar</span>-->
+        <!--                </button>-->
+        <!--            </div>-->
+        <!--        </nav>-->
 
         <div class="topic-group" id="statistics-view">
             <div class="row justify-content-center">
@@ -207,11 +213,13 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
                             }
                             ?>
                         </div>
-                        <a class="carousel-control-prev" href="#carouselExampleControls" role="button" data-slide="prev">
+                        <a class="carousel-control-prev" href="#carouselExampleControls" role="button"
+                           data-slide="prev">
                             <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                             <span class="sr-only">Previous</span>
                         </a>
-                        <a class="carousel-control-next" href="#carouselExampleControls" role="button" data-slide="next">
+                        <a class="carousel-control-next" href="#carouselExampleControls" role="button"
+                           data-slide="next">
                             <span class="carousel-control-next-icon" aria-hidden="true"></span>
                             <span class="sr-only">Next</span>
                         </a>
@@ -232,6 +240,21 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
 
     </div>
 </div>
+<!--JQUERY-->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<!--POPPER-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+        integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+        crossorigin="anonymous"></script>
+<!--BOOTSTRAP-->
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+        integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+        crossorigin="anonymous"></script>
+<!--CUSTOM SCROLLBAR-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/malihu-custom-scrollbar-plugin/3.1.5/jquery.mCustomScrollbar.concat.min.js"></script>
+<!--LODASH-->
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
+
 
 <script>
     $(document).ready(function () {
@@ -244,6 +267,11 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
     });
 
     $('.carousel').carousel();
+
+    $("nav ul li").on("click", function () {
+        $("nav").find(".active").removeClass("active");
+        $(this).addClass("active");
+    });
 </script>
 
 <script src="js/plots.js"></script>

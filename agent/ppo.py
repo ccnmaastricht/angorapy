@@ -2,7 +2,6 @@
 """Implementation of Proximal Policy Optimization Algorithm."""
 import json
 import logging
-import math
 import multiprocessing
 import os
 import re
@@ -364,10 +363,10 @@ class PPOAgent:
                                                  else statistics.mean(stats.episode_lengths))
                 self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
                                                  else statistics.mean(stats.episode_rewards))
-                self.cycle_length_history.append(None if stats.numb_completed_episodes == 0
-                                                 else statistics.stdev(stats.episode_lengths))
-                self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
-                                                 else statistics.stdev(stats.episode_rewards))
+                self.cycle_length_std_history.append(None if stats.numb_completed_episodes == 0
+                                                     else statistics.stdev(stats.episode_lengths))
+                self.cycle_reward_std_history.append(None if stats.numb_completed_episodes == 0
+                                                     else statistics.stdev(stats.episode_rewards))
             else:
                 flat_print("Evaluating...")
                 eval_lengths, eval_rewards = self.evaluate(8, ray_already_initialized=True)

@@ -22,6 +22,18 @@ let standard_layout = {
         yanchor: "top",
         y: -0.3,
         x: 0.5
+    },
+    xaxis: {
+        zeroline: false,
+        showline: true,
+        showgrid: false,
+        mirror: 'ticks',
+    },
+    yaxis: {
+        zeroline: false,
+        showline: true,
+        showgrid: false,
+        mirror: 'ticks',
     }
 };
 
@@ -50,13 +62,23 @@ $.ajax({
         };
 
         let traces = [length_trace, reward_trace];
-        let layout = {
+        let layout = _.merge({
             title: "Average Rewards and Episode Lengths",
-            ...standard_layout,
             yaxis: {title: "Return"},
-            yaxis2: {title: "Steps", side: "right", overlaying: 'y',},
-
-        };
+            yaxis2: {title: "Steps", side: "right", overlaying: 'y', showgrid: false},
+            // shape: [{
+            //     type: 'line',
+            //     x0: 2,
+            //     y0: 2,
+            //     x1: 5,
+            //     y1: 2,
+            //     line: {
+            //         color: 'rgb(50, 171, 96)',
+            //         width: 4,
+            //         dash: 'dashdot'
+            //     }
+            // }]
+        }, standard_layout);
 
         Plotly.newPlot(reward_plot_div, traces, layout);
 
@@ -68,10 +90,9 @@ $.ajax({
             marker: {color: "green"},
         };
 
-        Plotly.newPlot(entropy_plot_div, [entropy_trace], {
+        Plotly.newPlot(entropy_plot_div, [entropy_trace], _.merge({
             title: "Approximate Entropy",
-            ...standard_layout
-        });
+        }, standard_layout));
 
         // Policy Loss PLOT
         let ploss_trace = {
@@ -80,10 +101,9 @@ $.ajax({
             marker: {color: "Turquoise"},
         };
 
-        Plotly.newPlot(ploss_plot_div, [ploss_trace], {
+        Plotly.newPlot(ploss_plot_div, [ploss_trace], _.merge({
             title: "Policy Loss",
-            ...standard_layout
-        });
+        }, standard_layout));
 
         // VALUE LOSS PLOT
         let vloss_trace = {
@@ -92,22 +112,34 @@ $.ajax({
             marker: {color: "Tomato "},
         };
 
-        Plotly.newPlot(vloss_plot_div, [vloss_trace], {
+        Plotly.newPlot(vloss_plot_div, [vloss_trace], _.merge({
             title: "Value Loss",
-            ...standard_layout
-        });
+        }, standard_layout));
 
         // NORMALIZATION PLOTS
         let rew_norm_trace = {
-            x: _.range(_.size(data["preprocessors"]["RewardNormalizationWrapper"])), y: data["preprocessors"]["RewardNormalizationWrapper"],
-            mode: "lines", name: "Running Mean Reward",
+            x: _.range(_.size(data["preprocessors"]["RewardNormalizationWrapper"]["mean"])),
+            y: data["preprocessors"]["RewardNormalizationWrapper"]["mean"],
+            mode: "lines",
+            name: "Running Mean Reward",
             marker: {color: "Green "},
         };
 
-        Plotly.newPlot(rew_norm_plot_div, [rew_norm_trace], {
+        Plotly.newPlot(rew_norm_plot_div, [rew_norm_trace], _.merge({
             title: "Reward Normalization",
-            ...standard_layout
-        });
+        }, standard_layout));
+
+        let state_norm_trace = {
+            x: _.range(_.size(data["preprocessors"]["StateNormalizationWrapper"]["mean"])),
+            y: data["preprocessors"]["StateNormalizationWrapper"]["mean"],
+            mode: "lines",
+            name: "Running Mean State",
+            marker: {color: "Green "},
+        };
+
+        Plotly.newPlot(state_norm_plot_div, [state_norm_trace], _.merge({
+            title: "State Normalization",
+        }, standard_layout));
     },
 
     error: function () {
