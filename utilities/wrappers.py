@@ -112,11 +112,23 @@ class _RunningMeanWrapper(_Wrapper, abc.ABC):
     def recover(cls, serialization_data):
         """Recover a running mean wrapper from its serialization"""
         wrapper = cls() if len(serialization_data) == 3 else cls(serialization_data[3])
-        wrapper.n = serialization_data[0]
-        wrapper.mean = serialization_data[1]
-        wrapper.variance = serialization_data[2]
+        wrapper.n = np.array(serialization_data[0])
+        wrapper.mean = np.array(serialization_data[1])
+        wrapper.variance = np.array(serialization_data[2])
 
         return wrapper
+
+    def simplified_mean(self) -> float:
+        """Get a simplified, one dimensional mean by meaning any means."""
+        return np.mean(self.mean).item()
+
+    def simplified_variance(self) -> float:
+        """Get a simplified, one dimensional variance by meaning any variances."""
+        return np.mean(self.variance).item()
+
+    def simplified_stdev(self) -> float:
+        """Get a simplified, one dimensional stdev by meaning any variances and taking their square root."""
+        return np.sqrt(np.mean(self.variance)).item()
 
 
 class StateNormalizationWrapper(_RunningMeanWrapper):

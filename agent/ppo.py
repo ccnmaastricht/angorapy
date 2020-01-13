@@ -2,6 +2,7 @@
 """Implementation of Proximal Policy Optimization Algorithm."""
 import json
 import logging
+import math
 import multiprocessing
 import os
 import re
@@ -20,11 +21,11 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from agent import policy
+from agent import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
-from agent.policy import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from agent.policies import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
 from utilities.model_management import is_recurrent_model, get_layer_names, get_component, reset_states_masked
@@ -187,8 +188,8 @@ class PPOAgent:
         self.underflow_history = []
 
         self.preprocessor_stat_history = {
-            w.__class__.__name__: [(w.n, w.mean, w.variance)] for w in self.preprocessor if
-            isinstance(w, _RunningMeanWrapper)
+            w.__class__.__name__: {"mean": [w.simplified_mean()], "stdev": [w.simplified_stdev()]}
+            for w in self.preprocessor if isinstance(w, _RunningMeanWrapper)
         }
 
     def set_gpu(self, activated: bool):
@@ -370,10 +371,11 @@ class PPOAgent:
 
             # record preprocessor stats
             for w in self.preprocessor:
-                if w.name not in self.preprocessor_stat_history.keys():
+                if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, _RunningMeanWrapper):
                     continue
 
-                self.preprocessor_stat_history[w.name].append((w.n, w.mean, w.variance))
+                self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
+                self.preprocessor_stat_history[w.name]["stdev"].append(w.simplified_stdev())
 
             time_dict["evaluating"] = time.time() - subprocess_start
             subprocess_start = time.time()
@@ -538,7 +540,7 @@ class PPOAgent:
         model_representation = ModelTuple(self.builder_function_name,
                                           self.policy.get_weights(),
                                           self.distribution.__class__.__name__)
-        result_ids = [evaluate.remote(model_representation, self.env_name) for _ in range(n)]
+        result_ids = [evaluate.remote(model_representation, self.env_name, self.preprocessor) for _ in range(n)]
 
         lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])
 
@@ -630,25 +632,21 @@ class PPOAgent:
             parameters = json.load(f)
 
         model_builder = getattr(models, parameters["builder_function_name"])
-        distribution = getattr(policy, parameters["distribution"])()
+        distribution = getattr(policies, parameters["distribution"])()
+        preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])
         env = gym.make(parameters["env_name"])
 
         loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
                                 workers=parameters["workers"], learning_rate=parameters["learning_rate"],
                                 discount=parameters["discount"], lam=parameters["lam"], clip=parameters["clip"],
                                 c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
-                                gradient_clipping=parameters["gradient_clipping"],
+                                gradient_clipping=parameters["gradient_clipping"], preprocessor=preprocessor,
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
 
         for p, v in parameters.items():
-            if p in ["distribution"]:
+            if p in ["distribution", "preprocessor"]:
                 continue
-
-            if p == "preprocessor":
-                loaded_agent.__dict__[p] = CombiWrapper.from_serialization(v)
-            else:
-                loaded_agent.__dict__[p] = v
 
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{latest}/weights")
 

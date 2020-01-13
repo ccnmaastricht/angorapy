@@ -3,7 +3,7 @@ import logging
 
 import argcomplete
 
-from agent.policy import get_distribution_by_short_name
+from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import *
 from models import get_model_builder

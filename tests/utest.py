@@ -12,7 +12,7 @@ from scipy.signal import lfilter
 from scipy.stats import norm, entropy, beta
 
 from agent.core import extract_discrete_action_probabilities, estimate_advantage
-from agent.policy import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
+from agent.policies import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from models import get_model_builder

@@ -1,19 +1,16 @@
 #!/usr/bin/env python
 import os
-from pprint import pprint
 from typing import List, Union
 
 import gym
-import numpy as np
 import tensorflow as tf
 
-from agent.policy import _PolicyDistribution, GaussianPolicyDistribution
+from agent.policies import _PolicyDistribution
 from agent.ppo import PPOAgent
-from models import build_ffn_models, get_model_builder, plot_model
+from utilities.model_management import is_recurrent_model, list_layer_names, get_layers_by_names, \
+    build_sub_model_to
 from utilities.util import parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
-from utilities.model_management import is_recurrent_model, list_layer_names, extract_layers, get_layers_by_names, \
-    build_sub_model_to
 from utilities.wrappers import RewardNormalizationWrapper, StateNormalizationWrapper, CombiWrapper, _Wrapper, \
     SkipWrapper
 
@@ -50,9 +47,11 @@ class Investigator:
         return get_layers_by_names(self.network, layer_names=layer_names)
 
     def get_layer_weights(self, layer_name):
+        """Get the weights of a layer identified by its unique name."""
         return self.get_layers_by_names(layer_name).get_weights()
 
     def get_weight_dict(self):
+        """Get a dictionary mapping layer names to the weights of the layers."""
         out = {}
         for layer_name in self.list_layer_names(only_para_layers=True):
             out[layer_name] = self.get_layer_weights(layer_name)
@@ -81,9 +80,10 @@ class Investigator:
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        state = parse_state(env.reset())
+        state = env.reset()
+        state = self.preprocessor.wrap_a_step((state, None, None, None))
         while not done:
-            dual_out = flatten(polymodel.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+            dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
             activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
 
             states.append(state)
@@ -93,9 +93,10 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, _ = env.step(action)
-            observation, reward, done, _ = self.preprocessor.wrap_a_step((observation, reward, done, None), update=False)
+            observation, reward, done, _ = self.preprocessor.wrap_a_step((observation, reward, done, None),
+                                                                         update=False)
 
-            state = parse_state(observation)
+            state = observation
             reward_trajectory.append(reward)
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
@@ -105,20 +106,24 @@ class Investigator:
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        state = parse_state(env.reset())
+        state = env.reset()
+        state = self.preprocessor.wrap_a_step((state, None, None, None), update=False)
         cumulative_reward = 0
         while not done:
             env.render()
-            probabilities = flatten(self.network.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+            probabilities = flatten(
+                self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, _ = env.step(action)
             cumulative_reward += reward
-            observation, reward, done, _ = self.preprocessor.wrap_a_step((observation, reward, done, None), update=False)
+            observation, reward, done, _ = self.preprocessor.wrap_a_step((observation, reward, done, None),
+                                                                         update=False)
 
-            state = parse_state(observation)
+            state = observation
 
-        print(f"Achieved a score of {cumulative_reward}. {'Good Boy!' if cumulative_reward > env.spec.reward_threshold else ''}")
+        print(
+            f"Achieved a score of {cumulative_reward}. {'Good Boy!' if cumulative_reward > env.spec.reward_threshold else ''}")
 
 
 if __name__ == "__main__":
@@ -127,9 +132,8 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     agent_007 = PPOAgent.from_agent_state(1578664065)
-    agent_007.preprocessor = CombiWrapper([StateNormalizationWrapper(agent_007.state_dim), RewardNormalizationWrapper()])
+    agent_007.preprocessor = CombiWrapper(
+        [StateNormalizationWrapper(agent_007.state_dim), RewardNormalizationWrapper()])
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)
-
-
