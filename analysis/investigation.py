@@ -50,7 +50,7 @@ class Investigator:
         return get_layers_by_names(self.network, layer_names=layer_names)
 
     def get_layer_weights(self, layer_name):
-        return self.get_layers_by_names(layer_name).get_weights()
+        return self.get_layers_by_names(layer_name)[0].get_weights()
 
     def get_weight_dict(self):
         out = {}
