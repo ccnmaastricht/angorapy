@@ -10,7 +10,7 @@ import tensorflow as tf
 from gym.spaces import Box
 
 import models
-from agent import policy
+from agent import policies
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from environments import *
@@ -19,7 +19,7 @@ from utilities.const import STORAGE_DIR, DETERMINISTIC, COLORS, DEBUG
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
 from utilities.util import parse_state, add_state_dims, flatten, set_all_seeds, env_extract_dims
 from utilities.model_management import is_recurrent_model
-from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper
+from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, _Wrapper
 
 
 @ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
@@ -41,7 +41,7 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     # load policy
     if isinstance(policy_tuple, ModelTuple):
         model_builder = getattr(models, policy_tuple.model_builder)
-        distribution = getattr(policy, policy_tuple.distribution_type)()
+        distribution = getattr(policies, policy_tuple.distribution_type)()
 
         # recurrent policy needs batch size for statefulness
         _, _, joint = model_builder(env, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
@@ -221,13 +221,13 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
-def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
+def evaluate(policy_tuple, env_name: str, preprocessor: _Wrapper) -> Tuple[int, int]:
     """Evaluate one episode of the given environment following the given policy. Remote implementation."""
     environment = gym.make(env_name)
 
     if isinstance(policy_tuple, ModelTuple):
         model_builder = getattr(models, policy_tuple.model_builder)
-        distribution = getattr(policy, policy_tuple.distribution_type)()
+        distribution = getattr(policies, policy_tuple.distribution_type)()
 
         # recurrent policy needs batch size for statefulness
         policy, _, _ = model_builder(environment, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
@@ -239,14 +239,15 @@ def evaluate(policy_tuple, env_name: str) -> Tuple[int, int]:
     done = False
     reward_trajectory = []
     length = 0
-    state = parse_state(environment.reset())
+    state = environment.reset()
+    state = preprocessor.wrap_a_step((state, None, None, None), update=False)[0]
     while not done:
-        probabilities = flatten(policy.predict(add_state_dims(state, dims=2 if is_recurrent else 1)))
+        probabilities = flatten(policy.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
         action, _ = distribution.act(*probabilities)
         observation, reward, done, _ = environment.step(action)
-        state = parse_state(observation)
         reward_trajectory.append(reward)
+        state, reward, done, _ = preprocessor.wrap_a_step((observation, reward, done, None), update=False)
         length += 1
 
     return length, sum(reward_trajectory)

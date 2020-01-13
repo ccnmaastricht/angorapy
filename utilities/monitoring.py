@@ -139,8 +139,7 @@ class Monitor:
             entropies=self.agent.entropy_history,
             vloss=self.agent.value_loss_history,
             ploss=self.agent.policy_loss_history,
-            preprocessors={k: [list(map(lambda a: a.tolist() if not isinstance(a, (int, float)) else a, t)) for t in v]
-                           for k, v in self.agent.preprocessor_stat_history.items()}
+            preprocessors=self.agent.preprocessor_stat_history
         )
 
         with open(f"{self.story_directory}/progress.json", "w") as f:
