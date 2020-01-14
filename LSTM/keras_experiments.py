@@ -1,73 +1,89 @@
-from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN, Flatten, TimeDistributed
+#from tensorflow.keras.models import Sequential
+#from tensorflow.keras.layers import Dense, LSTM
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import stats
-
-model = Sequential(name="NVDAmodel")
-model.add(SimpleRNN(8, input_shape=(10, 4)))
-model.add(Dense(4))
-#model.add(AveragePooling1D())
-#model.add(Flatten())
+import tensorflow as tf
+from utilities.model_management import build_sub_model_to
 
 
-model.summary()
-# import and analyse data
-NVDA = pd.read_csv('/Users/Raphael/Downloads/NVDA.csv')
+# from analysis.chiefinvestigation import
 
-# NVDA.head()
-# NVDA.iloc[:1000].plot(x="Date", y=["Open", "Close"])
-# plt.show()
+class Stockpredictor:
 
-diff = NVDA["Close"]-NVDA["Open"]
-num = NVDA.to_numpy()[:, 1:5]
-#num = stats.zscore(num)
-X_train = num[0:629,:]
-X_test = num[629:,:]
-print(X_train.shape)
+    def __init__(self):
+        pass
 
-#X_train = X_train.to_numpy()
-#X_test = X_test.to_numpy()
-X_train = stats.zscore(np.array(X_train.tolist()))
-#X_test = stats.zscore(X_test)
-# X_train = np.reshape(X_train, (, 4))
-# X_test = np.reshape(X_test, (51, 4, 1))
-samples = []
-test_samples = []
-y = []
-y_test = []
-for i in range(X_train.shape[0]-10):
-    samples.append(np.expand_dims(X_train[i:(i+10)], axis=0))
-    y.append(np.expand_dims(X_train[10+i], axis=0))
-    test_samples.append(np.expand_dims(X_test[i:(i+10)], axis=0))
-    y_test.append(np.expand_dims(X_test[10+i], axis=0))
+    def model_builder(name, batch_shape, ):
+        inputs = tf.keras.Input(batch_shape=batch_shape, name="input")
 
-samples = np.concatenate(samples, axis=0)
-y = np.concatenate(y, axis=0)
-test_samples = np.concatenate(test_samples, axis=0)
-y_test = np.concatenate(y_test, axis = 0)
+        x = tf.keras.layers.LSTM(16, name='lstm')(inputs)
+        x = tf.keras.layers.ReLU()(x)
+        x = tf.keras.layers.Dense(4, activation="relu")(x)
 
+        model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
+        model.summary()
 
-# X_train = np.expand_dims(X_train.to_numpy(), axis=1)
-# X_test = np.expand_dims(X_test.to_numpy(), axis=1)
+        return model
 
-model.compile(optimizer="adam", loss="mse",
-              metrics=['accuracy'])
+def data_processor():
 
-history = model.fit(samples, y, epochs=1000)
+    # import and analyse data
+    NVDA = pd.read_csv('/Users/Raphael/Downloads/NVDA.csv')
 
-accuracy = model.evaluate(test_samples, y_test)
-print(accuracy)
+    num = NVDA.to_numpy()[:4000, 1:5]
+    train_size = 0.7
+    X_train = num[0:int(NVDA.shape[0]*train_size),:]
+    X_test = num[-int((1-train_size)*NVDA.shape[0]):,:]
+    print(X_train.shape)
 
-predictions = np.squeeze(model.predict(test_samples))
+    #X_train = X_train.to_numpy()
+    #X_test = X_test.to_numpy()
+    # X_train = stats.zscore(np.array(X_train.tolist()))
+    #X_test = stats.zscore(X_test)
+    # X_train = np.reshape(X_train, (, 4))
+    # X_test = np.reshape(X_test, (51, 4, 1))
+    samples, test_samples, y, y_test = [], [], [], []
+    for i in range(X_train.shape[0]-10):
+        samples.append(np.expand_dims(X_train[i:(i+10)], axis=0))
+        y.append(np.expand_dims(X_train[10+i], axis=0))
+    for i in range(X_test.shape[0]-10):
+        test_samples.append(np.expand_dims(X_test[i:(i+10)], axis=0))
+        y_test.append(np.expand_dims(X_test[10+i], axis=0))
 
-plt.plot(list(range(len(predictions))), y_test, label="Act")
-plt.plot(list(range(len(predictions))), predictions, label="Pred")
-plt.legend()
+    samples = np.concatenate(samples, axis=0)
+    y = np.concatenate(y, axis=0)
+    test_samples = np.concatenate(test_samples, axis=0)
+    y_test = np.concatenate(y_test, axis = 0)
 
+    return samples, y, test_samples, y_test
+if __name__ == "__main__":
 
+    model= Stockpredictor.model_builder("NVDA_model", (5, 10, 4))
 
-#plt.plot(history.epoch, history.history["loss"])
-plt.show()
+    samples, y, test_samples, y_test = data_processor()
 
+    model.compile(optimizer="rmsprop", loss="mse",
+                  metrics=['accuracy'])
+
+    history = model.fit(tf.convert_to_tensor(samples, dtype=tf.float32),
+                        tf.convert_to_tensor(y, dtype=tf.float32), epochs=15)
+
+    accuracy = model.evaluate(tf.convert_to_tensor(test_samples,dtype=tf.float32),
+                              tf.convert_to_tensor(y_test, dtype=tf.float32))
+    print(accuracy)
+
+    predictions = np.squeeze(model.predict(tf.convert_to_tensor(test_samples,
+                                                                dtype=tf.float32)))
+    plt.plot(list(range(len(predictions))), y_test[:, 0], label="Act")
+    plt.plot(list(range(len(predictions))), predictions[:, 0], label="Pred")
+    plt.legend()
+    plt.show()
+
+    # analysis of model
+    weights = layer = model.get_layer('lstm').get_weights()
+    sub_model = build_sub_model_to(model, ['input', 'lstm'])
+
+    # activations = sub_model.predict(tf.convert_to_tensor(test_samples, dtype=tf.float32))
+
+    # minimize stuff -> write minimization function for lstm

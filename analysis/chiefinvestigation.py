@@ -135,7 +135,6 @@ class Chiefinvestigator:
         x_test = x_activation_data[-int(size_train*x_activation_data.shape[0]):-1, :]
         y_train = action_data[0:int(size_train*x_activation_data.shape[0])]
         y_test = action_data[-int(size_train*x_activation_data.shape[0]):-1]
-        # classify actions based on activation in lstm using SVM
 
         clf = SVC(gamma='auto')
         clf.fit(x_train, y_train)
@@ -150,8 +149,8 @@ class Chiefinvestigator:
         input = input[id, :]
         fun = lambda x: 0.5 * sum(
             (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
-        der = lambda x: np.sum((- np.eye(64, 64) + weights * (1 - np.tanh(x[0:64]) ** 2)),
-                               axis=1)  # - np.eye(64, 64) + weights*x[0:64]
+        # der = lambda x: np.sum((- np.eye(64, 64) + weights * (1 - np.tanh(x[0:64]) ** 2)),
+                            #   axis=1)  # - np.eye(64, 64) + weights*x[0:64]
         options = {'gtol': 1e-5, 'disp': True}
         # Jac = nd.Jacobian(fun)
         # print(Jac.shape)
@@ -161,7 +160,6 @@ class Chiefinvestigator:
         print(y)
         optimisedResults = minimize(fun, x0, method=method, jac=False, hess=Hes,
                                     options=options)
-        # masking hinders extraction of activations from previous layer!!
         return optimisedResults
 
     def curve_fit_minimization(self, activation, weights, inputweights, input):
