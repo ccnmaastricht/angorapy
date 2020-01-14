@@ -140,11 +140,11 @@ class Chiefinvestigator:
         clf.fit(x_train, y_train)
         clf.predict(x_test)
         score = clf.score(x_test, y_test)
-        print(score)
+        print("Classification accuracy", score)
 
     def minimiz(self, weights, inputweights, input, activation, method: str = 'trust-krylov'):
         id = np.random.randint(activation.shape[0])
-        print(id)
+        print("Timestep:", id)
         x0 = activation[id, :]
         input = input[id, :]
         fun = lambda x: 0.5 * sum(
@@ -152,13 +152,13 @@ class Chiefinvestigator:
         # der = lambda x: np.sum((- np.eye(64, 64) + weights * (1 - np.tanh(x[0:64]) ** 2)),
                             #   axis=1)  # - np.eye(64, 64) + weights*x[0:64]
         options = {'gtol': 1e-5, 'disp': True}
-        # Jac = nd.Jacobian(fun)
+        Jac = nd.Gradient(fun)
         # print(Jac.shape)
         Hes = nd.Hessian(fun)
-        print(Hes)
+        # print(Hes)
         y = fun(x0)
-        print(y)
-        optimisedResults = minimize(fun, x0, method=method, jac=False, hess=Hes,
+        print("First function evaluation:", y)
+        optimisedResults = minimize(fun, x0, method=method, jac=Jac, hess=Hes,
                                     options=options)
         return optimisedResults
 
@@ -169,7 +169,7 @@ class Chiefinvestigator:
         x = activation[id, :]
         input = input[id, :]
         fun = lambda weights: 0.5 * sum(
-            (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
+            (- x + np.matmul(weights, np.tanh(x)) + np.matmul(inputweights, input)) ** 2)
         ydata = np.zeros(activation.shape[1])
         popt, pcov = curve_fit(fun, xdata=weights, ydata=ydata, p0=x0)
         return popt, pcov
@@ -211,12 +211,13 @@ if __name__ == "__main__":
     states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
                                                                     "policy_recurrent_layer")
     actions = np.vstack(actions)
-    # weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
+    weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
     # print(weights)
-    # method = "trust-ncg"
-    # optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
-    #                                        input=previous_activations[0], activation=activations[1],
-    #                                        method=method)
+    method = "trust-ncg"
+    optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
+                                            input=np.reshape(activations[2], (activations[2].shape[0], 64)),
+                                            activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
+                                            method=method)
 
     zscores = sp.stats.zscore(np.reshape(activations[1], (activations[1].shape[0], 64))) # normalization
 

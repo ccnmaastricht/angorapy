@@ -15,11 +15,11 @@ class Stockpredictor:
         pass
 
     def model_builder(name, batch_shape, ):
-        inputs = tf.keras.Input(batch_shape=batch_shape, name="input")
+        inputs = tf.keras.Input(shape=batch_shape, name="input")
 
         x = tf.keras.layers.LSTM(16, name='lstm')(inputs)
         x = tf.keras.layers.ReLU()(x)
-        x = tf.keras.layers.Dense(4, activation="relu")(x)
+        x = tf.keras.layers.Dense(4, activation="relu", name="dense")(x)
 
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
         model.summary()
@@ -59,7 +59,7 @@ def data_processor():
     return samples, y, test_samples, y_test
 if __name__ == "__main__":
 
-    model= Stockpredictor.model_builder("NVDA_model", (5, 10, 4))
+    model = Stockpredictor.model_builder("NVDA_model", (10, 4))
 
     samples, y, test_samples, y_test = data_processor()
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
                   metrics=['accuracy'])
 
     history = model.fit(tf.convert_to_tensor(samples, dtype=tf.float32),
-                        tf.convert_to_tensor(y, dtype=tf.float32), epochs=15)
+                        tf.convert_to_tensor(y, dtype=tf.float32), epochs=100)
 
     accuracy = model.evaluate(tf.convert_to_tensor(test_samples,dtype=tf.float32),
                               tf.convert_to_tensor(y_test, dtype=tf.float32))
@@ -83,7 +83,8 @@ if __name__ == "__main__":
     # analysis of model
     weights = layer = model.get_layer('lstm').get_weights()
     sub_model = build_sub_model_to(model, ['input', 'lstm'])
+    sub_model.summary()
 
-    # activations = sub_model.predict(tf.convert_to_tensor(test_samples, dtype=tf.float32))
-
+    activations = sub_model.predict(tf.convert_to_tensor(test_samples, dtype=tf.float32))
+    print(activations)
     # minimize stuff -> write minimization function for lstm
