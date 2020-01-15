@@ -9,7 +9,7 @@ class Flipflopper:
 
         inputs = tf.keras.Input(shape=inputshape, name="input")
 
-        x = tf.keras.layers.RNN(1000, name='rnn')(inputs)
+        x = tf.keras.layers.SimpleRNN(300, name='rnn')(inputs)
         #x = tf.keras.layers.ReLU()(x)
         x = tf.keras.layers.Dense(3, activation="linear", name="dense")(x)
 
@@ -23,7 +23,7 @@ class Flipflopper:
         pulse_duration = 10
         batch_size=1
         nOut = 3 # number of output channels
-        nPulses = np.floor(size*0.2)
+        nPulses = np.floor(size*1)
         input = np.zeros((size, batch_size, nOut))
         T = np.arange(0, size, int(size/nPulses))
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     inputshape = (1, 3)
     model = flopper.build_model(inputshape)
 
-    model.compile(optimizer="rmsprop", loss="mse",
+    model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
 
     history = model.fit(tf.convert_to_tensor(stim, dtype=tf.float32),

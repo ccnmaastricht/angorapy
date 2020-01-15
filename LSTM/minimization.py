@@ -1,4 +1,3 @@
-# this file contains the great minimizer
 from scipy.optimize import minimize
 import numpy as np
 import numdifftools as nd
@@ -9,6 +8,7 @@ class Minimizer:
         pass
 
     def minimizGRU(self, weights, inputweights, inputs, activation, method: str = "trust-ncg"):
+        pass
 
     def minimizRNN(self, weights, inputweights, inputs, activation, method: str = 'trust-ncg'):
         optimisedResults = []
