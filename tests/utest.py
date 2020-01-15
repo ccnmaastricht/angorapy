@@ -73,7 +73,7 @@ class ProbabilityTest(unittest.TestCase):
         mu = tf.convert_to_tensor([[2.0, 3.0], [2.0, 1.0]], dtype=tf.float32)
         sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
 
-        result_reference = np.sum(norm._entropy_from_params(loc=mu, scale=sig), axis=-1)
+        result_reference = np.sum(norm.entropy(loc=mu, scale=sig), axis=-1)
         result_log = distro.entropy(np.log(sig)).numpy()
         result = distro._entropy_from_params(sig).numpy()
 
@@ -102,7 +102,7 @@ class ProbabilityTest(unittest.TestCase):
         alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
         betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
 
-        result_reference = np.sum(beta._entropy_from_params(alphas, betas), axis=-1)
+        result_reference = np.sum(beta.entropy(alphas, betas), axis=-1)
         result_pdf = distro._entropy_from_params((alphas, betas)).numpy()
 
         self.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
@@ -194,7 +194,7 @@ class WrapperTest(unittest.TestCase):
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
-            o, _, _, _ = normalizer.wrap_a_step((sample, 1, 1, 1))
+            o, _, _, _ = normalizer.modulate((sample, 1, 1, 1))
 
         self.assertTrue(np.allclose(true_mean, normalizer.mean))
         self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))
@@ -207,7 +207,7 @@ class WrapperTest(unittest.TestCase):
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
-            o, _, _, _ = normalizer.wrap_a_step((1, sample, 1, 1))
+            o, _, _, _ = normalizer.modulate((1, sample, 1, 1))
 
         self.assertTrue(np.allclose(true_mean, normalizer.mean))
         self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))

@@ -33,7 +33,7 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
 
     # train
     agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,
-                ray_already_initialized=not init_ray)
+                ray_is_initialized=not init_ray)
     env.close()
 
     return agent.cycle_reward_history

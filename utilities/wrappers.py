@@ -8,9 +8,11 @@ import gym
 import numpy as np
 
 from utilities.const import EPS, NUMPY_FLOAT_PRECISION
+from utilities.util import parse_state
 
 
-class _Wrapper(abc.ABC):
+class BaseWrapper(abc.ABC):
+    """Abstract base class for preprocessors."""
 
     def __init__(self):
         self.n = 1e-4  # make this at least epsilon so that first measure is not all zeros
@@ -31,7 +33,7 @@ class _Wrapper(abc.ABC):
         return self.__class__.__name__
 
     @abc.abstractmethod
-    def wrap_a_step(self, step_output, update=True):
+    def modulate(self, step_output, update=True):
         """Preprocess an environment output."""
         pass
 
@@ -73,10 +75,10 @@ class _Wrapper(abc.ABC):
 
     def correct_sample_size(self, deduction):
         """Deduce the given number from the sample counter."""
-        self.n -= deduction
+        self.n = self.n - deduction
 
 
-class _RunningMeanWrapper(_Wrapper, abc.ABC):
+class _RunningMeanWrapper(BaseWrapper, abc.ABC):
     mean: np.ndarray
     variance: np.ndarray
 
@@ -140,7 +142,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
         self.mean = np.zeros(state_shape, NUMPY_FLOAT_PRECISION)
         self.variance = np.ones(state_shape, NUMPY_FLOAT_PRECISION)
 
-    def wrap_a_step(self, step_result: Tuple, update=True) -> Tuple:
+    def modulate(self, step_result: Tuple, update=True) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
         try:
             o, r, done, info = step_result
@@ -157,7 +159,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
     def warmup(self, env: gym.Env, observations=10):
         """Warmup the wrapper by sampling the observation space."""
         for i in range(observations):
-            self.update(env.observation_space.sample())
+            self.update(parse_state(env.observation_space.sample()))
 
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
@@ -176,7 +178,7 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
         self.variance = np.array(1, NUMPY_FLOAT_PRECISION)
         self.ret = np.float64(0)
 
-    def wrap_a_step(self, step_result: Tuple, update=True) -> Tuple:
+    def modulate(self, step_result: Tuple, update=True) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
         try:
             o, r, done, info = step_result
@@ -207,7 +209,7 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
             self.update(env.step(env.action_space.sample())[1])
 
 
-class SkipWrapper(_Wrapper):
+class SkipWrapper(BaseWrapper):
     """Simple Passing Wrapper. Does nothing. Just for convenience."""
 
     @classmethod
@@ -215,7 +217,7 @@ class SkipWrapper(_Wrapper):
         """Recovery is just creation of new, no info to be recovered from."""
         return SkipWrapper()
 
-    def wrap_a_step(self, step_output, update=True):
+    def modulate(self, step_output, update=True):
         """Wrap by doing nothing."""
         return step_output
 
@@ -223,13 +225,15 @@ class SkipWrapper(_Wrapper):
         return self
 
 
-class CombiWrapper(_Wrapper):
+class CombiWrapper(BaseWrapper, object):
     """Combine any number of arbitrary wrappers into one using this interface. Meaningless wrappers (SkipWrappers) will
     be automatically neglected."""
 
-    def __init__(self, wrappers: Iterable[_Wrapper]):
+    def __init__(self, wrappers: Iterable[BaseWrapper]):
         super().__init__()
         self.wrappers = [w for w in wrappers if not isinstance(w, SkipWrapper)]
+        if len(self.wrappers) == 0:
+            self.__class__ = SkipWrapper  # not beautiful, but __new__ does not work with pickle for some reason
 
     def __add__(self, other):
         added_wraps = CombiWrapper([self.wrappers[i] + other.wrappers[i] for i in range(len(self.wrappers))])
@@ -249,10 +253,10 @@ class CombiWrapper(_Wrapper):
     def __repr__(self):
         return f"CombiWrapper{tuple(str(w) for w in self.wrappers)}"
 
-    def wrap_a_step(self, step_output, update=True):
+    def modulate(self, step_output, update=True):
         """Wrap a step by passing it through all contained wrappers."""
         for w in self.wrappers:
-            step_output = w.wrap_a_step(step_output, update=update)
+            step_output = w.modulate(step_output, update=update)
 
         if update:
             self.n += 1
@@ -277,6 +281,7 @@ class CombiWrapper(_Wrapper):
 
         return full
 
+    @classmethod
     def recover(cls, serialization_data):
         """Recover CombiWrapper, not supported."""
         raise NotImplementedError("There is no such thing as recovery for CombiWrappers. Create a new wrapper from"

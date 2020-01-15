@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Convolutional components/networks."""
-import math
 
-import numpy
 import tensorflow as tf
 
 

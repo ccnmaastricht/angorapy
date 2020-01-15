@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
 import os
+import time
 from inspect import getfullargspec as fargs
 from typing import Tuple
 
@@ -19,14 +20,15 @@ from utilities.const import STORAGE_DIR, DETERMINISTIC, COLORS, DEBUG
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
 from utilities.util import parse_state, add_state_dims, flatten, set_all_seeds, env_extract_dims
 from utilities.model_management import is_recurrent_model
-from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, _Wrapper
+from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
 
 
 @ray.remote(num_cpus=1, num_gpus=0, max_calls=10)
 def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: float, subseq_length: int, pid: int,
-            preprocessor):
+            preprocessor_serialized: dict):
     """Collect a batch shard of experience for a given number of timesteps."""
 
+    st = time.time()
     # import here to avoid pickling errors
     import tensorflow as tfl
 
@@ -38,13 +40,15 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     is_continuous = isinstance(env.action_space, Box)
     is_shadow_brain = "ShadowHand" in env_name
 
+    preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
+
     # load policy
     if isinstance(policy_tuple, ModelTuple):
         model_builder = getattr(models, policy_tuple.model_builder)
-        distribution = getattr(policies, policy_tuple.distribution_type)()
+        distribution = getattr(policies, policy_tuple.distribution_type)(env)
 
         # recurrent policy needs batch size for statefulness
-        _, _, joint = model_builder(env, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
+        _, _, joint = model_builder(env, distribution, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
         joint.set_weights(policy_tuple.weights)
     else:
         raise ValueError("Unknown input for model.")
@@ -67,29 +71,45 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
     states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
     episode_endpoints = []
-    state = env.reset()
-    state = preprocessor.wrap_a_step((state, None, None, None))[0]
+    state = parse_state(env.reset())
+    state = preprocessor.modulate((state, None, None, None))[0]
+
+    setup_time = time.time() - st
+    st = time.time()
+    pure_choice_time, pure_act_time, pure_sim_time, pure_norm_time, pure_eps_end_time = 0, 0, 0, 0, 0
+
     while t < horizon:
         current_subseq_length += 1
 
         # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
+        stt = time.time()
         policy_out = flatten(joint.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
+        pure_choice_time += time.time() - stt
         a_distr, value = policy_out[:-1], policy_out[-1]
         states.append(state)
         values.append(np.squeeze(value))
 
         # from the action distribution sample an action and remember both the action and its probability
+        stt = time.time()
         action, action_probability = distribution.act(*a_distr)
+        pure_act_time += time.time() - stt
+
         action = action if not DETERMINISTIC else np.zeros(action.shape)
         actions.append(action)
         action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
         # make a step based on the chosen action and collect the reward for this state
+        stt = time.time()
         observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
+        pure_sim_time += time.time() - stt
         current_episode_return += reward  # true reward for stats
-        observation, reward, done, _ = preprocessor.wrap_a_step((observation, reward, done, None))
+        stt = time.time()
+        observation, reward, done, _ = preprocessor.modulate((parse_state(observation), reward, done, None))
+        pure_norm_time += time.time() - stt
+
         rewards.append(reward)
 
+        stt = time.time()
         # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
         if is_recurrent and (current_subseq_length == subseq_length or done):
             buffer.push_seq_to_buffer(states, actions, action_probabilities, values[-current_subseq_length:])
@@ -118,8 +138,8 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
                 joint.reset_states()
 
             # reset environment to receive next episodes initial state
-            state = env.reset()
-            state = preprocessor.wrap_a_step((state, None, None, None))[0]
+            state = parse_state(env.reset())
+            state = preprocessor.modulate((state, None, None, None))[0]
 
             # update/reset some statistics and trackers
             buffer.episode_lengths.append(episode_steps)
@@ -130,12 +150,14 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
         else:
             state = observation
             episode_steps += 1
+        pure_eps_end_time += time.time() - stt
 
         t += 1
 
     env.close()
 
-    # WRAP UP
+    simulation_time = time.time() - st
+    st = time.time()
 
     # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
     values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[-1]))
@@ -183,10 +205,10 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
         print(f"{mc}values mean{ec}: {np.mean(buffer.values)}")
 
         print("\n\nWRAPPERS\n---------")
-        print(f"{mc}State Wrapper Mean{ec}: {preprocessor[0].mean}")
-        print(f"{mc}State Wrapper Var{ec}: {preprocessor[0].variance}")
-        print(f"{mc}Reward Wrapper Mean{ec}: {preprocessor[1].mean}")
-        print(f"{mc}Reward Wrapper Variance{ec}: {preprocessor[1].variance}")
+        print(f"{mc}State Wrapper Mean{ec}: {preprocessor_serialized[0].mean}")
+        print(f"{mc}State Wrapper Var{ec}: {preprocessor_serialized[0].variance}")
+        print(f"{mc}Reward Wrapper Mean{ec}: {preprocessor_serialized[1].mean}")
+        print(f"{mc}Reward Wrapper Variance{ec}: {preprocessor_serialized[1].variance}")
 
         import matplotlib.pyplot as plt
         import matplotlib
@@ -217,20 +239,25 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
+    wrapup_time = time.time() - st
+
+    # print((setup_time, simulation_time, (pure_choice_time, pure_act_time, pure_sim_time, pure_norm_time, pure_eps_end_time), wrapup_time))
+
     return stats, preprocessor
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
-def evaluate(policy_tuple, env_name: str, preprocessor: _Wrapper) -> Tuple[int, int]:
+def evaluate(policy_tuple, env_name: str, preprocessor_serialized: dict) -> Tuple[int, int]:
     """Evaluate one episode of the given environment following the given policy. Remote implementation."""
-    environment = gym.make(env_name)
+    env = gym.make(env_name)
+    preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
 
     if isinstance(policy_tuple, ModelTuple):
         model_builder = getattr(models, policy_tuple.model_builder)
-        distribution = getattr(policies, policy_tuple.distribution_type)()
+        distribution = getattr(policies, policy_tuple.distribution_type)(env)
 
         # recurrent policy needs batch size for statefulness
-        policy, _, _ = model_builder(environment, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
+        policy, _, _ = model_builder(env, distribution, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
         policy.set_weights(policy_tuple.weights)
     else:
         raise ValueError("Cannot handle given model type. Should be a ModelTuple.")
@@ -239,15 +266,15 @@ def evaluate(policy_tuple, env_name: str, preprocessor: _Wrapper) -> Tuple[int, 
     done = False
     reward_trajectory = []
     length = 0
-    state = environment.reset()
-    state = preprocessor.wrap_a_step((state, None, None, None), update=False)[0]
+    state = env.reset()
+    state = preprocessor.modulate((state, None, None, None), update=False)[0]
     while not done:
         probabilities = flatten(policy.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
         action, _ = distribution.act(*probabilities)
-        observation, reward, done, _ = environment.step(action)
+        observation, reward, done, _ = env.step(action)
         reward_trajectory.append(reward)
-        state, reward, done, _ = preprocessor.wrap_a_step((observation, reward, done, None), update=False)
+        state, reward, done, _ = preprocessor.modulate((observation, reward, done, None), update=False)
         length += 1
 
     return length, sum(reward_trajectory)

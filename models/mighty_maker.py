@@ -15,7 +15,10 @@ parameter_dicts = list(map(lambda c: dict(zip(arguments.keys(), c)), combination
 
 for pd in parameter_dicts:
     base_function = build_ffn_models if pd["model_type"] == "ffn" else build_rnn_models
-    func_name = f"build_{'_'.join(map(str, pd.values()))}_models"
+    name_parts = pd.copy()
+    name_parts["shared"] = "shared" if name_parts["shared"] else "distinct"
+
+    func_name = f"build_{'_'.join(map(str, name_parts.values()))}_models"
     globals()[func_name] = partial(base_function, **pd)
     globals()[func_name].__name__ = func_name
 

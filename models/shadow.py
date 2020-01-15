@@ -10,17 +10,17 @@ from tensorflow.keras.layers import TimeDistributed as TD
 from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 
+from agent.policies import BasePolicyDistribution, BetaPolicyDistribution
 from environments import *
-from models.components import _build_fcn_component, _build_continuous_head, _build_discrete_head
+from models.components import _build_fcn_component
 from models.convolutional import _build_visual_encoder
 from utilities.const import VISION_WH
 from utilities.util import env_extract_dims
 from utilities.model_management import calc_max_memory_usage
 
 
-def build_shadow_brain_v1(env: gym.Env, bs: int):
+def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int):
     """Build network for the shadow hand task."""
-    continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
 
@@ -50,8 +50,7 @@ def build_shadow_brain_v1(env: gym.Env, bs: int):
     o = tf.keras.layers.GRU(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     # output heads
-    policy_out = _build_continuous_head(n_actions, o.shape[1:], bs)(o) if continuous_control else _build_discrete_head(
-        n_actions, o.shape[1:], bs)(o)
+    policy_out = distribution.build_action_head(n_actions, o.shape[1:], bs)(o)
     value_out = tf.keras.layers.Dense(1, name="value")(o)
 
     # define models
@@ -65,9 +64,8 @@ def build_shadow_brain_v1(env: gym.Env, bs: int):
     return policy, value, joint
 
 
-def build_blind_shadow_brain_v1(env: gym.Env, bs: int):
+def build_blind_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int):
     """Build network for the shadow hand task but without visual inputs."""
-    continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
 
@@ -97,8 +95,7 @@ def build_blind_shadow_brain_v1(env: gym.Env, bs: int):
     o = tf.keras.layers.SimpleRNN(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     # output heads
-    policy_out = _build_continuous_head(n_actions, o.shape[1:], bs)(o) if continuous_control else _build_discrete_head(
-        n_actions, o.shape[1:], bs)(o)
+    policy_out = distribution.build_action_head(n_actions, o.shape[1:], bs)(o)
     value_out = tf.keras.layers.Dense(1, name="value")(o)
 
     # define models
@@ -112,9 +109,8 @@ def build_blind_shadow_brain_v1(env: gym.Env, bs: int):
     return policy, value, joint
 
 
-def build_shadow_brain_v2(env: gym.Env, bs: int):
+def build_shadow_brain_v2(env: gym.Env, distribution: BasePolicyDistribution, bs: int):
     """Build network for the shadow hand task, version 2."""
-    continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
 
@@ -147,11 +143,7 @@ def build_shadow_brain_v2(env: gym.Env, bs: int):
     rnn_out = tf.keras.layers.GRU(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     # output heads
-    if continuous_control:
-        policy_out = _build_continuous_head(n_actions, rnn_out.shape[1:], bs)(rnn_out)
-    else:
-        policy_out = _build_discrete_head(n_actions, rnn_out.shape[1:], bs)(rnn_out)
-
+    policy_out = distribution.build_action_head(n_actions, rnn_out.shape[1:], bs)(rnn_out)
     value_out = tf.keras.layers.Dense(1, name="value")(rnn_out)
 
     # define models
@@ -165,11 +157,6 @@ def build_shadow_brain_v2(env: gym.Env, bs: int):
     return policy, value, joint
 
 
-def init_hidden(shape: Iterable):
-    """Get initial hidden state"""
-    return tf.zeros(shape=shape)
-
-
 if __name__ == "__main__":
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -179,7 +166,7 @@ if __name__ == "__main__":
     batch_size = 256
 
     env = gym.make("ShadowHand-v0")
-    _, _, joint = build_shadow_brain_v2(env, bs=batch_size)
+    _, _, joint = build_shadow_brain_v2(env, BetaPolicyDistribution(), bs=batch_size)
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 

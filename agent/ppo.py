@@ -2,7 +2,6 @@
 """Implementation of Proximal Policy Optimization Algorithm."""
 import json
 import logging
-import math
 import multiprocessing
 import os
 import re
@@ -14,6 +13,7 @@ from inspect import getfullargspec as fargs
 from typing import List, Tuple
 
 import gym
+import numpy
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -25,12 +25,12 @@ from agent import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import collect, evaluate
-from agent.policies import _PolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
 from utilities.model_management import is_recurrent_model, get_layer_names, get_component, reset_states_masked
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
-from utilities.wrappers import _Wrapper, CombiWrapper, SkipWrapper, _RunningMeanWrapper
+from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, _RunningMeanWrapper
 
 
 class PPOAgent:
@@ -49,7 +49,7 @@ class PPOAgent:
     def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate: float = 0.001,
                  discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
                  c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
-                 tbptt_length: int = 16, lr_schedule: str = None, distribution: _PolicyDistribution = None,
+                 tbptt_length: int = 16, lr_schedule: str = None, distribution: BasePolicyDistribution = None,
                  preprocessor=None, _make_dirs=True, debug: bool = False, pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
@@ -119,14 +119,14 @@ class PPOAgent:
             raise ValueError("Unknown Schedule type. Choose one of (None, exponential)")
 
         # models and optimizers
-        self.model_builder = model_builder
-        self.builder_function_name = model_builder.__name__
-        self.policy, self.value, self.joint = model_builder(self.env, **({"bs": 1} if "bs" in fargs(
-            model_builder).args else {}))
         self.distribution = distribution
         if self.distribution is None:
             self.distribution = CategoricalPolicyDistribution() if not self.continuous_control else GaussianPolicyDistribution()
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
+        self.model_builder = model_builder
+        self.builder_function_name = model_builder.__name__
+        self.policy, self.value, self.joint = model_builder(self.env, self.distribution, **({"bs": 1} if "bs" in fargs(
+            model_builder).args else {}))
 
         if pretrained_components is not None:
             print("Loading pretrained components:")
@@ -268,12 +268,10 @@ class PPOAgent:
         Returns:
           entropy bonus
         """
-        if self.continuous_control:
-            policy_output = policy_output[1]
         return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
-              separate_eval: bool = False, ray_already_initialized: bool = False) -> "PPOAgent":
+              separate_eval: bool = False, early_stop: bool = True, ray_is_initialized: bool = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -289,6 +287,8 @@ class PPOAgent:
             save_every (int): for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
             separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
+            early_stop (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
+                above the environments threshold
 
         Returns:
             self
@@ -303,12 +303,12 @@ class PPOAgent:
 
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
-        self.policy, self.value, self.joint = self.model_builder(self.env, **({"bs": batch_size} if "bs" in fargs(
-            self.model_builder).args else {}))
+        self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
+            {"bs": batch_size} if "bs" in fargs(self.model_builder).args else {}))
         self.joint.set_weights(weights)
 
         available_cpus = multiprocessing.cpu_count()
-        if not ray_already_initialized:
+        if not ray_is_initialized:
             ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
         print(f"Parallelizing {self.workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
@@ -331,11 +331,12 @@ class PPOAgent:
             # create processes and execute them
             split_stats, split_preprocessors = zip(*ray.get([collect.remote(model_representation, self.horizon,
                                                                             self.env_name, self.discount, self.lam,
-                                                                            self.tbptt_length, pid, self.preprocessor)
+                                                                            self.tbptt_length, pid,
+                                                                            self.preprocessor.serialize())
                                                              for pid in range(self.workers)]))
             stats = condense_stats(split_stats)
             old_n = self.preprocessor.n
-            self.preprocessor = _Wrapper.from_collection(split_preprocessors)
+            self.preprocessor = BaseWrapper.from_collection(split_preprocessors)
             self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for overcounting
 
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
@@ -379,6 +380,12 @@ class PPOAgent:
 
             time_dict["evaluating"] = time.time() - subprocess_start
             subprocess_start = time.time()
+
+            # early stopping
+            if self.env.spec.reward_threshold is not None and early_stop:
+                if numpy.all(numpy.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
+                    print("\rAll catch a breath, we stop the drill early due to the formidable result!")
+                    break
 
             self.report()
 
@@ -631,10 +638,10 @@ class PPOAgent:
         with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
             parameters = json.load(f)
 
-        model_builder = getattr(models, parameters["builder_function_name"])
-        distribution = getattr(policies, parameters["distribution"])()
-        preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])
         env = gym.make(parameters["env_name"])
+        model_builder = getattr(models, parameters["builder_function_name"])
+        distribution = getattr(policies, parameters["distribution"])(env)
+        preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])
 
         loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
                                 workers=parameters["workers"], learning_rate=parameters["learning_rate"],

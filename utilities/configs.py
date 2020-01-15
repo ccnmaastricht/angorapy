@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+"""Predefined configurations for different (groups of) environments."""
 
 
 def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, debug=False, discount=0.99,
@@ -36,6 +36,22 @@ continuous = make_config(
     clip_values=False
 )
 
+beta = make_config(
+    # continuous with some parameters from the beta paper
+    batch_size=64,
+    horizon=2048,
+    c_entropy=0.001,
+    lr_pi=0.0003,
+    epochs=10,
+    clip=0.2,
+    lam=0.95,
+    discount=0.995,
+    grad_norm=0.5,
+    iterations=100,
+    workers=8,
+    clip_values=False
+)
+
 bipedal = make_config(
     batch_size=32,
     horizon=2048,
@@ -65,4 +81,41 @@ mujoco = make_config(
     discount=0.99,
     grad_norm=0.5,
     clip_values=True
+)
+
+roboschool = make_config(
+    iterations=1000000//2048,   # one million timesteps
+    workers=32,
+    batch_size=4096,
+    horizon=512,
+    c_entropy=0.0,
+    lr_pi=0.0003,
+    lr_schedule="exponential",
+    epochs=15,
+    clip=0.2,
+    lam=0.95,
+    discount=0.99,
+    grad_norm=0.5,
+    clip_values=False
+)
+
+hand = make_config(
+    iterations=100,
+    workers=32,
+    batch_size=4096,
+    horizon=512,
+    c_entropy=0.01,
+    lr_pi=0.0003,
+    lr_schedule="exponential",
+    epochs=15,
+    clip=0.2,
+    lam=0.95,
+    discount=0.998,
+    grad_norm=0.5,
+    clip_values=False
+)
+
+
+env_to_default_config_mapping = dict(
+    **dict.fromkeys(["Humanoid-v2", "HumanoidStandup-v2"])
 )

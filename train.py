@@ -35,6 +35,12 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
 
+    # choose and make policy distribution
+    if settings.distribution is None:
+        settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
+
+    distribution = get_distribution_by_short_name(settings.distribution)(env)
+
     # setting appropriate model building function
     if "ShadowHand" in settings.env:
         if env.visual_input:
@@ -43,12 +49,6 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
             build_models = build_blind_shadow_brain_v1
     else:
         build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
-
-    # choose and make policy distribution
-    if settings.distribution is None:
-        settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
-
-    distribution = get_distribution_by_short_name(settings.distribution)
 
     # make preprocessor
     preprocessor = CombiWrapper([StateNormalizationWrapper(state_dim) if not settings.no_state_norming else SkipWrapper(),
@@ -61,6 +61,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
               f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
               f"{bc}{state_dim}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
               f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
+              f"Config: {settings.config}\n"
               f"Model: {build_models.__name__}\n"
               f"Distribution: {settings.distribution}\n"
               f"-----------------------------------------\n")

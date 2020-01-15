@@ -15,7 +15,7 @@ class ShadowHand(manipulate.ManipulateEnv):
 
     def __init__(self, model_path, target_position, target_rotation, target_position_range, reward_type,
                  initial_qpos={}, randomize_initial_position=True, randomize_initial_rotation=True,
-                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=False,
+                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=True,
                  ignore_z_target_rotation=False, touch_visualisation="off", touch_get_obs="sensordata",
                  visual_input: bool = False, max_steps=100):
         """Initializes a new Hand manipulation environment with touch sensors.
@@ -159,6 +159,7 @@ class ShadowHand(manipulate.ManipulateEnv):
             return (- (10. * d_pos + d_rot)     # distance rewards
                     - 1                         # constant punishment to encourage speed
                     + success * 5               # reward for finishing
+                                                # TODO dropping penalty
                     )
 
 
@@ -205,8 +206,6 @@ if __name__ == "__main__":
     env = gym.make("ShadowHand-v0")
     d, s = False, env.reset()
     while True:
-        # env.render()
+        env.render()
         action = env.action_space.sample()
-        s, _, _, _ = env.step(action)
-        plt.imshow(s["observation"][0])
-        plt.show()
+        _, _, _, _ = env.step(np.concatenate([np.zeros(0), np.ones(20)]))

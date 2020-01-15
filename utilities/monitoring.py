@@ -107,6 +107,8 @@ class Monitor:
                 deterministic=str(self.agent.env.spec.nondeterministic),
                 max_steps=str(self.agent.env.spec.max_episode_steps),
                 reward_threshold=str(self.agent.env.spec.reward_threshold),
+                max_action_values=str(self.agent.env.action_space.high),
+                min_action_values=str(self.agent.env.action_space.low),
             ),
             hyperparameters=dict(
                 continuous=str(self.agent.continuous_control),
