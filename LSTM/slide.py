@@ -24,11 +24,14 @@ def curved_line(point1, point2):
     z = np.linspace(point1[2], point2[2], 10)
     return (x, y, z)
 
+fixed_point = np.array((0.5, -1.86, 1.604))
 
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
 ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2],
            marker='x', s=25, c=color)
+ax.scatter(fixed_point[0], fixed_point[1], fixed_point[2],
+           marker='x', s=30)
 
 for i in range(N):
     # ax.plot3D(xlin[:, i, 0], ylin[:, i, 1], lines[:, i, 2])

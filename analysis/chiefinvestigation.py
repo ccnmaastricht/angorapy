@@ -66,22 +66,28 @@ class Chiefinvestigator:
 
         return states, activations, rewards, actions
 
-    def plot_results(self, results, action_data, title: str = "Results", dreiD: bool = False):
+    def plot_results(self, results, action_data, fixed_point, title: str = "Results", dreiD: bool = False):
         """Plot results of analysis performed by chiefinvestigator
 
         Args:
             results: Results of analysis to be plotted.
             action_data: Actions selected by agent that are used to color the plots.
             title: Title of the plot. Default is set to "Results"
+            :param dreiD:
+            :param fixed_point:
 
         Returns:
             Plot of data to be visualized
+
         """
         if dreiD is True:
             fig = plt.figure()
             ax = fig.add_subplot(projection='3d')
             ax.scatter(results[:, 0], results[:, 1], results[:, 2],
                        marker='o', s=5, c=action_data[:])
+            if fixed_point is not None:
+                ax.scatter(fixed_point[0, 0], fixed_point[0, 1], fixed_point[0, 2],
+                           marker='x', s=30)
             plt.title(title)
             ax.set_xlabel('PC1')
             ax.set_ylabel('PC2')
@@ -103,6 +109,7 @@ class Chiefinvestigator:
             plt.ylabel('first component')
         # plt.pause(0.5)
             plt.show()
+
 
     def plot_rewards(self, rewards):
         plt.plot(list(range(len(rewards))), rewards)
@@ -142,24 +149,23 @@ class Chiefinvestigator:
         score = clf.score(x_test, y_test)
         print("Classification accuracy", score)
 
-    def minimiz(self, weights, inputweights, input, activation, method: str = 'trust-krylov'):
-        id = np.random.randint(activation.shape[0])
-        print("Timestep:", id)
-        x0 = activation[id, :]
-        input = input[id, :]
-        fun = lambda x: 0.5 * sum(
-            (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
-        # der = lambda x: np.sum((- np.eye(64, 64) + weights * (1 - np.tanh(x[0:64]) ** 2)),
-                            #   axis=1)  # - np.eye(64, 64) + weights*x[0:64]
-        options = {'gtol': 1e-5, 'disp': True}
-        Jac = nd.Gradient(fun)
-        # print(Jac.shape)
-        Hes = nd.Hessian(fun)
-        # print(Hes)
-        y = fun(x0)
-        print("First function evaluation:", y)
-        optimisedResults = minimize(fun, x0, method=method, jac=Jac, hess=Hes,
-                                    options=options)
+    def minimiz(self, weights, inputweights, inputs, activation, method: str = 'trust-krylov'):
+        optimisedResults = []
+        # id = np.random.randint(activation.shape[0])
+        ids = np.arange(0, activation.shape[0], 10)
+        for id in range(len(ids)):
+            print("Timestep:", ids[id])
+            x0 = activation[ids[id], :]
+            input = inputs[ids[id], :]
+            fun = lambda x: 0.5 * sum(
+                (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
+            options = {'gtol': 1e-5, 'disp': True}
+            Jac, Hes = nd.Gradient(fun), nd.Hessian(fun)
+            y = fun(x0)
+            print("First function evaluation:", y)
+            optimisedResult = minimize(fun, x0, method=method, jac=Jac, hess=Hes,
+                                        options=options)
+            optimisedResults.append(optimisedResult)
         return optimisedResults
 
     def curve_fit_minimization(self, activation, weights, inputweights, input):
@@ -168,8 +174,7 @@ class Chiefinvestigator:
         x0 = activation[id, :]
         x = activation[id, :]
         input = input[id, :]
-        fun = lambda weights: 0.5 * sum(
-            (- x + np.matmul(weights, np.tanh(x)) + np.matmul(inputweights, input)) ** 2)
+        fun = lambda weights: 0.5 * sum((- x + np.matmul(weights, np.tanh(x)) + np.matmul(inputweights, input)) ** 2)
         ydata = np.zeros(activation.shape[1])
         popt, pcov = curve_fit(fun, xdata=weights, ydata=ydata, p0=x0)
         return popt, pcov
@@ -215,10 +220,10 @@ if __name__ == "__main__":
     # print(weights)
     method = "trust-ncg"
     optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
-                                            input=np.reshape(activations[2], (activations[2].shape[0], 64)),
+                                            inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
                                             activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
                                             method=method)
-
+    optimiserResults = np.concatenate(optimiserResults, axis=0)
     zscores = sp.stats.zscore(np.reshape(activations[1], (activations[1].shape[0], 64))) # normalization
 
     # plt.plot(list(range(len(activations[1]))), np.reshape(activations[1], (activations[1].shape[0], 64)))
@@ -235,14 +240,15 @@ if __name__ == "__main__":
     RS = 12
     tsne_results = sklm.TSNE(random_state=RS).fit_transform(zscores)
     # plot t-SNE results
-    chiefinvesti.plot_results(tsne_results, actions[:, 1], "t-SNE", False)
+    tsne_plot = chiefinvesti.plot_results(tsne_results, actions[:, 1], None, "t-SNE", False)
 
     pca = skld.PCA(3)
     pca.fit(zscores)
     X_pca = pca.transform(zscores)
-    chiefinvesti.plot_results(X_pca, actions[:, 1], "PCA", True)  # plot pca results
+    new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
+    chiefinvesti.plot_results(X_pca, actions[:, 1], new_pca, "PCA", True)  # plot pca results
     chiefinvesti.plot_results(X_pca, actions[:, 1], "PCA", False)
-    #new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
+
     #chiefinvesti.plot_rewards(all_rewards)
 
     # loadings plot
