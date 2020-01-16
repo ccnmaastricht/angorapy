@@ -2,12 +2,12 @@
 import abc
 import inspect
 import sys
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, Union, List
 
 import gym
 import numpy as np
 
-from utilities.const import EPS, NUMPY_FLOAT_PRECISION
+from utilities.const import EPS, NP_FLOAT_PREC
 from utilities.util import parse_state
 
 
@@ -79,68 +79,97 @@ class BaseWrapper(abc.ABC):
 
 
 class _RunningMeanWrapper(BaseWrapper, abc.ABC):
-    mean: np.ndarray
-    variance: np.ndarray
+    mean: List[np.ndarray]
+    variance: List[np.ndarray]
 
     def __init__(self, **args):
         super().__init__()
 
     def __add__(self, other) -> "_RunningMeanWrapper":
         needs_shape = len(inspect.signature(self.__class__).parameters) > 0
-        new_wrapper = self.__class__(self.mean.shape) if needs_shape else self.__class__()
-        new_wrapper.n = self.n + other.n
-        new_wrapper.mean = (self.n / new_wrapper.n) * self.mean + (other.n / new_wrapper.n) * other.mean
-        new_wrapper.variance = (self.n * (self.variance + (self.mean - new_wrapper.mean) ** 2)
-                                + other.n * (other.variance + (other.mean - new_wrapper.mean) ** 2)) / new_wrapper.n
+        nw = self.__class__(tuple(m.shape for m in self.mean)) if needs_shape else self.__class__()
+        nw.n = self.n + other.n
 
-        return new_wrapper
+        for i in range(len(self.mean)):
+            nw.mean[i] = (self.n / nw.n) * self.mean[i] + (other.n / nw.n) * other.mean[i]
+            nw.variance[i] = (self.n * (self.variance[i] + (self.mean[i] - nw.mean[i]) ** 2)
+                              + other.n * (other.variance[i] + (other.mean[i] - nw.mean[i]) ** 2)) / nw.n
 
-    def update(self, observation):
-        """Update the mean and variance of the tracked statistic based on the new sample.
-        Simplification of https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm"""
+        return nw
+
+    def update(self, observation: Union[Tuple[np.ndarray], np.ndarray]) -> None:
+        """Update the mean(s) and variance(s) of the tracked statistic based on the new sample.
+
+        Simplification of https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm.
+
+        The method can handle multi input states where the observation is a tuple of numpy arrays. For each element
+        a separate mean/variance is tracked. Any non-vector input will be skipped as they are assumed to be images
+        and should be handled differently.
+        """
         self.n += 1
 
-        delta = observation - self.mean
-        m_a = self.variance * (self.n - 1)
+        if not isinstance(observation, Tuple):
+            observation = (observation,)
 
-        self.mean = np.array(self.mean + delta * (1 / self.n), dtype=NUMPY_FLOAT_PRECISION)
-        self.variance = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n, dtype=NUMPY_FLOAT_PRECISION)
+        for i, obs in enumerate(filter(lambda o: len(o.shape) == 1, observation)):
+            delta = obs - self.mean[i]
+            m_a = self.variance[i] * (self.n - 1)
+
+            self.mean[i] = np.array(self.mean[i] + delta * (1 / self.n), dtype=NP_FLOAT_PREC)
+            self.variance[i] = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n, dtype=NP_FLOAT_PREC)
 
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
-        return {self.__class__.__name__: (self.n, self.mean.tolist(), self.variance.tolist())}
+        return {self.__class__.__name__: (self.n,
+                                          list(map(lambda m: m.tolist(), self.mean)),
+                                          list(map(lambda v: v.tolist(), self.variance))
+                                          )}
 
     @classmethod
     def recover(cls, serialization_data):
         """Recover a running mean wrapper from its serialization"""
         wrapper = cls() if len(serialization_data) == 3 else cls(serialization_data[3])
         wrapper.n = np.array(serialization_data[0])
-        wrapper.mean = np.array(serialization_data[1])
-        wrapper.variance = np.array(serialization_data[2])
+        wrapper.mean = list(map(lambda l: np.array(l), serialization_data[1]))
+        wrapper.variance = list(map(lambda l: np.array(l), serialization_data[2]))
 
         return wrapper
 
-    def simplified_mean(self) -> float:
+    def simplified_mean(self) -> List[float]:
         """Get a simplified, one dimensional mean by meaning any means."""
-        return np.mean(self.mean).item()
+        return [np.mean(m).item() for m in self.mean]
 
-    def simplified_variance(self) -> float:
+    def simplified_variance(self) -> List[float]:
         """Get a simplified, one dimensional variance by meaning any variances."""
-        return np.mean(self.variance).item()
+        return [np.mean(v).item() for v in self.variance]
 
-    def simplified_stdev(self) -> float:
+    def simplified_stdev(self) -> List[float]:
         """Get a simplified, one dimensional stdev by meaning any variances and taking their square root."""
-        return np.sqrt(np.mean(self.variance)).item()
+        return [np.sqrt(np.mean(v)).item() for v in self.variance]
 
 
 class StateNormalizationWrapper(_RunningMeanWrapper):
     """Wrapper for state normalization using running mean and variance estimations."""
 
-    def __init__(self, state_shape):
+    def __init__(self, state_shapes: Union[Iterable[Iterable[int]], Iterable[int], int]):
         super().__init__()
-        self.shape = state_shape
-        self.mean = np.zeros(state_shape, NUMPY_FLOAT_PRECISION)
-        self.variance = np.ones(state_shape, NUMPY_FLOAT_PRECISION)
+
+        # parse input types into normed shape format
+        self.shapes: Iterable[Iterable[int]]
+        if isinstance(state_shapes, Iterable) and all(isinstance(x, Iterable) for x in state_shapes):
+            self.shapes = state_shapes
+        elif isinstance(state_shapes, int):
+            self.shapes = ((state_shapes,),)
+        elif isinstance(state_shapes, Iterable) and all(isinstance(x, int) for x in state_shapes):
+            self.shapes = (state_shapes,)
+        else:
+            raise ValueError("Cannot understand shape format.")
+
+        self.mean = [np.zeros(i_shape, NP_FLOAT_PREC) for i_shape in self.shapes if len(i_shape) == 1]
+        self.variance = [np.ones(i_shape, NP_FLOAT_PREC) for i_shape in self.shapes if len(i_shape) == 1]
+
+        assert len(self.mean) > 0 and len(self.variance) > 0, "Initialized StateNormalizationWrapper got no vector " \
+                                                              "states."
 
     def modulate(self, step_result: Tuple, update=True) -> Tuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
@@ -153,8 +182,15 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
             self.update(o)
 
         # normalize
-        o = np.clip((o - self.mean) / (np.sqrt(self.variance + EPS)), -10., 10.)
-        return o, r, done, info
+        if not isinstance(o, Tuple):
+            o = (o,)
+
+        normed_o = []
+        for i, op in enumerate(filter(lambda a: len(a.shape) == 1, o)):
+            normed_o.append(np.clip((op - self.mean[i]) / (np.sqrt(self.variance[i] + EPS)), -10., 10.))
+
+        normed_o = normed_o[0] if len(normed_o) == 1 else tuple(normed_o)
+        return normed_o, r, done, info
 
     def warmup(self, env: gym.Env, observations=10):
         """Warmup the wrapper by sampling the observation space."""
@@ -164,7 +200,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
     def serialize(self) -> dict:
         """Serialize the wrapper to allow for saving it in a file."""
         serialization = super().serialize()
-        serialization[self.__class__.__name__] += (self.shape,)
+        serialization[self.__class__.__name__] += (self.shapes,)
 
         return serialization
 
@@ -174,8 +210,8 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
 
     def __init__(self):
         super().__init__()
-        self.mean = np.array(0, NUMPY_FLOAT_PRECISION)
-        self.variance = np.array(1, NUMPY_FLOAT_PRECISION)
+        self.mean = [np.array(0, NP_FLOAT_PREC)]
+        self.variance = [np.array(1, NP_FLOAT_PREC)]
         self.ret = np.float64(0)
 
     def modulate(self, step_result: Tuple, update=True) -> Tuple:
@@ -194,7 +230,7 @@ class RewardNormalizationWrapper(_RunningMeanWrapper):
             self.update(self.ret)
 
         # normalize
-        r = np.clip(r / (np.sqrt(self.variance + EPS)), -10., 10.)
+        r = np.clip(r / (np.sqrt(self.variance[0] + EPS)), -10., 10.)
 
         if done:
             self.ret = 0.
@@ -260,6 +296,7 @@ class CombiWrapper(BaseWrapper, object):
 
         if update:
             self.n += 1
+
         return step_output
 
     def correct_sample_size(self, deduction):

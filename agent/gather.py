@@ -83,6 +83,7 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
 
         # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
         stt = time.time()
+
         policy_out = flatten(joint.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
         pure_choice_time += time.time() - stt
         a_distr, value = policy_out[:-1], policy_out[-1]

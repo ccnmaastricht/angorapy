@@ -16,7 +16,7 @@ from agent.policies import GaussianPolicyDistribution, CategoricalPolicyDistribu
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from models import get_model_builder
-from utilities.const import NUMPY_FLOAT_PRECISION
+from utilities.const import NP_FLOAT_PREC
 from utilities.model_management import reset_states_masked
 from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
@@ -217,9 +217,9 @@ class WrapperTest(unittest.TestCase):
         normalizer_b = StateNormalizationWrapper(10)
         normalizer_c = StateNormalizationWrapper(10)
 
-        inputs_a = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
-        inputs_b = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
-        inputs_c = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
+        inputs_a = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
+        inputs_b = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
+        inputs_c = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
 
         true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
         true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)

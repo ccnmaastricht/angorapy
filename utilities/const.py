@@ -20,7 +20,7 @@ STORAGE_DIR = "storage/experience/"
 PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
 
 # NUMERICAL PRECISION
-NUMPY_FLOAT_PRECISION = np.float64
+NP_FLOAT_PREC = np.float64
 NUMPY_INTEGER_PRECISION = np.int64
 EPS = 1e-8
 

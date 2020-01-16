@@ -10,7 +10,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from agent.layers import StdevLayer
-from utilities.const import NUMPY_FLOAT_PRECISION
+from utilities.const import NP_FLOAT_PREC
 from utilities.util import env_extract_dims
 
 
