@@ -96,10 +96,6 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
                 <div class="col col-6">
                     <div id="reward-plot" style="width:100%; height:500px;"></div>
                 </div>
-
-                <div class="col col-6">
-                    <div id="entropy-plot" style="width:100%; height:500px"></div>
-                </div>
             </div>
 
             <!--  OBJECTIVE PLOTS  -->
@@ -108,13 +104,17 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
             </div>
 
             <div class="row justify-content-center">
-                <div class="col col-6">
+                <div class="col col-4">
                     <div id="ploss-plot" style="width:100%; height:500px"></div>
 
                 </div>
 
-                <div class="col col-6">
+                <div class="col col-4">
                     <div id="vloss-plot" style="width:100%; height:500px"></div>
+                </div>
+
+                <div class="col col-4">
+                    <div id="entropy-plot" style="width:100%; height:500px"></div>
                 </div>
             </div>
 
@@ -271,6 +271,11 @@ $progress = json_decode(file_get_contents($DIR . "/progress.json"), true);
     $("nav ul li").on("click", function () {
         $("nav").find(".active").removeClass("active");
         $(this).addClass("active");
+    });
+
+    $(".reload-button").on("click", function () {
+        console.log("jo");
+        location.reload();
     });
 </script>
 
