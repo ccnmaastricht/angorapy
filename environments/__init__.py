@@ -23,10 +23,10 @@ gym.envs.register(
 )
 
 gym.envs.register(
-    id='HandReach-v1',
+    id='HandReachDenseRelative-v0',
     entry_point='gym.envs.robotics:HandReachEnv',
     kwargs={"reward_type": "not_sparse", "relative_control": True},
-    max_episode_steps=500,
+    max_episode_steps=50,
 )
 
 # MODIFIED ENVIRONMENTS

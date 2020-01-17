@@ -11,7 +11,7 @@ from utilities.model_management import is_recurrent_model, list_layer_names, get
     build_sub_model_to
 from utilities.util import parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
-from utilities.wrappers import RewardNormalizationWrapper, StateNormalizationWrapper, CombiWrapper, BaseWrapper, \
+from utilities.wrappers import BaseWrapper, \
     SkipWrapper
 
 
@@ -106,7 +106,7 @@ class Investigator:
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        state = env.reset()
+        state = parse_state(env.reset())
         state = self.preprocessor.modulate((state, None, None, None), update=False)[0]
         cumulative_reward = 0
         while not done:
@@ -117,13 +117,13 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, _ = env.step(action)
             cumulative_reward += reward
-            observation, reward, done, _ = self.preprocessor.modulate((observation, reward, done, None),
+            observation, reward, done, _ = self.preprocessor.modulate((parse_state(observation), reward, done, None),
                                                                       update=False)
 
             state = observation
 
         print(f"Achieved a score of {cumulative_reward}. "
-              f"{'Good Boy!' if cumulative_reward > env.spec.reward_threshold else ''}")
+              f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
 
 if __name__ == "__main__":
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1579113216)
+    agent_007 = PPOAgent.from_agent_state(1579299998)
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)

@@ -425,6 +425,7 @@ class PPOAgent:
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 
+        print("Drill finished.")
         return self
 
     @tf.function

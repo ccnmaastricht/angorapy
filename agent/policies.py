@@ -23,9 +23,6 @@ class BasePolicyDistribution(abc.ABC):
 
     def __init__(self, env: gym.Env):
         self.state_dim, self.action_dim = env_extract_dims(env)
-        self.action_max_values = env.action_space.high
-        self.action_min_values = env.action_space.low
-        self.action_mm_diff = self.action_max_values - self.action_min_values
 
     @property
     def is_continuous(self):
@@ -147,6 +144,13 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
 
 class BaseContinuousPolicyDistribution(BasePolicyDistribution, abc.ABC):
     """Abstract base class of continuous policy distributions."""
+
+    def __init__(self, env):
+        super().__init__(env)
+
+        self.action_max_values = env.action_space.high
+        self.action_min_values = env.action_space.low
+        self.action_mm_diff = self.action_max_values - self.action_min_values
 
     @property
     def is_continuous(self):

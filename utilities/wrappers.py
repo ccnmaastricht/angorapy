@@ -111,7 +111,7 @@ class _RunningMeanWrapper(BaseWrapper, abc.ABC):
         if not isinstance(observation, Tuple):
             observation = (observation,)
 
-        for i, obs in enumerate(filter(lambda o: len(o.shape) in [0, 1], observation)):
+        for i, obs in enumerate(filter(lambda o: isinstance(o, (int, float)) or len(o.shape) in [0, 1], observation)):
             delta = obs - self.mean[i]
             m_a = self.variance[i] * (self.n - 1)
 
