@@ -20,7 +20,7 @@ class Minimizer:
             input = inputs[ids[id], :]
             fun = lambda x: 0.5 * sum(
                 (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
-            options = {'gtol': 1e-5, 'disp': True}
+            options = {'gtol': 1e-10, 'disp': True}
             Jac, Hes = nd.Gradient(fun), nd.Hessian(fun)
             y = fun(x0)
             print("First function evaluation:", y)
