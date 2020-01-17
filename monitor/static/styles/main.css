@@ -254,3 +254,8 @@ a.button-control:hover {
     display: flex;
     justify-content: center;
 }
+
+.delete-item span {
+    color: red;
+    cursor: pointer;
+}

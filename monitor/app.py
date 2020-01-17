@@ -7,6 +7,7 @@ from utilities.const import PATH_TO_EXPERIMENTS
 
 import flask
 from flask_jsglue import JSGlue
+from flask import request
 
 app = flask.Flask(__name__)
 jsglue = JSGlue(app)
@@ -95,3 +96,18 @@ def clear_all_empty():
 
     return {"deleted": deleted}
 
+
+@app.route('/delete_experiment', methods=['GET', 'POST'])
+def delete_experiment():
+    """Delete an experiment of posted id."""
+    if request.method == "POST":
+        try:
+            eid = request.json['id']
+            eid = int(eid)  # make sure its a number
+            shutil.rmtree(os.path.join(PATH_TO_EXPERIMENTS, str(eid)))
+        except Exception:
+            return {"success": False}
+    else:
+        return {"success": False}
+
+    return {"success": True}

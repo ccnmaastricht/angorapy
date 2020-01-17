@@ -2,8 +2,8 @@
 
 {% block title %} Overview {% endblock %}
 {% block inpage_title %}
-                <h1 class="display-3"> Experiment Overview </h1>
-{#                <h3> A Subtitle </h3>#}
+    <h1 class="display-3"> Experiment Overview </h1>
+    {#                <h3> A Subtitle </h3>#}
 {% endblock %}
 
 
@@ -12,19 +12,21 @@
 
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
-{#            <button type="button" id="sidebarCollapse" class="btn btn-info">#}
-{#                <i class="fas fa-align-left"></i>#}
-{#                <span>Toggle Sidebar</span>#}
-{#            </button>#}
+            {#            <button type="button" id="sidebarCollapse" class="btn btn-info">#}
+            {#                <i class="fas fa-align-left"></i>#}
+            {#                <span>Toggle Sidebar</span>#}
+            {#            </button>#}
 
-            <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i> Clear All Empty</button>
+            <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i> Clear All
+                Empty
+            </button>
 
             <div>
-{#                <label for="filter-env">Show</label>#}
+                {#                <label for="filter-env">Show</label>#}
                 <select class="custom-select" id="filter-env">
                     <option selected>Show All</option>
                     {% for env in envs_available|sort(reverse=true) %}
-                        <option value="{{env}}">{{ env }}</option>
+                        <option value="{{ env }}">{{ env }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -43,21 +45,23 @@
                 <th scope="col">Date</th>
                 <th scope="col">Iterations</th>
                 <th scope="col">Maximum Reward</th>
+                <th scope="col">Actions</th>
             </tr>
             </thead>
 
             <tbody>
 
-                {% for exp, info in exps.items()|sort(reverse=true) %}
-                    <tr class="exp-row">
-                        <th scope="row">{{ loop.index }}</th>
-                        <td><a href="experiment/{{ exp }}">{{ exp }}</a></td>
-                        <td class="name-col">{{ info.env }}</td>
-                        <td>{{ info.date }}</td>
-                        <td>{{ info.iterations }}</td>
-                        <td>{{ info.max_reward }}</td>
-                    </tr>
-                {% endfor %}
+            {% for exp, info in exps.items()|sort(reverse=true) %}
+                <tr class="exp-row">
+                    <th scope="row">{{ loop.index }}</th>
+                    <td class="id-col"><a href="experiment/{{ exp }}">{{ exp }}</a></td>
+                    <td class="name-col">{{ info.env }}</td>
+                    <td>{{ info.date }}</td>
+                    <td>{{ info.iterations }}</td>
+                    <td>{{ info.max_reward }}</td>
+                    <td class="delete-item"><span><i class="fas fa-trash-alt"></i></span></td>
+                </tr>
+            {% endfor %}
 
             </tbody>
         </table>
@@ -65,35 +69,48 @@
 {% endblock %}
 
 {% block js_footer %}
-<script>
-$("#clear-empty").on("click", function () {
-    console.log("Ho");
-    $.get({
-        url: "{{ url_for("clear_all_empty") }}",
-        data:$('#frm').serialize(),
-        success: function(data){
-             alert("Cleared " + data["deleted"] + " experiments.");
-             location.reload();
-        },
-        error: function () {
-            alert("Failed to delete.")
-        }
-    });
-});
+    <script>
+        $("#clear-empty").on("click", function () {
+            console.log("Ho");
+            $.get({
+                url: "{{ url_for("clear_all_empty") }}",
+                success: function (data) {
+                    alert("Cleared " + data["deleted"] + " experiments.");
+                    location.reload();
+                },
+                error: function () {
+                    alert("Failed to delete.")
+                }
+            });
+        });
 
-$("#filter-env").on("change", function () {
-    let env = $(this).val();
-    $(".exp-row").each(function () {
-        if (env === "Show All") {
-            $(this).show();
-        } else {
-            if ($(this).find("td.name-col").text() !== env) {
-                $(this).hide();
-            } else {
-                $(this).show();
-            }
-        }
-    });
-});
-</script>
+        $("#filter-env").on("change", function () {
+            let env = $(this).val();
+            $(".exp-row").each(function () {
+                if (env === "Show All") {
+                    $(this).show();
+                } else {
+                    if ($(this).find("td.name-col").text() !== env) {
+                        $(this).hide();
+                    } else {
+                        $(this).show();
+                    }
+                }
+            });
+        });
+
+        $(".delete-item span").on("click", function () {
+            let eid = $(this).parent().parent().find("td.id-col").text();
+            console.log(eid);
+            $.ajax({
+                type: 'POST',
+                url: "{{ url_for("delete_experiment") }}",
+                contentType: 'application/json;charset=UTF-8',
+                data: JSON.stringify({'id': eid}),
+                success: function (ret) {
+                    location.reload();
+                }
+            });
+        });
+    </script>
 {% endblock %}
