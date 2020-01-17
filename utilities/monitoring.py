@@ -18,9 +18,9 @@ from scipy.signal import savgol_filter
 
 from agent.ppo import PPOAgent
 from utilities import const
+from utilities.const import PATH_TO_EXPERIMENTS
 from utilities.util import parse_state, add_state_dims, flatten
 
-PATH_TO_EXPERIMENTS = "monitor/experiments/"
 matplotlib.use('Agg')
 
 
@@ -107,6 +107,8 @@ class Monitor:
                 deterministic=str(self.agent.env.spec.nondeterministic),
                 max_steps=str(self.agent.env.spec.max_episode_steps),
                 reward_threshold=str(self.agent.env.spec.reward_threshold),
+                max_action_values=str(self.agent.env.action_space.high),
+                min_action_values=str(self.agent.env.action_space.low),
             ),
             hyperparameters=dict(
                 continuous=str(self.agent.continuous_control),
@@ -132,10 +134,12 @@ class Monitor:
         progress = dict(
             rewards=dict(
                 mean=self.agent.cycle_reward_history,
-                stdev=self.agent.cycle_reward_std_history),
+                stdev=self.agent.cycle_reward_std_history,
+                last_cycle=self.agent.episode_reward_history[-1] if self.agent.iteration > 1 else []),
             lengths=dict(
                 mean=self.agent.cycle_length_history,
-                stdev=self.agent.cycle_length_std_history),
+                stdev=self.agent.cycle_length_std_history,
+                last_cycle=self.agent.episode_length_history[-1] if self.agent.iteration > 1 else []),
             entropies=self.agent.entropy_history,
             vloss=self.agent.value_loss_history,
             ploss=self.agent.policy_loss_history,

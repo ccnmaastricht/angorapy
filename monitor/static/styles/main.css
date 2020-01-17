@@ -109,6 +109,10 @@ a, a:hover, a:focus {
     margin: 40px 0;
 }
 
+.inactive {
+    color: lightgrey;
+}
+
 /* SIDEBAR */
 
 .wrapper {

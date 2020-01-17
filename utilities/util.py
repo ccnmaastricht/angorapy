@@ -10,6 +10,8 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.python.client import device_lib
 
+from utilities.error import UninterpretableObservationSpace
+
 
 def get_available_gpus():
     """Get list of available GPUs."""
@@ -29,13 +31,26 @@ def set_all_seeds(seed):
     random.seed(seed)
 
 
-def env_extract_dims(env: gym.Env) -> Tuple[Union[int, tuple], int]:
-    """Returns state and (discrete) action space dimensionality for given environment."""
+def env_extract_dims(env: gym.Env) -> Tuple[Union[int, Tuple[int]], int]:
+    """Returns state and action space dimensionality for given environment."""
+
+    # observation space
     if isinstance(env.observation_space, Dict):
-        obs_dim = tuple(field.shape for field in env.observation_space["observation"])
+        # dict observation with observation field
+        if isinstance(env.observation_space["observation"], gym.spaces.Box):
+            obs_dim = env.observation_space["observation"].shape[0]
+        elif isinstance(env.observation_space["observation"], gym.spaces.Tuple):
+            # e.g. shadow hand environment with multiple inputs
+            obs_dim = tuple(field.shape for field in env.observation_space["observation"])
+        else:
+            raise UninterpretableObservationSpace(f"Cannot extract the dimensionality from a Dict observation space "
+                                                  f"where the observation is of type "
+                                                  f"{type(env.observation_space['observation']).__name__}")
     else:
+        # standard observation in box form
         obs_dim = env.observation_space.shape[0]
 
+    # action space
     if isinstance(env.action_space, Discrete):
         act_dim = env.action_space.n
     elif isinstance(env.action_space, Box):
@@ -64,12 +79,19 @@ def is_array_collection(a: numpy.ndarray):
 
 def parse_state(state: Union[numpy.ndarray, dict]) -> Union[numpy.ndarray, Tuple]:
     """Parse a state (array or array of arrays) received from an environment to have type float32."""
-    return state.astype(numpy.float32) if not isinstance(state, dict) else \
-        tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
+    if not isinstance(state, dict):
+        return state.astype(numpy.float32)
+    else:
+        observation = state["observation"]
+        if isinstance(observation, np.ndarray):
+            return observation
+        else:
+            # multi input state like shadowhand
+            return tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
 
 
 def add_state_dims(state: Union[numpy.ndarray, Tuple], dims: int = 1, axis: int = 0) -> Union[numpy.ndarray, Tuple]:
-    """Expand state (array or lost of arrays) to have a batch dimension."""
+    """Expand state (array or lost of arrays) to have a batch and/or time dimension."""
     if dims < 1:
         return state
 
