@@ -15,11 +15,11 @@ from agent import policies
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from environments import *
-from models import build_ffn_models, build_rnn_models
+from models import build_ffn_models, build_rnn_models, GaussianPolicyDistribution
 from utilities.const import STORAGE_DIR, DETERMINISTIC, COLORS, DEBUG
 from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
-from utilities.util import parse_state, add_state_dims, flatten, set_all_seeds, env_extract_dims
 from utilities.model_management import is_recurrent_model
+from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims
 from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
 
 
@@ -157,7 +157,7 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
 
     env.close()
 
-    simulation_time = time.time() - st
+    stepping_time = time.time() - st
     st = time.time()
 
     # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
@@ -232,6 +232,9 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
         # add batch dimension for optimization
         buffer.inject_batch_dimension()
 
+    wrapup_time = time.time() - st
+    st = time.time()
+
     # convert buffer to dataset and save it to tf record
     dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
     dataset = dataset.map(tf_serialize_example)
@@ -240,9 +243,14 @@ def collect(policy_tuple, horizon: int, env_name: str, discount: float, lam: flo
     writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{pid}.tfrecord")
     writer.write(dataset)
 
-    wrapup_time = time.time() - st
+    savenwrite_time = time.time() - st
 
-    # print((setup_time, simulation_time, (pure_choice_time, pure_act_time, pure_sim_time, pure_norm_time, pure_eps_end_time), wrapup_time))
+    # if pid == 0:
+    #     print(f"\n\nTotal Runtime: {sum([setup_time, stepping_time, wrapup_time, savenwrite_time])}")
+    #     print(
+    #         f"\tSetup: {setup_time}\n\tStep: {stepping_time}\n\t\tChoice: {pure_choice_time}\n\t\tAct: {pure_act_time}"
+    #         f"\n\t\tSim: {pure_sim_time}\n\t\tNorm: {pure_norm_time}\n\t\tEnding: {pure_eps_end_time}"
+    #         f"\n\tWrapup: {wrapup_time}\n\tSaving: {savenwrite_time}")
 
     return stats, preprocessor
 
@@ -282,32 +290,32 @@ def evaluate(policy_tuple, env_name: str, preprocessor_serialized: dict) -> Tupl
 
 
 if __name__ == "__main__":
+    """Performance Measuring."""
+
+    RUN_DEBUG = False
+
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # need to deactivate GPU in Debugger mode!
-    tf.config.experimental_run_functions_eagerly(True)
-
-    # env_n = "ShadowHand-v1"
-    # env = gym.make(env_n)
-    # p, v, j = build_shadow_brain_v1(env, 1)
-    # joint_tuple = ModelTuple(build_shadow_brain_v1.__name__, j.get_weights())
-    # if isinstance(env.observation_space, Dict) and "observation" in env.observation_space.sample():
-    #     j(merge_into_batch([add_state_dims(env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
-
-    set_all_seeds(1)
+    tf.config.experimental_run_functions_eagerly(RUN_DEBUG)
 
     env_n = "HalfCheetah-v2"
     env = gym.make(env_n)
+    distribution = GaussianPolicyDistribution(env)
     sd, ad = env_extract_dims(env)
-    p, v, j = models.get_model_builder("ffn", False)(env)
-    joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights(), "GaussianPolicyDistribution")
-    rp, rv, rj = models.get_model_builder("rnn", False)(env)
-    rjoint_tuple = ModelTuple(build_rnn_models.__name__, rj.get_weights(), "GaussianPolicyDistribution")
+    p, v, j = models.get_model_builder("ffn", False)(env, distribution)
+    joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights(), distribution.__class__.__name__)
+    rp, rv, rj = models.get_model_builder("rnn", False)(env, distribution)
+    rjoint_tuple = ModelTuple(build_rnn_models.__name__, rj.get_weights(), distribution.__class__.__name__)
 
     wrapper = CombiWrapper((StateNormalizationWrapper(sd), RewardNormalizationWrapper()))
 
-    ray.init(local_mode=True)
-    print("FFN")
-    outs_ffn = [ray.get(collect.remote(joint_tuple, 32, env_n, 0.99, 0.95, 16, 0, wrapper)) for _ in range(1)]
-    print("\nRNN")
-    outs_rnn = [ray.get(collect.remote(rjoint_tuple, 32, env_n, 0.99, 0.95, 16, 0, wrapper)) for _ in range(1)]
+    ray.init()
+    t = time.time()
+    rms_ffn = [collect.remote(joint_tuple, 2048, env_n, 0.99, 0.95, 16, i, wrapper.serialize()) for i in range(1)]
+    outs_ffn = [ray.get(rm) for rm in rms_ffn]
+    print(f"Programm Runtime: {time.time() - t}")
+
+    # remote function, 8 workers, 2048 horizon: Programm Runtime: 24.98351287841797
+    # remote function, 1 worker, 2048 horizon: Programm Runtime: 10.563997030258179
+
