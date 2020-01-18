@@ -24,7 +24,7 @@ import models
 from agent import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
-from agent.gather import collect, evaluate
+from agent.gather import Gatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
@@ -94,7 +94,7 @@ class PPOAgent:
 
         # hyperparameters
         self.horizon = horizon
-        self.workers = workers
+        self.n_workers = workers
         self.discount = discount
         self.learning_rate = learning_rate
         self.clip = clip
@@ -295,13 +295,13 @@ class PPOAgent:
         Returns:
             self
         """
-        assert self.horizon * self.workers >= batch_size, "Batch Size is larger than the number of transitions."
-        if self.is_recurrent and batch_size > self.workers:
+        assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+        if self.is_recurrent and batch_size > self.n_workers:
             logging.warning(
                 f"Batchsize is larger than possible with the available number of independent sequences for "
-                f"Truncated BPTT. Setting batchsize to {self.workers}, which means {self.workers * self.tbptt_length} "
+                f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
                 f"transitions per batch.")
-            batch_size = self.workers
+            batch_size = self.n_workers
 
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
@@ -313,7 +313,12 @@ class PPOAgent:
         if not ray_is_initialized:
             ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
 
-        print(f"Parallelizing {self.workers} Workers Over {available_cpus} Threads.\n")
+        # set up the persistent workers
+        workers = [Gatherer.remote(self.builder_function_name,
+                                   self.distribution.__class__.__name__,
+                                   self.env_name, i) for i in range(self.n_workers)]
+
+        print(f"Parallelizing {self.n_workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -322,25 +327,24 @@ class PPOAgent:
             flat_print("Gathering...")
 
             # export the current state of the policy and value network under unique (-enough) key
-            name_key = round(time.time())
             if export:
+                raise NotImplementedError("Currently Exporting is not supported for weight sharing.")
+                name_key = round(time.time())
                 self.joint.save(f"{self.model_export_dir}/{name_key}/model")
                 model_representation = f"{self.model_export_dir}/{name_key}/"
-            else:
-                model_representation = ModelTuple(self.builder_function_name,
-                                                  self.joint.get_weights(),
-                                                  self.distribution.__class__.__name__)
+
+            # distribute the current policy to the workers
+            [actor.update_weights.remote(self.joint.get_weights()) for actor in workers]
 
             # create processes and execute them
-            split_stats, split_preprocessors = zip(*ray.get([collect.remote(model_representation, self.horizon,
-                                                                            self.env_name, self.discount, self.lam,
-                                                                            self.tbptt_length, pid,
-                                                                            self.preprocessor.serialize())
-                                                             for pid in range(self.workers)]))
+            split_stats, split_preprocessors = zip(*ray.get([actor.collect.remote(self.horizon, self.discount, self.lam,
+                                                                                  self.tbptt_length,
+                                                                                  self.preprocessor.serialize())
+                                                             for actor in workers]))
             stats = condense_stats(split_stats)
             old_n = self.preprocessor.n
             self.preprocessor = BaseWrapper.from_collection(split_preprocessors)
-            self.preprocessor.correct_sample_size((self.workers - 1) * old_n)  # adjust for overcounting
+            self.preprocessor.correct_sample_size((self.n_workers - 1) * old_n)  # adjust for overcounting
 
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
@@ -420,7 +424,7 @@ class PPOAgent:
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // min(self.workers, available_cpus)) / (
+            self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, available_cpus)) / (
                 time_dict["gathering"])
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
@@ -490,7 +494,7 @@ class PPOAgent:
         Returns:
             None
         """
-        progressbar = tqdm(total=epochs * ((self.horizon * self.workers / self.tbptt_length) / batch_size),
+        progressbar = tqdm(total=epochs * ((self.horizon * self.n_workers / self.tbptt_length) / batch_size),
                            leave=False, desc="Optimizing")
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):

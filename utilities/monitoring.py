@@ -117,7 +117,7 @@ class Monitor:
                 entropy_coefficient=str(self.agent.c_entropy.numpy().item()),
                 value_coefficient=str(self.agent.c_value.numpy().item()),
                 horizon=str(self.agent.horizon),
-                workers=str(self.agent.workers),
+                workers=str(self.agent.n_workers),
                 discount=str(self.agent.discount),
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
