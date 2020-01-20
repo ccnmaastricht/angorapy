@@ -14,9 +14,11 @@ from sklearn.decomposition import NMF
 from sklearn.svm import SVC
 import sklearn.manifold as sklm
 from mpl_toolkits.mplot3d import Axes3D
+from LSTM.minimization import parallelised
 
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
+from LSTM.minimization import Minimizer
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 
@@ -219,11 +221,16 @@ if __name__ == "__main__":
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
     # print(weights)
     method = "trust-ncg"
-    optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
-                                            inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
-                                            activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
-                                            method=method)
-    optimiserResults = np.concatenate(optimiserResults, axis=0)
+    # optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
+                                          #  inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
+                                          #  activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
+                                          #  method=method)
+    # optimiserResults = np.concatenate(optimiserResults, axis=0)
+    # greatminimizer = Minimizer(weights=weights[1], inputweights=weights[0], method=method)
+    optimisedResults = parallelised(inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
+                                    activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
+                                    weights=weights[1], inputweights=weights[0], method=method)
+
     zscores = sp.stats.zscore(np.reshape(activations[1], (activations[1].shape[0], 64))) # normalization
 
     # plt.plot(list(range(len(activations[1]))), np.reshape(activations[1], (activations[1].shape[0], 64)))
@@ -245,7 +252,7 @@ if __name__ == "__main__":
     pca = skld.PCA(3)
     pca.fit(zscores)
     X_pca = pca.transform(zscores)
-    new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
+    # new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
     chiefinvesti.plot_results(X_pca, actions[:, 1], new_pca, "PCA", True)  # plot pca results
     chiefinvesti.plot_results(X_pca, actions[:, 1], "PCA", False)
 
