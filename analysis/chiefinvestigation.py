@@ -14,11 +14,10 @@ from sklearn.decomposition import NMF
 from sklearn.svm import SVC
 import sklearn.manifold as sklm
 from mpl_toolkits.mplot3d import Axes3D
-from LSTM.minimization import parallelised
+from LSTM.minimization import parallel_minimization
 
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
-from LSTM.minimization import Minimizer
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 
@@ -88,7 +87,7 @@ class Chiefinvestigator:
             ax.scatter(results[:, 0], results[:, 1], results[:, 2],
                        marker='o', s=5, c=action_data[:])
             if fixed_point is not None:
-                ax.scatter(fixed_point[0, 0], fixed_point[0, 1], fixed_point[0, 2],
+                ax.scatter(fixed_point[:, 0], fixed_point[:, 1], fixed_point[:, 2],
                            marker='x', s=30)
             plt.title(title)
             ax.set_xlabel('PC1')
@@ -151,36 +150,6 @@ class Chiefinvestigator:
         score = clf.score(x_test, y_test)
         print("Classification accuracy", score)
 
-    def minimiz(self, weights, inputweights, inputs, activation, method: str = 'trust-krylov'):
-        optimisedResults = []
-        # id = np.random.randint(activation.shape[0])
-        ids = np.arange(0, activation.shape[0], 10)
-        for id in range(len(ids)):
-            print("Timestep:", ids[id])
-            x0 = activation[ids[id], :]
-            input = inputs[ids[id], :]
-            fun = lambda x: 0.5 * sum(
-                (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
-            options = {'gtol': 1e-5, 'disp': True}
-            Jac, Hes = nd.Gradient(fun), nd.Hessian(fun)
-            y = fun(x0)
-            print("First function evaluation:", y)
-            optimisedResult = minimize(fun, x0, method=method, jac=Jac, hess=Hes,
-                                        options=options)
-            optimisedResults.append(optimisedResult)
-        return optimisedResults
-
-    def curve_fit_minimization(self, activation, weights, inputweights, input):
-        id = np.random.randint(activation.shape[0])
-        print(id)
-        x0 = activation[id, :]
-        x = activation[id, :]
-        input = input[id, :]
-        fun = lambda weights: 0.5 * sum((- x + np.matmul(weights, np.tanh(x)) + np.matmul(inputweights, input)) ** 2)
-        ydata = np.zeros(activation.shape[1])
-        popt, pcov = curve_fit(fun, xdata=weights, ydata=ydata, p0=x0)
-        return popt, pcov
-
     def nmfactor(self, activation):
         minimum = np.min(activation)
         activation = activation - minimum
@@ -219,24 +188,15 @@ if __name__ == "__main__":
                                                                     "policy_recurrent_layer")
     actions = np.vstack(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
-    # print(weights)
+
+    # Minimization to find fixed points
     method = "trust-ncg"
-    # optimiserResults = chiefinvesti.minimiz(weights=weights[1], inputweights=weights[0],
-                                          #  inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
-                                          #  activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
-                                          #  method=method)
-    # optimiserResults = np.concatenate(optimiserResults, axis=0)
-    # greatminimizer = Minimizer(weights=weights[1], inputweights=weights[0], method=method)
-    optimisedResults = parallelised(inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
+    optimisedResults = parallel_minimization(inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
                                     activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
                                     weights=weights[1], inputweights=weights[0], method=method)
 
     zscores = sp.stats.zscore(np.reshape(activations[1], (activations[1].shape[0], 64))) # normalization
-
-    # plt.plot(list(range(len(activations[1]))), np.reshape(activations[1], (activations[1].shape[0], 64)))
-    # plt.title('Activations over episode')
-    # plt.show()
-
+    # display activations over episode
     plt.imshow(np.transpose(np.reshape(activations[1], (activations[1].shape[0], 64))))
     plt.show()
 
@@ -249,10 +209,17 @@ if __name__ == "__main__":
     # plot t-SNE results
     tsne_plot = chiefinvesti.plot_results(tsne_results, actions[:, 1], None, "t-SNE", False)
 
+    # processing of minimisation results for pca
+    optim_results = []
+    for i in range(len(optimisedResults)):
+        res = optimisedResults[i].x
+        optim_results.append(res)
+    optim_results = np.vstack(optim_results)
+
     pca = skld.PCA(3)
     pca.fit(zscores)
     X_pca = pca.transform(zscores)
-    # new_pca = pca.transform(optimiserResults.x.reshape(1, -1))
+    new_pca = pca.transform(optim_results)
     chiefinvesti.plot_results(X_pca, actions[:, 1], new_pca, "PCA", True)  # plot pca results
     chiefinvesti.plot_results(X_pca, actions[:, 1], "PCA", False)
 
