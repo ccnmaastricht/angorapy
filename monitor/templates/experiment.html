@@ -12,21 +12,14 @@
 {% endblock %}
 
 {% block page_content %}
-<!--        <nav class="navbar navbar-expand-lg navbar-light bg-light">-->
-<!--            <div class="container-fluid">-->
-<!---->
-<!--                <button type="button" id="sidebarCollapse" class="btn btn-info">-->
-<!--                    <i class="fas fa-align-left"></i>-->
-<!--                    <span>Toggle Sidebar</span>-->
-<!--                </button>-->
-<!--            </div>-->
-<!--        </nav>-->
+
 
 <div class="topic-group" id="statistics-view">
     <div class="row justify-content-center">
         <div class="col col-6">
             <div id="reward-plot" style="width:100%; height:500px;"></div>
         </div>
+
         <div class="col col-4">
             <div id="reward-boxplot" style="width:100%; height:500px;"></div>
         </div>
@@ -170,15 +163,6 @@
 {% block js_footer %}
 
 <script>
-    $(document).ready(function () {
-        $("#sidebar").mCustomScrollbar({theme: "minimal"});
-        $('#sidebarCollapse').on('click', function () {
-            $('#sidebar').toggleClass('active');
-            $('.collapse.in').toggleClass('in');
-            $('a[aria-expanded=true]').attr('aria-expanded', 'false');
-        });
-    });
-
     $('.carousel').carousel();
 
     $("nav ul li").on("click", function () {

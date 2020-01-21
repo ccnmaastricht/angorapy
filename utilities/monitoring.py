@@ -13,8 +13,6 @@ import numpy
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
-from matplotlib.axes import Axes
-from scipy.signal import savgol_filter
 
 from agent.ppo import PPOAgent
 from utilities import const
@@ -31,7 +29,7 @@ def scale(vector):
 
 
 class Monitor:
-    """Monitor for learning progress."""
+    """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
     def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None):
         self.agent = agent
@@ -149,81 +147,6 @@ class Monitor:
         with open(f"{self.story_directory}/progress.json", "w") as f:
             json.dump(progress, f)
 
-    def _make_graph(self, ax, lines, labels, name):
-        if self.iterations is not None:
-            ax.set_xbound(0, self.iterations)
-        ax.set_title(ax.get_title(),
-                     fontdict={'fontsize': "large",
-                               'fontweight': "bold",
-                               'verticalalignment': 'baseline',
-                               'horizontalalignment': "center"}
-                     )
-        ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15),
-                  fancybox=True, shadow=True, ncol=5)
-        plt.savefig(f"{self.story_directory}/{name}.svg", format="svg", bbox_inches="tight")
-
-    def update_graphs(self):
-        """Update graphs."""
-
-        # reward plot
-        fig, ax = plt.subplots()
-        ax.set_title("Mean Rewards and Episode Lengths.")
-        ax.set_xlabel("Iteration (Cycle)")
-        ax.set_ylabel("Mean Episode Reward")
-        twin_ax = ax.twinx()
-        twin_ax.set_ylabel("Episode Steps")
-
-        # average lengths
-        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
-        if len(self.agent.cycle_reward_history) > 11:
-            l_line = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange",
-                                  label="Episode Length")
-
-        # average rewards
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3, zorder=10)
-        if len(self.agent.cycle_reward_history) > 11:
-            r_line = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red", label="Average Reward")
-
-        if self.agent.env.spec.reward_threshold is not None:
-            ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
-
-        lines = l_line + r_line
-        labels = [l.get_label() for l in lines]
-
-        self._make_graph(ax, lines, labels, "reward_plot")
-        plt.close(fig)
-
-        # entropy, loss plot
-        fig, ax = plt.subplots()
-        ax: Axes
-        ax.set_title("Entropy and Loss.")
-        ax.set_xlabel("Epoch")
-        ax.set_ylabel("Loss")
-        twin_ax = ax.twinx()
-        twin_ax.set_ylabel("Entropy")
-
-        policy_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)", alpha=0.3)
-        if len(self.agent.policy_loss_history) > 11:
-            policy_loss_line = ax.plot(savgol_filter(scale(self.agent.policy_loss_history), 11, 3),
-                                       color=policy_loss_line[-1].get_color(), label="Policy Loss (Normalized)")
-
-        value_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Value Loss (Normalized)", alpha=0.3)
-        if len(self.agent.value_loss_history) > 11:
-            value_loss_line = ax.plot(savgol_filter(scale(self.agent.value_loss_history), 11, 3),
-                                      color=value_loss_line[-1].get_color(), label="Value Loss (Normalized)")
-
-        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green", alpha=0.3)
-        if len(self.agent.entropy_history) > 11:
-            entropy_line = ax.plot(savgol_filter(scale(self.agent.entropy_history), 11, 3),
-                                   color=entropy_line[-1].get_color(), label="Entropy")
-
-        lines = policy_loss_line + value_loss_line + entropy_line
-        labels = [l.get_label() for l in lines]
-
-        self._make_graph(ax, lines, labels, "loss_plot")
-        plt.close(fig)
-
     def update(self):
         """Update different components of the Monitor."""
         self.write_progress()
-        # self.update_graphs()

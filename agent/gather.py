@@ -35,7 +35,7 @@ class Gatherer:
         # setup persistent tools
         self.env = gym.make(env_name)
         self.distribution = getattr(policies, distribution_name)(self.env)
-        _, _, self.joint = model_builder(
+        self.policy, _, self.joint = model_builder(
             self.env, self.distribution, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
 
         # some attributes for adaptive behaviour
@@ -258,32 +258,20 @@ class Gatherer:
 
         return stats, preprocessor
 
-    def evaluate(policy_tuple, env_name: str, preprocessor_serialized: dict) -> Tuple[int, int]:
+    def evaluate(self, preprocessor_serialized: dict) -> Tuple[int, int]:
         """Evaluate one episode of the given environment following the given policy. Remote implementation."""
-        env = gym.make(env_name)
         preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
 
-        if isinstance(policy_tuple, ModelTuple):
-            model_builder = getattr(models, policy_tuple.model_builder)
-            distribution = getattr(policies, policy_tuple.distribution_type)(env)
-
-            # recurrent policy needs batch size for statefulness
-            policy, _, _ = model_builder(env, distribution, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
-            policy.set_weights(policy_tuple.weights)
-        else:
-            raise ValueError("Cannot handle given model type. Should be a ModelTuple.")
-
-        is_recurrent = is_recurrent_model(policy)
         done = False
         reward_trajectory = []
         length = 0
-        state = env.reset()
+        state = self.env.reset()
         state = preprocessor.modulate((state, None, None, None), update=False)[0]
         while not done:
-            probabilities = flatten(policy.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
+            probabilities = flatten(self.policy.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
 
-            action, _ = distribution.act(*probabilities)
-            observation, reward, done, _ = env.step(action)
+            action, _ = self.distribution.act(*probabilities)
+            observation, reward, done, _ = self.env.step(action)
             reward_trajectory.append(reward)
             state, reward, done, _ = preprocessor.modulate((observation, reward, done, None), update=False)
             length += 1

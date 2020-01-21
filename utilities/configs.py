@@ -4,10 +4,18 @@
 def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, debug=False, discount=0.99,
                 env='CartPole-v1', epochs=3, eval=False, export_file=None, grad_norm=0.5, horizon=1024,
                 iterations=1000, lam=0.97, load_from=None, lr_pi=0.001, clip_values=False, save_every=0,
-                workers=8, tbptt: int = 16, lr_schedule=None, no_state_norming=False, no_reward_norming=False):
-    """Make a config."""
-
+                workers=8, tbptt: int = 16, lr_schedule=None, no_state_norming=False, no_reward_norming=False,
+                model="ffn", early_stopping=False):
+    """Make a config from scratch."""
     return dict(**locals())
+
+
+def derive_config(original: dict, overrules: dict):
+    """Make a new config with another config as base, overruling a given set of parameters."""
+    derived = original.copy()
+    for k, v in overrules.items():
+        derived[k] = v
+    return derived
 
 
 discrete = make_config(
@@ -35,6 +43,8 @@ continuous = make_config(
     workers=8,
     clip_values=False
 )
+
+continuous_rnn = derive_config(continuous, {"model": "rnn"})
 
 beta = make_config(
     # continuous with some parameters from the beta paper

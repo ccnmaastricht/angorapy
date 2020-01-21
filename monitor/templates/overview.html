@@ -10,30 +10,6 @@
 
 {% block page_content %}
 
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <div class="container-fluid">
-            {#            <button type="button" id="sidebarCollapse" class="btn btn-info">#}
-            {#                <i class="fas fa-align-left"></i>#}
-            {#                <span>Toggle Sidebar</span>#}
-            {#            </button>#}
-
-            <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i> Clear All
-                Empty
-            </button>
-
-            <div>
-                {#                <label for="filter-env">Show</label>#}
-                <select class="custom-select" id="filter-env">
-                    <option selected>Show All</option>
-                    {% for env in envs_available|sort(reverse=true) %}
-                        <option value="{{ env }}">{{ env }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-        </div>
-    </nav>
-
     <div class="topic-group">
 
         <table class="table">

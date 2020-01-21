@@ -1,6 +1,8 @@
+import argparse
 import colorsys
 import json
 import os
+import re
 from typing import Dict, Tuple, List
 
 import gym
@@ -11,6 +13,7 @@ import numpy as np
 from agent.ppo import PPOAgent
 from models import build_ffn_models, build_rnn_models
 from utilities import configs
+from utilities.configs import derive_config
 
 
 def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool = True):
@@ -28,7 +31,7 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
                      learning_rate=settings["lr_pi"], discount=settings["discount"], lam=settings["lam"],
                      clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
-                     gradient_clipping=settings["grad_norm"], clip_values=settings["no_value_clip"],
+                     gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
                      tbptt_length=settings["tbptt"])
 
     # train
@@ -51,39 +54,50 @@ def lighten_color(color, amount=0.5):
 
 
 if __name__ == '__main__':
+    all_envs = [e.id for e in list(gym.envs.registry.all())]
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    experiment_name = "half_cheetah"
-    config = configs.mujoco
-    benchmarking_settings = [("HalfCheetah-v2", "ffn")]  # , ("HalfCheetah-v2", "rnn")]
-    n_iterations = 100
-    repetitions = 10
+    parser = argparse.ArgumentParser(description="Perform a comparative benchmarking experiment. Given one task, a "
+                                                 "number of agents is trained with different configurations, "
+                                                 "for instance comparing different architectures.")
+    parser.add_argument("env", type=str, choices=all_envs, help="environment in which the configurations are compared")
+    parser.add_argument("name", type=str, nargs="?", default=None, help="the name of the experiment, used for data "
+                                                                        "saving, will default to a combination of env "
+                                                                        "and configs")
+    parser.add_argument("--repetitions", "-r", type=int, help="number of repetitions of each configuration for means"
+                        , default=10)
+    parser.add_argument("--cycles", "-i", type=int, help="number of cycles during one drill", default=100)
+    parser.add_argument("--configs", "-c", type=str, nargs="+", help="a list of configurations to be compared")
+    parser.add_argument("--stop-early", "-e", action="store_true", help="allow independent early stopping")
+    args = parser.parse_args()
+
+    configurations = {n: derive_config(getattr(configs, n), {"stop_early": args.stop_early}) for n in args.configs}
+    if args.name is None:
+        args.name = re.sub("-v[0-9]", "", args.env) + "_" + "_".join(args.configs)
 
     results: Dict[str, Tuple[List, List]] = {}
     should_init = True
-    for env_name, model_type in benchmarking_settings:
-        identifier = str((env_name, model_type))
-
+    for conf_name, config in configurations.items():
         reward_histories = []
-        for i in range(repetitions):
-            print(f"Repetition {i + 1}/{repetitions} in environment {env_name} with model {model_type}.")
-            reward_histories.append(test_environment(env_name, config, model_type=model_type,
-                                                     n=n_iterations, init_ray=should_init))
+        for i in range(args.repetitions):
+            print(f"Repetition {i + 1}/{args.repetitions} in environment {args.env} with model {config['model']}.")
+            reward_histories.append(test_environment(args.env, config, model_type=config["model"],
+                                                     n=args.cycles, init_ray=should_init))
             should_init = False
 
             means = np.mean(reward_histories, axis=0)
             stdevs = np.std(reward_histories, axis=0)
-            results.update({identifier: (means.tolist(), stdevs.tolist())})
+            results.update({conf_name: (means.tolist(), stdevs.tolist())})
 
-            with open(f"docs/benchmarks/{experiment_name}.json", "w") as f:
+            with open(f"docs/benchmarks/{args.name}.json", "w") as f:
                 json.dump(results, f, indent=2)
 
-        x = list(range(1, n_iterations + 1))
-        plt.plot(x, results[identifier][0], 'k-')
+        x = list(range(1, args.cycles + 1))
+        plt.plot(x, results[conf_name][0], 'k-')
         plt.fill_between(x,
-                         np.array(results[identifier][0]) - np.array(results[identifier][1]),
-                         np.array(results[identifier][0]) + np.array(results[identifier][1]),
-                         label=f"{env_name} ({model_type})")
+                         np.array(results[conf_name][0]) - np.array(results[conf_name][1]),
+                         np.array(results[conf_name][0]) + np.array(results[conf_name][1]),
+                         label=f"{args.env} ({conf_name})")
 
     plt.legend()
-    plt.savefig(f"docs/figures/benchmarking_{experiment_name}.pdf", format="pdf")
+    plt.savefig(f"docs/benchmarks/benchmarking_{args.name}.pdf", format="pdf")

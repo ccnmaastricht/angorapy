@@ -92,7 +92,8 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every,
                       iterations=settings.iterations)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
-                export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval)
+                export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval,
+                stop_early=settings.stop_early)
 
     agent.save_agent_state()
     env.close()
@@ -147,6 +148,7 @@ if __name__ == "__main__":
     parser.add_argument("--tbptt", type=int, default=16, help=f"length of subsequences in truncated BPTT")
     parser.add_argument("--grad-norm", type=float, default=0.5, help=f"norm for gradient clipping, 0 deactivates")
     parser.add_argument("--clip-values", action="store_true", help=f"clip value objective")
+    parser.add_argument("--stop-early", action="store_true", help=f"stop early if threshold of env was surpassed")
 
     # read arguments
     argcomplete.autocomplete(parser)

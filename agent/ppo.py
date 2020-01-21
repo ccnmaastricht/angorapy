@@ -121,7 +121,8 @@ class PPOAgent:
         # models and optimizers
         self.distribution = distribution
         if self.distribution is None:
-            self.distribution = CategoricalPolicyDistribution() if not self.continuous_control else GaussianPolicyDistribution()
+            self.distribution = CategoricalPolicyDistribution(
+                self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
@@ -273,7 +274,7 @@ class PPOAgent:
         return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
-              separate_eval: bool = False, early_stop: bool = True, ray_is_initialized: bool = False) -> "PPOAgent":
+              separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -289,7 +290,7 @@ class PPOAgent:
             save_every (int): for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
             separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
-            early_stop (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
+            stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
                 above the environments threshold
 
         Returns:
@@ -318,7 +319,6 @@ class PPOAgent:
                                    self.distribution.__class__.__name__,
                                    self.env_name, i) for i in range(self.n_workers)]
 
-        print(f"Parallelizing {self.n_workers} Workers Over {available_cpus} Threads.\n")
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -337,15 +337,18 @@ class PPOAgent:
             [actor.update_weights.remote(self.joint.get_weights()) for actor in workers]
 
             # create processes and execute them
-            split_stats, split_preprocessors = zip(*ray.get([actor.collect.remote(self.horizon, self.discount, self.lam,
-                                                                                  self.tbptt_length,
-                                                                                  self.preprocessor.serialize())
-                                                             for actor in workers]))
+            split_stats, split_preprocessors = zip(*ray.get(
+                [actor.collect.remote(self.horizon, self.discount, self.lam, self.tbptt_length,
+                                      self.preprocessor.serialize()) for actor in workers]))
+
             stats = condense_stats(split_stats)
+
+            # accumulate preprocessors
             old_n = self.preprocessor.n
             self.preprocessor = BaseWrapper.from_collection(split_preprocessors)
             self.preprocessor.correct_sample_size((self.n_workers - 1) * old_n)  # adjust for overcounting
 
+            # read the dataset from storage
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
 
@@ -393,7 +396,7 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # early stopping
-            if self.env.spec.reward_threshold is not None and early_stop:
+            if self.env.spec.reward_threshold is not None and stop_early:
                 if numpy.all(numpy.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
                     print("\rAll catch a breath, we stop the drill early due to the formidable result!")
                     break

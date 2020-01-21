@@ -40,11 +40,7 @@
             <h3>Experiment Monitor</h3>
         </div>
 
-        <div class="reload-button">
-            <button type="button" id="refresh" class="btn btn-circle btn-md">
-                <i class="fas fa-sync"></i>
-            </button>
-        </div>
+
 
         <ul class="list-unstyled components">
             <li class="active"><a href="#statistics-view">Training Statistics</a></li>
@@ -78,6 +74,33 @@
                 {% endblock %}
             </div>
         </div>
+
+        <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container-fluid">
+
+                <div class="reload-button">
+                    <button type="button" id="refresh" class="btn btn-circle btn-md">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+
+                <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i> Clear All
+                    Empty
+                </button>
+
+                <div>
+                    {#                <label for="filter-env">Show</label>#}
+                    <select class="custom-select" id="filter-env">
+                        <option selected>Show All</option>
+                        {% for env in envs_available|sort(reverse=true) %}
+                            <option value="{{ env }}">{{ env }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+        </nav>
+
 
         {% block page_content %}
 
