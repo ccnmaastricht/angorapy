@@ -3,7 +3,6 @@ import numpy as np
 import numpy.random as npr
 import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
-import sklearn.decomposition as skld
 from mpl_toolkits.mplot3d import Axes3D
 from LSTM.fixedpointfinder import FixedPointFinder
 
@@ -189,35 +188,12 @@ class Flipflopper:
         method = "trust-ncg"
         finder = FixedPointFinder(self.hps, self.data_hps)
         self.fixed_points = finder.parallel_minimization(inputs=stim['inputs'][0, :, :],
-                                                  activation=activations[0, :, :],
-                                                  weights=weights[1],
-                                                  inputweights=weights[0],
-                                                  method=method)
+                                                          activation=activations[0, :, :],
+                                                          weights=weights[1],
+                                                          inputweights=weights[0],
+                                                          method=method)
+        finder.plot_fixed_points(activations=activations)
 
-        # processing of minimisation results for pca
-        optim_results = []
-        for i in range(len(self.fixed_points)):
-            res = self.fixed_points[i].x
-            optim_results.append(res)
-        optim_results = np.vstack(optim_results)
-
-        pca = skld.PCA(3)
-        pca.fit(activations[0, :, :])
-        X_pca = pca.transform(activations[0, :, :])
-        new_pca = pca.transform(optim_results)
-
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2],
-                   marker='o', s=5)
-
-        ax.scatter(new_pca[:, 0], new_pca[:, 1], new_pca[:, 2],
-                   marker='x', s=30)
-        plt.title('PCA')
-        ax.set_xlabel('PC1')
-        ax.set_ylabel('PC2')
-        ax.set_zlabel('PC3')
-        plt.show()
 
 
 if __name__ == "__main__":
