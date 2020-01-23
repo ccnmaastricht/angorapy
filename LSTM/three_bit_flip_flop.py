@@ -2,6 +2,10 @@ import tensorflow as tf
 import numpy as np
 import numpy.random as npr
 import matplotlib.pyplot as plt
+from utilities.model_management import build_sub_model_to
+import sklearn.decomposition as skld
+from mpl_toolkits.mplot3d import Axes3D
+from LSTM.fixedpointfinder import FixedPointFinder
 
 class Flipflopper:
     ''' Class for training an RNN to implement a 3-Bit Flip-Flop task as
@@ -18,75 +22,66 @@ class Flipflopper:
         in theory.
 
     Usage:
+        The class Flipflopper can be used to build and train a model of type
+        RNN on the 3-Bit Flip-Flop task. Furthermore, the class can make use
+        of the class FixedPointFinder to analyze the trained model.
 
     Hyperparameters:
+        rnn_type: Specifies architecture of type RNN. Must be one of
+        ['vanilla','gru', 'lstm']. Will raise ValueError if
+        specified otherwise. Default is 'vanilla'.
+
+        n_hidden: Specifies the number of hidden units in RNN. Default
+        is: 24.
+
     '''
 
-    def __init__(self):
-        self.hps = {'rnn_type': 'lstm',
-                    'n_hidden': 24,
+    def __init__(self, rnn_type: str = 'vanilla', n_hidden: int = 24):
+
+        self.hps = {'rnn_type': rnn_type,
+                    'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel'}
         self.data_hps = {'n_batch': 128,
                          'n_time': 256,
                          'n_bits': 3,
                          'p_flip': 0.2}
+        # data_hps may be changed but are recommended to remain at their default values
 
+    def _build_model(self):
+        '''Builds model that can be used to train the 3-Bit Flip-Flop task.
 
-    def build_model(self):
+        Args:
+            None.
+
+        Returns:
+            None.'''
         n_hidden = self.hps['n_hidden']
         name = self.hps['model_name']
         # inputshape=(self.data_hps['n_time'], self.data_hps['n_bits'])
         n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
 
-        inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch)
+        inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
 
         if self.hps['rnn_type'] == 'vanilla':
-            x = tf.keras.layers.SimpleRNN(n_hidden, name='vanilla', return_sequences=True)(inputs)
-            x = tf.keras.layers.Dense(3)(x)
+            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'gru':
-            x = tf.keras.layers.GRU(n_hidden, name='gru', return_sequences=True)(inputs)
-            x = tf.keras.layers.Dense(3)(x)
+            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
-            x = tf.keras.layers.LSTM(n_hidden, name='lstm', return_sequences=True)(inputs)
-            x = tf.keras.layers.Dense(3)(x)
+            x = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
+        x = tf.keras.layers.Dense(3)(x)
         self.model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
         self.model.summary()
 
-
-
-    def generate_stim(self):
-        batch_size = self.data_hps['n_batch']
-        pulse_duration = 10
-        bits = self.data_hps['n_bits']
-        nPulses = np.floor(self.data_hps['n_time']*1)
-        input = np.zeros((batch_size, self.data_hps['n_time'], bits))
-        T = np.arange(0, size, int(size/nPulses))
-
-        tstart = np.random.permutation(T)
-        for i in range(int(nPulses)):
-            if tstart[i] <= (size-pulse_duration):
-                input[tstart[i]:tstart[i]+pulse_duration, 0, np.random.randint(0, 3)] = 2*(np.random.rand() < .5)-1
-
-        # generate output
-        target = np.zeros((size, bits))
-
-        prev = np.zeros((batch_size, bits))
-        for t in range(size-batch_size):
-            changed = np.argwhere(input[t, :, :])
-            prev[0, changed[0, 1]] = input[t, 0, changed[0, 1]]
-            target[t, :] = prev
-
-
-        return input, target
 
     def generate_flipflop_trials(self):
         '''Generates synthetic data (i.e., ground truth trials) for the
         FlipFlop task. See comments following FlipFlop class definition for a
         description of the input-output relationship in the task.
+
         Args:
             None.
         Returns:
@@ -94,8 +89,9 @@ class Flipflopper:
                 'inputs': [n_batch x n_time x n_bits] numpy array containing
                 input pulses.
                 'outputs': [n_batch x n_time x n_bits] numpy array specifying
-                the correct behavior of the FlipFlop memory device.
-        '''
+                the correct behavior of the FlipFlop memory device.'''
+
+
         self.rng = npr.RandomState(125)
         data_hps = self.data_hps
         n_batch = data_hps['n_batch']
@@ -138,6 +134,19 @@ class Flipflopper:
         return {'inputs': inputs, 'output': output}
 
     def train(self, stim):
+        '''Function to train an RNN model and visualize training history.
+
+        Args:
+            stim: dict containing 'inputs' and 'output' as input and target data for training the model.
+
+                'inputs': [n_batch x n_time x n_bits] numpy array containing
+                input pulses.
+                'outputs': [n_batch x n_time x n_bits] numpy array specifying
+                the correct behavior of the FlipFlop memory device.
+
+        Returns:
+            None.'''
+        self._build_model()
         self.model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
         self.history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
@@ -150,7 +159,6 @@ class Flipflopper:
         plt.xlabel('Epochs')
         plt.legend()
         plt.show()
-
 
     def visualize_flipflop(self, stim):
         prediction = self.model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
@@ -169,17 +177,60 @@ class Flipflopper:
         ax2.xaxis.set_visible(False)
 
         plt.show()
+# TODO: both visualization of training history and visualization of flipflop need improvement.
 
+    def find_fixed_points(self, stim):
+        '''Intialize class FixedPointFinder'''
+        weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
+        sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
 
+        activations = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
+
+        method = "trust-ncg"
+        finder = FixedPointFinder(self.hps, self.data_hps)
+        self.fixed_points = finder.parallel_minimization(inputs=stim['inputs'][0, :, :],
+                                                  activation=activations[0, :, :],
+                                                  weights=weights[1],
+                                                  inputweights=weights[0],
+                                                  method=method)
+
+        # processing of minimisation results for pca
+        optim_results = []
+        for i in range(len(self.fixed_points)):
+            res = self.fixed_points[i].x
+            optim_results.append(res)
+        optim_results = np.vstack(optim_results)
+
+        pca = skld.PCA(3)
+        pca.fit(activations[0, :, :])
+        X_pca = pca.transform(activations[0, :, :])
+        new_pca = pca.transform(optim_results)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2],
+                   marker='o', s=5)
+
+        ax.scatter(new_pca[:, 0], new_pca[:, 1], new_pca[:, 2],
+                   marker='x', s=30)
+        plt.title('PCA')
+        ax.set_xlabel('PC1')
+        ax.set_ylabel('PC2')
+        ax.set_zlabel('PC3')
+        plt.show()
 
 
 if __name__ == "__main__":
-    flopper = Flipflopper()
+    rnn_type = 'vanilla'
+    n_hidden = 24
+
+    flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    flopper.build_model()
     flopper.train(stim)
 
     flopper.visualize_flipflop(stim)
+
+    flopper.find_fixed_points(stim)
 
 

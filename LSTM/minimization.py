@@ -4,16 +4,17 @@ import numdifftools as nd
 import multiprocessing as mp
 
 
+
 def minimizGRU(self, weights, inputweights, inputs, activation, method: str = "trust-ncg"):
     pass
 
 
 def minimizRNN(combined):
-    x0, input, weights, inputweights, method = combined[0][0:64], combined[0][64:128], combined[1], combined[2], \
+    x0, input, weights, inputweights, method = combined[0][0:24], combined[0][24:27], combined[1], combined[2], \
                                                combined[3]
     fun = lambda x: 0.5 * sum(
-        (- x[0:64] + np.matmul(weights, np.tanh(x[0:64])) + np.matmul(inputweights, input)) ** 2)
-    options = {'gtol': 1e-10, 'disp': True}
+        (- x[0:24] + np.matmul(weights, np.tanh(x[0:24])) + np.matmul(inputweights, input)) ** 2)
+    options = {'gtol': 1e-12, 'disp': True}
     jac, hes = nd.Gradient(fun), nd.Hessian(fun)
     y = fun(x0)
     print("First function evaluation:", y)
@@ -28,7 +29,7 @@ def parallel_minimization(inputs, activation, weights, inputweights, method):
 
     """
     pool = mp.Pool(mp.cpu_count())
-    ids = np.arange(0, activation.shape[0], 10)
+    ids = np.arange(0, activation.shape[0])
     print(len(ids), " minimizations to parallelize.")
     x0, input = activation[ids, :], inputs[ids, :]
     combind = []

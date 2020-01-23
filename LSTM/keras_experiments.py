@@ -81,7 +81,7 @@ if __name__ == "__main__":
     plt.show()
 
     # analysis of model
-    weights = layer = model.get_layer('lstm').get_weights()
+    weights = model.get_layer('lstm').get_weights()
     sub_model = build_sub_model_to(model, ['input', 'lstm'])
     sub_model.summary()
 
