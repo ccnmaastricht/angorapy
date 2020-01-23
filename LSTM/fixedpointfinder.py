@@ -84,7 +84,7 @@ class FixedPointFinder:
         ax.set_zlabel('PC3')
         plt.show()
 # TODO: plotting function needs more modules and option to include or not include trajectories
-
+# TODO: also needed: decision boundary for when a fixed point is considered unique and when not
     def _extract_fixed_point_locations(self):
         # processing of minimisation results for pca
         fixed_point_location = []
@@ -93,4 +93,5 @@ class FixedPointFinder:
         self.fixed_point_locations = np.vstack(fixed_point_location)
 
 # TODO: implement other architectures
+# TODO: interpret Jacobian
 
