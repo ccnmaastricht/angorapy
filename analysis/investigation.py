@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from agent.policies import BasePolicyDistribution
 from agent.ppo import PPOAgent
-from utilities.model_management import is_recurrent_model, list_layer_names, get_layers_by_names, \
+from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, \
     build_sub_model_to
 from utilities.util import parse_state, add_state_dims, flatten, \
     insert_unknown_shape_dimensions
@@ -106,8 +106,7 @@ class Investigator:
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        state = parse_state(env.reset())
-        state = self.preprocessor.modulate((state, None, None, None), update=False)[0]
+        state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
         cumulative_reward = 0
         while not done:
             env.render()
@@ -131,7 +130,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1579299998)
+    agent_007 = PPOAgent.from_agent_state(1579780260)
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)

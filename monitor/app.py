@@ -3,11 +3,11 @@ import os
 import re
 import shutil
 
-from utilities.const import PATH_TO_EXPERIMENTS
-
 import flask
-from flask_jsglue import JSGlue
 from flask import request
+from flask_jsglue import JSGlue
+
+from utilities.const import PATH_TO_EXPERIMENTS
 
 app = flask.Flask(__name__)
 jsglue = JSGlue(app)
@@ -27,20 +27,23 @@ def overview():
             eid = eid_m.group(0)
 
             if os.path.isfile(os.path.join(path, "progress.json")):
-
                 with open(os.path.join(path, "progress.json"), "r") as f:
                     progress = json.load(f)
 
                 with open(os.path.join(path, "meta.json"), "r") as f:
                     meta = json.load(f)
 
+                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
+                    meta["environment"]["reward_threshold"])
                 iterations = len(progress["rewards"]["mean"])
                 experiments.update({
                     eid: {
                         "env": meta["environment"]["name"],
                         "date": meta["date"],
                         "iterations": iterations,
-                        "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A"
+                        "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
+                        "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
+                            progress["rewards"]["mean"]) > reward_threshold)
                     }
                 })
 

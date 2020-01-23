@@ -28,9 +28,9 @@
             <tbody>
 
             {% for exp, info in exps.items()|sort(reverse=true) %}
-                <tr class="exp-row">
+                <tr onclick="window.location='experiment/{{ exp }}'" class="exp-row {{ "table-success" if info.is_success else ("table-info" if info.success == "maybe" else "") }}">
                     <th scope="row">{{ loop.index }}</th>
-                    <td class="id-col"><a href="experiment/{{ exp }}">{{ exp }}</a></td>
+                    <td class="id-col">{{ exp }}</td>
                     <td class="name-col">{{ info.env }}</td>
                     <td>{{ info.date }}</td>
                     <td>{{ info.iterations }}</td>

@@ -12,8 +12,8 @@ import numpy as np
 
 from agent.ppo import PPOAgent
 from models import build_ffn_models, build_rnn_models
-from utilities import configs
-from utilities.configs import derive_config
+import configs
+from configs import derive_config
 
 
 def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool = True):
@@ -36,7 +36,7 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
 
     # train
     agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,
-                ray_is_initialized=not init_ray)
+                ray_is_initialized=not init_ray, stop_early=settings.stop_early)
     env.close()
 
     return agent.cycle_reward_history
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     for conf_name, config in configurations.items():
         reward_histories = []
         for i in range(args.repetitions):
-            print(f"Repetition {i + 1}/{args.repetitions} in environment {args.env} with model {config['model']}.")
+            print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with model {config['model']}.")
             reward_histories.append(test_environment(args.env, config, model_type=config["model"],
                                                      n=args.cycles, init_ray=should_init))
             should_init = False

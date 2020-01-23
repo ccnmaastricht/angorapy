@@ -70,6 +70,8 @@ $.when(
     $.get(Flask.url_for("static", {"filename": "experiments/" + expid + "/meta.json"})),
     $.get(Flask.url_for("static", {"filename": "experiments/" + expid + "/progress.json"}))
 ).then(function (req_1, req_2) {
+    console.log("hello");
+
     let meta = req_1[0];
     let prog = req_2[0];
 
@@ -182,6 +184,11 @@ $.when(
 
 
     // ENTROPY PLOT
+    console.log(prog["entropies"]);
+    while (prog["entropies"].indexOf("NaN") > -1) {
+        prog["entropies"][prog["entropies"].indexOf("NaN")] = NaN
+    }
+
     let entropy_trace = {
         x: _.range(_.size(prog["entropies"])), y: prog["entropies"],
         mode: "lines", name: "Approximate Entropy",

@@ -35,6 +35,9 @@ def get_layer_names(model: tf.keras.Model):
 
 def extract_layers(network: tf.keras.Model, unfold_tds: bool = False) -> List[tf.keras.layers.Layer]:
     """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
+    if not hasattr(network, "layers"):
+        return [network]
+
     layers = []
     for l in network.layers:
         if isinstance(l, tf.keras.Model) or isinstance(l, tf.keras.Sequential):

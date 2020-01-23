@@ -17,7 +17,7 @@ from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from models import get_model_builder
 from utilities.const import NP_FLOAT_PREC
-from utilities.model_management import reset_states_masked
+from utilities.model_utils import reset_states_masked
 from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
 
@@ -54,7 +54,7 @@ class ProbabilityTest(unittest.TestCase):
     # GAUSSIAN
 
     def test_gaussian_pdf(self):
-        distro = GaussianPolicyDistribution()
+        distro = GaussianPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         x = tf.convert_to_tensor([[2, 3], [4, 3], [2, 1]], dtype=tf.float32)
         mu = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
@@ -68,7 +68,7 @@ class ProbabilityTest(unittest.TestCase):
         self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
 
     def test_gaussian_entropy(self):
-        distro = GaussianPolicyDistribution()
+        distro = GaussianPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         mu = tf.convert_to_tensor([[2.0, 3.0], [2.0, 1.0]], dtype=tf.float32)
         sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
@@ -83,7 +83,7 @@ class ProbabilityTest(unittest.TestCase):
     # BETA
 
     def test_beta_pdf(self):
-        distro = BetaPolicyDistribution()
+        distro = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         x = tf.convert_to_tensor([[0.2, 0.3], [0.4, 0.3], [0.2, 0.1]], dtype=tf.float32)
         alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
@@ -97,7 +97,7 @@ class ProbabilityTest(unittest.TestCase):
         self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
 
     def test_beta_entropy(self):
-        distro = BetaPolicyDistribution()
+        distro = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
         betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
@@ -110,7 +110,7 @@ class ProbabilityTest(unittest.TestCase):
     # CATEGORICAL
 
     def test_categorical_entropy(self):
-        distro = CategoricalPolicyDistribution()
+        distro = CategoricalPolicyDistribution(gym.make("CartPole-v1"))
 
         probs = tf.convert_to_tensor([[0.1, 0.4, 0.2, 0.25, 0.05],
                                       [0.1, 0.4, 0.2, 0.2, 0.1],

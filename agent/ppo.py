@@ -28,9 +28,9 @@ from agent.gather import Gatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import ModelTuple, condense_stats
-from utilities.model_management import is_recurrent_model, get_layer_names, get_component, reset_states_masked
+from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
-from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, _RunningMeanWrapper
+from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, BaseRunningMeanWrapper
 
 
 class PPOAgent:
@@ -188,11 +188,12 @@ class PPOAgent:
         self.policy_loss_history = []
         self.value_loss_history = []
         self.time_dicts = []
+        self.cycle_timings = []
         self.underflow_history = []
 
         self.preprocessor_stat_history = {
             w.__class__.__name__: {"mean": [w.simplified_mean()], "stdev": [w.simplified_stdev()]}
-            for w in self.preprocessor if isinstance(w, _RunningMeanWrapper)
+            for w in self.preprocessor if isinstance(w, BaseRunningMeanWrapper)
         }
 
     def set_gpu(self, activated: bool):
@@ -315,10 +316,20 @@ class PPOAgent:
             ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
 
         # set up the persistent workers
-        workers = [Gatherer.remote(self.builder_function_name,
-                                   self.distribution.__class__.__name__,
-                                   self.env_name, i) for i in range(self.n_workers)]
+        worker_options: dict = {}
+        if self.n_workers == 1:
+            worker_options["num_gpus"] = 1
+            worker_options["num_cpus"] = available_cpus
+        elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
+            worker_options["num_cpus"] = available_cpus // self.n_workers
 
+        print(f"{self.n_workers} workers each use: {worker_options}")
+
+        workers = [Gatherer.options(**worker_options).remote(self.builder_function_name,
+                                                             self.distribution.__class__.__name__,
+                                                             self.env_name, i) for i in range(self.n_workers)]
+
+        cycle_start = None
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -386,7 +397,7 @@ class PPOAgent:
 
             # record preprocessor stats
             for w in self.preprocessor:
-                if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, _RunningMeanWrapper):
+                if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, BaseRunningMeanWrapper):
                     continue
 
                 self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
@@ -401,13 +412,15 @@ class PPOAgent:
                     print("\rAll catch a breath, we stop the drill early due to the formidable result!")
                     break
 
+            if cycle_start is not None:
+                self.cycle_timings.append(round(time.time() - cycle_start, 2))
             self.report()
+            cycle_start = time.time()
 
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
 
             time_dict["optimizing"] = time.time() - subprocess_start
-            subprocess_start = time.time()
 
             flat_print("Finalizing...")
             self.total_frames_seen += stats.numb_processed_frames
@@ -422,8 +435,6 @@ class PPOAgent:
 
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 self.save_agent_state()
-
-            time_dict["finalizing"] = time.time() - subprocess_start
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
@@ -477,7 +488,14 @@ class PPOAgent:
             if __debug__ and tf.reduce_any(tf.math.is_nan(value_loss)):
                 print("Value Loss became NaN during training. Something is going horribly wrong.")
 
-        return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        info = {
+            "policy_output": policy_output,
+            "action_probabilities": action_probabilities,
+            "value_output": value_output,
+            "gradients": gradients
+        }
+
+        return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
 
     def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -510,7 +528,7 @@ class PPOAgent:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        ent, pi_loss, v_loss = self._learn_on_batch(b)
+                        ent, pi_loss, v_loss, info = self._learn_on_batch(b)
                         progressbar.update(1)
                     else:
                         # truncated back propagation through time
@@ -519,12 +537,20 @@ class PPOAgent:
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
-                            ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                            ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
                             progressbar.update(1)
 
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["action_prob"])
                             reset_states_masked(self.joint, reset_mask)
+                #
+                # for grad in info["gradients"]:
+                #     if tf.reduce_any(tf.math.is_nan(grad)):
+                #         print(ent)
+                #         print(pi_loss)
+                #         print(v_loss)
+                #         print(info)
+                #         exit()
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -559,11 +585,23 @@ class PPOAgent:
         if not ray_already_initialized:
             ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
-        model_representation = ModelTuple(self.builder_function_name,
-                                          self.policy.get_weights(),
-                                          self.distribution.__class__.__name__)
-        result_ids = [evaluate.remote(model_representation, self.env_name, self.preprocessor) for _ in range(n)]
+        # set up the persistent workers
+        available_cpus = multiprocessing.cpu_count()
+        worker_options: dict = {}
+        if n == 1:
+            worker_options["num_gpus"] = 1
+            worker_options["num_cpus"] = available_cpus
+        elif available_cpus % n == 0 and n != available_cpus:
+            worker_options["num_cpus"] = available_cpus // n
 
+        workers = [Gatherer.options(**worker_options).remote(self.builder_function_name,
+                                                             self.distribution.__class__.__name__,
+                                                             self.env_name, i) for i in range(n)]
+
+        for w in workers:
+            w.update_weights.remote(self.joint.get_weights())
+
+        result_ids = [w.evaluate.remote(self.preprocessor.serialize()) for w in workers]
         lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])
 
         return lengths, rewards
@@ -576,8 +614,7 @@ class PPOAgent:
         time_distribution_string = ""
         if len(self.time_dicts) > 0:
             times = [time for time in self.time_dicts[-1].values() if time is not None]
-            jobs = [job[0] for job, time in self.time_dicts[-1].items() if time is not None]
-            time_percentages = [str(round(100 * t / sum(times))) + jobs[i] for i, t in enumerate(times)]
+            time_percentages = [str(round(100 * t / sum(times))) for i, t in enumerate(times)]
             time_distribution_string = "[" + "|".join(map(str, time_percentages)) + "]"
         if isinstance(self.lr_schedule, tf.keras.optimizers.schedules.LearningRateSchedule):
             current_lr = self.lr_schedule(self.optimizer.iterations)
@@ -605,7 +642,8 @@ class PPOAgent:
                    f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                    f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                    f"{underflow}"
-                   f"fps: {fps_string} {time_distribution_string}\n")
+                   f"fps: {fps_string} {time_distribution_string}; "
+                   f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
 
     def save_agent_state(self):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
@@ -659,7 +697,7 @@ class PPOAgent:
         preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])
 
         loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
-                                workers=parameters["workers"], learning_rate=parameters["learning_rate"],
+                                workers=parameters["n_workers"], learning_rate=parameters["learning_rate"],
                                 discount=parameters["discount"], lam=parameters["lam"], clip=parameters["clip"],
                                 c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"], preprocessor=preprocessor,

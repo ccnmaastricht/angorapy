@@ -8,7 +8,7 @@ from agent.ppo import PPOAgent
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-AGENT_ID = 1579044179
+AGENT_ID = 1579780260
 
 agent = PPOAgent.from_agent_state(AGENT_ID)
 print(f"Agent {AGENT_ID} successfully loaded.")

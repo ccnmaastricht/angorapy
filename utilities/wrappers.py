@@ -78,14 +78,16 @@ class BaseWrapper(abc.ABC):
         self.n = self.n - deduction
 
 
-class _RunningMeanWrapper(BaseWrapper, abc.ABC):
+class BaseRunningMeanWrapper(BaseWrapper, abc.ABC):
+    """Abstract base class for wrappers implementing a running mean over some statistic."""
+
     mean: List[np.ndarray]
     variance: List[np.ndarray]
 
     def __init__(self, **args):
         super().__init__()
 
-    def __add__(self, other) -> "_RunningMeanWrapper":
+    def __add__(self, other) -> "BaseRunningMeanWrapper":
         needs_shape = len(inspect.signature(self.__class__).parameters) > 0
         nw = self.__class__(tuple(m.shape for m in self.mean)) if needs_shape else self.__class__()
         nw.n = self.n + other.n
@@ -148,7 +150,7 @@ class _RunningMeanWrapper(BaseWrapper, abc.ABC):
         return [np.sqrt(np.mean(v)).item() for v in self.variance]
 
 
-class StateNormalizationWrapper(_RunningMeanWrapper):
+class StateNormalizationWrapper(BaseRunningMeanWrapper):
     """Wrapper for state normalization using running mean and variance estimations."""
 
     def __init__(self, state_shapes: Union[Iterable[Iterable[int]], Iterable[int], int]):
@@ -205,7 +207,7 @@ class StateNormalizationWrapper(_RunningMeanWrapper):
         return serialization
 
 
-class RewardNormalizationWrapper(_RunningMeanWrapper):
+class RewardNormalizationWrapper(BaseRunningMeanWrapper):
     """Wrapper for reward normalization using running mean and variance estimations."""
 
     def __init__(self):

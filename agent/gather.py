@@ -15,15 +15,15 @@ from agent import policies
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from environments import *
-from models import build_ffn_models, build_rnn_models, GaussianPolicyDistribution
-from utilities.const import STORAGE_DIR, DETERMINISTIC, COLORS, DEBUG
-from utilities.datatypes import ExperienceBuffer, ModelTuple, TimeSequenceExperienceBuffer
-from utilities.model_management import is_recurrent_model
+from models import build_rnn_models, GaussianPolicyDistribution
+from utilities.const import STORAGE_DIR, DETERMINISTIC
+from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer
+from utilities.model_utils import is_recurrent_model
 from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims
 from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
 
 
-@ray.remote(num_cpus=1)
+@ray.remote
 class Gatherer:
     """Remote Gathering class."""
 
@@ -47,7 +47,8 @@ class Gatherer:
         """Update the weights of this worker."""
         self.joint.set_weights(weights)
 
-    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict):
+    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict,
+                verbose: bool = False):
         """Collect a batch shard of experience for a given number of timesteps."""
 
         st = time.time()
@@ -75,11 +76,9 @@ class Gatherer:
         t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
         states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
         episode_endpoints = []
-        state = parse_state(self.env.reset())
-        state = preprocessor.modulate((state, None, None, None))[0]
+        state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None))[0]
 
-        setup_time = time.time() - st
-        st = time.time()
+        setup_time, st = time.time() - st, time.time()
         pure_choice_time, pure_act_time, pure_sim_time, pure_norm_time, pure_eps_end_time = 0, 0, 0, 0, 0
 
         while t < horizon:
@@ -88,7 +87,8 @@ class Gatherer:
             # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
             stt = time.time()
 
-            policy_out = flatten(self.joint.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
+            policy_out = flatten(
+                self.joint.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
             pure_choice_time += time.time() - stt
             a_distr, value = policy_out[:-1], policy_out[-1]
             states.append(state)
@@ -129,7 +129,8 @@ class Gatherer:
 
                 # calculate advantages for the finished episode, where the last value is 0 since it refers to the
                 # terminal state that we just observed
-                episode_advantages = estimate_episode_advantages(rewards[-episode_steps:], values[-episode_steps:] + [0],
+                episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
+                                                                 values[-episode_steps:] + [0],
                                                                  discount, lam)
                 episode_returns = episode_advantages + values[-episode_steps:]
 
@@ -143,8 +144,7 @@ class Gatherer:
                     self.joint.reset_states()
 
                 # reset environment to receive next episodes initial state
-                state = parse_state(self.env.reset())
-                state = preprocessor.modulate((state, None, None, None))[0]
+                state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None))[0]
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
@@ -161,8 +161,7 @@ class Gatherer:
 
         self.env.close()
 
-        stepping_time = time.time() - st
-        st = time.time()
+        stepping_time, st = time.time() - st, time.time()
 
         # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
         values.append(np.squeeze(self.joint.predict(add_state_dims(state, dims=2 if self.is_recurrent else 1))[-1]))
@@ -194,50 +193,10 @@ class Gatherer:
         # normalize advantages
         buffer.normalize_advantages()
 
-        if DEBUG:
-            mc = COLORS["FAIL"]
-            ec = COLORS["ENDC"]
-            np.set_printoptions(linewidth=250, floatmode="fixed")
-            print("LAST FIVES\n---------")
-            print(f"{mc}states{ec}: {buffer.states[-5:]}")
-            print(f"{mc}rewards{ec}: {rewards[-5:]}")
-            print(f"{mc}advantages{ec}: {advantages[-5:]}")
-            print(f"{mc}returns{ec}: {returns[-5:]}")
-            print(f"{mc}values{ec}: {buffer.values[-5:]}")
-            print(f"{mc}actions{ec}: {buffer.actions[-5:]}")
-            print(f"{mc}action probabilities{ec}: {buffer.action_probabilities[-5:]}")
-            print(f"{mc}action mean{ec}: {np.mean(actions)}: {np.mean(actions, axis=0)}")
-            print(f"{mc}values mean{ec}: {np.mean(buffer.values)}")
-
-            print("\n\nWRAPPERS\n---------")
-            print(f"{mc}State Wrapper Mean{ec}: {preprocessor_serialized[0].mean}")
-            print(f"{mc}State Wrapper Var{ec}: {preprocessor_serialized[0].variance}")
-            print(f"{mc}Reward Wrapper Mean{ec}: {preprocessor_serialized[1].mean}")
-            print(f"{mc}Reward Wrapper Variance{ec}: {preprocessor_serialized[1].variance}")
-
-            import matplotlib.pyplot as plt
-            import matplotlib
-            plt.hist(buffer.values, label="value")
-            plt.hist(buffer.returns, label="return")
-            plt.hist(advantages, label="adv")
-            plt.hist(rewards, label="rewards")
-            plt.hist(tf.square(buffer.values - buffer.returns), label="squared value-return")
-            plt.hist(buffer.action_probabilities, label="aprob")
-            plt.hist(np.mean(buffer.actions, axis=-1), label="action")
-
-            # plt.hist(buffer.advantages + buffer.values, label="return after norm")
-            matplotlib.use('TkAgg')
-            plt.legend()
-            plt.title("GATHER DISTRIBUTION")
-            plt.show()
-            exit()
-
         if self.is_recurrent:
-            # add batch dimension for optimization
             buffer.inject_batch_dimension()
 
-        wrapup_time = time.time() - st
-        st = time.time()
+        wrapup_time, st = time.time() - st, time.time()
 
         # convert buffer to dataset and save it to tf record
         dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=self.is_shadow_brain)
@@ -249,12 +208,12 @@ class Gatherer:
 
         savenwrite_time = time.time() - st
 
-        # if self.id == 0:
-        #     print(f"\n\nTotal Runtime: {sum([setup_time, stepping_time, wrapup_time, savenwrite_time])}")
-        #     print(
-        #         f"\tSetup: {setup_time}\n\tStep: {stepping_time}\n\t\tChoice: {pure_choice_time}\n\t\tAct: {pure_act_time}"
-        #         f"\n\t\tSim: {pure_sim_time}\n\t\tNorm: {pure_norm_time}\n\t\tEnding: {pure_eps_end_time}"
-        #         f"\n\tWrapup: {wrapup_time}\n\tSaving: {savenwrite_time}")
+        if self.id == 0 and verbose:
+            print(f"\n\nTotal Runtime: {sum([setup_time, stepping_time, wrapup_time, savenwrite_time])}")
+            print(
+                f"\tSetup: {setup_time}\n\tStep: {stepping_time}\n\t\tChoice: {pure_choice_time}\n\t\tAct: {pure_act_time}"
+                f"\n\t\tSim: {pure_sim_time}\n\t\tNorm: {pure_norm_time}\n\t\tEnding: {pure_eps_end_time}"
+                f"\n\tWrapup: {wrapup_time}\n\tSaving: {savenwrite_time}")
 
         return stats, preprocessor
 
@@ -263,20 +222,23 @@ class Gatherer:
         preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
 
         done = False
-        reward_trajectory = []
-        length = 0
-        state = self.env.reset()
-        state = preprocessor.modulate((state, None, None, None), update=False)[0]
+        state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None), update=False)[0]
+        cumulative_reward = 0
+        steps = 0
         while not done:
-            probabilities = flatten(self.policy.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
+            probabilities = flatten(
+                self.policy.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
 
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, _ = self.env.step(action)
-            reward_trajectory.append(reward)
-            state, reward, done, _ = preprocessor.modulate((observation, reward, done, None), update=False)
-            length += 1
+            cumulative_reward += reward
+            observation, reward, done, _ = preprocessor.modulate((parse_state(observation), reward, done, None),
+                                                                 update=False)
 
-        return length, sum(reward_trajectory)
+            state = observation
+            steps += 1
+
+        return steps, cumulative_reward
 
 
 if __name__ == "__main__":
@@ -292,21 +254,20 @@ if __name__ == "__main__":
     env_n = "HalfCheetah-v2"
     environment = gym.make(env_n)
     distro = GaussianPolicyDistribution(environment)
+    builder = build_rnn_models
     sd, ad = env_extract_dims(environment)
-    p, v, j = models.get_model_builder("ffn", False)(environment, distro)
-    joint_tuple = ModelTuple(build_ffn_models.__name__, j.get_weights(), distro.__class__.__name__)
-    rp, rv, rj = models.get_model_builder("rnn", False)(environment, distro)
-    rjoint_tuple = ModelTuple(build_rnn_models.__name__, rj.get_weights(), distro.__class__.__name__)
-
     wrapper = CombiWrapper((StateNormalizationWrapper(sd), RewardNormalizationWrapper()))
 
     ray.init()
     t = time.time()
-    actors = [Gatherer.remote(build_ffn_models.__name__, distro.__class__.__name__, env_n, i) for i in range(8)]
-    outs_ffn = ray.get([actor.collect.remote(2048, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors])
+    actors = [Gatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(8)]
 
-    print(f"Programm Runtime: {time.time() - t}")
+    for _ in range(100):
+        it = time.time()
+        outs_ffn = ray.get([actor.collect.remote(2048, 0.99, 0.95, 16, wrapper.serialize(), False) for actor in actors])
+        print(f"Gathering Time: {time.time() - it}")
 
-    # remote function, 8 workers, 2048 horizon: Programm Runtime: 24.98351287841797
-    # remote function, 1 worker, 2048 horizon: Programm Runtime: 10.563997030258179
+    print(f"Program Runtime: {time.time() - t}")
 
+    # remote function, 8 workers, 2048 horizon: Program Runtime: 24.98351287841797
+    # remote function, 1 worker, 2048 horizon: Program Runtime: 10.563997030258179

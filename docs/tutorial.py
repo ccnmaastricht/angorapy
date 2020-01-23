@@ -8,7 +8,7 @@ from models import build_rnn_models, build_ffn_models, plot_model
 from utilities.monitoring import Monitor
 import tensorflow as tf
 
-from utilities.model_management import extract_layers
+from utilities.model_utils import extract_layers
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

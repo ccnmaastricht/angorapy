@@ -16,7 +16,7 @@ from models.components import _build_fcn_component
 from models.convolutional import _build_visual_encoder
 from utilities.const import VISION_WH
 from utilities.util import env_extract_dims
-from utilities.model_management import calc_max_memory_usage
+from utilities.model_utils import calc_max_memory_usage
 
 
 def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int):

@@ -2,15 +2,14 @@
 
 import abc
 import math
+import os
 from typing import Union, Tuple
 
 import gym
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 from agent.layers import StdevLayer
-from utilities.const import NP_FLOAT_PREC
 from utilities.util import env_extract_dims
 
 
@@ -270,7 +269,11 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
 
 class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
-    """Beta Distribution."""
+    """Beta Distribution for bounded action spaces.
+
+    The beta distribution has finite support in the interval [0, 1]. In contrast to infinitely supported distributions
+    it is henceforth bias free and can be scaled to fit any bounded action space.
+    """
 
     def __init__(self, env: gym.Env):
         super().__init__(env)
@@ -285,7 +288,15 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def act(self, alphas: tf.Tensor, betas: tf.Tensor):
         """Sample an action from a beta distribution."""
-        actions = np.random.beta(alphas, betas).astype("float32")
+        np.seterr(all='raise')
+        try:
+            actions = np.random.beta(alphas, betas).astype("float32")
+        except:
+            print("Breaking due to acting issues in Beta.")
+            print(alphas, betas)
+            exit()
+        np.seterr(all='warn')
+
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
         probabilities = tf.squeeze(self.log_probability(actions, alphas, betas)).numpy()
 
@@ -293,8 +304,8 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def sample(self, alphas: tf.Tensor, betas: tf.Tensor):
         """Sample from the Beta distribution."""
-        actions = tfp.distributions.Beta(alphas, betas).sample(alphas.shape)
-        actions = self._scale_sample_to_action_range(tf.reshape(actions, [-1])).numpy()
+        actions = np.random.beta(alphas, betas).astype("float32")
+        actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
 
         return actions
 
@@ -342,13 +353,14 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         """Entropy of the beta distribution"""
         alphas, betas = params
 
-        bab = tf.multiply(tf.exp(tf.math.lgamma(alphas)),
-                          tf.exp(tf.math.lgamma(betas)) / tf.exp(tf.math.lgamma(tf.add(alphas, betas))))
+        # directly get log of bab to prevent numerical issues
+        bab_log = tf.math.lgamma(alphas) + (tf.math.lgamma(betas) - tf.math.lgamma(tf.add(alphas, betas)))
+
         a = tf.multiply(tf.subtract(alphas, 1.), tf.math.polygamma(0., alphas))
         b = tf.multiply(tf.subtract(betas, 1.), tf.math.polygamma(0., betas))
         ab = tf.multiply(tf.subtract(alphas + betas, 2.), tf.math.polygamma(0., tf.add(alphas, betas)))
 
-        return tf.reduce_sum(tf.math.log(bab) - a - b + ab, axis=-1)
+        return tf.reduce_sum(bab_log - a - b + ab, axis=-1)
 
     def build_action_head(self, n_actions, input_shape, batch_size):
         """Build a policy head for the beta distribution, for alpha and beta prediction.
@@ -385,3 +397,86 @@ def get_distribution_by_short_name(name: str) -> type(BasePolicyDistribution):
         raise ValueError("Unknown distribution type.")
 
     return _distribution_short_name_map[name]
+
+
+if __name__ == '__main__':
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    tf.config.experimental_run_functions_eagerly(True)
+
+    alpha_values = tf.Variable(
+        tf.convert_to_tensor([[8.938385, 4.4944053], [8.072847, 3.896354], [5.8409, 16.770706],
+                              [6.457196, 3.7021167], [8.459473, 2.4432063], [5.8367686, 16.77717],
+                              [7.396127, 6.1568685], [5.6440363, 2.4467988], [7.4883037, 4.8172426],
+                              [1.0415163, 13.661626], [8.184399, 3.0246682], [7.880297, 1.9001544],
+                              [5.8413563, 16.767475], [9.695139, 3.228641], [9.868104, 2.4025457],
+                              [5.5843325, 2.5526636], [8.354853, 2.2522547], [6.049675, 3.9981081],
+                              [1.0892259, 1.8125873], [6.867864, 4.111598], [6.687017, 4.2205567],
+                              [1.002021, 3.2135968], [5.1481977, 3.06296], [4.161758, 3.8794537],
+                              [9.803629, 3.3969364], [5.8313046, 16.791286], [9.075689, 2.2122455],
+                              [5.8302336, 16.797678], [4.151903, 4.2679996], [1.930316, 2.0440588],
+                              [9.567475, 3.8535635], [5.980739, 6.351991], [7.8173714, 11.585241],
+                              [4.0460186, 2.8431087], [5.8561397, 16.730507], [1.002385, 6.2710385],
+                              [5.8427405, 16.77926], [9.697691, 2.5892835], [6.14186, 4.121876],
+                              [5.8483515, 16.742254], [6.5186186, 8.308382], [9.868338, 3.1142523],
+                              [2.6051607, 4.36975], [5.6795597, 16.96957], [5.83926, 16.75718],
+                              [6.744679, 2.5456617], [8.440493, 1.8084457], [2.483343, 5.2575064],
+                              [1.0149746, 3.263671], [5.9133854, 16.68347], [5.8320594, 16.789776],
+                              [4.1731586, 2.1167388], [7.735517, 7.076754], [1.0081679, 17.55378],
+                              [7.068624, 14.628963], [6.7396364, 5.6128044], [1.0012822, 15.498347],
+                              [1.0293571, 1.8714967], [7.5208883, 2.7606077], [5.0341096, 3.9475212],
+                              [5.8355403, 16.789673], [1.1125941, 4.3463087], [7.9846663, 6.322643],
+                              [5.8893747, 16.42147]], dtype=np.float32), trainable=True)
+    beta_values = tf.Variable(
+        tf.convert_to_tensor([[2.183386, 2.9739923], [3.1625044, 4.1142673], [22.830832, 18.064775],
+                              [3.511745, 5.7261972], [1.2304039, 4.6869473], [22.837652, 18.060904],
+                              [1.5336509, 1.4385742], [3.0401452, 5.010111], [2.6510806, 2.6101472],
+                              [13.229868, 1.8663367], [2.4673338, 3.1305523], [1.646185, 7.4393163],
+                              [22.830168, 18.068228],
+                              [1.9740455, 3.709764],
+                              [1.6457771, 3.2711968], [2.4490194, 2.2189336],
+                              [1.4809418, 7.0599666],
+                              [1.9662321, 3.2177906], [8.827774, 5.0210023],
+                              [1.2161083, 3.5753946],
+                              [1.9550581, 2.9819784], [15.853697, 6.6819644],
+                              [5.162377, 7.67019],
+                              [3.5433118, 2.6651163], [4.596446, 13.006447],
+                              [22.839733, 18.039728],
+                              [2.3328233, 5.009877], [22.796652, 17.977396],
+                              [4.6107235, 4.6580896],
+                              [6.146406, 6.025529], [1.3834891, 2.5556445],
+                              [1.4930258, 1.7116091], [16.098206, 15.994671],
+                              [2.5803814, 2.240404],
+                              [22.797514, 18.088808], [14.126961, 2.9379811],
+                              [22.706978, 17.907507],
+                              [2.5837054, 5.4331207], [2.3258739, 3.119586],
+                              [22.831034, 18.064049],
+                              [9.235467, 8.808327], [2.244622, 3.9687579],
+                              [7.0887294, 5.509886],
+                              [23.16967, 18.116217], [22.861628, 18.05772],
+                              [2.3353539, 4.519433],
+                              [3.8810425, 7.4091396], [8.343775, 6.1214557],
+                              [14.896653, 7.231964],
+                              [22.296999, 17.656912], [22.839067, 18.041899],
+                              [2.038148, 1.9405288],
+                              [1.5256938, 1.5784876], [16.824055, 1.9999955],
+                              [19.758589, 17.27514],
+                              [1.4453835, 1.5468833], [20.05187, 3.5975597],
+                              [13.091117, 7.2226744],
+                              [1.3260393, 2.1171453], [1.5235064, 1.2015443],
+                              [22.751884, 17.93849],
+                              [10.623502, 4.50803], [1.0056278, 1.3404158],
+                              [22.546137, 17.973293]], dtype=np.float32), trainable=True)
+
+    with tf.GradientTape() as tape:
+        d = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
+        index = np.where(np.isinf(d.entropy((alpha_values.value(), beta_values.value()))))
+        entropy = d.entropy((alpha_values.value(), beta_values.value()))
+
+    grads = tape.gradient(entropy, alpha_values)
+    critical_index = np.where(np.isnan(grads))
+    print(grads)
+    print(f"Kritischer Bengel: {critical_index}")
+    print(beta_values.value().numpy()[critical_index])
+    print(alpha_values.value().numpy()[critical_index])
+    print(entropy)

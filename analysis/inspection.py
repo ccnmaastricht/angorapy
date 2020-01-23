@@ -3,7 +3,7 @@
 import os
 
 from agent.ppo import PPOAgent
-from utilities.model_management import extract_layers
+from utilities.model_utils import extract_layers
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

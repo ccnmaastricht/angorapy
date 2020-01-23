@@ -8,7 +8,7 @@ from agent.ppo import PPOAgent
 from models import *
 from models import get_model_builder
 from models.shadow import build_shadow_brain_v1, build_blind_shadow_brain_v1
-from utilities import configs
+import configs
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims

@@ -63,8 +63,8 @@ class Monitor:
                                             **({"bs": 1} if "bs" in fargs(self.agent.model_builder).args else {}))
         pi.set_weights(self.agent.policy.get_weights())
 
-        for i in range(n):
-            episode_letter = chr(97 + i)
+        for j in range(n):
+            episode_letter = chr(97 + j)
 
             # collect an episode
             done = False

@@ -208,6 +208,11 @@ a.button-control:hover {
   width: 100%;
 }
 
+.exp-row:hover {
+  transform: translateX(5px);
+  cursor: pointer;
+}
+
 /* MEDIAQUERIES */
 @media (max-width: 768px) {
   #sidebar {
