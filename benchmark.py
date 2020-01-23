@@ -10,6 +10,7 @@ import matplotlib.colors as mc
 import matplotlib.pyplot as plt
 import numpy as np
 
+from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import build_ffn_models, build_rnn_models
 import configs
@@ -27,12 +28,17 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     else:
         raise ValueError("Unknown Model Type.")
 
+    if settings["distribution"] is not None:
+        distribution = get_distribution_by_short_name(settings["distribution"])(env)
+    else:
+        distribution = None
+
     # set up the agent and a reporting module
     agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
                      learning_rate=settings["lr_pi"], discount=settings["discount"], lam=settings["lam"],
                      clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
                      gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
-                     tbptt_length=settings["tbptt"])
+                     tbptt_length=settings["tbptt"], distribution=distribution)
 
     # train
     agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,
