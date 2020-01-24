@@ -9,19 +9,15 @@ from scipy.spatial.distance import pdist, squareform
 from utilities.model_management import build_sub_model_to
 import tensorflow as tf
 
+
 class FixedPointFinder:
     def __init__(self, hps, data_hps, model):
         self.hps = hps
         self.data_hps = data_hps
         self.unique_tol = 1e-03
         self.abundance_threshold = 0.04
-        self._grab_model(model=model)
-
-
-    def _grab_model(self, model):
         self.weights = model.get_layer(self.hps['rnn_type']).get_weights()
         self.model = model
-
 
     def parallel_minimization(self, inputs, activation, method):
         """Function to set up parallel processing of minimization for fixed points
@@ -29,16 +25,16 @@ class FixedPointFinder:
 
         """
         pool = mp.Pool(mp.cpu_count())
-        print(len(activation.shape[0]), " minimizations to parallelize.")
+        print(activation.shape[0], " minimizations to parallelize.")
         x0 = activation
         combind = []
         for i in range(x0.shape[0]):
-            combind.append((x0[i, :], inputs[i, :], self.weights, method))
+            combind.append((x0[i, :], inputs[i, :], method))
 
         if self.hps['rnn_type'] == 'vanilla':
-            self.fixedpoints = pool.map(self._minimizRNN, combind)
+            self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
         elif self.hps['rnn_type'] == 'gru':
-            self.fixedpoints = pool.map(self._minimizGRU, combind)
+            self.fixedpoints = pool.map(self._minimizgru, combind, chunksize=1)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -46,12 +42,11 @@ class FixedPointFinder:
         self._handle_bad_approximations()
         return self.good_fixed_points
 
-
-    def _minimizRNN(self, combined):
+    def _minimizrnn(self, combined):
         n_hidden = self.hps['n_hidden']
         x0, input, weights, method = combined[0], \
                                                    combined[1], \
-                                                   combined[2], combined[4]
+                                                   self.weights, combined[2]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         fun = lambda x: 0.5 * sum(
             (- x[0:n_hidden] + np.matmul(weights.transpose(), np.tanh(x[0:n_hidden])) +
@@ -64,21 +59,22 @@ class FixedPointFinder:
                                     options=options)
         return fixed_point
 
-    def _minimizGRU(self, combined):
+    def _minimizgru(self, combined):
 
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
+
         n_hidden = self.hps['n_hidden']
         x0, input, weights, method = combined[0], \
                                      combined[1], \
-                                     combined[2], combined[4]
+                                     self.weights, combined[2]
         z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2*n_hidden), np.arange(2*n_hidden, 3*n_hidden)
         W_z, W_r, W_h = weights[0][:, z].transpose(), weights[0][:, r].transpose(), weights[0][:, h].transpose()
         U_z, U_r, U_h = weights[1][:, z].transpose(), weights[1][:, r].transpose(), weights[1][:, h].transpose()
         b_z, b_r, b_h = weights[2][0, z].transpose(), weights[2][0, r].transpose(), weights[2][0, h].transpose()
 
-        fun = lambda x: 0.5* sum(((1-sigmoid(np.matmul(W_z, input) + np.matmul(U_z, x[0:n_hidden]) + b_z)) @ \
-                        np.tanh(np.matmul(W_h, input) + np.matmul(U_h, (sigmoid(np.matmul(W_r, input) + \
+        fun = lambda x: 0.5* sum(((1-sigmoid(np.matmul(W_z, input) + np.matmul(U_z, x[0:n_hidden]) + b_z)) @
+                        np.tanh(np.matmul(W_h, input) + np.matmul(U_h, (sigmoid(np.matmul(W_r, input) +
                         np.matmul(U_r, x[0:n_hidden]) + b_r))) @ x[0:n_hidden] + b_h) - x[0:n_hidden])**2)
         options = {'gtol': 1e-14, 'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)

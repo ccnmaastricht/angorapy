@@ -211,6 +211,7 @@ class Flipflopper:
         """Load saved model from JSON file.
         The function will overwrite the current model, if it exists."""
         self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
+        # self.model = load_model(os.getcwd()+"/saved/model.h5")
         print("Loaded "+self.hps['rnn_type']+" model.")
 
 
@@ -224,10 +225,10 @@ if __name__ == "__main__":
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    flopper.train(stim)
+    # flopper.train(stim)
 
-    flopper.visualize_flipflop(stim)
+    # flopper.visualize_flipflop(stim)
 
-    # flopper.find_fixed_points(stim)
+    flopper.find_fixed_points(stim)
 
 
