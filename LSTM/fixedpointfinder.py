@@ -1,5 +1,6 @@
 import numpy as np
 import multiprocessing as mp
+import math
 import numdifftools as nd
 from scipy.optimize import minimize
 import sklearn.decomposition as skld
@@ -32,7 +33,7 @@ class FixedPointFinder:
         x0 = activation
         combind = []
         for i in range(x0.shape[0]):
-            combind.append((x0[i, :], inputs[i, :], self.weights[1], self.weights[0], method))
+            combind.append((x0[i, :], inputs[i, :], self.weights, method))
 
         if self.hps['rnn_type'] == 'vanilla':
             self.fixedpoints = pool.map(self._minimizRNN, combind)
@@ -48,12 +49,13 @@ class FixedPointFinder:
 
     def _minimizRNN(self, combined):
         n_hidden = self.hps['n_hidden']
-        x0, input, weights, inputweights, method = combined[0], \
+        x0, input, weights, method = combined[0], \
                                                    combined[1], \
-                                                   combined[2], combined[3], \
-                                                   combined[4]
+                                                   combined[2], combined[4]
+        weights, inputweights, b = weights[1], weights[0], weights[2]
         fun = lambda x: 0.5 * sum(
-            (- x[0:n_hidden] + np.matmul(weights.transpose(), np.tanh(x[0:n_hidden])) + np.matmul(inputweights.transpose(), input)) ** 2)
+            (- x[0:n_hidden] + np.matmul(weights.transpose(), np.tanh(x[0:n_hidden])) +
+             np.matmul(inputweights.transpose(), input) + b) ** 2)
         options = {'gtol': 1e-14, 'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
@@ -62,8 +64,29 @@ class FixedPointFinder:
                                     options=options)
         return fixed_point
 
-    def _minimizGRU(self):
-        pass
+    def _minimizGRU(self, combined):
+
+        def sigmoid(x):
+            return 1 / (1 + np.exp(-x))
+        n_hidden = self.hps['n_hidden']
+        x0, input, weights, method = combined[0], \
+                                     combined[1], \
+                                     combined[2], combined[4]
+        z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2*n_hidden), np.arange(2*n_hidden, 3*n_hidden)
+        W_z, W_r, W_h = weights[0][:, z].transpose(), weights[0][:, r].transpose(), weights[0][:, h].transpose()
+        U_z, U_r, U_h = weights[1][:, z].transpose(), weights[1][:, r].transpose(), weights[1][:, h].transpose()
+        b_z, b_r, b_h = weights[2][0, z].transpose(), weights[2][0, r].transpose(), weights[2][0, h].transpose()
+
+        fun = lambda x: 0.5* sum(((1-sigmoid(np.matmul(W_z, input) + np.matmul(U_z, x[0:n_hidden]) + b_z)) @ \
+                        np.tanh(np.matmul(W_h, input) + np.matmul(U_h, (sigmoid(np.matmul(W_r, input) + \
+                        np.matmul(U_r, x[0:n_hidden]) + b_r))) @ x[0:n_hidden] + b_h) - x[0:n_hidden])**2)
+        options = {'gtol': 1e-14, 'disp': True}
+        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
+        y = fun(x0)
+        print("First function evaluation:", y)
+        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
+                                    options=options)
+        return fixed_point
 
     def _handle_bad_approximations(self):
         """This functions identifies approximations where the minmization

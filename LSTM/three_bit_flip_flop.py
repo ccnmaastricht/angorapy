@@ -195,8 +195,8 @@ class Flipflopper:
         self.fixed_points = []
         for i in range(n_batches):
             self.fixed_points.append(finder.parallel_minimization(inputs=stim['inputs'][i, :, :],
-                                                             activation=activation[i, :, :],
-                                                             method=method))
+                                                                 activation=activation[i, :, :],
+                                                                 method=method))
         if n_batches == 1:
             finder.plot_fixed_points(activations=activation)
         else:
@@ -204,30 +204,30 @@ class Flipflopper:
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
-        self.model.save(os.getcwd()+"/saved/model.h5")
-        print("Saved model.")
+        self.model.save(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
+        print("Saved "+self.hps['rnn_type']+" model.")
 
     def _load_model(self):
         """Load saved model from JSON file.
         The function will overwrite the current model, if it exists."""
-        self.model = load_model(os.getcwd()+"/saved/model.h5")
-        print("Loaded model.")
+        self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
+        print("Loaded "+self.hps['rnn_type']+" model.")
 
 
 
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
+    rnn_type = 'gru'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    #flopper.train(stim)
+    flopper.train(stim)
 
-    #flopper.visualize_flipflop(stim)
+    flopper.visualize_flipflop(stim)
 
-    flopper.find_fixed_points(stim)
+    # flopper.find_fixed_points(stim)
 
 
