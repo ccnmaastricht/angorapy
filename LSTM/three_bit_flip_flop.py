@@ -186,19 +186,21 @@ class Flipflopper:
         '''Intialize class FixedPointFinder'''
 
         self._load_model()
-        weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
         sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
-
-        activations = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
+        activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
 
         method = "trust-ncg"
-        finder = FixedPointFinder(self.hps, self.data_hps)
-        self.fixed_points = finder.parallel_minimization(inputs=stim['inputs'][0, :, :],
-                                                          activation=activations[0, :, :],
-                                                          weights=weights[1],
-                                                          inputweights=weights[0],
-                                                          method=method)
-        finder.plot_fixed_points(activations=activations)
+        n_batches = 1 # how many batches to draw from
+        finder = FixedPointFinder(self.hps, self.data_hps, self.model)
+        self.fixed_points = []
+        for i in range(n_batches):
+            self.fixed_points.append(finder.parallel_minimization(inputs=stim['inputs'][i, :, :],
+                                                             activation=activation[i, :, :],
+                                                             method=method))
+        if n_batches == 1:
+            finder.plot_fixed_points(activations=activation)
+        else:
+            finder.plot_fixed_points(activations=activation, fixedpoints=self.fixed_points)
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
