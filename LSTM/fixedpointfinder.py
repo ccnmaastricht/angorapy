@@ -5,29 +5,39 @@ from scipy.optimize import minimize
 import sklearn.decomposition as skld
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist, squareform
+from utilities.model_management import build_sub_model_to
+import tensorflow as tf
 
 class FixedPointFinder:
-    def __init__(self, hps, data_hps):
+    def __init__(self, hps, data_hps, model):
         self.hps = hps
         self.data_hps = data_hps
         self.unique_tol = 1e-03
         self.abundance_threshold = 0.04
+        self._grab_model(model=model)
 
-    def parallel_minimization(self, weights, inputweights, activation, inputs, method):
+
+    def _grab_model(self, model):
+        self.weights = model.get_layer(self.hps['rnn_type']).get_weights()
+        self.model = model
+
+
+    def parallel_minimization(self, inputs, activation, method):
         """Function to set up parallel processing of minimization for fixed points
 
 
         """
         pool = mp.Pool(mp.cpu_count())
-        ids = np.arange(0, activation.shape[0])
-        print(len(ids), " minimizations to parallelize.")
-        x0, input = activation[ids, :], inputs[ids, :]
+        print(len(activation.shape[0]), " minimizations to parallelize.")
+        x0 = activation
         combind = []
         for i in range(x0.shape[0]):
-            combind.append((x0[i, :], input[i, :], weights, inputweights, method))
+            combind.append((x0[i, :], inputs[i, :], self.weights[1], self.weights[0], method))
 
         if self.hps['rnn_type'] == 'vanilla':
-            self.fixedpoints = pool.map(self._minimizRNN, combind, chunksize=1)
+            self.fixedpoints = pool.map(self._minimizRNN, combind)
+        elif self.hps['rnn_type'] == 'gru':
+            self.fixedpoints = pool.map(self._minimizGRU, combind)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -52,6 +62,9 @@ class FixedPointFinder:
                                     options=options)
         return fixed_point
 
+    def _minimizGRU(self):
+        pass
+
     def _handle_bad_approximations(self):
         """This functions identifies approximations where the minmization
         was not successful."""
@@ -64,14 +77,17 @@ class FixedPointFinder:
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
 
-    def plot_fixed_points(self, activations):
-
+    def plot_fixed_points(self, activations, fixedpoints = None):
+        if fixedpoints is not None:
+            self.good_fixed_points = fixedpoints
         self._extract_fixed_point_locations()
         self._find_unique_fixed_points()
 
+        activations = np.vstack(activations)
+
         pca = skld.PCA(3)
-        pca.fit(activations[0, :, :])
-        X_pca = pca.transform(activations[0, :, :])
+        pca.fit(activations)
+        X_pca = pca.transform(activations)
         new_pca = pca.transform(self.unique_fixed_points)
 
         fig = plt.figure()
@@ -86,7 +102,7 @@ class FixedPointFinder:
         ax.set_ylabel('PC2')
         ax.set_zlabel('PC3')
         plt.show()
-# TODO: plotting function needs more modules and option to include or not include trajectories
+
     def _extract_fixed_point_locations(self):
         # processing of minimisation results for pca
         fixed_point_location = []
@@ -95,7 +111,7 @@ class FixedPointFinder:
         self.fixed_point_locations = np.vstack(fixed_point_location)
 
     def _find_unique_fixed_points(self):
-        candidates = squareform(pdist(self.fixed_point_locations)) <= self.unique_tol
+        candidates = squareform(pdist(self.fixed_point_locations, )) <= self.unique_tol
         self.unique_fixed_points = \
             self.fixed_point_locations[np.mean(candidates, axis=1) >= self.abundance_threshold, :]
 
