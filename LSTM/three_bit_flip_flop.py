@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
 from mpl_toolkits.mplot3d import Axes3D
 from LSTM.fixedpointfinder import FixedPointFinder
+from tensorflow.keras.models import load_model
+import os
 
 class Flipflopper:
     ''' Class for training an RNN to implement a 3-Bit Flip-Flop task as
@@ -149,7 +151,9 @@ class Flipflopper:
         self.model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
         self.history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
-                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=2000)
+                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=4000)
+
+        self._save_model()
 
         plt.figure()
         plt.plot(self.history.history['loss'], label='loss')
@@ -180,6 +184,8 @@ class Flipflopper:
 
     def find_fixed_points(self, stim):
         '''Intialize class FixedPointFinder'''
+
+        self._load_model()
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
         sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
 
@@ -194,6 +200,19 @@ class Flipflopper:
                                                           method=method)
         finder.plot_fixed_points(activations=activations)
 
+    def _save_model(self):
+        '''Save trained model to JSON file.'''
+        self.model.save(os.getcwd()+"/saved/model.h5")
+        print("Saved model.")
+
+    def _load_model(self):
+        """Load saved model from JSON file.
+        The function will overwrite the current model, if it exists."""
+        self.model = load_model(os.getcwd()+"/saved/model.h5")
+        print("Loaded model.")
+
+
+
 
 
 if __name__ == "__main__":
@@ -203,9 +222,9 @@ if __name__ == "__main__":
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    flopper.train(stim)
+    #flopper.train(stim)
 
-    flopper.visualize_flipflop(stim)
+    #flopper.visualize_flipflop(stim)
 
     flopper.find_fixed_points(stim)
 
