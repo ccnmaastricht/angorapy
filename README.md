@@ -1,4 +1,4 @@
-<img src="docs/img/logo.jpg" width=25% align="right" />
+<img src="docs/img/logo.png" width=25% align="right" />
 
 # Dexterous Robot Hand
 
