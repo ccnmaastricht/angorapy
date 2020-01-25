@@ -197,6 +197,7 @@ class Flipflopper:
             self.fixed_points.append(finder.parallel_minimization(inputs=stim['inputs'][i, :, :],
                                                                  activation=activation[i, :, :],
                                                                  method=method))
+        self.fixed_points = [fixed_point for points in self.fixed_points for fixed_point in points]
         if n_batches == 1:
             finder.plot_fixed_points(activations=activation)
         else:
