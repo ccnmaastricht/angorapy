@@ -108,7 +108,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     # general parameters
-    parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs)
+    parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs,
+                        help="the target environment")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if not shadowhand")
     parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta"])
