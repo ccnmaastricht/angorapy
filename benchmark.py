@@ -1,12 +1,10 @@
 import argparse
-import colorsys
 import json
 import os
 import re
 from typing import Dict, Tuple, List
 
 import gym
-import matplotlib.colors as mc
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -15,6 +13,8 @@ from agent.ppo import PPOAgent
 from models import build_ffn_models, build_rnn_models
 import configs
 from configs import derive_config
+
+from utilities.const import PATH_TO_BENCHMARKS
 
 
 def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool = True):
@@ -48,17 +48,6 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     return agent.cycle_reward_history
 
 
-def lighten_color(color, amount=0.5):
-    """Lightens the given color by multiplying (1-luminosity) by the given amount."""
-    try:
-        c = mc.cnames[color]
-    except Exception:
-        c = color
-    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
-
-    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
-
-
 if __name__ == '__main__':
     all_envs = [e.id for e in list(gym.envs.registry.all())]
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -86,7 +75,7 @@ if __name__ == '__main__':
     for conf_name, config in configurations.items():
         reward_histories = []
         for i in range(args.repetitions):
-            print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with model {config['model']}.")
+            print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with config {conf_name}.")
             reward_histories.append(test_environment(args.env, config, model_type=config["model"],
                                                      n=args.cycles, init_ray=should_init))
             should_init = False
@@ -95,7 +84,7 @@ if __name__ == '__main__':
             stdevs = np.std(reward_histories, axis=0)
             results.update({conf_name: (means.tolist(), stdevs.tolist())})
 
-            with open(f"docs/benchmarks/{args.name}.json", "w") as f:
+            with open(f"{PATH_TO_BENCHMARKS}/{args.name}.json", "w") as f:
                 json.dump(results, f, indent=2)
 
         x = list(range(1, args.cycles + 1))
@@ -106,4 +95,4 @@ if __name__ == '__main__':
                          label=f"{args.env} ({conf_name})")
 
     plt.legend()
-    plt.savefig(f"docs/benchmarks/benchmarking_{args.name}.pdf", format="pdf")
+    plt.savefig(f"{PATH_TO_BENCHMARKS}benchmarking_{args.name}.pdf", format="pdf")

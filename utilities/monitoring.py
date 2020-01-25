@@ -138,9 +138,9 @@ class Monitor:
                 mean=[round(v, 2) for v in self.agent.cycle_length_history],
                 stdev=[round(v, 2) for v in self.agent.cycle_length_std_history],
                 last_cycle=self.agent.episode_length_history[-1] if self.agent.iteration > 1 else []),
-            entropies=[round(v, 2) for v in self.agent.entropy_history],
-            vloss=[round(v, 2) for v in self.agent.value_loss_history],
-            ploss=[round(v, 2) for v in self.agent.policy_loss_history],
+            entropies=[round(v, 4) for v in self.agent.entropy_history],
+            vloss=[round(v, 4) for v in self.agent.value_loss_history],
+            ploss=[round(v, 4) for v in self.agent.policy_loss_history],
             preprocessors=self.agent.preprocessor_stat_history
         )
 

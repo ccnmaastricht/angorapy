@@ -18,6 +18,8 @@ COLORS = dict(
 BASE_SAVE_PATH = "storage/saved_models/states/"
 STORAGE_DIR = "storage/experience/"
 PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
+PATH_TO_EXPERIMENTS = "monitor/static/experiments/"
+PATH_TO_BENCHMARKS = "docs/benchmarks/"
 
 # NUMERICAL PRECISION
 NP_FLOAT_PREC = np.float64
@@ -30,4 +32,3 @@ VISION_WH = 227
 # DEBUGGING
 DETERMINISTIC = False
 DEBUG = False
-PATH_TO_EXPERIMENTS = "monitor/static/experiments/"

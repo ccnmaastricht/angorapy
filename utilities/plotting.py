@@ -1,6 +1,9 @@
 """interactive plotting from https://stackoverflow.com/a/31417070/5407682"""
+import colorsys
 
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import pyplot as plt, colors as mc
 
 
 def make_interactive_legend(ax=None):
@@ -79,3 +82,21 @@ class InteractiveLegend(object):
 
     def show(self):
         plt.show()
+
+
+def plot_with_confidence(x, lb, ub, label, col=None):
+    """Plot a line with confidence Intervals."""
+    x = np.array(x)
+    plt.fill_between(range(x.shape[0]), lb, ub, alpha=0.3, color=col, label=f"{label}")
+    plt.plot(x, color=col)
+
+
+def lighten_color(color, amount=0.5):
+    """Lightens the given color by multiplying (1-luminosity) by the given amount."""
+    try:
+        c = mc.cnames[color]
+    except Exception:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])

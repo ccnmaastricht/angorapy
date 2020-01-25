@@ -129,7 +129,7 @@ a, a:hover, a:focus {
 #sidebar h3 {
   margin-bottom: 0;
 }
-#sidebar .active {
+#sidebar.active {
   margin-left: -250px;
 }
 #sidebar .sidebar-header {
@@ -209,7 +209,6 @@ a.button-control:hover {
 }
 
 .exp-row:hover {
-  transform: translateX(5px);
   cursor: pointer;
 }
 

@@ -75,14 +75,16 @@ $.when(
     let meta = req_1[0];
     let prog = req_2[0];
 
+    let reward_means = prog["rewards"]["mean"];
+
     // rewards with slider for smoothing
     let window_sizes = [0, 1, 2, 3, 4];
 
     let reward_traces = [];
     for (let ws in window_sizes) {
         reward_traces.push({
-            x: _.range(_.size(prog["rewards"]["mean"])),
-            y: smooth(prog["rewards"]["mean"], window_sizes[ws]),
+            x: _.range(_.size(reward_means)),
+            y: smooth(reward_means, window_sizes[ws]),
             mode: "lines",
             yaxis: 'y',
             name: "Reward",
@@ -144,7 +146,7 @@ $.when(
         shapes: [{
             type: 'line',
             x0: 0, y0: meta["environment"]["reward_threshold"],
-            x1: prog["rewards"]["mean"].length, y1: meta["environment"]["reward_threshold"],
+            x1: reward_means.length, y1: meta["environment"]["reward_threshold"],
             layer: "below",
             line: {
                 color: 'grey',
@@ -183,6 +185,17 @@ $.when(
         {responsive: true});
 
 
+    // OBJECTIVE PLOTS
+    let reference_reward_trace = {
+        x: _.range(_.size(reward_means)), y: reward_means,
+        mode: "lines", name: "Reward", line: {color: "lightgrey", dash: "dot"}, yaxis: 'y2',
+    };
+
+    let objective_layout = _.merge({
+        yaxis2: {title: "Cumulative Return", side: "right", overlaying: 'y', showgrid: false},
+        yaxis: {title: "Loss", showgrid: false},
+    }, standard_layout);
+
     // ENTROPY PLOT
     console.log(prog["entropies"]);
     while (prog["entropies"].indexOf("NaN") > -1) {
@@ -193,11 +206,12 @@ $.when(
         x: _.range(_.size(prog["entropies"])), y: prog["entropies"],
         mode: "lines", name: "Approximate Entropy",
         marker: {color: "green"},
+        yaxis: 'y',
     };
 
-    Plotly.newPlot(entropy_plot_div, [entropy_trace], _.merge({
+    Plotly.newPlot(entropy_plot_div, [entropy_trace, reference_reward_trace], _.merge({
         title: "Approximate Entropy",
-    }, standard_layout), {responsive: true});
+    }, objective_layout), {responsive: true});
 
     // Policy Loss PLOT
     let ploss_trace = {
@@ -206,9 +220,9 @@ $.when(
         marker: {color: "Turquoise"},
     };
 
-    Plotly.newPlot(ploss_plot_div, [ploss_trace], _.merge({
+    Plotly.newPlot(ploss_plot_div, [ploss_trace, reference_reward_trace], _.merge({
         title: "Policy Loss",
-    }, standard_layout), {responsive: true});
+    }, objective_layout), {responsive: true});
 
     // VALUE LOSS PLOT
     let vloss_trace = {
@@ -217,9 +231,9 @@ $.when(
         marker: {color: "Tomato "},
     };
 
-    Plotly.newPlot(vloss_plot_div, [vloss_trace], _.merge({
+    Plotly.newPlot(vloss_plot_div, [vloss_trace, reference_reward_trace], _.merge({
         title: "Value Loss",
-    }, standard_layout), {responsive: true});
+    }, objective_layout), {responsive: true});
 
     // NORMALIZATION PLOTS
     let rew_norm_traces = [];
