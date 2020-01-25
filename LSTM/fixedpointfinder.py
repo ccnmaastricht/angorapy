@@ -88,6 +88,29 @@ class FixedPointFinder:
                                     options=options)
         return fixed_point
 
+    @staticmethod
+    def _minimizlstm(combined):
+        x0, input, weights, method, n_hidden = combined[0], \
+                                     combined[1], \
+                                     combined[2], combined[3], combined[4]
+
+        def sigmoid(x):
+            return 1 / (1 + np.exp(-x))
+
+        f_fun = lambda x: sigmoid(np.matmul(W_f, input) + np.matmul(U_f, x[0:n_hidden]) + b_f)
+        i_fun = lambda x: sigmoid(np.matmul(W_i, input) + np.matmul(U_i, x[0:n_hidden]) + b_i)
+        o_fun = lambda x: sigmoid(np.matmul(W_o, input) + np.matmul(U_o, x[0:n_hidden]) + b_o)
+
+        fun = lambda x: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden]))
+        options = {'gtol': 1e-12, 'disp': True}
+        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
+        y = fun(x0)
+        print("First function evaluation:", y)
+        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
+                                    options=options)
+        return fixed_point
+
+
     def _handle_bad_approximations(self):
         """This functions identifies approximations where the minmization
         was not successful."""
