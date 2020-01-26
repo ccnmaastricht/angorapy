@@ -8,6 +8,7 @@ analysis/monitor/experiments/
 analysis/storage/
 
 docs/monitor/experiments/
+docs/benchmarks/*
 docs/storage/
 
 tests/storage/
