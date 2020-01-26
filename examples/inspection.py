@@ -1,15 +1,17 @@
 #!/usr/bin/env python
-"""Load and inspect and agent, scaffold script."""
+"""Example script on loading and inspecting an agent."""
 import os
 
 from agent.ppo import PPOAgent
-from utilities.model_utils import extract_layers
+from analysis.investigation import Investigator
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-agent = PPOAgent.from_agent_state(1579996654)
+os.chdir("../")
 
-all_weights = agent.policy.get_weights()
-print([layer.name for layer in extract_layers(agent.policy)])
+agent = PPOAgent.from_agent_state(1580042580)
+inv = Investigator.from_agent(agent)
 
-print(agent.policy.get_layer("dense").get_weights())
+# render agent at different steps
+inv.render_episode(agent.env)

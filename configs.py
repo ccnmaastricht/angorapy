@@ -98,9 +98,9 @@ mujoco_beta = derive_config(mujoco, {"distribution": "beta"})
 
 roboschool = make_config(
     iterations=50000000//2048,   # 50 million timesteps
-    workers=32,
+    workers=16,
     batch_size=4096,
-    horizon=512,
+    horizon=1024,
     c_entropy=0.0,
     lr_pi=0.0003,
     lr_schedule="exponential",

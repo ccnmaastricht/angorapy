@@ -672,11 +672,12 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int) -> "PPOAgent":
+    def from_agent_state(agent_id: int, from_iteration: int = None) -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
-            agent_id: the ID of the agent to be loaded
+            agent_id:           the ID of the agent to be loaded
+            from_iteration:     from which iteration to load, if None (default) use most recent
 
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
@@ -689,10 +690,14 @@ class PPOAgent:
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID's save history is empty.")
 
-        latest_matches = [re.match("([0-9]+)", fn) for fn in os.listdir(agent_path)]
-        latest = max([int(m.group(0)) for m in latest_matches if m is not None])
-        print(f"Loading from most recent iteration {latest}.")
-        with open(f"{agent_path}/{latest}/parameters.json", "r") as f:
+        latest_matches = PPOAgent.get_saved_iterations(agent_id)
+        if from_iteration is None:
+            from_iteration = max(latest_matches)
+        else:
+            assert from_iteration in latest_matches, "There is no save at this iteration."
+
+        print(f"Loading from iteration {from_iteration}.")
+        with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
             parameters = json.load(f)
 
         env = gym.make(parameters["env_name"])
@@ -712,6 +717,21 @@ class PPOAgent:
             if p in ["distribution", "preprocessor"]:
                 continue
 
-        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{latest}/weights")
+        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         return loaded_agent
+
+    @staticmethod
+    def get_saved_iterations(agent_id: int) -> list:
+        """Return a list of iterations at which the agent of given ID has been saved."""
+        agent_path = BASE_SAVE_PATH + f"/{agent_id}"
+
+        if not os.path.isdir(agent_path):
+            raise FileNotFoundError("The given agent ID does not match any existing save history.")
+
+        if len(os.listdir(agent_path)) == 0:
+            return []
+
+        its = [int(i.group(0)) for i in [re.match("([0-9]+)", fn) for fn in os.listdir(agent_path)] if i is not None]
+
+        return sorted(its)

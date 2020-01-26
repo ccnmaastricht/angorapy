@@ -28,6 +28,16 @@ class BaseWrapper(abc.ABC):
     def __iter__(self):
         return iter([self])
 
+    def __contains__(self, item):
+        if isinstance(item, BaseWrapper):
+            return item.name == self.name
+        elif isinstance(item, str):
+            return item == self.name
+        elif isinstance(item, type):
+            return item == self.__class__
+        else:
+            return False
+
     @property
     def name(self):
         """The name of the preprocessor."""
@@ -281,6 +291,9 @@ class CombiWrapper(BaseWrapper, object):
         added_wraps.n = copy(self.n) + copy(other.n)
 
         return added_wraps
+
+    def __contains__(self, item):
+        return any([item in w for w in self.wrappers])
 
     def __len__(self):
         return len(self.wrappers)

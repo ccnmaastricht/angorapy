@@ -35,6 +35,9 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
 
+    if env.spec.max_episode_steps > settings.horizon and not settings.eval:
+        logging.warning("Careful! Your horizon is lower than the max reward, this will most likely skew stats heavily.")
+
     # choose and make policy distribution
     if settings.distribution is None:
         settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
@@ -90,7 +93,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     agent.set_gpu(not settings.cpu)
 
     monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every,
-                      iterations=settings.iterations)
+                      iterations=settings.iterations, config_name=settings.config)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval,
                 stop_early=settings.stop_early)

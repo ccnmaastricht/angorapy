@@ -15,9 +15,11 @@ from gym.spaces import Box
 from matplotlib import animation
 
 from agent.ppo import PPOAgent
+from models import get_model_type
 from utilities import const
 from utilities.const import PATH_TO_EXPERIMENTS
 from utilities.util import parse_state, add_state_dims, flatten
+from utilities.wrappers import RewardNormalizationWrapper, StateNormalizationWrapper
 
 matplotlib.use('Agg')
 
@@ -31,10 +33,12 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None, config_name: str = "unknown"):
         self.agent = agent
         self.env = env
         self.iterations = iterations
+
+        self.config_name = config_name
 
         self.frequency = frequency
         self.gif_every = gif_every
@@ -98,6 +102,8 @@ class Monitor:
         """Write meta data information about experiment into json file."""
         metadata = dict(
             date=str(datetime.datetime.now()),
+            config=self.config_name,
+            iterations=self.iterations,
             environment=dict(
                 name=self.agent.env_name,
                 action_space=str(self.agent.env.action_space),
@@ -110,6 +116,8 @@ class Monitor:
             ),
             hyperparameters=dict(
                 continuous=str(self.agent.continuous_control),
+                distribution=self.agent.distribution.__class__.__name__,
+                model=get_model_type(self.agent.model_builder),
                 learning_rate=str(self.agent.learning_rate),
                 epsilon_clip=str(self.agent.clip),
                 entropy_coefficient=str(self.agent.c_entropy.numpy().item()),
@@ -120,6 +128,8 @@ class Monitor:
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
+                reward_norming=str(RewardNormalizationWrapper in self.agent.preprocessor),
+                state_norming=str(StateNormalizationWrapper in self.agent.preprocessor),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
             )
         )

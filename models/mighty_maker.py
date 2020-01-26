@@ -22,3 +22,11 @@ for pd in parameter_dicts:
     globals()[func_name] = partial(base_function, **pd)
     globals()[func_name].__name__ = func_name
 
+
+def get_model_type(model_builder) -> str:
+    """Get short name of type of a model builder."""
+    for mt in arguments["model_type"]:
+        if mt in model_builder.__name__:
+            return mt
+
+    return "unknown"

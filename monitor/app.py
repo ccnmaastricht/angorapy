@@ -76,6 +76,7 @@ def show_experiment(exp_id):
         "prev_id": experiment_paths[current_index - 1] if current_index != 0 else None,
         "hps": meta["hyperparameters"],
         "env_meta": meta["environment"],
+        "iterations": meta["iterations"] if "iterations" in meta else None
     })
 
 

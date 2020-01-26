@@ -17,6 +17,29 @@ body {
   margin-bottom: 20px;
 }
 
+tag {
+  color: white;
+  background-color: dimgray;
+  padding: 5px 10px;
+  border-radius: 10px;
+  margin: 10px 3px 10px 3px;
+}
+tag.red {
+  background-color: brown;
+}
+tag.blue {
+  background-color: steelblue;
+}
+tag.green {
+  background-color: OliveDrab;
+}
+tag.yellow {
+  background-color: Goldenrod;
+}
+tag.purple {
+  background-color: Orchid;
+}
+
 /* ELEMENTS */
 .topic-group {
   border: transparent;
