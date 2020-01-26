@@ -7,7 +7,7 @@ from utilities.model_utils import extract_layers
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-agent = PPOAgent.from_agent_state(1574852679)
+agent = PPOAgent.from_agent_state(1579996654)
 
 all_weights = agent.policy.get_weights()
 print([layer.name for layer in extract_layers(agent.policy)])

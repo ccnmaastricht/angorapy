@@ -33,6 +33,10 @@ def overview():
                 with open(os.path.join(path, "meta.json"), "r") as f:
                     meta = json.load(f)
 
+                # for vn, vector in progress.items():
+                #     replace()
+
+
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])
                 iterations = len(progress["rewards"]["mean"])

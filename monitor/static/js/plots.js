@@ -70,10 +70,10 @@ $.when(
     $.get(Flask.url_for("static", {"filename": "experiments/" + expid + "/meta.json"})),
     $.get(Flask.url_for("static", {"filename": "experiments/" + expid + "/progress.json"}))
 ).then(function (req_1, req_2) {
-    console.log("hello");
-
     let meta = req_1[0];
     let prog = req_2[0];
+
+    console.log(prog);
 
     let reward_means = prog["rewards"]["mean"];
 
@@ -153,7 +153,7 @@ $.when(
                 width: 2,
                 dash: 'dashdot',
             }
-        },]
+        },],
     }, standard_layout);
 
     Plotly.newPlot(reward_plot_div, traces, layout, {responsive: true});

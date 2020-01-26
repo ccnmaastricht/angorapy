@@ -2,6 +2,7 @@
 import abc
 import inspect
 import sys
+from copy import copy
 from typing import Tuple, Iterable, Union, List
 
 import gym
@@ -53,7 +54,9 @@ class BaseWrapper(abc.ABC):
     def from_serialization(s: dict):
         """Create (combi-)wrapper from a serialization."""
         if len(s) > 1:
-            return CombiWrapper([getattr(sys.modules[__name__], k).recover(v) for k, v in s.items()])
+            combi_wrappi = CombiWrapper([getattr(sys.modules[__name__], k).recover(v) for k, v in s.items()])
+            combi_wrappi.n = copy(combi_wrappi[0].n)
+            return combi_wrappi
         else:
             return getattr(sys.modules[__name__], list(s.keys())[0]).recover(list(s.values())[0])
 
@@ -275,7 +278,7 @@ class CombiWrapper(BaseWrapper, object):
 
     def __add__(self, other):
         added_wraps = CombiWrapper([self.wrappers[i] + other.wrappers[i] for i in range(len(self.wrappers))])
-        added_wraps.n = self.n + other.n
+        added_wraps.n = copy(self.n) + copy(other.n)
 
         return added_wraps
 
@@ -312,6 +315,8 @@ class CombiWrapper(BaseWrapper, object):
         for w in self.wrappers:
             w.warmup(env, observations=observations)
 
+        self.n += observations
+
     def serialize(self) -> dict:
         """Serialize all wrappers in the combi into one representation."""
         full = {}
@@ -325,3 +330,38 @@ class CombiWrapper(BaseWrapper, object):
         """Recover CombiWrapper, not supported."""
         raise NotImplementedError("There is no such thing as recovery for CombiWrappers. Create a new wrapper from"
                                   "recovered wrappers instead.")
+
+
+if __name__ == '__main__':
+    a = CombiWrapper([RewardNormalizationWrapper(), StateNormalizationWrapper(10)])
+    b = CombiWrapper([RewardNormalizationWrapper(), StateNormalizationWrapper(10)])
+    c = CombiWrapper([RewardNormalizationWrapper(), StateNormalizationWrapper(10)])
+
+    for i in range(10):
+        a.modulate([np.random.randn(10), np.random.randint(-5, 5), None, None])
+        b.modulate([np.random.randn(10), np.random.randint(-5, 5), None, None])
+        c.modulate([np.random.randn(10), np.random.randint(-5, 5), None, None])
+
+    print(a.n, b.n, c.n)
+
+    d = BaseWrapper.from_collection([a, b, c])
+
+    print(d.n)
+    print([w.n for w in d])
+
+    a, b, c = BaseWrapper.from_serialization(a.serialize()), \
+              BaseWrapper.from_serialization(b.serialize()), \
+              BaseWrapper.from_serialization(c.serialize())
+
+    print(a.n, b.n, c.n)
+
+    old_n = 2
+    d = BaseWrapper.from_collection([a, b, c])
+
+    print(d.n)
+    print([w.n for w in d])
+
+    d.correct_sample_size((3 - 1) * old_n)  # adjust for overcounting
+
+    print(d.n)
+    print([w.n for w in d])

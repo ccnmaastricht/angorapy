@@ -72,7 +72,7 @@ def flatten(some_list):
     return [some_list] if not isinstance(some_list, list) else [x for X in some_list for x in flatten(X)]
 
 
-def is_array_collection(a: numpy.ndarray):
+def is_array_collection(a: numpy.ndarray) -> bool:
     """Check if an array is an array of objects (e.g. other arrays) or an actual array of direct data."""
     return a.dtype == "O"
 

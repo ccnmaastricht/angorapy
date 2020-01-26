@@ -318,7 +318,7 @@ class PPOAgent:
         # set up the persistent workers
         worker_options: dict = {}
         if self.n_workers == 1:
-            worker_options["num_gpus"] = 1
+            # worker_options["num_gpus"] = 1
             worker_options["num_cpus"] = available_cpus
         elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
             worker_options["num_cpus"] = available_cpus // self.n_workers
@@ -354,10 +354,14 @@ class PPOAgent:
 
             stats = condense_stats(split_stats)
 
-            # accumulate preprocessors
+            # accumulate preprocessors TODO super unelegant, this should be inside the wrapper
+            old_ns = [w.n for w in self.preprocessor]
             old_n = self.preprocessor.n
             self.preprocessor = BaseWrapper.from_collection(split_preprocessors)
-            self.preprocessor.correct_sample_size((self.n_workers - 1) * old_n)  # adjust for overcounting
+            for i, p in enumerate(self.preprocessor):
+                p.correct_sample_size((self.n_workers - 1) * old_ns[i])  # adjust for overcounting
+            if isinstance(self.preprocessor, CombiWrapper):
+                self.preprocessor.n -= (self.n_workers - 1) * old_n
 
             # read the dataset from storage
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
@@ -383,9 +387,9 @@ class PPOAgent:
                                                  else statistics.mean(stats.episode_lengths))
                 self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
                                                  else statistics.mean(stats.episode_rewards))
-                self.cycle_length_std_history.append(None if stats.numb_completed_episodes == 0
+                self.cycle_length_std_history.append(None if stats.numb_completed_episodes <= 1
                                                      else statistics.stdev(stats.episode_lengths))
-                self.cycle_reward_std_history.append(None if stats.numb_completed_episodes == 0
+                self.cycle_reward_std_history.append(None if stats.numb_completed_episodes <= 1
                                                      else statistics.stdev(stats.episode_rewards))
             else:
                 flat_print("Evaluating...")

@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
     ray.init()
     t = time.time()
-    actors = [Gatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(8)]
+    actors = [Gatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(1)]
 
     for _ in range(100):
         it = time.time()
