@@ -100,8 +100,11 @@ class FixedPointFinder:
         f_fun = lambda x: sigmoid(np.matmul(W_f, input) + np.matmul(U_f, x[0:n_hidden]) + b_f)
         i_fun = lambda x: sigmoid(np.matmul(W_i, input) + np.matmul(U_i, x[0:n_hidden]) + b_i)
         o_fun = lambda x: sigmoid(np.matmul(W_o, input) + np.matmul(U_o, x[0:n_hidden]) + b_o)
+        c_fun = lambda x, c: f_fun(x[0:n_hidden]) * c[0:n_hidden] + i_fun(x[0:n_hidden]) * \
+                             np.tanh((np.matmul(W_c, input) + np.matmul(U_c, x[0:n_hidden]) + b_c) - c[0:n_hidden])
+        # perhaps put h and c in as one object to minimize and split up in functions
+        fun = lambda x, c: 0.5 * sum((o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden])**2)
 
-        fun = lambda x: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden]))
         options = {'gtol': 1e-12, 'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
