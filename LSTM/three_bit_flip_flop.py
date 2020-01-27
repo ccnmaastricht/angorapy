@@ -229,6 +229,6 @@ if __name__ == "__main__":
 
     # flopper.visualize_flipflop(stim)
 
-    #flopper.find_fixed_points(stim)
+    flopper.find_fixed_points(stim)
 
 

@@ -3,24 +3,23 @@ import numpy as np
 
 
 
-def evaluate_fixedpoint(jac_fun, fixedpoint):
-    jacobian_matrix = jac_fun(fixedpoint.x)
+def evaluate_fixedpoint(fixedpoint):
+    scale = 1.2
+    x_modes = []
 
-    e_val, e_vec = np.linalg.eig(jacobian_matrix)
+    for n in range(len(fixedpoint)):
+        e_val, e_vec = np.linalg.eig(fixedpoint[n].jac)
 
-    is_stable = np.all(np.abs(e_val) < 1.0)
-    scale = 0.75
+        is_stable = np.all(np.abs(e_val) < 1.0)
 
-    for i in range(len(e_val)):
-        magnitude = np.abs(e_val[i])
-        if not is_stable and magnitude > 1.0:
-            x_plus = fixedpoint.x + scale*magnitude*e_vec[:, i]
-            x_minus = fixedpoint.x - scale*magnitude*e_vec[:, i]
+        det = np.linalg.det(fixedpoint[n].jac)
+        for i in range(len(e_val)):
+            magnitude = np.abs(e_val[i])
+            if det < 0 and magnitude > 1.0:
+                x_plus = fixedpoint[n].x + scale*magnitude*e_vec[:, i]
+                x_minus = fixedpoint[n].x - scale*magnitude*e_vec[:, i]
 
-            x_mode = np.vstack((x_minus, fixedpoint.x, x_plus))
-
-            return x_mode
-
-        else:
-            return is_stable
+                x_mode = np.vstack((x_minus, fixedpoint[n].x, x_plus))
+                x_modes.append(np.real(x_mode))
+    return x_modes
 

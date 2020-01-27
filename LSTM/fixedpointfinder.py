@@ -31,7 +31,7 @@ class FixedPointFinder:
         weights = self.weights
         n_hidden = self.hps['n_hidden']
         combind = []
-        for i in range(x0.shape[0]):
+        for i in range(20):# x0.shape[0]):
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
@@ -62,6 +62,11 @@ class FixedPointFinder:
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                     options=options)
+        dynamical_system = lambda x: - x[0:n_hidden] + np.matmul(weights.transpose(), np.tanh(x[0:n_hidden])) + \
+                                     np.matmul(inputweights.transpose(), input) + b
+        jac_fun = nd.Jacobian(dynamical_system)
+        fixed_point.jac = jac_fun(fixed_point.x)
+
         return fixed_point
 
     @staticmethod
@@ -83,7 +88,7 @@ class FixedPointFinder:
         g_fun = lambda x: np.tanh((np.matmul(W_h, input) + np.matmul(U_h, (r_fun(x[0:n_hidden])*x[0:n_hidden])) + b_h))
 
         fun = lambda x: 0.5 * sum(((1-z_fun(x[0:n_hidden])) * g_fun(x[0:n_hidden]) - x[0:n_hidden])**2)
-        options = {'gtol': 1e-12, 'disp': True}
+        options = {'gtol': 1e-14, 'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
         print("First function evaluation:", y)
@@ -92,8 +97,9 @@ class FixedPointFinder:
 
         dynamical_system = lambda x: (1-z_fun(x[0:n_hidden])) * g_fun(x[0:n_hidden]) - x[0:n_hidden]
         jac_fun = nd.Jacobian(dynamical_system)
-        x_mode = evaluate_fixedpoint(jac_fun, fixed_point)
-        return list(zip(fixed_point, x_mode))
+        fixed_point.jac = jac_fun(fixed_point.x)
+
+        return fixed_point
 
     @staticmethod
     def _minimizlstm(combined):
@@ -128,7 +134,7 @@ class FixedPointFinder:
 
         dynamical_system = lambda x, c: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]
         jac_fun = nd.Jacobian(dynamical_system)
-        x_mode = evaluate_fixedpoint(jac_fun, fixed_point)
+        fixed_point.jac = jac_fun(fixed_point.x)
 
         return fixed_point
 
@@ -150,13 +156,16 @@ class FixedPointFinder:
             self.good_fixed_points = fixedpoints
         self._extract_fixed_point_locations()
         self._find_unique_fixed_points()
-
+        x_modes = evaluate_fixedpoint(self.good_fixed_points)
+        x_modes = np.vstack(x_modes)
         activations = np.vstack(activations)
 
         pca = skld.PCA(3)
         pca.fit(activations)
         X_pca = pca.transform(activations)
         new_pca = pca.transform(self.unique_fixed_points)
+        directions = pca.transform(x_modes)
+
 
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
@@ -164,8 +173,13 @@ class FixedPointFinder:
                 linewidth=0.2)
 
         ax.scatter(new_pca[:, 0], new_pca[:, 1], new_pca[:, 2],
-                   marker='x', s=30, c='r')
-        plt.title('PCA Modeltype: '+self.hps['rnn_type'])
+                   marker='x', s=30, c='k')
+        k = 0
+        for i in range(int(len(directions)/3)):
+            ax.plot(directions[k:k+3, 0], directions[k:k+3, 1], directions[k:k+3, 2],
+                    c = 'r')
+            k += 3
+        plt.title('PCA using modeltype: '+self.hps['rnn_type'])
         ax.set_xlabel('PC1')
         ax.set_ylabel('PC2')
         ax.set_zlabel('PC3')
@@ -186,5 +200,5 @@ class FixedPointFinder:
 
 
 
-# TODO: interpret Jacobian
+# TODO: interpret Jacobian -> solve the error
 
