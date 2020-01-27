@@ -96,7 +96,14 @@ class FixedPointFinder:
 
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
+        W, U, b = weights[0], weights[1], weights[2]
 
+        W_i, W_f, W_c, W_o = W[:, :n_hidden].transpose(), W[:, n_hidden:2*n_hidden].transpose(), \
+                             W[:, 2*n_hidden:3*n_hidden].transpose(), W[:, 3*n_hidden:4*n_hidden].transpose()
+        U_i, U_f, U_c, U_o = U[:, :n_hidden].transpose(), U[:, n_hidden:2*n_hidden].transpose(), \
+                             U[:, 2*n_hidden:3*n_hidden].transpose(), U[:, 3*n_hidden:4*n_hidden].transpose()
+        b_i, b_f, b_c, b_o = b[0, :n_hidden].transpose(), b[0, n_hidden:2*n_hidden].transpose(), \
+                             b[0, 2*n_hidden:3*n_hidden].transpose(), b[0, 3*n_hidden:4*n_hidden].transpose()
         f_fun = lambda x: sigmoid(np.matmul(W_f, input) + np.matmul(U_f, x[0:n_hidden]) + b_f)
         i_fun = lambda x: sigmoid(np.matmul(W_i, input) + np.matmul(U_i, x[0:n_hidden]) + b_i)
         o_fun = lambda x: sigmoid(np.matmul(W_o, input) + np.matmul(U_o, x[0:n_hidden]) + b_o)
@@ -165,6 +172,5 @@ class FixedPointFinder:
             self.fixed_point_locations[np.mean(candidates, axis=1) >= self.abundance_threshold, :]
 
 
-# TODO: implement other architectures
 # TODO: interpret Jacobian
 
