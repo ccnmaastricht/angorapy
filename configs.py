@@ -18,16 +18,7 @@ def derive_config(original: dict, overrules: dict):
     return derived
 
 
-discrete = make_config(
-    batch_size=32,
-    horizon=1024,
-    c_entropy=0.01,
-    lr_pi=0.001,
-    epochs=10,
-    clip=0.1,
-    lam=0.95,
-    discount=0.99
-)
+# CONTINUOUS DEFAULT
 
 continuous = make_config(
     batch_size=64,
@@ -47,7 +38,22 @@ continuous = make_config(
 continuous_rnn = derive_config(continuous, {"model": "rnn"})
 continuous_beta = derive_config(continuous, {"distribution": "beta"})
 
-beta = make_config(
+
+# BIPEDAL
+
+bipedal = derive_config(continuous, dict(
+    batch_size=32,
+    lr_pi=0.0001,
+    iterations=400,
+))
+
+bipedal_rnn = derive_config(bipedal, dict(model="rnn"))
+bipedal_beta = derive_config(bipedal, dict(distribution="beta"))
+
+
+# FROM PAPERS
+
+beta_paper = make_config(
     # continuous with some parameters from the beta paper
     batch_size=64,
     horizon=2048,
@@ -63,20 +69,8 @@ beta = make_config(
     clip_values=False
 )
 
-bipedal = make_config(
-    batch_size=32,
-    horizon=2048,
-    c_entropy=0.0,
-    lr_pi=0.0001,
-    epochs=10,
-    clip=0.2,
-    lam=0.95,
-    discount=0.99,
-    grad_norm=0.5,
-    iterations=1000,
-    workers=8,
-    clip_values=False
-)
+
+# MUJOCO
 
 mujoco = make_config(
     iterations=1000000//2048,   # one million timesteps
@@ -96,6 +90,9 @@ mujoco = make_config(
 mujoco_beta = derive_config(mujoco, {"distribution": "beta"})
 mujoco_vc = derive_config(mujoco, {"clip_values": True})
 
+
+# ROBOSCHOOL TASKS
+
 roboschool = make_config(
     iterations=50000000//2048,   # 50 million timesteps
     workers=16,
@@ -111,6 +108,9 @@ roboschool = make_config(
     grad_norm=0.5,
     clip_values=False
 )
+
+
+# HAND ENVS
 
 hand = make_config(
     iterations=100,
