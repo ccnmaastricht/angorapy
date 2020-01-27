@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist, squareform
 from utilities.model_management import build_sub_model_to
 import tensorflow as tf
+from LSTM.minimization import evaluate_fixedpoint
 
 
 class FixedPointFinder:
@@ -37,6 +38,8 @@ class FixedPointFinder:
             self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
         elif self.hps['rnn_type'] == 'gru':
             self.fixedpoints = pool.map(self._minimizgru, combind, chunksize=1)
+        elif self.hps['rnn_type'] == 'lstm':
+            self.fixedpoints = pool.map(self._minimizlstm, combind, chunksize=1)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -86,7 +89,11 @@ class FixedPointFinder:
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                     options=options)
-        return fixed_point
+
+        dynamical_system = lambda x: (1-z_fun(x[0:n_hidden])) * g_fun(x[0:n_hidden]) - x[0:n_hidden]
+        jac_fun = nd.Jacobian(dynamical_system)
+        x_mode = evaluate_fixedpoint(jac_fun, fixed_point)
+        return list(zip(fixed_point, x_mode))
 
     @staticmethod
     def _minimizlstm(combined):
@@ -118,6 +125,11 @@ class FixedPointFinder:
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                     options=options)
+
+        dynamical_system = lambda x, c: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]
+        jac_fun = nd.Jacobian(dynamical_system)
+        x_mode = evaluate_fixedpoint(jac_fun, fixed_point)
+
         return fixed_point
 
 
@@ -170,6 +182,8 @@ class FixedPointFinder:
         candidates = squareform(pdist(self.fixed_point_locations, )) <= self.unique_tol
         self.unique_fixed_points = \
             self.fixed_point_locations[np.mean(candidates, axis=1) >= self.abundance_threshold, :]
+
+
 
 
 # TODO: interpret Jacobian

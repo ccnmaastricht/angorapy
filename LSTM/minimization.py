@@ -1,41 +1,26 @@
-from scipy.optimize import minimize
 import numpy as np
-import numdifftools as nd
-import multiprocessing as mp
 
 
 
-def minimizGRU(self, weights, inputweights, inputs, activation, method: str = "trust-ncg"):
-    pass
 
+def evaluate_fixedpoint(jac_fun, fixedpoint):
+    jacobian_matrix = jac_fun(fixedpoint.x)
 
-def minimizRNN(combined):
-    x0, input, weights, inputweights, method = combined[0][0:24], combined[0][24:27], combined[1], combined[2], \
-                                               combined[3]
-    fun = lambda x: 0.5 * sum(
-        (- x[0:24] + np.matmul(weights, np.tanh(x[0:24])) + np.matmul(inputweights, input)) ** 2)
-    options = {'gtol': 1e-12, 'disp': True}
-    jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-    y = fun(x0)
-    print("First function evaluation:", y)
-    optimised_result = minimize(fun, x0, method=method, jac=jac, hess=hes,
-                                options=options)
-    return optimised_result
+    e_val, e_vec = np.linalg.eig(jacobian_matrix)
 
+    is_stable = np.all(np.abs(e_val) < 1.0)
+    scale = 0.75
 
-def parallel_minimization(inputs, activation, weights, inputweights, method):
-    """Function to set up parrallel processing of minimization for fixed points
+    for i in range(len(e_val)):
+        magnitude = np.abs(e_val[i])
+        if not is_stable and magnitude > 1.0:
+            x_plus = fixedpoint.x + scale*magnitude*e_vec[:, i]
+            x_minus = fixedpoint.x - scale*magnitude*e_vec[:, i]
 
+            x_mode = np.vstack((x_minus, fixedpoint.x, x_plus))
 
-    """
-    pool = mp.Pool(mp.cpu_count())
-    ids = np.arange(0, activation.shape[0])
-    print(len(ids), " minimizations to parallelize.")
-    x0, input = activation[ids, :], inputs[ids, :]
-    combind = []
-    for i in range(x0.shape[0]):
-        combind.append((np.hstack((x0[i, :], input[i, :])), weights, inputweights, method))
+            return x_mode
 
-    optimised_results = pool.map(minimizRNN, combind, chunksize=1)
+        else:
+            return is_stable
 
-    return optimised_results
