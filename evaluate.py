@@ -31,7 +31,7 @@ std_reward = round(statistics.stdev(rewards), 2)
 std_length = round(statistics.stdev(lengths), 2)
 
 print(f"Evaluated agent on {agent.env_name} and achieved an average reward of {average_reward} [std: {std_reward}; "
-      f"between ({max(rewards)}, {max(rewards)})].\n"
+      f"between ({min(rewards)}, {max(rewards)})].\n"
       f"An episode on average took {average_length} steps [std: {std_length}; "
-      f"between ({max(lengths)}, {max(lengths)})].\n"
+      f"between ({min(lengths)}, {max(lengths)})].\n"
       f"This took me {round(time.time() - start, 2)}s.")

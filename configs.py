@@ -85,16 +85,16 @@ mujoco = make_config(
     horizon=2048,
     c_entropy=0.0,
     lr_pi=0.0003,
-    lr_schedule="exponential",   # should be linear anneal
     epochs=10,
     clip=0.2,
     lam=0.95,
     discount=0.99,
     grad_norm=0.5,
-    clip_values=True
+    clip_values=False
 )
 
 mujoco_beta = derive_config(mujoco, {"distribution": "beta"})
+mujoco_vc = derive_config(mujoco, {"clip_values": True})
 
 roboschool = make_config(
     iterations=50000000//2048,   # 50 million timesteps
@@ -103,7 +103,7 @@ roboschool = make_config(
     horizon=1024,
     c_entropy=0.0,
     lr_pi=0.0003,
-    lr_schedule="exponential",
+    lr_schedule="exponential",  # should be a linear annealing
     epochs=15,
     clip=0.2,
     lam=0.95,

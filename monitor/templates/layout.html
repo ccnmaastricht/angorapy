@@ -84,9 +84,15 @@
                     </button>
                 </div>
 
-                <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i> Clear All
-                    Empty
-                </button>
+                <div>
+                    <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i>
+                        Clear All Empty
+                    </button>
+
+                    <button type="button" class="btn btn-warning" id="clear-short"><i class="fas fa-trash-alt"></i>
+                        Clear All Short
+                    </button>
+                </div>
 
                 <div>
                     {#                <label for="filter-env">Show</label>#}
@@ -147,7 +153,6 @@
     });
 
     $(".reload-button").on("click", function () {
-        console.log("jo");
         location.reload();
     });
 </script>

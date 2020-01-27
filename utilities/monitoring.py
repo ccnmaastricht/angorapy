@@ -116,7 +116,7 @@ class Monitor:
             ),
             hyperparameters=dict(
                 continuous=str(self.agent.continuous_control),
-                distribution=self.agent.distribution.__class__.__name__,
+                distribution=self.agent.distribution.short_name,
                 model=get_model_type(self.agent.model_builder),
                 learning_rate=str(self.agent.learning_rate),
                 epsilon_clip=str(self.agent.clip),

@@ -523,10 +523,13 @@ class PPOAgent:
                            leave=False, desc="Optimizing")
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
-            # for each epoch, dataset first should be shuffled to break correlation, then divided into batches
+            # for each epoch, dataset first should be shuffled to break correlation
             if not self.is_recurrent:
-                dataset = dataset.shuffle(10000)
+                dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+
+            # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
@@ -547,14 +550,6 @@ class PPOAgent:
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["action_prob"])
                             reset_states_masked(self.joint, reset_mask)
-                #
-                # for grad in info["gradients"]:
-                #     if tf.reduce_any(tf.math.is_nan(grad)):
-                #         print(ent)
-                #         print(pi_loss)
-                #         print(v_loss)
-                #         print(info)
-                #         exit()
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)

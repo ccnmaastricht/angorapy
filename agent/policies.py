@@ -30,6 +30,12 @@ class BasePolicyDistribution(abc.ABC):
 
     @property
     @abc.abstractmethod
+    def short_name(self):
+        """Indicate whether the distribution is continuous."""
+        return "base"
+
+    @property
+    @abc.abstractmethod
     def has_log_params(self):
         """Indicate whether the parameters of the distribution are expected to be given in log space."""
         pass
@@ -78,6 +84,11 @@ class BasePolicyDistribution(abc.ABC):
 class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the action space is discrete and the agent thus predicts a pmf over the possible actions."""
+
+    @property
+    def short_name(self):
+        """Policy's short identidier."""
+        return "categorical"
 
     @property
     def has_log_params(self):
@@ -159,6 +170,11 @@ class BaseContinuousPolicyDistribution(BasePolicyDistribution, abc.ABC):
 
 class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
     """Gaussian Probability Distribution."""
+
+    @property
+    def short_name(self):
+        """Policy's short identidier."""
+        return "gaussian"
 
     @property
     def has_log_params(self):
@@ -280,6 +296,11 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
         # assure that rescaling is possible
         assert not np.any(np.isinf(self.action_min_values)) and not np.any(np.isinf(self.action_max_values))
+
+    @property
+    def short_name(self):
+        """Policy's short identidier."""
+        return "beta"
 
     @property
     def has_log_params(self):
