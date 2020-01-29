@@ -58,13 +58,12 @@ class Flipflopper:
             None.'''
         n_hidden = self.hps['n_hidden']
         name = self.hps['model_name']
-        # inputshape=(self.data_hps['n_time'], self.data_hps['n_bits'])
         n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
 
         inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
 
         if self.hps['rnn_type'] == 'vanilla':
-            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True)(inputs)
         elif self.hps['rnn_type'] == 'gru':
             x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
@@ -189,7 +188,7 @@ class Flipflopper:
         sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
         activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
 
-        method = "trust-ncg"
+        method = "Newton-CG"
         n_batches = 1 # how many batches to draw from
         finder = FixedPointFinder(self.hps, self.data_hps, self.model)
         self.fixed_points = []
@@ -219,7 +218,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
+    rnn_type = 'gru'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
