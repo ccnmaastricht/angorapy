@@ -39,7 +39,7 @@ class FixedPointFinder:
         weights = self.weights
         n_hidden = self.hps['n_hidden']
         combind = []
-        for i in range(8):#x0.shape[0]):
+        for i in range(20):#x0.shape[0]):
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
@@ -62,16 +62,15 @@ class FixedPointFinder:
                                                    combined[1], \
                                                    combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
-        # projection_b = np.matmul(input, inputweights) + b
-        fun = lambda x: 0.5 * sum(
-            (- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) ** 2)
+        projection_b = np.matmul(input, inputweights) + b
+        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + b) ** 2)
         options = {'disp': True}
         jac, hes= nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
         print("First function evaluation:", y)
-        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes, tol=1e-30,
+        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                     options=options)
-        dynamical_system = lambda x: - x[0:n_hidden] + np.matmul(weights.transpose(), np.tanh(x[0:n_hidden]))
+        dynamical_system = lambda x: - x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b
         jac_fun = nd.Jacobian(dynamical_system)
         fixed_point.jac = jac_fun(fixed_point.x)
 
@@ -95,19 +94,19 @@ class FixedPointFinder:
         r_projection_b = np.matmul(input, W_r) + b_r
         g_projection_b = np.matmul(input, W_h) + b_h
 
-        z_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_z))
-        r_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_r))
-        g_fun = lambda x: np.tanh((np.matmul((r_fun(x[0:n_hidden]) * x[0:n_hidden]), U_h)))
+        z_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_z) + b_z)
+        r_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_r) + b_r)
+        g_fun = lambda x: np.tanh((r_fun(x[0:n_hidden]) * np.matmul(x[0:n_hidden], U_h) + b_h))
 
         fun = lambda x: 0.5 * sum(((1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])) ** 2)
         options = {'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
         print("First function evaluation:", y)
-        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes, tol=1e-30,
+        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                     options=options)
 
-        dynamical_system = lambda x: (1-z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
+        dynamical_system = lambda x: (1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
         jac_fun = nd.Jacobian(dynamical_system)
         fixed_point.jac = jac_fun(fixed_point.x)
 
@@ -164,6 +163,8 @@ class FixedPointFinder:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             elif np.sqrt(((activation[i, :] - self.fixedpoints[i].x)**2).sum()) > self.minimization_distance:
                 self.bad_fixed_points.append(self.fixedpoints[i])
+            elif self.fixedpoints[i].fun > 1e-09:
+                self.bad_fixed_points.append(self.fixedpoints[i])
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
                 self.good_inputs.append(inputs[i, :])
@@ -186,21 +187,23 @@ class FixedPointFinder:
 
         # somehow this block of code does not return values if put in function
         x_modes = []
+        x_directions = []
+        scale = 2.7
         for n in range(len(self.unique_jac)):
-            # e_val, e_vecs = np.linalg.eig(self.unique_jac[n].jac)
+
             trace = np.matrix.trace(self.unique_jac[n].jac)
             det = np.linalg.det(self.unique_jac[n].jac)
 
-            # is_complex = isinstance(e_val, complex)
             if det < 0:
                 print('saddle_point')
                 x_modes.append(True)
-                # ids = np.argwhere(np.abs(np.real(e_val)) > 1.0)
-                # for i in range(len(ids)):
-                #   x_plus = fixedpoint[n].x + scale*e_val[ids[i]]*e_vecs[:, ids[i]]
-                #   x_minus = fixedpoint[n].x + scale*e_val[ids[i]]*e_vecs[:, ids[i]]
-                #   x_mode = np.vstack((x_minus, fixedpoint[n].x, x_plus))
-                #   x_modes.append(np.real(x_mode))
+                e_val, e_vecs = np.linalg.eig(self.unique_jac[n].jac)
+                ids = np.argwhere(np.real(e_val) > 0)
+                for i in range(len(ids)):
+                    x_plus = self.unique_jac[n].x + scale*np.real(e_val[ids[i]]*e_vecs[:, ids[i]])
+                    x_minus = self.unique_jac[n].x - scale*np.real(e_val[ids[i]]*e_vecs[:, ids[i]])
+                    x_direction = np.vstack((x_plus, self.unique_jac[n].x, x_minus))
+                    x_directions.append(x_direction)
             elif det > 0:
                 if trace ** 2 - 4 * det > 0 and trace < 0:
                     # print('node was found.')
@@ -226,17 +229,11 @@ class FixedPointFinder:
             else:
                 ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
                            marker='.', s=30, c='r')
+                for p in range(len(x_directions)):
+                    direction_matrix = pca.transform(x_directions[p])
+                    ax.plot(direction_matrix[:, 0], direction_matrix[:, 1], direction_matrix[:, 2],
+                            c='r', linewidth=0.8)
 
-#        k = 0
- #       if not x_modes:
-  #          print('No unstable fixed points were found.')
-   #     else:
-    #        x_modes = np.vstack(x_modes)
-     #       directions = pca.transform(x_modes)
-      #      for i in range(int(len(directions)/24)):
-       #         ax.plot(directions[k:k+2, 0], directions[k:k+2, 1], directions[k:k+2, 2],
-        #                c = 'r', linewidth = 0.8)
-         #       k += 2
         plt.title('PCA using modeltype: '+self.hps['rnn_type'])
         ax.set_xlabel('PC1')
         ax.set_ylabel('PC2')

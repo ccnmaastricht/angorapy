@@ -218,7 +218,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'gru'
+    rnn_type = 'vanilla'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
