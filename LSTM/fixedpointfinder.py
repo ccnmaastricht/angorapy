@@ -39,7 +39,7 @@ class FixedPointFinder:
         weights = self.weights
         n_hidden = self.hps['n_hidden']
         combind = []
-        for i in range(20):#x0.shape[0]):
+        for i in range(x0.shape[0]):
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
@@ -63,15 +63,16 @@ class FixedPointFinder:
                                                    combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
-        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + b) ** 2)
+        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) ** 2)
         options = {'disp': True}
-        jac, hes= nd.Gradient(fun), nd.Hessian(fun)
+        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                     options=options)
-        dynamical_system = lambda x: - x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b
-        jac_fun = nd.Jacobian(dynamical_system)
+
+
+        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x[0:n_hidden])**2)
         fixed_point.jac = jac_fun(fixed_point.x)
 
         return fixed_point
@@ -163,7 +164,7 @@ class FixedPointFinder:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             elif np.sqrt(((activation[i, :] - self.fixedpoints[i].x)**2).sum()) > self.minimization_distance:
                 self.bad_fixed_points.append(self.fixedpoints[i])
-            elif self.fixedpoints[i].fun > 1e-09:
+            elif self.fixedpoints[i].fun > 1e-14:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
@@ -188,7 +189,7 @@ class FixedPointFinder:
         # somehow this block of code does not return values if put in function
         x_modes = []
         x_directions = []
-        scale = 2.7
+        scale = 4
         for n in range(len(self.unique_jac)):
 
             trace = np.matrix.trace(self.unique_jac[n].jac)
@@ -200,10 +201,10 @@ class FixedPointFinder:
                 e_val, e_vecs = np.linalg.eig(self.unique_jac[n].jac)
                 ids = np.argwhere(np.real(e_val) > 0)
                 for i in range(len(ids)):
-                    x_plus = self.unique_jac[n].x + scale*np.real(e_val[ids[i]]*e_vecs[:, ids[i]])
-                    x_minus = self.unique_jac[n].x - scale*np.real(e_val[ids[i]]*e_vecs[:, ids[i]])
+                    x_plus = self.unique_jac[n].x + scale*e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                    x_minus = self.unique_jac[n].x - scale*e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
                     x_direction = np.vstack((x_plus, self.unique_jac[n].x, x_minus))
-                    x_directions.append(x_direction)
+                    x_directions.append(np.real(x_direction))
             elif det > 0:
                 if trace ** 2 - 4 * det > 0 and trace < 0:
                     # print('node was found.')
