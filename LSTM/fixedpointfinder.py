@@ -35,7 +35,7 @@ class FixedPointFinder:
         weights = self.weights
         n_hidden = self.hps['n_hidden']
         combind = []
-        for i in range(x0.shape[0]):
+        for i in range(20):#x0.shape[0]):
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
@@ -59,7 +59,7 @@ class FixedPointFinder:
                                                    combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
-        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) ** 2)
+        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b) ** 2)
         options = {'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
@@ -223,7 +223,7 @@ class FixedPointFinder:
 
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        ax.plot(X_pca[0:5000, 0], X_pca[0:5000, 1], X_pca[0:5000, 2],
+        ax.plot(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2],
                 linewidth=0.2)
         for i in range(len(x_modes)):
             if not x_modes[i]:

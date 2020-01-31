@@ -167,6 +167,8 @@ class Chiefinvestigator:
         fixed_points = finder.parallel_minimization(inputs=input, activation=activation,
                                                     method=method)
 
+        finder.plot_fixed_points(activations=activation)
+
 
 
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
@@ -201,4 +203,5 @@ if __name__ == "__main__":
 
     actions = np.vstack(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
+    chiefinvesti.findfixedpoints(weights, activations, inputs)
 
