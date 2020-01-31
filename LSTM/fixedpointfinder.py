@@ -207,9 +207,15 @@ class FixedPointFinder:
                     x_directions.append(np.real(x_direction))
             elif det > 0:
                 if trace ** 2 - 4 * det > 0 and trace < 0:
-                    # print('node was found.')
                     print('stable fixed point was found.')
                     x_modes.append(False)
+                    e_val, e_vecs = np.linalg.eig(self.unique_jac[n].jac)
+                    ids = np.argwhere(np.real(e_val) > 0)
+                    for i in range(len(ids)):
+                        x_plus = self.unique_jac[n].x + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                        x_minus = self.unique_jac[n].x - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                        x_direction = np.vstack((x_plus, self.unique_jac[n].x, x_minus))
+                        x_directions.append(np.real(x_direction))
                 elif trace ** 2 - 4 * det > 0 and trace > 0:
                     print('unstable fixed point was found')
                 else:
