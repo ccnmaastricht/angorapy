@@ -189,8 +189,8 @@ class Flipflopper:
         activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
 
         method = "Newton-CG"
-        n_batches = 1 # how many batches to draw from
-        finder = FixedPointFinder(self.hps, self.data_hps, self.model)
+        n_batches = 3 # how many batches to draw from
+        finder = FixedPointFinder(self.hps, self.model)
         self.fixed_points = []
         for i in range(n_batches):
             self.fixed_points.append(finder.parallel_minimization(inputs=stim['inputs'][i, :, :],
@@ -218,7 +218,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
+    rnn_type = 'gru'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)

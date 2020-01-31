@@ -14,12 +14,12 @@ from sklearn.decomposition import NMF
 from sklearn.svm import SVC
 import sklearn.manifold as sklm
 from mpl_toolkits.mplot3d import Axes3D
-from LSTM.minimization import parallel_minimization
 
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
+from LSTM.fixedpointfinder import FixedPointFinder
 
 
 class Chiefinvestigator:
@@ -158,6 +158,16 @@ class Chiefinvestigator:
         H = model.components_
         return W, H
 
+    def findfixedpoints(self, weights, activation, input):
+        method = "Newton-CG"
+        hps = {'rnn_type': 'vanilla',
+               'n_hidden': 64}
+
+        finder = FixedPointFinder(hps, weights)
+        fixed_points = finder.parallel_minimization(inputs=input, activation=activation,
+                                                    method=method)
+
+
 
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
 # -> construct small amounts of points (perhaps belonging to one action into
@@ -177,7 +187,7 @@ if __name__ == "__main__":
     #os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id: int = 1578664065  # 1576849128 # 1576692646 from tonio
+    agent_id = 1578664065  # 1576849128 # 1576692646 from tonio
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
@@ -186,68 +196,9 @@ if __name__ == "__main__":
     activ = chiefinvesti.slave_investigator.get_layer_activations(layer_names[3])
     states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
                                                                     "policy_recurrent_layer")
+    inputs = np.reshape(activations[2], (activations[2].shape[0], 64))
+    activations = np.reshape(activations[1], (activations[1].shape[0], 64))
+
     actions = np.vstack(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
 
-    # Minimization to find fixed points
-    method = "trust-ncg"
-    optimisedResults = parallel_minimization(inputs=np.reshape(activations[2], (activations[2].shape[0], 64)),
-                                    activation=np.reshape(activations[1], (activations[1].shape[0], 64)),
-                                    weights=weights[1], inputweights=weights[0], method=method)
-
-    zscores = sp.stats.zscore(np.reshape(activations[1], (activations[1].shape[0], 64))) # normalization
-    # display activations over episode
-    plt.imshow(np.transpose(np.reshape(activations[1], (activations[1].shape[0], 64))))
-    plt.show()
-
-    # NMF
-    W, H = chiefinvesti.nmfactor(np.reshape(activations[1], (activations[1].shape[0], 64)))
-
-    # t-SNE
-    RS = 12
-    tsne_results = sklm.TSNE(random_state=RS).fit_transform(zscores)
-    # plot t-SNE results
-    tsne_plot = chiefinvesti.plot_results(tsne_results, actions[:, 1], None, "t-SNE", False)
-
-    # processing of minimisation results for pca
-    optim_results = []
-    for i in range(len(optimisedResults)):
-        res = optimisedResults[i].x
-        optim_results.append(res)
-    optim_results = np.vstack(optim_results)
-
-    pca = skld.PCA(3)
-    pca.fit(zscores)
-    X_pca = pca.transform(zscores)
-    new_pca = pca.transform(optim_results)
-    chiefinvesti.plot_results(X_pca, actions[:, 1], new_pca, "PCA", True)  # plot pca results
-    chiefinvesti.plot_results(X_pca, actions[:, 1], "PCA", False)
-
-    #chiefinvesti.plot_rewards(all_rewards)
-
-    # loadings plot
-    loadings_plot = False
-    if loadings_plot is True:
-        fig = plt.figure()
-        plt.scatter(pca.components_[1, :], pca.components_[0, :])
-        plt.title('Loadings plot')
-        plt.show()
-
-    svm_classify = True
-    if svm_classify is True:
-        action_data = actions[:, 1] > 0.5
-        action_data_1 = actions[:, 1] < -0.5
-        action_data = action_data + action_data_1
-        chiefinvesti.svm_classifier(np.reshape(activations[1], (activations[1].shape[0], 64)), action_data)
-
-    # timestepwise pca
-    # chiefinvesti.timestepwise_pca(x_activation_data, action_data, 'PCA')
-
-    # pca of actions to identify unique actions
-    if loadings_plot is True:
-        pca = skld.PCA(2)
-        pca.fit(actions)
-        action_pca = pca.transform(actions)
-        plt.scatter(action_pca[:, 1], action_pca[:, 0])
-        plt.title('PCA of action space')
-        plt.show()

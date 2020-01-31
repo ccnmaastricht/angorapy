@@ -1,25 +1,21 @@
 import numpy as np
 import multiprocessing as mp
-import sympy
 import numdifftools as nd
 from scipy.optimize import minimize
 import sklearn.decomposition as skld
 import matplotlib.pyplot as plt
-from scipy.spatial.distance import pdist, squareform
 from utilities.model_management import build_sub_model_to
 import tensorflow as tf
-from LSTM.minimization import evaluate_fixedpoint, classify_fixedpoint
 
 
 class FixedPointFinder:
-    def __init__(self, hps, data_hps, model):
+    def __init__(self, hps, weights):
         self.hps = hps
-        self.data_hps = data_hps
         self.unique_tol = 1e-03
-        self.abundance_threshold = 0.005
         self.minimization_distance = 10.0
-        self.weights = model.get_layer(self.hps['rnn_type']).get_weights()
-        self.model = model
+        # self.weights = model.get_layer(self.hps['rnn_type']).get_weights()
+        # self.model = model
+        self.weights = weights
 
 
     def parallel_minimization(self, inputs, activation, method):
