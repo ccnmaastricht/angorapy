@@ -161,7 +161,9 @@ class Chiefinvestigator:
     def findfixedpoints(self, weights, activation, input):
         method = "Newton-CG"
         hps = {'rnn_type': 'vanilla',
-               'n_hidden': 64}
+               'n_hidden': 64,
+               'unique_tol': 1e-03,
+               'threshold': 1e-14}
 
         finder = FixedPointFinder(hps, weights)
         fixed_points = finder.parallel_minimization(inputs=input, activation=activation,

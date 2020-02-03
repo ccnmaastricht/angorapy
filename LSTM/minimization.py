@@ -1,65 +1,67 @@
 import numpy as np
+import numdifftools as nd
 
 
 
+def backproprnn(combined):
+    def decay_lr(initial_lr, decay, iteration):
+        return initial_lr * (1.0 / (1.0 + decay * iteration))
+    x0, input, weights, n_hidden = combined[0], combined[1], combined[2], combined[3]
+    n_hidden = 24
+    weights, inputweights, b = weights[1], weights[0], weights[2]
+    projection_b = np.matmul(input, inputweights) + b
+    fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b) ** 2)
+    grad_fun = nd.Gradient(fun)
+    lr = 0.1
+    for i in range(500):
+        q = fun(x0)
+        print(q)
+        dq = grad_fun(x0)
+        dq = np.round(dq, 15)
+        x0 = x0 - lr * dq
+        lr = decay_lr(0.1, 0.001, i)
+    print('new IC')
+    fixedpoint = x0
 
-def evaluate_fixedpoint(fixedpoint):
-    x_modes = []
+    return fixedpoint
 
-    for n in range(len(fixedpoint)):
-        e_val, e_vec = np.linalg.eig(fixedpoint[n].jac)
+def backpropgru(combined):
+    def decay_lr(initial_lr, decay, iteration):
+        return initial_lr * (1.0 / (1.0 + decay * iteration))
 
-        #is_stable = np.all(np.abs(e_val) < 1.0)
+    def sigmoid(x):
+        return 1 / (1 + np.exp(-x))
 
-        det = np.linalg.det(fixedpoint[n].jac)
-        magnitude = np.argmax(np.abs(e_val))
-        for i in range(len(e_val)):
-            #magnitude = np.abs(e_val[i])
-            #if not is_stable and magnitude > 1.0:
-             #   x_plus = fixedpoint[n].x + magnitude * e_vec[:, i]
-             #   x_minus = fixedpoint[n].x - magnitude * e_vec[:, i]
+    x0, input, weights, n_hidden = combined[0], \
+                                           combined[1], \
+                                           combined[2], combined[3]
+    z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
+    W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
+    U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
+    b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
 
-             #   x_mode = np.vstack((x_minus, fixedpoint[n].x, x_plus))
+    z_projection_b = np.matmul(input, W_z) + b_z
+    r_projection_b = np.matmul(input, W_r) + b_r
+    g_projection_b = np.matmul(input, W_h) + b_h
 
+    z_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_z) + b_z)
+    r_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_r) + b_r)
+    g_fun = lambda x: np.tanh((r_fun(x[0:n_hidden]) * np.matmul(x[0:n_hidden], U_h) + b_h))
 
-            if det < 0 :
-                x_plus = fixedpoint[n].x + e_val[magnitude[i]]*e_vec[:, magnitude[i]]
-                x_minus = fixedpoint[n].x - e_val[magnitude[i]]*e_vec[:, magnitude[i]]
+    fun = lambda x: 0.5 * sum(((1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])) ** 2)
+    grad_fun = nd.Gradient(fun)
+    lr = 0.1
+    for i in range(1000):
+        q = fun(x0)
+        print(q)
+        dq = grad_fun(x0)
+        dq = np.round(dq, 15)
+        x0 = x0 - lr * dq
+        lr = decay_lr(0.1, 0.001, i)
+    print('new IC')
+    fixedpoint = x0
 
-                x_mode = np.vstack((x_minus, fixedpoint[n].x, x_plus))
-                x_modes.append(np.real(x_mode))
-    return x_modes
-
-def classify_fixedpoint(fixedpoint):
-    # scale = 4
-    for n in range(len(fixedpoint)):
-        e_val, e_vecs = np.linalg.eig(fixedpoint[n].jac)
-        trace = np.matrix.trace(fixedpoint[n].jac)
-        det = np.linalg.det(fixedpoint[n].jac)
-
-        #is_complex = isinstance(e_val, complex)
-        if det < 0:
-            print('saddle_point')
-            x_modes.append(True)
-            #ids = np.argwhere(np.abs(np.real(e_val)) > 1.0)
-            #for i in range(len(ids)):
-             #   x_plus = fixedpoint[n].x + scale*e_val[ids[i]]*e_vecs[:, ids[i]]
-             #   x_minus = fixedpoint[n].x + scale*e_val[ids[i]]*e_vecs[:, ids[i]]
-             #   x_mode = np.vstack((x_minus, fixedpoint[n].x, x_plus))
-             #   x_modes.append(np.real(x_mode))
-        elif det > 0:
-            if trace**2-4*det > 0 and trace < 0:
-                # print('node was found.')
-                print('stable fixed point was found.')
-                x_modes.append(False)
-            elif trace**2-4*det > 0 and trace > 0:
-                    print('unstable fixed point was found')
-            else :
-                    print('center was found.')
-        else:
-            print('fixed point manifold was found.')
-
-    return x_modes
+    return fixedpoint
 
 
 

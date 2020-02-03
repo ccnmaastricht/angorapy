@@ -6,19 +6,34 @@ import sklearn.decomposition as skld
 import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
 import tensorflow as tf
+from LSTM.minimization import backproprnn, backpropgru
 
 
 class FixedPointFinder:
     def __init__(self, hps, weights):
         self.hps = hps
-        self.unique_tol = 1e-03
+        self.unique_tol = hps['unique_tol']
+        self.threshold = hps['threshold']
         self.minimization_distance = 10.0
-        # self.weights = model.get_layer(self.hps['rnn_type']).get_weights()
-        # self.model = model
+        # self.
         self.weights = weights
+        self.scipyminimizer = Scipyminimizer()
 
+class Backpropagation:
 
-    def parallel_minimization(self, inputs, activation, method):
+    def backprop(self, inputs, x0):
+        weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
+        fixedpoint = []
+        for i in range(x0.shape[0]): # prepare iterable object for parallelization
+            combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
+        for i in range(8):#x0.shape[0]):
+            fixedpoint.append(backpropgru(combind[i]))
+
+        return fixedpoint
+
+class Scipyminimizer:
+
+    def parallel_minimization(self, inputs, x0, method):
         """Function to set up parallel processing of minimization for fixed points
 
         Args:
@@ -30,16 +45,14 @@ class FixedPointFinder:
 
         """
         pool = mp.Pool(mp.cpu_count())
-        print(activation.shape[0], " minimizations to parallelize.")
-        x0 = activation
-        weights = self.weights
-        n_hidden = self.hps['n_hidden']
-        combind = []
-        for i in range(20):#x0.shape[0]):
+        print(x0.shape[0], " minimizations to parallelize.")
+        weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
+
+        for i in range(x0.shape[0]): # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
-            self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
+            self.fixedpoints = pool.map(backproprnn, combind, chunksize=1)
         elif self.hps['rnn_type'] == 'gru':
             self.fixedpoints = pool.map(self._minimizgru, combind, chunksize=1)
         elif self.hps['rnn_type'] == 'lstm':
@@ -48,7 +61,7 @@ class FixedPointFinder:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
-        self._handle_bad_approximations(activation, inputs)
+        self._handle_bad_approximations(x0, inputs)
 
         return self.good_fixed_points
 
@@ -59,7 +72,7 @@ class FixedPointFinder:
                                                    combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
-        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b) ** 2)
+        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) ** 2)
         options = {'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
@@ -150,7 +163,10 @@ class FixedPointFinder:
 
     def _handle_bad_approximations(self, activation, inputs):
         """This functions identifies approximations where the minmization
-        was not successful and/or the fixed point moved further away than minimization distance threshold."""
+        was
+         a) not successful
+         b) the fixed point moved further away from IC than minimization distance threshold
+         c) minimization did not return q(x) < threshold"""
 
         self.bad_fixed_points = []
         self.good_fixed_points = []
@@ -160,7 +176,7 @@ class FixedPointFinder:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             elif np.sqrt(((activation[i, :] - self.fixedpoints[i].x)**2).sum()) > self.minimization_distance:
                 self.bad_fixed_points.append(self.fixedpoints[i])
-            elif self.fixedpoints[i].fun > 1e-14:
+            elif self.fixedpoints[i].fun > self.threshold:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
@@ -173,7 +189,6 @@ class FixedPointFinder:
         self._extract_fixed_point_locations()
         self._find_unique_fixed_points()
         self.unique_jac = [self.good_fixed_points[i] for i in self.unique_idx]
-        # x_modes = classify_fixedpoint(self.unique_jac)
 
         activations = np.vstack(activations)
 
@@ -216,6 +231,7 @@ class FixedPointFinder:
                     print('unstable fixed point was found')
                 else:
                     print('center was found.')
+                    x_modes.append(False)
             else:
                 print('fixed point manifold was found.')
 
@@ -249,10 +265,11 @@ class FixedPointFinder:
         for i in range(len(self.good_fixed_points)):
             fixed_point_location.append(self.good_fixed_points[i].x)
         self.fixed_point_locations = np.vstack(fixed_point_location)
-        # self.good_inputs = np.vstack(self.good_inputs)
 
     def _find_unique_fixed_points(self):
-        d = int(np.round(np.max([0 - np.log10(1e-03)])))
+        """Identify fixed points that are unique within a distance threshold
+        of """
+        d = int(np.round(np.max([0 - np.log10(self.unique_tol)])))
         ux, idx = np.unique(self.fixed_point_locations.round(decimals=d), axis=0, return_index=True)
 
         self.unique_fixed_points = ux
