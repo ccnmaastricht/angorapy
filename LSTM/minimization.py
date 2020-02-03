@@ -21,7 +21,8 @@ def backproprnn(combined):
         x0 = x0 - lr * dq
         lr = decay_lr(0.1, 0.001, i)
     print('new IC')
-
+    jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x[0:n_hidden]) ** 2)
+    jacobian = jac_fun(x0)
     fixedpoint = {'fun': q,
                   'x': x0,
                   'jac': jacobian}
@@ -34,6 +35,10 @@ def backpropgru(combined):
 
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
+
+    def print_update(q, lr):
+        print("Function value:", q, "; lr:", lr, "; ")
+
 
     x0, input, weights, n_hidden = combined[0], \
                                            combined[1], \
@@ -54,17 +59,19 @@ def backpropgru(combined):
     fun = lambda x: 0.5 * sum(((1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])) ** 2)
     grad_fun = nd.Gradient(fun)
     lr = 0.1
-    for i in range(10):
+    q = fun(x0)
+    for i in range(1000):
         q = fun(x0)
-        print(q)
         dq = grad_fun(x0)
         dq = np.round(dq, 15)
         x0 = x0 - lr * dq
         lr = decay_lr(0.1, 0.001, i)
-    print('new IC')
+        if i == 100 % i:
+            print_update(q, lr)
     dynamical_system = lambda x: (1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
     jac_fun = nd.Jacobian(dynamical_system)
     jacobian = jac_fun(x0)
+    print('Function value after minimization ', q)
     fixedpoint = {'fun': q,
                   'x': x0,
                   'jac': jacobian}

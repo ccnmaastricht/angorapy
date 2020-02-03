@@ -30,9 +30,12 @@ class FixedPointFinder:
         self.fixedpoints = []
         for i in range(x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
-        for i in range(8):  # x0.shape[0]):
-            if self.hps['rnn_type'] == 'gru':
-                self.fixedpoints.append(backpropgru(combind[i]))
+        #for i in range(20):  # x0.shape[0]):
+        #    if self.hps['rnn_type'] == 'gru':
+         #       self.fixedpoints.append(backpropgru(combind[i]))
+
+        pool = mp.Pool(mp.cpu_count())
+        self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
 
         self._handle_bad_approximations(x0, inputs)
 
