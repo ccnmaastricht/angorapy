@@ -10,28 +10,32 @@ from LSTM.minimization import backproprnn, backpropgru
 
 
 class FixedPointFinder:
-    def __init__(self, hps, weights):
+    def __init__(self, hps, weights, inputs, x0):
         self.hps = hps
         self.unique_tol = hps['unique_tol']
         self.threshold = hps['threshold']
         self.minimization_distance = 10.0
-        # self.
-        self.weights = weights
-        self.scipyminimizer = Scipyminimizer()
 
-class Backpropagation:
+        self.weights = weights
+        if self.hps['rnn_type'] == 'vanilla':
+            self.parallel_minimization(inputs[0, :, :], x0[0, :, :], "Newton-CG")
+            self.plot_fixed_points(x0, )
+        else:
+            self.backprop(inputs[0, :, :], x0[0, :, :])
+            self.plot_fixed_points(x0, )
+
 
     def backprop(self, inputs, x0):
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
-        fixedpoint = []
-        for i in range(x0.shape[0]): # prepare iterable object for parallelization
+        self.fixedpoints = []
+        for i in range(x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
-        for i in range(8):#x0.shape[0]):
-            fixedpoint.append(backpropgru(combind[i]))
+        for i in range(8):  # x0.shape[0]):
+            if self.hps['rnn_type'] == 'gru':
+                self.fixedpoints.append(backpropgru(combind[i]))
 
-        return fixedpoint
+        self._handle_bad_approximations(x0, inputs)
 
-class Scipyminimizer:
 
     def parallel_minimization(self, inputs, x0, method):
         """Function to set up parallel processing of minimization for fixed points
@@ -48,11 +52,11 @@ class Scipyminimizer:
         print(x0.shape[0], " minimizations to parallelize.")
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
 
-        for i in range(x0.shape[0]): # prepare iterable object for parallelization
+        for i in range(8):#x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
-            self.fixedpoints = pool.map(backproprnn, combind, chunksize=1)
+            self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
         elif self.hps['rnn_type'] == 'gru':
             self.fixedpoints = pool.map(self._minimizgru, combind, chunksize=1)
         elif self.hps['rnn_type'] == 'lstm':
@@ -63,13 +67,11 @@ class Scipyminimizer:
 
         self._handle_bad_approximations(x0, inputs)
 
-        return self.good_fixed_points
-
     @staticmethod
     def _minimizrnn(combined):
         x0, input, weights, method, n_hidden = combined[0], \
-                                                   combined[1], \
-                                                   combined[2], combined[3], combined[4]
+                                               combined[1], \
+                                               combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
         fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) ** 2)
@@ -78,13 +80,14 @@ class Scipyminimizer:
         y = fun(x0)
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
-                                    options=options)
+                               options=options)
 
-
-        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x[0:n_hidden])**2)
+        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x[0:n_hidden]) ** 2)
         fixed_point.jac = jac_fun(fixed_point.x)
-
-        return fixed_point
+        fixedpoint = {'fun': fixed_point.fun,
+                      'x': fixed_point.x,
+                      'jac': fixed_point.jac}
+        return fixedpoint
 
     @staticmethod
     def _minimizgru(combined):
@@ -93,9 +96,9 @@ class Scipyminimizer:
             return 1 / (1 + np.exp(-x))
 
         x0, input, weights, method, n_hidden = combined[0], \
-                                     combined[1], \
-                                     combined[2], combined[3], combined[4]
-        z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2*n_hidden), np.arange(2*n_hidden, 3*n_hidden)
+                                               combined[1], \
+                                               combined[2], combined[3], combined[4]
+        z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
         W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
         U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
         b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
@@ -114,52 +117,51 @@ class Scipyminimizer:
         y = fun(x0)
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
-                                    options=options)
+                               options=options)
 
         dynamical_system = lambda x: (1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
         jac_fun = nd.Jacobian(dynamical_system)
         fixed_point.jac = jac_fun(fixed_point.x)
-
 
         return fixed_point
 
     @staticmethod
     def _minimizlstm(combined):
         x0, input, weights, method, n_hidden = combined[0], \
-                                     combined[1], \
-                                     combined[2], combined[3], combined[4]
+                                               combined[1], \
+                                               combined[2], combined[3], combined[4]
 
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
+
         W, U, b = weights[0], weights[1], weights[2]
 
-        W_i, W_f, W_c, W_o = W[:, :n_hidden].transpose(), W[:, n_hidden:2*n_hidden].transpose(), \
-                             W[:, 2*n_hidden:3*n_hidden].transpose(), W[:, 3*n_hidden:4*n_hidden].transpose()
-        U_i, U_f, U_c, U_o = U[:, :n_hidden].transpose(), U[:, n_hidden:2*n_hidden].transpose(), \
-                             U[:, 2*n_hidden:3*n_hidden].transpose(), U[:, 3*n_hidden:4*n_hidden].transpose()
-        b_i, b_f, b_c, b_o = b[0, :n_hidden].transpose(), b[0, n_hidden:2*n_hidden].transpose(), \
-                             b[0, 2*n_hidden:3*n_hidden].transpose(), b[0, 3*n_hidden:4*n_hidden].transpose()
+        W_i, W_f, W_c, W_o = W[:, :n_hidden].transpose(), W[:, n_hidden:2 * n_hidden].transpose(), \
+                             W[:, 2 * n_hidden:3 * n_hidden].transpose(), W[:, 3 * n_hidden:4 * n_hidden].transpose()
+        U_i, U_f, U_c, U_o = U[:, :n_hidden].transpose(), U[:, n_hidden:2 * n_hidden].transpose(), \
+                             U[:, 2 * n_hidden:3 * n_hidden].transpose(), U[:, 3 * n_hidden:4 * n_hidden].transpose()
+        b_i, b_f, b_c, b_o = b[0, :n_hidden].transpose(), b[0, n_hidden:2 * n_hidden].transpose(), \
+                             b[0, 2 * n_hidden:3 * n_hidden].transpose(), b[0, 3 * n_hidden:4 * n_hidden].transpose()
         f_fun = lambda x: sigmoid(np.matmul(W_f, input) + np.matmul(U_f, x[0:n_hidden]) + b_f)
         i_fun = lambda x: sigmoid(np.matmul(W_i, input) + np.matmul(U_i, x[0:n_hidden]) + b_i)
         o_fun = lambda x: sigmoid(np.matmul(W_o, input) + np.matmul(U_o, x[0:n_hidden]) + b_o)
         c_fun = lambda x, c: f_fun(x[0:n_hidden]) * c[0:n_hidden] + i_fun(x[0:n_hidden]) * \
                              np.tanh((np.matmul(W_c, input) + np.matmul(U_c, x[0:n_hidden]) + b_c) - c[0:n_hidden])
         # perhaps put h and c in as one object to minimize and split up in functions
-        fun = lambda x, c: 0.5 * sum((o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden])**2)
+        fun = lambda x, c: 0.5 * sum((o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]) ** 2)
 
         options = {'gtol': 1e-14, 'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
         print("First function evaluation:", y)
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
-                                    options=options)
+                               options=options)
 
         dynamical_system = lambda x, c: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]
         jac_fun = nd.Jacobian(dynamical_system)
         fixed_point.jac = jac_fun(fixed_point.x)
 
         return fixed_point
-
 
     def _handle_bad_approximations(self, activation, inputs):
         """This functions identifies approximations where the minmization
@@ -172,18 +174,15 @@ class Scipyminimizer:
         self.good_fixed_points = []
         self.good_inputs = []
         for i in range(len(self.fixedpoints)):
-            if not self.fixedpoints[i].success:
+            if np.sqrt(((activation[i, :] - self.fixedpoints[i]['x']) ** 2).sum()) > self.minimization_distance:
                 self.bad_fixed_points.append(self.fixedpoints[i])
-            elif np.sqrt(((activation[i, :] - self.fixedpoints[i].x)**2).sum()) > self.minimization_distance:
-                self.bad_fixed_points.append(self.fixedpoints[i])
-            elif self.fixedpoints[i].fun > self.threshold:
+            elif self.fixedpoints[i]['fun'] > self.threshold:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
                 self.good_inputs.append(inputs[i, :])
 
-
-    def plot_fixed_points(self, activations, fixedpoints = None):
+    def plot_fixed_points(self, activations, fixedpoints=None):
         if fixedpoints is not None:
             self.good_fixed_points = fixedpoints
         self._extract_fixed_point_locations()
@@ -203,29 +202,29 @@ class Scipyminimizer:
         scale = 4
         for n in range(len(self.unique_jac)):
 
-            trace = np.matrix.trace(self.unique_jac[n].jac)
-            det = np.linalg.det(self.unique_jac[n].jac)
+            trace = np.matrix.trace(self.unique_jac[n]['jac'])
+            det = np.linalg.det(self.unique_jac[n]['jac'])
 
             if det < 0:
                 print('saddle_point')
                 x_modes.append(True)
-                e_val, e_vecs = np.linalg.eig(self.unique_jac[n].jac)
+                e_val, e_vecs = np.linalg.eig(self.unique_jac[n]['jac'])
                 ids = np.argwhere(np.real(e_val) > 0)
                 for i in range(len(ids)):
-                    x_plus = self.unique_jac[n].x + scale*e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                    x_minus = self.unique_jac[n].x - scale*e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                    x_direction = np.vstack((x_plus, self.unique_jac[n].x, x_minus))
+                    x_plus = self.unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                    x_minus = self.unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                    x_direction = np.vstack((x_plus, self.unique_jac[n]['x'], x_minus))
                     x_directions.append(np.real(x_direction))
             elif det > 0:
                 if trace ** 2 - 4 * det > 0 and trace < 0:
                     print('stable fixed point was found.')
                     x_modes.append(False)
-                    e_val, e_vecs = np.linalg.eig(self.unique_jac[n].jac)
+                    e_val, e_vecs = np.linalg.eig(self.unique_jac[n]['jac'])
                     ids = np.argwhere(np.real(e_val) > 0)
                     for i in range(len(ids)):
-                        x_plus = self.unique_jac[n].x + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                        x_minus = self.unique_jac[n].x - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                        x_direction = np.vstack((x_plus, self.unique_jac[n].x, x_minus))
+                        x_plus = self.unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                        x_minus = self.unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                        x_direction = np.vstack((x_plus, self.unique_jac[n]['x'], x_minus))
                         x_directions.append(np.real(x_direction))
                 elif trace ** 2 - 4 * det > 0 and trace > 0:
                     print('unstable fixed point was found')
@@ -235,16 +234,14 @@ class Scipyminimizer:
             else:
                 print('fixed point manifold was found.')
 
-
-
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        ax.plot(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2],
+        ax.plot(X_pca[:2000, 0], X_pca[:2000, 1], X_pca[:2000, 2],
                 linewidth=0.2)
         for i in range(len(x_modes)):
             if not x_modes[i]:
                 ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
-                        marker='.', s=30, c='k')
+                           marker='.', s=30, c='k')
             else:
                 ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
                            marker='.', s=30, c='r')
@@ -253,7 +250,7 @@ class Scipyminimizer:
                     ax.plot(direction_matrix[:, 0], direction_matrix[:, 1], direction_matrix[:, 2],
                             c='r', linewidth=0.8)
 
-        plt.title('PCA using modeltype: '+self.hps['rnn_type'])
+        plt.title('PCA using modeltype: ' + self.hps['rnn_type'])
         ax.set_xlabel('PC1')
         ax.set_ylabel('PC2')
         ax.set_zlabel('PC3')
@@ -263,7 +260,7 @@ class Scipyminimizer:
         # processing of minimisation results for pca
         fixed_point_location = []
         for i in range(len(self.good_fixed_points)):
-            fixed_point_location.append(self.good_fixed_points[i].x)
+            fixed_point_location.append(self.good_fixed_points[i]['x'])
         self.fixed_point_locations = np.vstack(fixed_point_location)
 
     def _find_unique_fixed_points(self):
@@ -275,8 +272,4 @@ class Scipyminimizer:
         self.unique_fixed_points = ux
         self.unique_idx = idx
 
-
-
-
 # TODO: interpret Jacobian -> solve the error
-

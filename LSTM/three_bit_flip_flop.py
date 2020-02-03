@@ -185,23 +185,14 @@ class Flipflopper:
         '''Intialize class FixedPointFinder'''
 
         self._load_model()
-        self._get_activations()
+        self._get_activations(stim)
         method = "Newton-CG"
         n_batches = 1 # how many batches to draw from
         self.hps['unique_tol'] = 1e-03
-        self.hps['threshold'] = 1e-14
+        self.hps['threshold'] = 1
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
-        finder = FixedPointFinder(self.hps, weights)
-        self.fixed_points = []
-        for i in range(n_batches):
-            self.fixed_points = finder.backprop(inputs=stim['inputs'][i, :, :],
-                                                x0=self.activation[i, :, :])
-        #self.fixed_points = [fixed_point for points in self.fixed_points for fixed_point in points]
-        #if n_batches == 1:
-         #   finder.plot_fixed_points(activations=self.activation)
-        #else:
-         #   finder.plot_fixed_points(activations=self.activation, fixedpoints=self.fixed_points)
+        self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
@@ -214,7 +205,7 @@ class Flipflopper:
         self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
         print("Loaded "+self.hps['rnn_type']+" model.")
 
-    def _get_activations(self):
+    def _get_activations(self, stim):
         sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
         self.activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
 

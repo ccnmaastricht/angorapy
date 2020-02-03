@@ -21,7 +21,10 @@ def backproprnn(combined):
         x0 = x0 - lr * dq
         lr = decay_lr(0.1, 0.001, i)
     print('new IC')
-    fixedpoint = x0
+
+    fixedpoint = {'fun': q,
+                  'x': x0,
+                  'jac': jacobian}
 
     return fixedpoint
 
@@ -51,7 +54,7 @@ def backpropgru(combined):
     fun = lambda x: 0.5 * sum(((1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])) ** 2)
     grad_fun = nd.Gradient(fun)
     lr = 0.1
-    for i in range(1000):
+    for i in range(10):
         q = fun(x0)
         print(q)
         dq = grad_fun(x0)
@@ -59,7 +62,12 @@ def backpropgru(combined):
         x0 = x0 - lr * dq
         lr = decay_lr(0.1, 0.001, i)
     print('new IC')
-    fixedpoint = x0
+    dynamical_system = lambda x: (1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
+    jac_fun = nd.Jacobian(dynamical_system)
+    jacobian = jac_fun(x0)
+    fixedpoint = {'fun': q,
+                  'x': x0,
+                  'jac': jacobian}
 
     return fixedpoint
 
