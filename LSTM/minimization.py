@@ -4,22 +4,29 @@ import numdifftools as nd
 
 
 def backproprnn(combined):
+
+    def print_update(q, lr):
+        print("Function value:", q,"; lr:", lr, "; ")
+
+
     def decay_lr(initial_lr, decay, iteration):
         return initial_lr * (1.0 / (1.0 + decay * iteration))
     x0, input, weights, n_hidden = combined[0], combined[1], combined[2], combined[3]
     n_hidden = 24
     weights, inputweights, b = weights[1], weights[0], weights[2]
     projection_b = np.matmul(input, inputweights) + b
-    fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b) ** 2)
+    fun = lambda x: 0.5 * np.sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) **2 )
     grad_fun = nd.Gradient(fun)
-    lr = 0.1
+    inlr = 0.01
     for i in range(500):
         q = fun(x0)
-        print(q)
         dq = grad_fun(x0)
         dq = np.round(dq, 15)
+        lr = decay_lr(inlr, 0.0001, i)
         x0 = x0 - lr * dq
-        lr = decay_lr(0.1, 0.001, i)
+
+        if i == i % 100:
+            print_update(q, lr)
     print('new IC')
     jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x[0:n_hidden]) ** 2)
     jacobian = jac_fun(x0)
@@ -66,7 +73,7 @@ def backpropgru(combined):
         dq = np.round(dq, 15)
         x0 = x0 - lr * dq
         lr = decay_lr(0.1, 0.001, i)
-        if i == 100 % i:
+        if i == i % 100:
             print_update(q, lr)
     dynamical_system = lambda x: (1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
     jac_fun = nd.Jacobian(dynamical_system)
@@ -77,6 +84,9 @@ def backpropgru(combined):
                   'jac': jacobian}
 
     return fixedpoint
+
+def exponential_minimization():
+    linspace = np.linspace(minima, maxima, num=100)
 
 
 

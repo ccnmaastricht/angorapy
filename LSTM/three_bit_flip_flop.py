@@ -150,7 +150,7 @@ class Flipflopper:
         self.model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
         self.history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
-                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=4000)
+                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=5000)
 
         self._save_model()
 
@@ -189,7 +189,7 @@ class Flipflopper:
         method = "Newton-CG"
         n_batches = 1 # how many batches to draw from
         self.hps['unique_tol'] = 1e-03
-        self.hps['threshold'] = 1e-06
+        self.hps['threshold'] = 1
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
         self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)
@@ -215,7 +215,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'gru'
+    rnn_type = 'vanilla'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)

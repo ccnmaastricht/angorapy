@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
 import tensorflow as tf
 from LSTM.minimization import backproprnn, backpropgru
+import mayavi
+from mayavi import mlab
 
 
 class FixedPointFinder:
@@ -18,24 +20,35 @@ class FixedPointFinder:
 
         self.weights = weights
         if self.hps['rnn_type'] == 'vanilla':
-            self.parallel_minimization(inputs[0, :, :], x0[0, :, :], "Newton-CG")
+            self.backprop(inputs, x0)
             self.plot_fixed_points(x0, )
+            self.plot_velocities(x0, )
         else:
             self.backprop(inputs[0, :, :], x0[0, :, :])
             self.plot_fixed_points(x0, )
+            self.plot_velocities(x0, )
 
 
     def backprop(self, inputs, x0):
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
         self.fixedpoints = []
-        for i in range(x0.shape[0]):  # prepare iterable object for parallelization
+        recurrentweights = weights[1]
+        def func(x):
+            return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), recurrentweights))**2), axis=1)
+
+        activations, inputs = np.vstack(x0), np.vstack(inputs)
+        eval = func(activations)
+        idx = np.argwhere(eval < 1)
+
+        x0, inputs = activations[idx[:, 0], :], inputs[idx[:, 0], :]
+        for i in range(4):#x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
         #for i in range(20):  # x0.shape[0]):
         #    if self.hps['rnn_type'] == 'gru':
          #       self.fixedpoints.append(backpropgru(combind[i]))
 
         pool = mp.Pool(mp.cpu_count())
-        self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
+        self.fixedpoints = pool.map(backproprnn, combind, chunksize=1)
 
         self._handle_bad_approximations(x0, inputs)
 
@@ -185,12 +198,31 @@ class FixedPointFinder:
                 self.good_fixed_points.append(self.fixedpoints[i])
                 self.good_inputs.append(inputs[i, :])
 
+    def plot_velocities(self, activations):
+        recurrentweights = self.weights[1]
+        def func(x):
+            return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), recurrentweights))**2), axis=1)
+
+        activations = np.vstack(activations)
+        # get velocity at point
+        vel = func(activations)
+
+        pca = skld.PCA(3)
+        pca.fit(activations)
+        X_pca = pca.transform(activations)
+
+        mlab.plot3d(X_pca[:5000, 0], X_pca[:5000, 1], X_pca[:5000, 2], vel[:5000])
+        mlab.colorbar(orientation='vertical')
+        mlab.show()
+
     def plot_fixed_points(self, activations, fixedpoints=None):
         if fixedpoints is not None:
             self.good_fixed_points = fixedpoints
         self._extract_fixed_point_locations()
         self._find_unique_fixed_points()
         self.unique_jac = [self.good_fixed_points[i] for i in self.unique_idx]
+
+
 
         activations = np.vstack(activations)
 
