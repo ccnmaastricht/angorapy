@@ -32,23 +32,16 @@ class FixedPointFinder:
     def backprop(self, inputs, x0):
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
         self.fixedpoints = []
-        recurrentweights = weights[1]
-        def func(x):
-            return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), recurrentweights))**2), axis=1)
 
-        activations, inputs = np.vstack(x0), np.vstack(inputs)
-        eval = func(activations)
-        idx = np.argwhere(eval < 1)
-
-        x0, inputs = activations[idx[:, 0], :], inputs[idx[:, 0], :]
-        for i in range(4):#x0.shape[0]):  # prepare iterable object for parallelization
+        combind = []
+        for i in range(8):#x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
         #for i in range(20):  # x0.shape[0]):
         #    if self.hps['rnn_type'] == 'gru':
          #       self.fixedpoints.append(backpropgru(combind[i]))
 
         pool = mp.Pool(mp.cpu_count())
-        self.fixedpoints = pool.map(backproprnn, combind, chunksize=1)
+        self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
 
         self._handle_bad_approximations(x0, inputs)
 
@@ -199,9 +192,29 @@ class FixedPointFinder:
                 self.good_inputs.append(inputs[i, :])
 
     def plot_velocities(self, activations):
-        recurrentweights = self.weights[1]
-        def func(x):
-            return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), recurrentweights))**2), axis=1)
+
+        if self.hps['rnn_type'] == 'vanilla':
+            recurrentweights = self.weights[1]
+            def func(x):
+                return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), recurrentweights))**2), axis=1)
+        elif self.hps['rnn_type'] == 'gru':
+            weights, n_hidden = self.weights, self.hps['n_hidden']
+            z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
+            W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
+            U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
+            b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
+
+            #z_projection_b = np.matmul(input, W_z) + b_z
+            #r_projection_b = np.matmul(input, W_r) + b_r
+            #g_projection_b = np.matmul(input, W_h) + b_h
+
+            def sigmoid(x):
+                return 1 / (1 + np.exp(-x))
+
+
+            func = lambda x: 0.5 * np.sum((((1 - sigmoid(np.matmul(x, U_z) + b_z)) * (np.tanh((sigmoid(np.matmul(x, U_r) + b_r)  * np.matmul(x, U_h) + b_h)) - x)) ** 2), axis = 1)
+        else:
+            pass
 
         activations = np.vstack(activations)
         # get velocity at point
@@ -211,7 +224,9 @@ class FixedPointFinder:
         pca.fit(activations)
         X_pca = pca.transform(activations)
 
-        mlab.plot3d(X_pca[:5000, 0], X_pca[:5000, 1], X_pca[:5000, 2], vel[:5000])
+        n_points = 2000
+        mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
+                    vel[:n_points])
         mlab.colorbar(orientation='vertical')
         mlab.show()
 

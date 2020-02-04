@@ -189,7 +189,7 @@ class Flipflopper:
         method = "Newton-CG"
         n_batches = 1 # how many batches to draw from
         self.hps['unique_tol'] = 1e-03
-        self.hps['threshold'] = 1
+        self.hps['threshold'] = 1e-03
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
         self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)
@@ -215,7 +215,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
+    rnn_type = 'gru'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
