@@ -20,7 +20,7 @@ class FixedPointFinder:
 
         self.weights = weights
         if self.hps['rnn_type'] == 'vanilla':
-            self.backprop(inputs, x0)
+            self.backprop(inputs[0, :, :], x0[0, :, :])
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
         else:
@@ -34,14 +34,19 @@ class FixedPointFinder:
         self.fixedpoints = []
 
         combind = []
-        for i in range(8):#x0.shape[0]):  # prepare iterable object for parallelization
+        for i in range(20):#x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
         #for i in range(20):  # x0.shape[0]):
         #    if self.hps['rnn_type'] == 'gru':
          #       self.fixedpoints.append(backpropgru(combind[i]))
 
         pool = mp.Pool(mp.cpu_count())
-        self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
+        if self.hps['rnn_type'] == 'vanilla':
+            self.fixedpoints = pool.map(backproprnn, combind, chunksize=1)
+        elif self.hps['rnn_type'] == 'gru':
+            self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
+        else:
+            pass
 
         self._handle_bad_approximations(x0, inputs)
 
@@ -224,7 +229,7 @@ class FixedPointFinder:
         pca.fit(activations)
         X_pca = pca.transform(activations)
 
-        n_points = 2000
+        n_points = 4000
         mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
                     vel[:n_points])
         mlab.colorbar(orientation='vertical')
