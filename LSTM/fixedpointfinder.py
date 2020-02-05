@@ -12,19 +12,24 @@ from mayavi import mlab
 
 
 class FixedPointFinder:
-    def __init__(self, hps, weights, inputs, x0):
+    def __init__(self, hps, weights, inputs, x0, method: str = "Newton-CG"):
         self.hps = hps
         self.unique_tol = hps['unique_tol']
         self.threshold = hps['threshold']
         self.minimization_distance = 10.0
 
         self.weights = weights
-        if self.hps['rnn_type'] == 'vanilla':
-            self.backprop(inputs[0, :, :], x0[0, :, :])
+        if len(x0.shape) == 3:
+            x, input =  x0[0, :, :], inputs[0, :, :]
+        else:
+            pass
+
+        if self.hps['algorithm'] == 'scipy':
+            self.parallel_minimization(input, x, method)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
         else:
-            self.backprop(inputs[0, :, :], x0[0, :, :])
+            self.backprop(inputs, x0)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
 
@@ -34,11 +39,9 @@ class FixedPointFinder:
         self.fixedpoints = []
 
         combind = []
-        for i in range(20):#x0.shape[0]):  # prepare iterable object for parallelization
+        for i in range(x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
-        #for i in range(20):  # x0.shape[0]):
-        #    if self.hps['rnn_type'] == 'gru':
-         #       self.fixedpoints.append(backpropgru(combind[i]))
+
 
         pool = mp.Pool(mp.cpu_count())
         if self.hps['rnn_type'] == 'vanilla':
@@ -46,7 +49,8 @@ class FixedPointFinder:
         elif self.hps['rnn_type'] == 'gru':
             self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
         else:
-            pass
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
         self._handle_bad_approximations(x0, inputs)
 
@@ -88,7 +92,7 @@ class FixedPointFinder:
                                                combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
-        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights)) ** 2)
+        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + b) ** 2)
         options = {'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
@@ -188,9 +192,9 @@ class FixedPointFinder:
         self.good_fixed_points = []
         self.good_inputs = []
         for i in range(len(self.fixedpoints)):
-            if np.sqrt(((activation[i, :] - self.fixedpoints[i]['x']) ** 2).sum()) > self.minimization_distance:
-                self.bad_fixed_points.append(self.fixedpoints[i])
-            elif self.fixedpoints[i]['fun'] > self.threshold:
+ #           if np.sqrt(((activation[i, :] - self.fixedpoints[i]['x']) ** 2).sum()) > self.minimization_distance:
+  #              self.bad_fixed_points.append(self.fixedpoints[i])
+            if self.fixedpoints[i]['fun'] > self.threshold:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
@@ -291,7 +295,7 @@ class FixedPointFinder:
 
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        ax.plot(X_pca[:2000, 0], X_pca[:2000, 1], X_pca[:2000, 2],
+        ax.plot(X_pca[:5000, 0], X_pca[:5000, 1], X_pca[:5000, 2],
                 linewidth=0.2)
         for i in range(len(x_modes)):
             if not x_modes[i]:

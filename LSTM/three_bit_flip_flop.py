@@ -186,10 +186,9 @@ class Flipflopper:
 
         self._load_model()
         self._get_activations(stim)
-        method = "Newton-CG"
-        n_batches = 1 # how many batches to draw from
         self.hps['unique_tol'] = 1e-03
-        self.hps['threshold'] = 1e-14
+        self.hps['threshold'] = 1e-02
+        self.hps['algorithm'] = "scipy"
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
         self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)
@@ -216,14 +215,14 @@ class Flipflopper:
 
 if __name__ == "__main__":
     rnn_type = 'vanilla'
-    n_hidden = 24
+    n_hidden = 64
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    # flopper.train(stim)
+    flopper.train(stim)
 
-    # flopper.visualize_flipflop(stim)
+    flopper.visualize_flipflop(stim)
 
     flopper.find_fixed_points(stim)
 

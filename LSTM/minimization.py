@@ -6,32 +6,19 @@ import tensorflow as tf
 def backproprnn(combined):
 
     def print_update(q):
-        print("Function value:", q, "; ")
+        print("Function value:", q)
 
-
-    def decay_lr(initial_lr, decay, iteration):
-        return initial_lr * (1.0 / (1.0 + decay * iteration))
     x0, input, weights, n_hidden = combined[0], combined[1], combined[2], combined[3]
-    n_hidden = 24
+
     weights, inputweights, b = weights[1], weights[0], weights[2]
     projection_b = np.matmul(input, inputweights) + b
-    fun = lambda x: 0.5 * np.sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + projection_b) **2)
+    fun = lambda x: 0.5 * np.sum(np.square(- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + b))
     grad_fun = nd.Gradient(fun)
-    max_iter = 4000
-    inlr = 0.01
-    #for i in range(500):
-     #   q = fun(x0)
-     #   dq = dqrad_fun(x0)
-     #   dq = np.round(dq, 15)
-     #   lr = decay_lr(inlr, 0.001, i)
-     #   x0 = x0 - lr * dq
-
-      #  if i % 100 == 0:
-      #      print_update(q, lr)
+    inlr, max_iter = 0.001, 4000
     beta_1, beta_2 = 0.9, 0.999
     m, v = np.zeros(n_hidden), np.zeros(n_hidden)
     epsilon = 1e-08
-    for t in range(1000):
+    for t in range(max_iter):
         q = fun(x0)
         dq = grad_fun(x0)
         m = beta_1 * m + (1 - beta_1) * dq
@@ -40,7 +27,7 @@ def backproprnn(combined):
         v_hat = v / (1 - np.power(beta_2, t+1))
         x0 = x0 - inlr * m_hat / (np.sqrt(v_hat) + epsilon)
 
-        if t % 100 == 0:
+        if t % 200 == 0:
             print_update(q)
 
     print('new IC')
@@ -80,13 +67,12 @@ def backpropgru(combined):
 
     fun = lambda x: 0.5 * sum(((1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])) ** 2)
     grad_fun = nd.Gradient(fun)
-    inlr = 0.001
 
-
+    inlr, max_iter = 0.001, 4000
     beta_1, beta_2 = 0.9, 0.999
     m, v = np.zeros(n_hidden), np.zeros(n_hidden)
     epsilon = 1e-08
-    for t in range(4000):
+    for t in range(max_iter):
         q = fun(x0)
         dq = grad_fun(x0)
         m = beta_1 * m + (1 - beta_1) * dq
@@ -95,7 +81,7 @@ def backpropgru(combined):
         v_hat = v / (1 - np.power(beta_2, t+1))
         x0 = x0 - inlr * m_hat / (np.sqrt(v_hat) + epsilon)
 
-        if t % 100 == 0:
+        if t % 200 == 0:
             print_update(q)
     dynamical_system = lambda x: (1 - z_fun(x[0:n_hidden])) * (g_fun(x[0:n_hidden]) - x[0:n_hidden])
     jac_fun = nd.Jacobian(dynamical_system)

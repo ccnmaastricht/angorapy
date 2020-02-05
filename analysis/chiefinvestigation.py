@@ -163,13 +163,10 @@ class Chiefinvestigator:
         hps = {'rnn_type': 'vanilla',
                'n_hidden': 64,
                'unique_tol': 1e-03,
-               'threshold': 1e-14}
+               'threshold': 1e-01,
+               'algorithm': 'scipy'}
 
-        finder = FixedPointFinder(hps, weights)
-        fixed_points = finder.parallel_minimization(inputs=input, activation=activation,
-                                                    method=method)
-
-        finder.plot_fixed_points(activations=activation)
+        self.finder = FixedPointFinder(hps, weights, input, activation)
 
 
 
@@ -198,12 +195,17 @@ if __name__ == "__main__":
     print(layer_names)
 
     activ = chiefinvesti.slave_investigator.get_layer_activations(layer_names[3])
-    states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
-                                                                    "policy_recurrent_layer")
-    inputs = np.reshape(activations[2], (activations[2].shape[0], 64))
-    activations = np.reshape(activations[1], (activations[1].shape[0], 64))
+    activationss, inputss = [], []
+    for i in range(10):
+        states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
+                                                                        "policy_recurrent_layer")
+        inputs = np.reshape(activations[2], (activations[2].shape[0], 64))
+        activations = np.reshape(activations[1], (activations[1].shape[0], 64))
+        activationss.append(activations)
+        inputss.append(inputs)
+        actions = np.vstack(actions)
 
-    actions = np.vstack(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
-    chiefinvesti.findfixedpoints(weights, activations, inputs)
+    activationss, inputss = np.vstack(activationss), np.vstack(inputss)
+    chiefinvesti.findfixedpoints(weights, activationss, inputss)
 
