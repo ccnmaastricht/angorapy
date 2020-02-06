@@ -8,6 +8,9 @@ def backproprnn(combined):
     def print_update(q):
         print("Function value:", q)
 
+    def decay_lr(initial_lr, decay, iteration):
+        return initial_lr * (1.0 / (1.0 + decay * iteration))
+
     x0, input, weights, n_hidden = combined[0], combined[1], combined[2], combined[3]
 
     weights, inputweights, b = weights[1], weights[0], weights[2]
@@ -20,12 +23,14 @@ def backproprnn(combined):
     epsilon = 1e-08
     for t in range(max_iter):
         q = fun(x0)
+        lr = decay_lr(inlr, 0.001, t)
+        # gradient norm clip will be implemented here.
         dq = grad_fun(x0)
         m = beta_1 * m + (1 - beta_1) * dq
         v = beta_2 * v + (1 - beta_2) * np.power(dq, 2)
         m_hat = m / (1 - np.power(beta_1, t+1))
         v_hat = v / (1 - np.power(beta_2, t+1))
-        x0 = x0 - inlr * m_hat / (np.sqrt(v_hat) + epsilon)
+        x0 = x0 - lr * m_hat / (np.sqrt(v_hat) + epsilon)
 
         if t % 200 == 0:
             print_update(q)

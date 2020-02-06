@@ -150,7 +150,7 @@ class Flipflopper:
         self.model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
         self.history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
-                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=5000)
+                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=4000)
 
         self._save_model()
 
@@ -187,7 +187,7 @@ class Flipflopper:
         self._load_model()
         self._get_activations(stim)
         self.hps['unique_tol'] = 1e-03
-        self.hps['threshold'] = 1e-02
+        self.hps['threshold'] = 1e-10
         self.hps['algorithm'] = "scipy"
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
@@ -214,8 +214,8 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
-    n_hidden = 64
+    rnn_type = 'lstm'
+    n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
@@ -224,6 +224,6 @@ if __name__ == "__main__":
 
     flopper.visualize_flipflop(stim)
 
-    flopper.find_fixed_points(stim)
+    # flopper.find_fixed_points(stim)
 
 

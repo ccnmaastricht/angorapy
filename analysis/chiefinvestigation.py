@@ -2,14 +2,11 @@ import os
 
 import gym
 import matplotlib.pyplot as plt
-import numdifftools as nd
 import numpy as np
 import scipy as sp
 import sklearn.decomposition as skld
 from matplotlib import animation
 import matplotlib.image as mpimg
-from matplotlib.lines import Line2D
-from scipy.optimize import minimize, curve_fit
 from sklearn.decomposition import NMF
 from sklearn.svm import SVC
 import sklearn.manifold as sklm
@@ -196,7 +193,7 @@ if __name__ == "__main__":
 
     activ = chiefinvesti.slave_investigator.get_layer_activations(layer_names[3])
     activationss, inputss = [], []
-    for i in range(10):
+    for i in range(20):
         states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
                                                                         "policy_recurrent_layer")
         inputs = np.reshape(activations[2], (activations[2].shape[0], 64))

@@ -4,44 +4,74 @@ import numdifftools as nd
 from scipy.optimize import minimize
 import sklearn.decomposition as skld
 import matplotlib.pyplot as plt
-from utilities.model_management import build_sub_model_to
-import tensorflow as tf
 from LSTM.minimization import backproprnn, backpropgru
-import mayavi
 from mayavi import mlab
 
 
 class FixedPointFinder:
+    """The class FixedPointFinder creates a fixedpoint dictionary and has functionality to visualize RNN trajectories
+    projected in 3D. A fixedpoint dictionary contain 'fun', the function evaluation at the fixedpoint 'x' and the
+    corresponding 'jacobian'
+
+    Args:
+        hps: Dictionary of hyperparameters.
+
+            unique_tol: Tolerance for when a fixedpoint will be considered unique, i.e. when two points are further
+            away from each than the tolerance, they will be considered unique and discarded otherwise. Default: 1e-03.
+
+            threshold: Minimization criteria. A fixedpoint must evaluate below the threshold in order to be considered
+            a slow/fixed point. This value depends on the task of the RNN. Default for 3-Bit Flip-FLop: 1e-12.
+
+            rnn_type: Specifying the architecture of the network. The network architecture defines the dynamical system.
+            Must be one of ['vanilla', 'gru', 'lstm']. No default.
+
+            n_hidden: Specifiying the number hidden units in the recurrent layer. No default.
+
+            algorithm: Algorithm that shall be employed for the minimization. Must be one of: scipy, adam. It is recommended
+            to use any of the two for vanilla architectures but adam for gru and lstm architectures. No default.
+
+        weights: list of weights as returned by tensorflow.keras for recurrent layer. The list must contain three objects:
+        input weights, recurrent weights and biases.
+
+        inputs: Input to the recurrent layer. First two dimensions must match first two dimesnions of x0
+
+        x0: acitvations of recurrent layer.
+
+        method: methd to pass to minimize function from scipy. Default: Newton-CG. """
     def __init__(self, hps, weights, inputs, x0, method: str = "Newton-CG"):
         self.hps = hps
         self.unique_tol = hps['unique_tol']
         self.threshold = hps['threshold']
         self.minimization_distance = 10.0
 
+        self.fixedpoints = []
         self.weights = weights
         if len(x0.shape) == 3:
-            x, input =  x0[0, :, :], inputs[0, :, :]
+            x, input = x0[0, :, :], inputs[0, :, :]
         else:
-            pass
+            x, input = x0, inputs
 
         if self.hps['algorithm'] == 'scipy':
             self.parallel_minimization(input, x, method)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
         else:
-            self.backprop(inputs, x0)
+            self.backprop(input, x)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
 
-
     def backprop(self, inputs, x0):
-        weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
-        self.fixedpoints = []
+        """Function to set up parallel processing of minimization for fixed points using adam as optimizer.
 
+        Args:
+            inputs: constant input at timestep of initial condition (IC). Object needs to have shape:
+            [n_timesteps x n_hidden].
+            x0: object containing ICs to begin optimization from. Object needs to have shape:
+            [n_timesteps x n_hidden]."""
+        weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
         combind = []
         for i in range(x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
-
 
         pool = mp.Pool(mp.cpu_count())
         if self.hps['rnn_type'] == 'vanilla':
@@ -54,14 +84,13 @@ class FixedPointFinder:
 
         self._handle_bad_approximations(x0, inputs)
 
-
     def parallel_minimization(self, inputs, x0, method):
-        """Function to set up parallel processing of minimization for fixed points
+        """Function to set up parallel processing of minimization for fixed points using minimize from scipy.
 
         Args:
-            input: constant input at timestep of initial condition (IC). Object needs to have shape:
+            inputs: constant input at timestep of initial condition (IC). Object needs to have shape:
             [n_timesteps x n_hidden].
-            activation: object containing ICs to begin optimization from. Object needs to have shape:
+            x0: object containing ICs to begin optimization from. Object needs to have shape:
             [n_timesteps x n_hidden].
             method: optimization method to be communicated to scipy.optimize.minimize. Default: "Newton-CG"
 
@@ -70,7 +99,7 @@ class FixedPointFinder:
         print(x0.shape[0], " minimizations to parallelize.")
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
 
-        for i in range(8):#x0.shape[0]):  # prepare iterable object for parallelization
+        for i in range(x0.shape[0]):  # prepare iterable object for parallelization
             combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
 
         if self.hps['rnn_type'] == 'vanilla':
@@ -87,9 +116,7 @@ class FixedPointFinder:
 
     @staticmethod
     def _minimizrnn(combined):
-        x0, input, weights, method, n_hidden = combined[0], \
-                                               combined[1], \
-                                               combined[2], combined[3], combined[4]
+        x0, input, weights, method, n_hidden = combined[0], combined[1], combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
         fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + b) ** 2)
@@ -113,17 +140,15 @@ class FixedPointFinder:
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
 
-        x0, input, weights, method, n_hidden = combined[0], \
-                                               combined[1], \
-                                               combined[2], combined[3], combined[4]
+        x0, input, weights, method, n_hidden = combined[0], combined[1], combined[2], combined[3], combined[4]
         z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
         W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
         U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
         b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
 
-        z_projection_b = np.matmul(input, W_z) + b_z
-        r_projection_b = np.matmul(input, W_r) + b_r
-        g_projection_b = np.matmul(input, W_h) + b_h
+        # z_projection_b = np.matmul(input, W_z) + b_z
+        # r_projection_b = np.matmul(input, W_r) + b_r
+        # g_projection_b = np.matmul(input, W_h) + b_h
 
         z_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_z) + b_z)
         r_fun = lambda x: sigmoid(np.matmul(x[0:n_hidden], U_r) + b_r)
@@ -145,6 +170,7 @@ class FixedPointFinder:
 
     @staticmethod
     def _minimizlstm(combined):
+        """There is not yet code to extract the lstm state tuple. Thus there would be h but no c vector. NOT YET WORKING"""
         x0, input, weights, method, n_hidden = combined[0], \
                                                combined[1], \
                                                combined[2], combined[3], combined[4]
@@ -168,7 +194,7 @@ class FixedPointFinder:
         # perhaps put h and c in as one object to minimize and split up in functions
         fun = lambda x, c: 0.5 * sum((o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]) ** 2)
 
-        options = {'gtol': 1e-14, 'disp': True}
+        options = {'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
         print("First function evaluation:", y)
@@ -201,7 +227,7 @@ class FixedPointFinder:
                 self.good_inputs.append(inputs[i, :])
 
     def plot_velocities(self, activations):
-
+        """Function to evaluate and visualize velocities at all recorded activations of the recurrent layer."""
         if self.hps['rnn_type'] == 'vanilla':
             recurrentweights = self.weights[1]
             def func(x):
@@ -223,7 +249,8 @@ class FixedPointFinder:
 
             func = lambda x: 0.5 * np.sum((((1 - sigmoid(np.matmul(x, U_z) + b_z)) * (np.tanh((sigmoid(np.matmul(x, U_r) + b_r)  * np.matmul(x, U_h) + b_h)) - x)) ** 2), axis = 1)
         else:
-            pass
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
         activations = np.vstack(activations)
         # get velocity at point
@@ -233,7 +260,7 @@ class FixedPointFinder:
         pca.fit(activations)
         X_pca = pca.transform(activations)
 
-        n_points = 4000
+        n_points = 3000
         mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
                     vel[:n_points])
         mlab.colorbar(orientation='vertical')
@@ -316,7 +343,8 @@ class FixedPointFinder:
         plt.show()
 
     def _extract_fixed_point_locations(self):
-        # processing of minimisation results for pca
+        """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
+        puts all coordinates in single array."""
         fixed_point_location = []
         for i in range(len(self.good_fixed_points)):
             fixed_point_location.append(self.good_fixed_points[i]['x'])
@@ -330,5 +358,3 @@ class FixedPointFinder:
 
         self.unique_fixed_points = ux
         self.unique_idx = idx
-
-# TODO: interpret Jacobian -> solve the error
