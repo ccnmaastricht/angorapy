@@ -161,7 +161,7 @@ class Chiefinvestigator:
                'n_hidden': 64,
                'unique_tol': 1e-03,
                'threshold': 1e-01,
-               'algorithm': 'scipy'}
+               'algorithm': 'backprop'}
 
         self.finder = FixedPointFinder(hps, weights, input, activation)
 

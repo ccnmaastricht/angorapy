@@ -17,7 +17,7 @@ class Stockpredictor:
     def model_builder(name, batch_shape, ):
         inputs = tf.keras.Input(shape=batch_shape, name="input")
 
-        x = tf.keras.layers.LSTM(16, name='lstm')(inputs)
+        x = tf.keras.layers.SimpleRNN(16, name='vanilla')(inputs)
         x = tf.keras.layers.ReLU()(x)
         x = tf.keras.layers.Dense(4, activation="relu", name="dense")(x)
 

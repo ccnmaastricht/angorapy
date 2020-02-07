@@ -65,7 +65,7 @@ class Flipflopper:
         if self.hps['rnn_type'] == 'vanilla':
             x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True)(inputs)
         elif self.hps['rnn_type'] == 'gru':
-            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
             x = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         else:
@@ -188,7 +188,7 @@ class Flipflopper:
         self._get_activations(stim)
         self.hps['unique_tol'] = 1e-03
         self.hps['threshold'] = 1e-10
-        self.hps['algorithm'] = "scipy"
+        self.hps['algorithm'] = "backprop"
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
         self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)
@@ -214,16 +214,16 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'lstm'
+    rnn_type = 'gru'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    flopper.train(stim)
+    # flopper.train(stim)
 
-    flopper.visualize_flipflop(stim)
+    # flopper.visualize_flipflop(stim)
 
-    # flopper.find_fixed_points(stim)
+    flopper.find_fixed_points(stim)
 
 

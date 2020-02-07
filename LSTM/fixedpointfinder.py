@@ -70,8 +70,9 @@ class FixedPointFinder:
             [n_timesteps x n_hidden]."""
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
         combind = []
-        for i in range(x0.shape[0]):  # prepare iterable object for parallelization
-            combind.append((x0[i, :], inputs[i, :], weights, n_hidden))
+        for i in range(x0.shape[0]-10):  # prepare iterable object for parallelization
+            combind.append((x0[i:i+10, :], inputs[i:i+10, :], weights, n_hidden))
+            i += 10
 
         pool = mp.Pool(mp.cpu_count())
         if self.hps['rnn_type'] == 'vanilla':
@@ -81,7 +82,7 @@ class FixedPointFinder:
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
-
+        self.fixedpoints = [item for sublist in self.fixedpoints for item in sublist]
         self._handle_bad_approximations(x0, inputs)
 
     def parallel_minimization(self, inputs, x0, method):
@@ -99,8 +100,9 @@ class FixedPointFinder:
         print(x0.shape[0], " minimizations to parallelize.")
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
 
-        for i in range(x0.shape[0]):  # prepare iterable object for parallelization
-            combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
+        for i in range(x0.shape[0]-10):  # prepare iterable object for parallelization
+            combind.append((x0[i:i+10, :], inputs[i:i+10, :], weights, method, n_hidden))
+            i += 10
 
         if self.hps['rnn_type'] == 'vanilla':
             self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
@@ -119,7 +121,7 @@ class FixedPointFinder:
         x0, input, weights, method, n_hidden = combined[0], combined[1], combined[2], combined[3], combined[4]
         weights, inputweights, b = weights[1], weights[0], weights[2]
         projection_b = np.matmul(input, inputweights) + b
-        fun = lambda x: 0.5 * sum((- x[0:n_hidden] + np.matmul(np.tanh(x[0:n_hidden]), weights) + b) ** 2)
+        fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + b) ** 2)
         options = {'disp': True}
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
         y = fun(x0)
@@ -127,7 +129,7 @@ class FixedPointFinder:
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                options=options)
 
-        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x[0:n_hidden]) ** 2)
+        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x) ** 2)
         fixed_point.jac = jac_fun(fixed_point.x)
         fixedpoint = {'fun': fixed_point.fun,
                       'x': fixed_point.x,
@@ -224,7 +226,7 @@ class FixedPointFinder:
                 self.bad_fixed_points.append(self.fixedpoints[i])
             else:
                 self.good_fixed_points.append(self.fixedpoints[i])
-                self.good_inputs.append(inputs[i, :])
+               # self.good_inputs.append(inputs[i, :])
 
     def plot_velocities(self, activations):
         """Function to evaluate and visualize velocities at all recorded activations of the recurrent layer."""
@@ -285,7 +287,7 @@ class FixedPointFinder:
         # somehow this block of code does not return values if put in function
         x_modes = []
         x_directions = []
-        scale = 4
+        scale = 2
         for n in range(len(self.unique_jac)):
 
             trace = np.matrix.trace(self.unique_jac[n]['jac'])
