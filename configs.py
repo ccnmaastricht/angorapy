@@ -18,6 +18,27 @@ def derive_config(original: dict, overrules: dict):
     return derived
 
 
+# DISCRETE
+
+discrete = make_config(
+    batch_size=128,
+    horizon=2048,
+    c_entropy=0.01,
+    lr_pi=0.0003,
+    epochs=10,
+    clip=0.2,
+    lam=0.95,
+    discount=0.99,
+    grad_norm=0.5,
+    iterations=100,
+    workers=8,
+    clip_values=False
+)
+
+discrete_no_ent = derive_config(discrete, {"c_entropy": 0.0})
+discrete_rnn = derive_config(discrete, {"model": "rnn"})
+discrete_gru = derive_config(discrete, {"model": "gru"})
+
 # CONTINUOUS DEFAULT
 
 continuous = make_config(

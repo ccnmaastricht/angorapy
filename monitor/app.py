@@ -56,6 +56,49 @@ def overview():
     return flask.render_template("overview.html", exps=experiments, envs_available=envs_available)
 
 
+@app.route("/benchmarks")
+def overview():
+    """Write Benchmark page."""
+    exp_dir = PATH_TO_EXPERIMENTS
+    experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]
+
+    experiments = {}
+    envs_available = set()
+    for path in experiment_paths:
+        eid_m = re.match("[0-9]+", str(path.split("/")[-1]))
+        if eid_m:
+            eid = eid_m.group(0)
+
+            if os.path.isfile(os.path.join(path, "progress.json")):
+                with open(os.path.join(path, "progress.json"), "r") as f:
+                    progress = json.load(f)
+
+                with open(os.path.join(path, "meta.json"), "r") as f:
+                    meta = json.load(f)
+
+                # for vn, vector in progress.items():
+                #     replace()
+
+                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
+                    meta["environment"]["reward_threshold"])
+                iterations = len(progress["rewards"]["mean"])
+                experiments.update({
+                    eid: {
+                        "env": meta["environment"]["name"],
+                        "date": meta["date"],
+                        "iterations": iterations,
+                        "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
+                        "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
+                            progress["rewards"]["mean"]) > reward_threshold),
+                        "bookmark": meta["bookmark"] if "bookmark" in meta else False
+                    }
+                })
+
+                envs_available.add(meta["environment"]["name"])
+
+    return flask.render_template("overview.html", exps=experiments, envs_available=envs_available)
+
+
 @app.route("/bookmark", methods=("POST", "GET"))
 def bookmark():
     """Bookmark an experiment."""
@@ -79,7 +122,6 @@ def bookmark():
         return {"success": "no post"}
 
     return {"success": "success"}
-
 
 
 @app.route("/experiment/<int:exp_id>", methods=("POST", "GET"))
@@ -171,3 +213,5 @@ def delete_experiment():
         return {"success": False}
 
     return {"success": True}
+
+

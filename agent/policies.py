@@ -31,7 +31,7 @@ class BasePolicyDistribution(abc.ABC):
     @property
     @abc.abstractmethod
     def short_name(self):
-        """Indicate whether the distribution is continuous."""
+        """Distribution's short name."""
         return "base"
 
     @property
@@ -309,15 +309,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def act(self, alphas: tf.Tensor, betas: tf.Tensor):
         """Sample an action from a beta distribution."""
-        np.seterr(all='raise')
-        try:
-            actions = np.random.beta(alphas, betas).astype("float32")
-        except:
-            print("Breaking due to acting issues in Beta.")
-            print(alphas, betas)
-            exit()
-        np.seterr(all='warn')
-
+        actions = np.random.beta(alphas, betas).astype("float32")
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
         probabilities = tf.squeeze(self.log_probability(actions, alphas, betas)).numpy()
 
@@ -355,11 +347,11 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         """Log probability utilizing the fact that tensorflow directly returns log of gamma function.
 
         Input Shape: (B, A)
+        Output Shape: (B,)
         """
         samples = self._scale_sample_to_distribution_range(samples)
 
-        top = tf.pow(samples, tf.subtract(alphas, 1.)) * tf.pow(
-            tf.subtract(1., samples), tf.subtract(betas, 1.))
+        top = tf.pow(samples, tf.subtract(alphas, 1.)) * tf.pow(tf.subtract(1., samples), tf.subtract(betas, 1.))
         log_pdf = tf.math.log(top) - tf.math.lgamma(alphas) - tf.math.lgamma(betas) + tf.math.lgamma(alphas + betas)
 
         return tf.math.reduce_sum(log_pdf, axis=-1)

@@ -47,11 +47,9 @@ class Gatherer:
         """Update the weights of this worker."""
         self.joint.set_weights(weights)
 
-    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict,
-                verbose: bool = False):
+    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict):
         """Collect a batch shard of experience for a given number of timesteps."""
 
-        st = time.time()
         # import here to avoid pickling errors
         import tensorflow as tfl
 
@@ -77,45 +75,31 @@ class Gatherer:
         states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
         episode_endpoints = []
         state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None))[0]
-
-        setup_time, st = time.time() - st, time.time()
-        pure_choice_time, pure_act_time, pure_sim_time, pure_norm_time, pure_eps_end_time = 0, 0, 0, 0, 0
-
         while t < horizon:
             current_subseq_length += 1
 
             # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
-            stt = time.time()
-
             policy_out = flatten(
                 self.joint.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
-            pure_choice_time += time.time() - stt
             a_distr, value = policy_out[:-1], policy_out[-1]
             states.append(state)
             values.append(np.squeeze(value))
 
             # from the action distribution sample an action and remember both the action and its probability
-            stt = time.time()
             action, action_probability = self.distribution.act(*a_distr)
-            pure_act_time += time.time() - stt
 
             action = action if not DETERMINISTIC else np.zeros(action.shape)
             actions.append(action)
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
             # make a step based on the chosen action and collect the reward for this state
-            stt = time.time()
             observation, reward, done, _ = self.env.step(np.atleast_1d(action) if self.is_continuous else action)
-            pure_sim_time += time.time() - stt
             current_episode_return += reward  # true reward for stats
-            stt = time.time()
-            observation, reward, done, _ = preprocessor.modulate((parse_state(observation), reward, done, None))
-            pure_norm_time += time.time() - stt
 
+            observation, reward, done, _ = preprocessor.modulate((parse_state(observation), reward, done, None))
             rewards.append(reward)
 
-            stt = time.time()
-            # if recurrent, at a subsequence breakpoint or episode end stack the observations and give them to the buffer
+            # if recurrent, at a subsequence breakpoint/episode end stack the observations and buffer them
             if self.is_recurrent and (current_subseq_length == subseq_length or done):
                 buffer.push_seq_to_buffer(states, actions, action_probabilities, values[-current_subseq_length:])
 
@@ -155,13 +139,10 @@ class Gatherer:
             else:
                 state = observation
                 episode_steps += 1
-            pure_eps_end_time += time.time() - stt
 
             t += 1
 
         self.env.close()
-
-        stepping_time, st = time.time() - st, time.time()
 
         # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
         values.append(np.squeeze(self.joint.predict(add_state_dims(state, dims=2 if self.is_recurrent else 1))[-1]))
@@ -196,24 +177,12 @@ class Gatherer:
         if self.is_recurrent:
             buffer.inject_batch_dimension()
 
-        wrapup_time, st = time.time() - st, time.time()
-
         # convert buffer to dataset and save it to tf record
         dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=self.is_shadow_brain)
         dataset = dataset.map(tf_serialize_example)
 
-        # TODO I have the suspicion that the writer leaks memory if we wouldn't reset the workers
         writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{self.id}.tfrecord")
         writer.write(dataset)
-
-        savenwrite_time = time.time() - st
-
-        if self.id == 0 and verbose:
-            print(f"\n\nTotal Runtime: {sum([setup_time, stepping_time, wrapup_time, savenwrite_time])}")
-            print(
-                f"\tSetup: {setup_time}\n\tStep: {stepping_time}\n\t\tChoice: {pure_choice_time}\n\t\tAct: {pure_act_time}"
-                f"\n\t\tSim: {pure_sim_time}\n\t\tNorm: {pure_norm_time}\n\t\tEnding: {pure_eps_end_time}"
-                f"\n\tWrapup: {wrapup_time}\n\tSaving: {savenwrite_time}")
 
         return stats, preprocessor
 

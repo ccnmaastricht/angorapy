@@ -246,6 +246,7 @@ class PPOAgent:
           squared error between prediction and return
         """
         error = tf.square(value_predictions - returns)
+
         if clip:
             # clips value error to reduce variance
             clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
@@ -256,7 +257,7 @@ class PPOAgent:
             # build and apply a mask over the old values (recurrent)
             mask = tf.not_equal(old_action_prob, 0)
             error_masked = tf.where(mask, error, 0)  # masking with tf.where because inf * 0 = nan...
-            return tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
+            return (tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))) * 0.5
         else:
             return tf.reduce_mean(error) * 0.5
 
@@ -330,6 +331,7 @@ class PPOAgent:
                                                              self.env_name, i) for i in range(self.n_workers)]
 
         cycle_start = None
+        full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -430,13 +432,16 @@ class PPOAgent:
             self.total_frames_seen += stats.numb_processed_frames
             self.total_episodes_seen += stats.numb_completed_episodes
 
-            if monitor is not None and monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                print("Creating Episode GIFs for current state of policy...")
-                monitor.create_episode_gif(n=1)
+            # update monitor logs
+            if monitor is not None:
+                if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                    print("Creating Episode GIFs for current state of policy...")
+                    monitor.create_episode_gif(n=1)
 
-            if monitor is not None and monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                monitor.update()
+                if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                    monitor.update()
 
+            # save the current state of the agent
             if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                 self.save_agent_state()
 
@@ -447,7 +452,8 @@ class PPOAgent:
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 
-        print("Drill finished.")
+        print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
+
         return self
 
     @tf.function
@@ -475,22 +481,15 @@ class PPOAgent:
             entropy = self.entropy_bonus(policy_output)
             total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
+        # calculate the gradient of the joint model based on total loss
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
+
         # clip gradients to avoid gradient explosion and stabilize learning
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
-        self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
-        # check for NaNs to detect errors early
-        if tf.executing_eagerly():
-            if __debug__ and tf.reduce_any(list(map(lambda x: tf.reduce_any(tf.math.is_nan(x)), gradients))):
-                print("At least part of the gradients were NaN. That sucks big time.")
-            if __debug__ and tf.reduce_any(tf.math.is_nan(entropy)):
-                print("Entropy became NaN during training. Something is going horribly wrong.")
-            if __debug__ and tf.reduce_any(tf.math.is_nan(policy_loss)):
-                print("Policy Loss became NaN during training. Something is going horribly wrong.")
-            if __debug__ and tf.reduce_any(tf.math.is_nan(value_loss)):
-                print("Value Loss became NaN during training. Something is going horribly wrong.")
+        # apply the gradients to the joint model's parameters
+        self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
         info = {
             "policy_output": policy_output,

@@ -9,7 +9,8 @@ from utilities.plotting import plot_with_confidence
 colors = ["red", "green", "blue", "orange"]
 
 parser = argparse.ArgumentParser()
-parser.add_argument("exp", nargs="*", type=str, default="LunarLanderContinuous_continuous_continuous_beta", help="name of the experiment")
+parser.add_argument("exp", nargs="*", type=str, default=["LunarLanderContinuous_continuous_continuous_beta"],
+                    help="name of the experiment")
 
 args = parser.parse_args()
 
@@ -17,6 +18,10 @@ results = {}
 for exp in args.exp:
     with open(f"docs/benchmarks/{exp}.json") as f:
         results.update(json.load(f))
+
+plt.axhline(results["reward_threshold"]) if results["reward_threshold"] is not None else None
+results.pop("reward_threshold")
+
 
 x = list(range(1, len(results[list(results.keys())[0]][0]) + 1))
 
@@ -29,7 +34,10 @@ for i, name in enumerate(results):
                          label=name,
                          col=colors[i])
 
+    plt.xlabel("Cycle")
+    plt.ylabel("Mean Cumulative Reward")
+
 plt.legend()
-plt.title(f"Benchmarking {args.exp}")
-plt.savefig(f"docs/benchmarks/benchmarking_{args.exp}.pdf", format="pdf")
+plt.title(f"{args.exp[0].split('_')[0]}")
+plt.savefig(f"docs/benchmarks/benchmarking_{'_'.join(args.exp)}.pdf", format="pdf")
 plt.show()
