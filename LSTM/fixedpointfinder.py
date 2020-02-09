@@ -31,19 +31,46 @@ class FixedPointFinder:
             algorithm: Algorithm that shall be employed for the minimization. Must be one of: scipy, adam. It is recommended
             to use any of the two for vanilla architectures but adam for gru and lstm architectures. No default.
 
+            n_points: Number of points to use to plot the trajectories the network took. Recommended 200-5000, otherwise
+            the plot will look too sparse or too crowded. Default: 3000.
+
+            use_input: boolean parameter indicating if input to the recurrent layer shall be used during minimization or
+            not. Default: False
+
+        scipy_hps: Dictionary of hyperparameters specifically for minimize from scipy.
+
+            method: Method to employ for minimization using the scipy package. Default: "Newton-CG".
+
+            display: boolean array indication, if information about the minimization shall be printed to the console
+
+        adam_hps: Dictionary of hyperparameters specifically for adam optimizer.
+
+            max_iter: maximum number of iterations to run backpropagation for. Default: 5000.
+
+
+
         weights: list of weights as returned by tensorflow.keras for recurrent layer. The list must contain three objects:
         input weights, recurrent weights and biases.
 
-        inputs: Input to the recurrent layer. First two dimensions must match first two dimesnions of x0
+        inputs: Input to the recurrent layer. First two dimensions must match first two dimensions of x0
 
-        x0: acitvations of recurrent layer.
-
-        method: methd to pass to minimize function from scipy. Default: Newton-CG. """
-    def __init__(self, hps, weights, inputs, x0, method: str = "Newton-CG"):
+        x0: activations of recurrent layer."""
+    def __init__(self, hps, weights, inputs, x0):
         self.hps = hps
         self.unique_tol = hps['unique_tol']
         self.threshold = hps['threshold']
         self.minimization_distance = 10.0
+        self.n_points = 3000
+        self.use_input = False
+        self.n_ic = hps['n_ic']
+        self.scipy_hps = {'method': hps['method'],
+                          'display': hps['display']}
+
+        self.adam_hps = {'max_iter': hps['max_iter'],
+                         'n_init': hps['n_init'],
+                         'lr': hps['lr'],
+                         'gradientnormclip': hps['gradientnormclip'],
+                         'print_every': hps['print_every']}
 
         self._print_hps()
         self.fixedpoints = []
@@ -54,13 +81,14 @@ class FixedPointFinder:
             x, input = x0, inputs
 
         if self.hps['algorithm'] == 'scipy':
-            self.parallel_minimization(input, x, method)
+            self.parallel_minimization(input, x)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
         else:
             self.backprop(input, x)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
+# TODO: add hyperparameters:
 
     def backprop(self, inputs, x0):
         """Function to set up parallel processing of minimization for fixed points using adam as optimizer.
@@ -72,9 +100,10 @@ class FixedPointFinder:
             [n_timesteps x n_hidden]."""
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
         combind = []
-        for i in range(x0.shape[0]-10):  # prepare iterable object for parallelization
-            combind.append((x0[i:i+10, :], inputs[i:i+10, :], weights, n_hidden))
-            i += 10
+        for i in range(self.n_ic-10):  # prepare iterable object for parallelization
+            combind.append((x0[i:i+self.adam_hps['n_init'], :], inputs[i:i+self.adam_hps['n_init'], :],
+                            weights, n_hidden, self.adam_hps, self.use_input))
+            i += self.adam_hps['n_init']
 
         pool = mp.Pool(mp.cpu_count())
         if self.hps['rnn_type'] == 'vanilla':
@@ -87,7 +116,7 @@ class FixedPointFinder:
         self.fixedpoints = [item for sublist in self.fixedpoints for item in sublist]
         self._handle_bad_approximations(x0, inputs)
 
-    def parallel_minimization(self, inputs, x0, method):
+    def parallel_minimization(self, inputs, x0):
         """Function to set up parallel processing of minimization for fixed points using minimize from scipy.
 
         Args:
@@ -99,11 +128,11 @@ class FixedPointFinder:
 
         """
         pool = mp.Pool(mp.cpu_count())
-        print(x0.shape[0], " minimizations to parallelize.")
+        print(self.n_ic, " minimizations to parallelize.")
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
 
-        for i in range(8):  # prepare iterable object for parallelization
-            combind.append((x0[i, :], inputs[i, :], weights, method, n_hidden))
+        for i in range(self.n_ic):  # prepare iterable object for parallelization
+            combind.append((x0[i, :], inputs[i, :], weights, self.scipy_hps, n_hidden, self.use_input))
 
         if self.hps['rnn_type'] == 'vanilla':
             self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
@@ -119,14 +148,16 @@ class FixedPointFinder:
 
     @staticmethod
     def _minimizrnn(combined):
-        x0, input, weights, method, n_hidden = combined[0], combined[1], combined[2], combined[3], combined[4]
+        x0, input, weights, scipy_hps, n_hidden, use_input = combined[0], combined[1], combined[2], combined[3], \
+                                                          combined[4], combined[5]
 
-        fun = build_rnn_ds(weights, input, use_input=False)
-        options = {'disp': True}
+
+        fun = build_rnn_ds(weights, input, use_input=use_input)
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-        y = fun(x0)
-        print("First function evaluation:", y)
-        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
+
+        print("First function evaluation:", fun(x0))
+        options = {'disp': scipy_hps['display']}
+        fixed_point = minimize(fun, x0, method=scipy_hps['method'], jac=jac, hess=hes,
                                options=options)
 
         jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x) ** 2)
@@ -138,40 +169,49 @@ class FixedPointFinder:
 
     @staticmethod
     def _minimizgru(combined):
-        x0, input, weights, method, n_hidden = combined[0], combined[1], combined[2], combined[3], combined[4]
+        x0, input, weights, scipy_hps, n_hidden, use_input = combined[0], combined[1], combined[2], combined[3], \
+                                                          combined[4], combined[5]
 
-        fun, dynamical_system = build_gru_ds(weights, input, n_hidden, use_input=False)
-        options = {'disp': True}
+        fun, dynamical_system = build_gru_ds(weights, input, n_hidden, use_input=use_input)
+
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-        y = fun(x0)
-        print("First function evaluation:", y)
-        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
+
+        print("First function evaluation:", fun(x0))
+        options = {'disp': scipy_hps['display']}
+        fixed_point = minimize(fun, x0, method=scipy_hps['method'], jac=jac, hess=hes,
                                options=options)
 
         jac_fun = nd.Jacobian(dynamical_system)
         fixed_point.jac = jac_fun(fixed_point.x)
+        fixedpoint = {'fun': fixed_point.fun,
+                      'x': fixed_point.x,
+                      'jac': fixed_point.jac}
 
-        return fixed_point
+        return fixedpoint
 
     @staticmethod
     def _minimizlstm(combined):
         """There is not yet code to extract the lstm state tuple. Thus there would be h but no c vector. NOT YET WORKING"""
-        x0, input, weights, method, n_hidden = combined[0], \
+        x0, input, weights, method, n_hidden, use_input = combined[0], \
                                                combined[1], \
-                                               combined[2], combined[3], combined[4]
+                                               combined[2], combined[3], combined[4], combined[5]
 
-        fun, dynamical_system = build_lstm_ds(weights, input, n_hidden, use_input=False)
-        options = {'disp': True}
+        fun, dynamical_system = build_lstm_ds(weights, input, n_hidden, use_input=use_input)
+
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-        y = fun(x0)
-        print("First function evaluation:", y)
+
+        print("First function evaluation:", fun(x0))
+        options = {'disp': True}
         fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
                                options=options)
 
         jac_fun = nd.Jacobian(dynamical_system)
         fixed_point.jac = jac_fun(fixed_point.x)
+        fixedpoint = {'fun': fixed_point.fun,
+                      'x': fixed_point.x,
+                      'jac': fixed_point.jac}
 
-        return fixed_point
+        return fixedpoint
 
     def _handle_bad_approximations(self, activation, inputs):
         """This functions identifies approximations where the minmization
@@ -195,25 +235,10 @@ class FixedPointFinder:
     def plot_velocities(self, activations):
         """Function to evaluate and visualize velocities at all recorded activations of the recurrent layer."""
         if self.hps['rnn_type'] == 'vanilla':
-            recurrentweights = self.weights[1]
-            def func(x):
-                return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), recurrentweights))**2), axis=1)
+            func = build_rnn_ds(self.weights)
         elif self.hps['rnn_type'] == 'gru':
             weights, n_hidden = self.weights, self.hps['n_hidden']
-            z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
-            W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
-            U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
-            b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
-
-            #z_projection_b = np.matmul(input, W_z) + b_z
-            #r_projection_b = np.matmul(input, W_r) + b_r
-            #g_projection_b = np.matmul(input, W_h) + b_h
-
-            def sigmoid(x):
-                return 1 / (1 + np.exp(-x))
-
-
-            func = lambda x: 0.5 * np.sum((((1 - sigmoid(np.matmul(x, U_z) + b_z)) * (np.tanh((sigmoid(np.matmul(x, U_r) + b_r)  * np.matmul(x, U_h) + b_h)) - x)) ** 2), axis = 1)
+            func, _ = build_gru_ds(weights, n_hidden)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -226,7 +251,7 @@ class FixedPointFinder:
         pca.fit(activations)
         X_pca = pca.transform(activations)
 
-        n_points = 3000
+        n_points = self.n_points
         mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
                     vel[:n_points])
         mlab.colorbar(orientation='vertical')
@@ -288,7 +313,7 @@ class FixedPointFinder:
 
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        ax.plot(X_pca[:5000, 0], X_pca[:5000, 1], X_pca[:5000, 2],
+        ax.plot(X_pca[:self.n_points, 0], X_pca[:self.n_points, 1], X_pca[:self.n_points, 2],
                 linewidth=0.2)
         for i in range(len(x_modes)):
             if not x_modes[i]:

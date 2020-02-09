@@ -1,19 +1,19 @@
 import numpy as np
 
 
-def build_rnn_ds(weights, input, use_input: bool = False):
+def build_rnn_ds(weights, input: None, use_input: bool = False):
     weights, inputweights, b = weights[1], weights[0], weights[2]
     projection_b = np.matmul(input, inputweights) + b
 
     if use_input:
         fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2)
     else:
-        fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + b) ** 2)
+        fun = lambda x: np.mean(0.5 * sum((- x + np.matmul(np.tanh(x), weights) + b) ** 2))
 
     return fun
 
 
-def build_gru_ds(weights, input, n_hidden, use_input:bool = False):
+def build_gru_ds(weights, n_hidden, input: None, use_input: bool = False):
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
 
