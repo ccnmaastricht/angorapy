@@ -188,7 +188,7 @@ class Flipflopper:
         self._get_activations(stim)
         self.hps['unique_tol'] = 1e-03
         self.hps['threshold'] = 1e-10
-        self.hps['algorithm'] = "backprop"
+        self.hps['algorithm'] = "scipy"
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
         self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)

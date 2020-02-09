@@ -17,6 +17,7 @@ from analysis.investigation import Investigator
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from LSTM.fixedpointfinder import FixedPointFinder
+from mayavi import mlab
 
 
 class Chiefinvestigator:
@@ -192,7 +193,7 @@ if __name__ == "__main__":
     print(layer_names)
 
     activ = chiefinvesti.slave_investigator.get_layer_activations(layer_names[3])
-    activationss, inputss = [], []
+    activationss, inputss, actionss = [], [], []
     for i in range(20):
         states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
                                                                         "policy_recurrent_layer")
@@ -201,8 +202,17 @@ if __name__ == "__main__":
         activationss.append(activations)
         inputss.append(inputs)
         actions = np.vstack(actions)
-
+        actionss.append(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
     activationss, inputss = np.vstack(activationss), np.vstack(inputss)
-    chiefinvesti.findfixedpoints(weights, activationss, inputss)
+    # chiefinvesti.findfixedpoints(weights, activationss, inputss)
+    actionss = np.concatenate(actionss, axis=0)
+
+    pca = skld.PCA(3)
+    pca.fit(activationss)
+    X_pca = pca.transform(activationss)
+
+    n_points = 3000
+    p = mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2])
+
 
