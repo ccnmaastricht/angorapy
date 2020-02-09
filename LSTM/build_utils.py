@@ -8,7 +8,7 @@ def build_rnn_ds(weights, input: None, use_input: bool = False):
     if use_input:
         fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2)
     else:
-        fun = lambda x: np.mean(0.5 * sum((- x + np.matmul(np.tanh(x), weights) + b) ** 2))
+        fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + b) ** 2)
 
     return fun
 
@@ -36,7 +36,7 @@ def build_gru_ds(weights, n_hidden, input: None, use_input: bool = False):
         r_fun = lambda x: sigmoid(np.matmul(x, U_r) + b_r)
         g_fun = lambda x: np.tanh((r_fun(x) * np.matmul(x, U_h) + b_h))
 
-        fun = lambda x: 0.5 * sum(((1 - z_fun(x)) * (g_fun(x) - x)) ** 2)
+        fun = lambda x: 0.5 * np.sum((((1 - z_fun(x)) * (g_fun(x) - x)) ** 2), axis=1)
 
     dynamical_system = lambda x: (1 - z_fun(x)) * (g_fun(x) - x)
 

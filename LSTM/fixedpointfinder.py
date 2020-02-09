@@ -26,7 +26,7 @@ class FixedPointFinder:
             rnn_type: Specifying the architecture of the network. The network architecture defines the dynamical system.
             Must be one of ['vanilla', 'gru', 'lstm']. No default.
 
-            n_hidden: Specifiying the number hidden units in the recurrent layer. No default.
+            n_hidden: Specifiying the number of hidden units in the recurrent layer. No default.
 
             algorithm: Algorithm that shall be employed for the minimization. Must be one of: scipy, adam. It is recommended
             to use any of the two for vanilla architectures but adam for gru and lstm architectures. No default.
@@ -84,10 +84,15 @@ class FixedPointFinder:
             self.parallel_minimization(input, x)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
-        else:
+        elif self.hps['algorithm'] == 'adam':
             self.backprop(input, x)
             self.plot_fixed_points(x0, )
             self.plot_velocities(x0, )
+        else:
+            self.exponential_minimization(inputs, x0)
+            # self.plot_fixed_points(x0, )
+            # self.plot_velocities(x0, )
+
 # TODO: add hyperparameters:
 
     def backprop(self, inputs, x0):
@@ -145,6 +150,39 @@ class FixedPointFinder:
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
         self._handle_bad_approximations(x0, inputs)
+
+    def exponential_minimization(self, inputs, x0):
+        x0 = np.vstack(x0)
+
+        pca = skld.PCA(3)
+        pca.fit(x0)
+        X_pca = pca.transform(x0)
+
+        minimum, maximum = np.amin(X_pca, axis=0), np.amax(X_pca, axis=0)
+
+        n_samples = 50
+        self.search_points = np.linspace(minimum, maximum, n_samples)
+
+        self.x, self.y, self.z = np.meshgrid(self.search_points[:, 0], self.search_points[:, 1], self.search_points[:, 2],
+                                             indexing='ij')
+        self.positions = np.vstack([self.x.ravel(), self.y.ravel(), self.z.ravel()]).transpose()
+        self.original_space = pca.inverse_transform(self.positions)
+
+        fun, _ = build_gru_ds(self.weights, self.hps['n_hidden'], inputs, use_input=False)
+
+        self.value = fun(self.original_space)
+
+        k = 10000
+        idx = np.argpartition(self.value, k)
+        self.new_positions = self.positions[idx[:k]]
+        self.new_value = self.value[idx[:k]]
+        n_points = k
+        mlab.plot3d(self.new_positions[:n_points, 0], self.new_positions[:n_points, 1], self.new_positions[:n_points, 2],
+                    self.new_value[:n_points])
+        mlab.colorbar(orientation='vertical')
+        mlab.show()
+
+
 
     @staticmethod
     def _minimizrnn(combined):

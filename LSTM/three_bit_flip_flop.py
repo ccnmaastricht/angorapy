@@ -186,8 +186,11 @@ class Flipflopper:
 
         self._load_model()
         self._get_activations(stim)
-        self.hps = {'unique_tol': 1e-03,
-                    'algorithm': "scipy",
+        self.hps = {'rnn_type': self.hps['rnn_type'],
+                    'n_hidden': self.hps['n_hidden'],
+                    'unique_tol': 1e-03,
+                    'threshold': 1e-10,
+                    'algorithm': "exponential",
                     'n_init': 1,
                     'method': "Newton-CG",
                     'display': True,
