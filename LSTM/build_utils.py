@@ -1,4 +1,4 @@
-import numpy as np
+import autograd.numpy as np
 
 
 def build_rnn_ds(weights, input: None, use_input: bool = False):
@@ -13,7 +13,7 @@ def build_rnn_ds(weights, input: None, use_input: bool = False):
     return fun
 
 
-def build_gru_ds(weights, n_hidden, input: None, use_input: bool = False):
+def build_gru_ds(weights, n_hidden, input: str = None, use_input: bool = False):
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
 

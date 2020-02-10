@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from utilities.model_management import build_sub_model_to
+from LSTM.fixedpointfinder import FixedPointFinder
 
 
 # from analysis.chiefinvestigation import
@@ -88,3 +89,18 @@ if __name__ == "__main__":
     activations = sub_model.predict(tf.convert_to_tensor(test_samples, dtype=tf.float32))
     print(activations)
     # minimize stuff -> write minimization function for lstm
+
+    hps = {'rnn_type': 'vanilla',
+                'n_hidden': 16,
+                'unique_tol': 1e-03,
+                'threshold': 1e-10,
+                'algorithm': "backprop",
+                'n_init': 1,
+                'method': "Newton-CG",
+                'display': True,
+                'max_iter': 5000,
+                'n_ic': 8,
+                'lr': 0.001,
+                'gradientnormclip': 1.0,
+                'print_every': 200}
+    finder = FixedPointFinder()

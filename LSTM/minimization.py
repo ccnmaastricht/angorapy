@@ -59,12 +59,11 @@ def backpropgru(combined):
         return initial_lr * (1.0 / (1.0 + decay * iteration))
 
 
-    x0, input, weights, n_hidden, adam_hps, use_input = combined[0], \
+    x0, input, weights, n_hidden, adam_hps = combined[0], \
                                            combined[1], \
-                                           combined[2], combined[3], combined[4], combined[5]
-    fun, dynamical_system = build_gru_ds(weights, input, n_hidden, use_input=use_input)
+                                           combined[2], combined[3], combined[4],
+    fun, dynamical_system = build_gru_ds(weights, n_hidden, input, use_input=False)
     # grad_fun = nd.Gradient(fun)
-
     inlr, max_iter = adam_hps['lr'], adam_hps['max_iter']
     beta_1, beta_2 = 0.9, 0.999
     m, v = np.zeros(n_hidden), np.zeros(n_hidden)
@@ -89,7 +88,7 @@ def backpropgru(combined):
 
     jac_fun = nd.Jacobian(dynamical_system)
     fixedpoints = []
-    for i in range():
+    for i in range(adam_hps['n_init']):
         jacobian = jac_fun(x0[i, :])
         fixedpoint = {'fun': q,
                       'x': x0[i, :],

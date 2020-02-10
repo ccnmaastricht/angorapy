@@ -63,16 +63,13 @@ class FixedPointFinder:
         self.threshold = hps['threshold']
         self.minimization_distance = 10.0
         self.n_points = 3000
+
         self.use_input = False
         self.n_ic = hps['n_ic']
-        self.scipy_hps = {'method': hps['method'],
-                          'display': hps['display']}
+        self.scipy_hps = hps['scipy_hps']
 
-        self.adam_hps = {'max_iter': hps['max_iter'],
-                         'n_init': hps['n_init'],
-                         'lr': hps['lr'],
-                         'gradientnormclip': hps['gradientnormclip'],
-                         'print_every': hps['print_every']}
+        self.adam_hps = hps['adam_hps']
+        self.n_init = self.adam_hps['n_init']
 
         self._print_hps()
         self.fixedpoints = []
@@ -85,15 +82,15 @@ class FixedPointFinder:
         if self.hps['algorithm'] == 'scipy':
             self.parallel_minimization(input, x)
             self.plot_fixed_points(x0, )
-            self.plot_velocities(x0, )
+            self.plot_velocities(x0, input)
         elif self.hps['algorithm'] == 'adam':
             self.backprop(input, x)
             self.plot_fixed_points(x0, )
-            self.plot_velocities(x0, )
+            self.plot_velocities(x0, input)
         else:
             self.exponential_minimization(inputs, x0)
             # self.plot_fixed_points(x0, )
-            # self.plot_velocities(x0, )
+            # self.plot_velocities(x0, input)
 
 # TODO: add hyperparameters:
 
@@ -106,11 +103,9 @@ class FixedPointFinder:
             x0: object containing ICs to begin optimization from. Object needs to have shape:
             [n_timesteps x n_hidden]."""
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
-        combind = []
-        for i in range(self.n_ic-10):  # prepare iterable object for parallelization
-            combind.append((x0[i:i+self.adam_hps['n_init'], :], inputs[i:i+self.adam_hps['n_init'], :],
-                            weights, n_hidden, self.adam_hps, self.use_input))
-            i += self.adam_hps['n_init']
+        adam_hps, use_input = self.adam_hps, self.use_input
+        for i in range(self.hps['n_ic']-self.n_init):  # prepare iterable object for parallelization
+            combind.append((x0[i:(i+self.n_init), :], inputs[i:(i+self.n_init), :], weights, n_hidden, adam_hps))
 
         pool = mp.Pool(mp.cpu_count())
         if self.hps['rnn_type'] == 'vanilla':
@@ -183,26 +178,26 @@ class FixedPointFinder:
 
         fun, _ = build_gru_ds(self.weights, self.hps['n_hidden'], inputs, use_input=False)
         self.value = fun(self.original_space)
-        k = int(n_samples**3/100)
+        k = int(n_samples**3/10)
         idx = np.argpartition(self.value, k)
         self.new_positions = self.positions[idx[:k]]
         self.value = self.value[idx[:k]]
         for i in range(2):
             self.new_points = generate_points(self.new_positions[:, 0], self.new_positions[:, 1], self.new_positions[:, 2],
-                                              0.01, 0.01, 2)
+                                              0.01/((i+1)*8), 0.1/((i+1)*10), 20)
             self.new_points = np.hstack(self.new_points).transpose()
 
             self.positions = np.vstack((self.new_positions, self.new_points))
             self.original_space = pca.inverse_transform(self.positions)
             self.value = fun(self.original_space)
-            k = int(len(self.value)/4)
+            k = int(len(self.value)/21)
             idx = np.argpartition(self.value, k)
             self.new_positions = self.positions[idx[:k]]
             self.value = self.value[idx[:k]]
             n_points = k
 
 
-
+        n_points = k
         mlab.points3d(self.new_positions[:n_points, 0], self.new_positions[:n_points, 1], self.new_positions[:n_points, 2],
                     self.value[:n_points])
         mlab.colorbar(orientation='vertical')
@@ -296,13 +291,13 @@ class FixedPointFinder:
                 self.good_fixed_points.append(self.fixedpoints[i])
                # self.good_inputs.append(inputs[i, :])
 
-    def plot_velocities(self, activations):
+    def plot_velocities(self, activations, input):
         """Function to evaluate and visualize velocities at all recorded activations of the recurrent layer."""
         if self.hps['rnn_type'] == 'vanilla':
-            func = build_rnn_ds(self.weights)
+            func = build_rnn_ds(self.weights, input, use_input=False)
         elif self.hps['rnn_type'] == 'gru':
             weights, n_hidden = self.weights, self.hps['n_hidden']
-            func, _ = build_gru_ds(weights, n_hidden)
+            func, _ = build_gru_ds(weights, n_hidden, input, use_input=False)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])

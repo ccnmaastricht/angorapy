@@ -190,15 +190,15 @@ class Flipflopper:
                     'n_hidden': self.hps['n_hidden'],
                     'unique_tol': 1e-03,
                     'threshold': 1e-10,
-                    'algorithm': "exponential",
-                    'n_init': 1,
-                    'method': "Newton-CG",
-                    'display': True,
-                    'max_iter': 5000,
-                    'n_ic': 8,
-                    'lr': 0.001,
-                    'gradientnormclip': 1.0,
-                    'print_every': 200}
+                    'n_ic': 20,
+                    'algorithm': "adam",
+                    'scipy_hps': {'method': "Newton-CG",
+                                  'display': True},
+                    'adam_hps': {'max_iter': 5000,
+                                 'lr': 0.001,
+                                 'n_init': 4,
+                                 'gradientnormclip': 1.0,
+                                 'print_every': 200}}
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
 
         self.finder = FixedPointFinder(self.hps, weights, inputs=stim['inputs'], x0=self.activation)
