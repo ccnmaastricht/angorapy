@@ -12,9 +12,8 @@ import math
 
 
 class FixedPointFinder:
-    """The class FixedPointFinder creates a fixedpoint dictionary and has functionality to visualize RNN trajectories
-    projected in 3D. A fixedpoint dictionary contain 'fun', the function evaluation at the fixedpoint 'x' and the
-    corresponding 'jacobian'
+    """The class FixedPointFinder creates a fixedpoint dictionary. A fixedpoint dictionary contain 'fun',
+    the function evaluation at the fixedpoint 'x' and the corresponding 'jacobian'.
 
     Args:
         hps: Dictionary of hyperparameters.
@@ -82,15 +81,12 @@ class FixedPointFinder:
         if self.hps['algorithm'] == 'scipy':
             self.parallel_minimization(input, x)
             self.plot_fixed_points(x0, )
-            self.plot_velocities(x0, input)
         elif self.hps['algorithm'] == 'adam':
             self.backprop(input, x)
             self.plot_fixed_points(x0, )
-            self.plot_velocities(x0, input)
         else:
             self.exponential_minimization(inputs, x0)
             # self.plot_fixed_points(x0, )
-            # self.plot_velocities(x0, input)
 
 # TODO: add hyperparameters:
 
@@ -98,10 +94,12 @@ class FixedPointFinder:
         """Function to set up parallel processing of minimization for fixed points using adam as optimizer.
 
         Args:
-            inputs: constant input at timestep of initial condition (IC). Object needs to have shape:
-            [n_timesteps x n_hidden].
-            x0: object containing ICs to begin optimization from. Object needs to have shape:
-            [n_timesteps x n_hidden]."""
+            inputs: constant input at timestep of initial condition (IC).
+                    Object needs to have shape [n_timesteps x n_hidden].
+            x0: object containing ICs to begin optimization from.
+                Object needs to have shape [n_timesteps x n_hidden].
+        Returns:
+            Fixedpointobject"""
         weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
         adam_hps, use_input = self.adam_hps, self.use_input
         for i in range(self.hps['n_ic']-self.n_init):  # prepare iterable object for parallelization
@@ -122,12 +120,8 @@ class FixedPointFinder:
         """Function to set up parallel processing of minimization for fixed points using minimize from scipy.
 
         Args:
-            inputs: constant input at timestep of initial condition (IC). Object needs to have shape:
-            [n_timesteps x n_hidden].
-            x0: object containing ICs to begin optimization from. Object needs to have shape:
-            [n_timesteps x n_hidden].
-            method: optimization method to be communicated to scipy.optimize.minimize. Default: "Newton-CG"
-
+            inputs: constant input at timestep of initial condition (IC). Object needs to have shape [n_timesteps x n_hidden].
+            x0: object containing ICs to begin optimization from. Object needs to have shape [n_timesteps x n_hidden].
         """
         pool = mp.Pool(mp.cpu_count())
         print(self.n_ic, " minimizations to parallelize.")
@@ -291,8 +285,12 @@ class FixedPointFinder:
                 self.good_fixed_points.append(self.fixedpoints[i])
                # self.good_inputs.append(inputs[i, :])
 
-    def plot_velocities(self, activations, input):
-        """Function to evaluate and visualize velocities at all recorded activations of the recurrent layer."""
+    def compute_velocities(self, activations, input):
+        """Function to evaluate velocities at all recorded activations of the recurrent layer.
+
+        Args:
+             """
+
         if self.hps['rnn_type'] == 'vanilla':
             func = build_rnn_ds(self.weights, input, use_input=False)
         elif self.hps['rnn_type'] == 'gru':
@@ -304,18 +302,11 @@ class FixedPointFinder:
 
         activations = np.vstack(activations)
         # get velocity at point
-        vel = func(activations)
+        velocities = func(activations)
+        return velocities
 
-        pca = skld.PCA(3)
-        pca.fit(activations)
-        X_pca = pca.transform(activations)
 
-        n_points = self.n_points
-        mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
-                    vel[:n_points])
-        mlab.colorbar(orientation='vertical')
-        mlab.show()
-
+# TODO: velocities as output as functionality
     def plot_fixed_points(self, activations, fixedpoints=None):
         if fixedpoints is not None:
             self.good_fixed_points = fixedpoints
