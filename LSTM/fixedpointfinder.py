@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from LSTM.minimization import backproprnn, backpropgru
 from mayavi import mlab
 from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
+import random
+import math
 
 
 class FixedPointFinder:
@@ -152,6 +154,17 @@ class FixedPointFinder:
         self._handle_bad_approximations(x0, inputs)
 
     def exponential_minimization(self, inputs, x0):
+
+        def generate_points(center_x, center_y, center_z, mean_radius, sigma_radius, num_points):
+            points = []
+            for theta in np.linspace(0, 2 * math.pi - (2 * math.pi / num_points), num_points):
+                radius = random.gauss(mean_radius, sigma_radius)
+                x = center_x + radius * math.cos(theta)
+                y = center_y + radius * math.sin(theta)
+                z = center_z + radius * math.tan(math.sin(theta)/math.cos(theta))
+                points.append([x, y, z])
+            return points
+
         x0 = np.vstack(x0)
 
         pca = skld.PCA(3)
@@ -160,25 +173,38 @@ class FixedPointFinder:
 
         minimum, maximum = np.amin(X_pca, axis=0), np.amax(X_pca, axis=0)
 
-        n_samples = 50
+        n_samples = 200
         self.search_points = np.linspace(minimum, maximum, n_samples)
 
-        self.x, self.y, self.z = np.meshgrid(self.search_points[:, 0], self.search_points[:, 1], self.search_points[:, 2],
+        x, y, z = np.meshgrid(self.search_points[:, 0], self.search_points[:, 1], self.search_points[:, 2],
                                              indexing='ij')
-        self.positions = np.vstack([self.x.ravel(), self.y.ravel(), self.z.ravel()]).transpose()
+        self.positions = np.vstack([x.ravel(), y.ravel(), z.ravel()]).transpose()
         self.original_space = pca.inverse_transform(self.positions)
 
         fun, _ = build_gru_ds(self.weights, self.hps['n_hidden'], inputs, use_input=False)
-
         self.value = fun(self.original_space)
-
-        k = 10000
+        k = int(n_samples**3/100)
         idx = np.argpartition(self.value, k)
         self.new_positions = self.positions[idx[:k]]
-        self.new_value = self.value[idx[:k]]
-        n_points = k
-        mlab.plot3d(self.new_positions[:n_points, 0], self.new_positions[:n_points, 1], self.new_positions[:n_points, 2],
-                    self.new_value[:n_points])
+        self.value = self.value[idx[:k]]
+        for i in range(2):
+            self.new_points = generate_points(self.new_positions[:, 0], self.new_positions[:, 1], self.new_positions[:, 2],
+                                              0.01, 0.01, 2)
+            self.new_points = np.hstack(self.new_points).transpose()
+
+            self.positions = np.vstack((self.new_positions, self.new_points))
+            self.original_space = pca.inverse_transform(self.positions)
+            self.value = fun(self.original_space)
+            k = int(len(self.value)/4)
+            idx = np.argpartition(self.value, k)
+            self.new_positions = self.positions[idx[:k]]
+            self.value = self.value[idx[:k]]
+            n_points = k
+
+
+
+        mlab.points3d(self.new_positions[:n_points, 0], self.new_positions[:n_points, 1], self.new_positions[:n_points, 2],
+                    self.value[:n_points])
         mlab.colorbar(orientation='vertical')
         mlab.show()
 
