@@ -22,10 +22,7 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
     state_dim, action_dim = env_extract_dims(env)
 
     # model
-    if model_type == "ffn":
-        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
-    else:
-        raise ValueError("Unknown Model Type.")
+    build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
 
     # distribution
     if settings["distribution"] is not None:
