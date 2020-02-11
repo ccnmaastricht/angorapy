@@ -1,9 +1,9 @@
 import autograd.numpy as np
 
 
-def build_rnn_ds(weights, input: None, use_input: bool = False):
+def build_rnn_ds(weights, inputs):
     weights, inputweights, b = weights[1], weights[0], weights[2]
-    projection_b = np.matmul(input, inputweights) + b
+    projection_b = np.matmul(inputs, inputweights) + b
 
     def fun(x):
         return 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2)

@@ -109,6 +109,7 @@ def adam_optimizer(fun, x0, epsilon, max_iter, print_every, agnc):
     inlr, max_iter = epsilon, max_iter
     beta_1, beta_2 = 0.9, 0.999
     epsilon = 1e-08
+    m, v = np.zeros(x0.shape), np.zeros(x0.shape)
     for t in range(max_iter):
         q = fun(x0)
         lr = decay_lr(inlr, 0.0001, t)

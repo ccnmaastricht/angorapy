@@ -4,7 +4,7 @@ import numpy.random as npr
 import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
 from mpl_toolkits.mplot3d import Axes3D
-from LSTM.fixedpointfinder import FixedPointFinder, FPF_adam
+from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder
 from tensorflow.keras.models import load_model
 import os
 
@@ -200,9 +200,12 @@ class Flipflopper:
                                  'gradientnormclip': 1.0,
                                  'print_every': 200}}
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
-        return weights
-        self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
-        self.ffinder = FPF_adam()
+        # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
+        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'])
+        states = self.ffinder.sample_states(self.activation, 8)
+        inputs = np.zeros((states.shape[0], 3))
+        fps = self.ffinder.find_fixed_points(states, inputs)
+        return fps
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
@@ -225,8 +228,8 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'gru'
-    n_hidden = 24
+    rnn_type = 'vanilla'
+    n_hidden = 64
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
@@ -235,6 +238,6 @@ if __name__ == "__main__":
 
     # flopper.visualize_flipflop(stim)
 
-    weights = flopper.find_fixed_points(stim)
+    fps = flopper.find_fixed_points(stim)
 
 

@@ -11,39 +11,24 @@ from mayavi import mlab
 from LSTM.build_utils import build_rnn_ds, build_joint_rnn_ds, \
     build_gru_ds, build_lstm_ds, build_joint_gru_ds
 from LSTM.minimization import adam_optimizer
+from scipy.spatial.distance import pdist, squareform
 
 
 class FixedPointFinder(object):
 
     _default_hps = {'q_threshold': 1e-12,
                     'tol_unique': 1e-03,
-                    'algorithm': 'adam',
                     'use_input': False,
                     'verbose': True,
-                    'random_seed': 0,
-                    'alr_hps': {'decay_rate': 0.001},
-                    'agnc_hps': {'norm_clip': 1.0,
-                                 'decay_rate': 1e-03},
-                    'adam_hps': {'epsilon': 1e-02,
-                                 'max_iters': 5000,
-                                 'method': 'joint',
-                                 'print_every': 200},
-                    'scipy_hps': {'method': 'Newton-CG',
-                                  'gtol': 1e-20,
-                                  'display': True}}
+                    'random_seed': 0}
 
 
     def __init__(self, weights, rnn_type,
                  q_threshold=_default_hps['q_threshold'],
                  tol_unique=_default_hps['tol_unique'],
-                 algorithm=_default_hps['algorithm'],
                  use_input=_default_hps['use_input'],
                  verbose=_default_hps['verbose'],
-                 random_seed=_default_hps['random_seed'],
-                 alr_hps=_default_hps['alr_hps'],
-                 agnc_hps=_default_hps['agnc_hps'],
-                 adam_hps=_default_hps['adam_hps'],
-                 scipy_hps=_default_hps['scipy_hps']):
+                 random_seed=_default_hps['random_seed']):
         """The class FixedPointFinder creates a fixedpoint dictionary. A fixedpoint dictionary contain 'fun',
         the function evaluation at the fixedpoint 'x' and the corresponding 'jacobian'.
 
@@ -90,15 +75,9 @@ class FixedPointFinder(object):
 
         self.q_threshold = q_threshold
         self.unique_tol = tol_unique
-        self.algorithm = algorithm
 
         self.verbose = verbose
         self.use_input = use_input
-
-        self.alr_hps = alr_hps
-        self.agnc_hps = agnc_hps
-        self.adam_hps = adam_hps
-        self.scipy_hps = scipy_hps
 
         self.rng = np.random.RandomState(random_seed)
 
@@ -130,17 +109,16 @@ class FixedPointFinder(object):
     def _handle_bad_approximations(self, fps):
         """This functions identifies approximations where the minmization
         was
-         a) not successful
-         b) the fixed point moved further away from IC than minimization distance threshold
-         c) minimization did not return q(x) < q_threshold"""
+         a) the fixed point moved further away from IC than minimization distance threshold
+         b) minimization did not return q(x) < q_threshold"""
 
         bad_fixed_points = []
         good_fixed_points = []
-        for i in range(len(fps)):
-            if fps[i]['fun'] > self.q_threshold:
-                bad_fixed_points.append(fps[i])
+        for fp in fps:
+            if fp['fun'] > self.q_threshold:
+                bad_fixed_points.append(fp)
             else:
-                good_fixed_points.append(fps[i])
+                good_fixed_points.append(fp)
 
         return good_fixed_points, bad_fixed_points
 
@@ -151,12 +129,10 @@ class FixedPointFinder(object):
              """
 
         if self.rnn_type == 'vanilla':
-            func = build_rnn_ds(self.weights, input, use_input=False)
+            func = build_rnn_ds(self.weights, input)
         elif self.rnn_type == 'gru':
             weights, n_hidden = self.weights, self.hps['n_hidden']
-            func, _ = build_gru_ds(weights, n_hidden, input, use_input=False)
-        elif self.rnn_type == 'lstm':
-
+            func, _ = build_gru_ds(weights, n_hidden, input)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -166,68 +142,30 @@ class FixedPointFinder(object):
         velocities = func(activations)
         return velocities
 
-    @staticmethod
-    def classify_fixedpoints(fps):
 
-        # somehow this block of code does not return values if put in function
-
-        x_modes = []
-        x_directions = []
-        scale = 2
-        for n in range(len(unique_jac)):
-
-            trace = np.matrix.trace(unique_jac[n]['jac'])
-            det = np.linalg.det(unique_jac[n]['jac'])
-
-            if det < 0:
-                print('saddle_point')
-                x_modes.append(True)
-                e_val, e_vecs = np.linalg.eig(unique_jac[n]['jac'])
-                ids = np.argwhere(np.real(e_val) > 0)
-                for i in range(len(ids)):
-                    x_plus = unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                    x_minus = unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                    x_direction = np.vstack((x_plus, unique_jac[n]['x'], x_minus))
-                    x_directions.append(np.real(x_direction))
-            elif det > 0:
-                if trace ** 2 - 4 * det > 0 and trace < 0:
-                    print('stable fixed point was found.')
-                    x_modes.append(False)
-                    e_val, e_vecs = np.linalg.eig(unique_jac[n]['jac'])
-                    ids = np.argwhere(np.real(e_val) > 0)
-                    for i in range(len(ids)):
-                        x_plus = unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                        x_minus = unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                        x_direction = np.vstack((x_plus, unique_jac[n]['x'], x_minus))
-                        x_directions.append(np.real(x_direction))
-                elif trace ** 2 - 4 * det > 0 and trace > 0:
-                    print('unstable fixed point was found')
-                else:
-                    print('center was found.')
-                    x_modes.append(False)
-            else:
-                print('fixed point manifold was found.')
-
-    def compute_unstable_modes(self):
-
-
-    @staticmethod
-    def _extract_fixed_point_locations(good_fixed_points):
-        """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
-        puts all coordinates in single array."""
-        fixed_point_location = []
-        for i in range(len(good_fixed_points)):
-            fixed_point_location.append(good_fixed_points[i]['x'])
-        fixed_point_locations = np.vstack(fixed_point_location)
-        return fixed_point_locations
-
-    def _find_unique_fixed_points(self, fixed_point_locations):
+    def _find_unique_fixed_points(self, fps):
         """Identify fixed points that are unique within a distance threshold
         of """
-        d = int(np.round(np.max([0 - np.log10(self.unique_tol)])))
-        ux, idx = np.unique(fixed_point_locations.round(decimals=d), axis=0, return_index=True)
 
-        return ux, idx
+        def extract_fixed_point_locations(fps):
+            """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
+            puts all coordinates in single array."""
+            fixed_point_location = []
+            for fp in fps:
+                fixed_point_location.append(fp['x'])
+            fixed_point_locations = np.vstack(fixed_point_location)
+            return fixed_point_locations
+
+        fps_locations = extract_fixed_point_locations(fps)
+        d = int(np.round(np.max([0 - np.log10(self.unique_tol)])))
+        ux, idx = np.unique(fps_locations.round(decimals=d), axis=0, return_index=True)
+
+        unique_fps = []
+        for id in idx:
+            unique_fps.append(fps[id])
+        # TODO: use pdist and also select based on lowest q(x)
+
+        return unique_fps
 
     def _print_hps(self):
         COLORS = dict(
@@ -250,24 +188,45 @@ class FixedPointFinder(object):
               f"-----------------------------------------\n")
 
 
-class FPF_adam(FixedPointFinder):
+class Adamfixedpointfinder(FixedPointFinder):
+    adam_default_hps = {'alr_hps': {'decay_rate': 0.001},
+                        'agnc_hps': {'norm_clip': 1.0,
+                                     'decay_rate': 1e-03},
+                        'adam_hps': {'epsilon': 1e-02,
+                                     'max_iters': 5000,
+                                     'method': 'joint',
+                                     'print_every': 200}}
+
+    def __init__(self, weights, rnn_type,
+                 alr_hps=adam_default_hps['alr_hps'],
+                 agnc_hps=adam_default_hps['agnc_hps'],
+                 adam_hps=adam_default_hps['adam_hps'],
+                 ):
+        FixedPointFinder.__init__(self, weights, rnn_type)
+        self.alr_hps = alr_hps
+        self.agnc_hps = agnc_hps
+        self.adam_hps = adam_hps
+
+
 
     def find_fixed_points(self, x0, inputs):
         if self.rnn_type == 'vanilla':
             fun = build_joint_rnn_ds(self.weights, inputs)
-            per_point_fun = build_rnn_ds(self.weights, inputs)
+            # per_point_fun = build_rnn_ds(self.weights, inputs)
         elif self.rnn_type == 'gru':
             fun, dynamical_system = build_joint_gru_ds(self.weights, self.n_hidden, inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
-        joint_fun = np.mean(fun)
-        x0 = adam_optimizer(joint_fun, x0,
+
+        x0 = adam_optimizer(fun, x0,
                             epsilon=self.adam_hps['epsilon'],
                             max_iter=self.adam_hps['max_iters'],
-                            print_every=self.agnc_hps['norm_clip'])
-
-        jac_fun = nd.Jacobian(dynamical_system)
+                            print_every=200,
+                            agnc=self.agnc_hps['norm_clip'])
+        n_hidden, weights = self.n_hidden, self.weights[1]
+        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x) ** 2)
+        # nd.Jacobian(dynamical_system)
         fixedpoints = []
         for i in range(len(x0)):
             jacobian = jac_fun(x0[i, :])
@@ -277,11 +236,22 @@ class FPF_adam(FixedPointFinder):
                           'jac': jacobian}
             fixedpoints.append(fixedpoint)
 
-        return fixedpoints
+        good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
+        unique_fps = self._find_unique_fixed_points(good_fps)
+
+        return unique_fps
 
 
+class Scipyfixedpointfinder(FixedPointFinder):
+    scipy_default_hps = {'method': 'Newton-CG',
+                         'gtol': 1e-20,
+                         'display': True}
 
-class FPF_scipy(FixedPointFinder):
+    def __init__(self, weights, rnn_type,
+                 scipy_hps=scipy_default_hps['scipy_hps']):
+        FixedPointFinder.__init__(self, weights, rnn_type)
+        self.scipy_hps = scipy_hps
+
 
     def find_fixed_points(self):
         pass
