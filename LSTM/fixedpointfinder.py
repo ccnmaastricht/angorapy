@@ -6,91 +6,142 @@ import sklearn.decomposition as skld
 import matplotlib.pyplot as plt
 from LSTM.minimization import backproprnn, backpropgru
 from mayavi import mlab
-from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
-import random
-import math
+from LSTM.build_utils import build_rnn_ds, build_joint_rnn_ds, build_gru_ds, build_lstm_ds
+from LSTM.minimization import adam_optimizer
 
 
-class FixedPointFinder:
-    """The class FixedPointFinder creates a fixedpoint dictionary. A fixedpoint dictionary contain 'fun',
-    the function evaluation at the fixedpoint 'x' and the corresponding 'jacobian'.
+class FixedPointFinder(object):
 
-    Args:
-        hps: Dictionary of hyperparameters.
-
-            unique_tol: Tolerance for when a fixedpoint will be considered unique, i.e. when two points are further
-            away from each than the tolerance, they will be considered unique and discarded otherwise. Default: 1e-03.
-
-            threshold: Minimization criteria. A fixedpoint must evaluate below the threshold in order to be considered
-            a slow/fixed point. This value depends on the task of the RNN. Default for 3-Bit Flip-FLop: 1e-12.
-
-            rnn_type: Specifying the architecture of the network. The network architecture defines the dynamical system.
-            Must be one of ['vanilla', 'gru', 'lstm']. No default.
-
-            n_hidden: Specifiying the number of hidden units in the recurrent layer. No default.
-
-            algorithm: Algorithm that shall be employed for the minimization. Must be one of: scipy, adam. It is recommended
-            to use any of the two for vanilla architectures but adam for gru and lstm architectures. No default.
-
-            n_points: Number of points to use to plot the trajectories the network took. Recommended 200-5000, otherwise
-            the plot will look too sparse or too crowded. Default: 3000.
-
-            use_input: boolean parameter indicating if input to the recurrent layer shall be used during minimization or
-            not. Default: False
-
-        scipy_hps: Dictionary of hyperparameters specifically for minimize from scipy.
-
-            method: Method to employ for minimization using the scipy package. Default: "Newton-CG".
-
-            display: boolean array indication, if information about the minimization shall be printed to the console
-
-        adam_hps: Dictionary of hyperparameters specifically for adam optimizer.
-
-            max_iter: maximum number of iterations to run backpropagation for. Default: 5000.
+    _default_hps = {'q_threshold': 1e-12,
+                    'tol_unique': 1e-03,
+                    'algorithm': 'adam',
+                    'use_input': False,
+                    'verbose': True,
+                    'random_seed': 0,
+                    'alr_hps': {'decay_rate': 0.001},
+                    'agnc_hps': {'norm_clip': 1.0,
+                                 'decay_rate': 1e-03},
+                    'adam_hps': {'epsilon': 1e-02,
+                                 'max_iters': 5000,
+                                 'method': 'joint',
+                                 'print_every': 200},
+                    'scipy_hps': {'method': 'Newton-CG',
+                                  'gtol': 1e-20,
+                                  'display': True}}
 
 
+    def __init__(self, weights, rnn_type,
+                 q_threshold=_default_hps['q_threshold'],
+                 tol_unique=_default_hps['tol_unique'],
+                 algorithm=_default_hps['algorithm'],
+                 use_input=_default_hps['use_input'],
+                 verbose=_default_hps['verbose'],
+                 random_seed=_default_hps['random_seed'],
+                 alr_hps=_default_hps['alr_hps'],
+                 agnc_hps=_default_hps['agnc_hps'],
+                 adam_hps=_default_hps['adam_hps'],
+                 scipy_hps=_default_hps['scipy_hps']):
+        """The class FixedPointFinder creates a fixedpoint dictionary. A fixedpoint dictionary contain 'fun',
+        the function evaluation at the fixedpoint 'x' and the corresponding 'jacobian'.
 
-        weights: list of weights as returned by tensorflow.keras for recurrent layer. The list must contain three objects:
-        input weights, recurrent weights and biases.
+        Args:
+            hps: Dictionary of hyperparameters.
 
-        inputs: Input to the recurrent layer. First two dimensions must match first two dimensions of x0
+                unique_tol: Tolerance for when a fixedpoint will be considered unique, i.e. when two points are further
+                away from each than the tolerance, they will be considered unique and discarded otherwise. Default: 1e-03.
 
-        x0: activations of recurrent layer."""
-    def __init__(self, hps, weights, inputs, x0):
-        self.hps = hps
-        self.unique_tol = hps['unique_tol']
-        self.threshold = hps['threshold']
-        self.minimization_distance = 10.0
-        self.n_points = 3000
+                threshold: Minimization criteria. A fixedpoint must evaluate below the threshold in order to be considered
+                a slow/fixed point. This value depends on the task of the RNN. Default for 3-Bit Flip-FLop: 1e-12.
 
-        self.use_input = False
-        self.n_ic = hps['n_ic']
-        self.scipy_hps = hps['scipy_hps']
+                rnn_type: Specifying the architecture of the network. The network architecture defines the dynamical system.
+                Must be one of ['vanilla', 'gru', 'lstm']. No default.
 
-        self.adam_hps = hps['adam_hps']
-        self.n_init = self.adam_hps['n_init']
+                n_hidden: Specifiying the number of hidden units in the recurrent layer. No default.
 
-        self._print_hps()
-        self.fixedpoints = []
+                algorithm: Algorithm that shall be employed for the minimization. Must be one of: scipy, adam. It is recommended
+                to use any of the two for vanilla architectures but adam for gru and lstm architectures. No default.
+
+                n_points: Number of points to use to plot the trajectories the network took. Recommended 200-5000, otherwise
+                the plot will look too sparse or too crowded. Default: 3000.
+
+                use_input: boolean parameter indicating if input to the recurrent layer shall be used during minimization or
+                not. Default: False
+
+            scipy_hps: Dictionary of hyperparameters specifically for minimize from scipy.
+
+                method: Method to employ for minimization using the scipy package. Default: "Newton-CG".
+
+                display: boolean array indication, if information about the minimization shall be printed to the console
+
+            adam_hps: Dictionary of hyperparameters specifically for adam optimizer.
+
+                max_iter: maximum number of iterations to run backpropagation for. Default: 5000.
+
+
+
+            weights: list of weights as returned by tensorflow.keras for recurrent layer. The list must contain three objects:
+            input weights, recurrent weights and biases."""
+
         self.weights = weights
-        if len(x0.shape) == 3:
-            x, input = x0[0, :, :], inputs[0, :, :]
+        self.rnn_type = rnn_type
+
+        self.q_threshold = q_threshold
+        self.unique_tol = tol_unique
+        self.algorithm = algorithm
+
+        self.verbose = verbose
+        self.use_input = use_input
+
+        self.alr_hps = alr_hps
+        self.agnc_hps = agnc_hps
+        self.adam_hps = adam_hps
+        self.scipy_hps = scipy_hps
+
+        self.rng = np.random.RandomState(random_seed)
+
+        if self.rnn_type == 'vanilla':
+            self.n_hidden = int(weights[1].shape[1])
+        elif self.rnn_type == 'gru':
+            self.n_hidden = int(weights[1].shape[1] / 3)
+        elif self.rnn_type == 'lstm':
+            self.n_hidden = int(weights[1].shape[1] / 4)
         else:
-            x, input = x0, inputs
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-        if self.hps['algorithm'] == 'scipy':
-            self.parallel_minimization(input, x)
-            self.plot_fixed_points(x0, )
-        elif self.hps['algorithm'] == 'adam':
-            self.backprop(input, x)
-            self.plot_fixed_points(x0, )
+        if self.verbose:
+            self._print_hps()
+
+    def sample_states(self, activations, n_inits):
+        """Draws [n_inits] random samples from recurrent layer activations."""
+
+        if len(activations.shape) == 3:
+            activations = np.vstack(activations)
+
+        init_idx = self.rng.randint(activations.shape[0], size=n_inits)
+
+        sampled_activations = activations[init_idx, :]
+
+        return sampled_activations
+
+    def find_fixed_points(self, activations, inputs):
+        """"""
+        if not self.use_input:
+            inputs = np.zeros(activations.shape)
+
+
+        if self.algorithm == 'adam' and self.adam_hps['method'] == 'joint':
+            fps = self._joint_adam_optimizer(inputs, activations)
+        elif self.algorithm == 'scipy':
+            fps = self.parallel_minimization(inputs, activations)
         else:
-            self.exponential_minimization(inputs, x0)
-            # self.plot_fixed_points(x0, )
+            raise ValueError('Unsupported algorithm. Must be either one of'
+                             '\'adam\' or \'scipy\' but was \'%s\'', self.algorithm)
 
-# TODO: add hyperparameters:
+        return fps
 
-    def backprop(self, inputs, x0):
+
+    def _joint_adam_optimizer(self, inputs, x0):
         """Function to set up parallel processing of minimization for fixed points using adam as optimizer.
 
         Args:
@@ -100,10 +151,40 @@ class FixedPointFinder:
                 Object needs to have shape [n_timesteps x n_hidden].
         Returns:
             Fixedpointobject"""
-        weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
+        if self.verbose:
+            print('Running joint adam optimization of %s initial conditions', x0.shape[0])
+
+
+        if self.rnn_type == 'vanilla':
+            fun = build_joint_rnn_ds(self.weights, inputs)
+            fps = adam_optimizer(fun, x0,
+                                 epsilon=self.adam_hps['epsilon'],
+                                 max_iter=self.adam_hps['max_iters'],
+                                 print_every=self.adam_hps['prin_every'],
+                                 agnc=self.agnc_hps['norm_clip'])
+        elif self.rnn_type == 'gru':
+            pass
+        elif self.rnn_type == 'lstm':
+            pass
+        else:
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
+
+
+        return fps
+
+
+
+
+
+
+
+
+    def _sequential_adam_optimizer(self, activations, inputs):
+
         adam_hps, use_input = self.adam_hps, self.use_input
-        for i in range(self.hps['n_ic']-self.n_init):  # prepare iterable object for parallelization
-            combind.append((x0[i:(i+self.n_init), :], inputs[i:(i+self.n_init), :], weights, n_hidden, adam_hps))
+        for i in range(self.hps['n_ic'] - self.n_init):  # prepare iterable object for parallelization
+            combind.append((x0[i:(i + self.n_init), :], inputs[i:(i + self.n_init), :], weights, n_hidden, adam_hps))
 
         pool = mp.Pool(mp.cpu_count())
         if self.hps['rnn_type'] == 'vanilla':
@@ -112,7 +193,7 @@ class FixedPointFinder:
             self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
+                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
         self.fixedpoints = [item for sublist in self.fixedpoints for item in sublist]
         self._handle_bad_approximations(x0, inputs)
 
@@ -141,62 +222,6 @@ class FixedPointFinder:
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
         self._handle_bad_approximations(x0, inputs)
-
-    def exponential_minimization(self, inputs, x0):
-
-        def generate_points(center_x, center_y, center_z, mean_radius, sigma_radius, num_points):
-            points = []
-            for theta in np.linspace(0, 2 * math.pi - (2 * math.pi / num_points), num_points):
-                radius = random.gauss(mean_radius, sigma_radius)
-                x = center_x + radius * math.cos(theta)
-                y = center_y + radius * math.sin(theta)
-                z = center_z + radius * math.tan(math.sin(theta)/math.cos(theta))
-                points.append([x, y, z])
-            return points
-
-        x0 = np.vstack(x0)
-
-        pca = skld.PCA(3)
-        pca.fit(x0)
-        X_pca = pca.transform(x0)
-
-        minimum, maximum = np.amin(X_pca, axis=0), np.amax(X_pca, axis=0)
-
-        n_samples = 200
-        self.search_points = np.linspace(minimum, maximum, n_samples)
-
-        x, y, z = np.meshgrid(self.search_points[:, 0], self.search_points[:, 1], self.search_points[:, 2],
-                                             indexing='ij')
-        self.positions = np.vstack([x.ravel(), y.ravel(), z.ravel()]).transpose()
-        self.original_space = pca.inverse_transform(self.positions)
-
-        fun, _ = build_gru_ds(self.weights, self.hps['n_hidden'], inputs, use_input=False)
-        self.value = fun(self.original_space)
-        k = int(n_samples**3/10)
-        idx = np.argpartition(self.value, k)
-        self.new_positions = self.positions[idx[:k]]
-        self.value = self.value[idx[:k]]
-        for i in range(2):
-            self.new_points = generate_points(self.new_positions[:, 0], self.new_positions[:, 1], self.new_positions[:, 2],
-                                              0.01/((i+1)*8), 0.1/((i+1)*10), 20)
-            self.new_points = np.hstack(self.new_points).transpose()
-
-            self.positions = np.vstack((self.new_positions, self.new_points))
-            self.original_space = pca.inverse_transform(self.positions)
-            self.value = fun(self.original_space)
-            k = int(len(self.value)/21)
-            idx = np.argpartition(self.value, k)
-            self.new_positions = self.positions[idx[:k]]
-            self.value = self.value[idx[:k]]
-            n_points = k
-
-
-        n_points = k
-        mlab.points3d(self.new_positions[:n_points, 0], self.new_positions[:n_points, 1], self.new_positions[:n_points, 2],
-                    self.value[:n_points])
-        mlab.colorbar(orientation='vertical')
-        mlab.show()
-
 
 
     @staticmethod
@@ -266,24 +291,22 @@ class FixedPointFinder:
 
         return fixedpoint
 
-    def _handle_bad_approximations(self, activation, inputs):
+    def _handle_bad_approximations(self, fps):
         """This functions identifies approximations where the minmization
         was
          a) not successful
          b) the fixed point moved further away from IC than minimization distance threshold
-         c) minimization did not return q(x) < threshold"""
+         c) minimization did not return q(x) < q_threshold"""
 
-        self.bad_fixed_points = []
-        self.good_fixed_points = []
-        self.good_inputs = []
-        for i in range(len(self.fixedpoints)):
- #           if np.sqrt(((activation[i, :] - self.fixedpoints[i]['x']) ** 2).sum()) > self.minimization_distance:
-  #              self.bad_fixed_points.append(self.fixedpoints[i])
-            if self.fixedpoints[i]['fun'] > self.threshold:
-                self.bad_fixed_points.append(self.fixedpoints[i])
+        bad_fixed_points = []
+        good_fixed_points = []
+        for i in range(len(fps)):
+            if fps[i]['fun'] > self.q_threshold:
+                bad_fixed_points.append(fps[i])
             else:
-                self.good_fixed_points.append(self.fixedpoints[i])
-               # self.good_inputs.append(inputs[i, :])
+                good_fixed_points.append(fps[i])
+
+        return good_fixed_points, bad_fixed_points
 
     def compute_velocities(self, activations, input):
         """Function to evaluate velocities at all recorded activations of the recurrent layer.
@@ -383,22 +406,23 @@ class FixedPointFinder:
         ax.set_zlabel('PC3')
         plt.show()
 
-    def _extract_fixed_point_locations(self):
+    @staticmethod
+    def _extract_fixed_point_locations(good_fixed_points):
         """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
         puts all coordinates in single array."""
         fixed_point_location = []
-        for i in range(len(self.good_fixed_points)):
-            fixed_point_location.append(self.good_fixed_points[i]['x'])
-        self.fixed_point_locations = np.vstack(fixed_point_location)
+        for i in range(len(good_fixed_points)):
+            fixed_point_location.append(good_fixed_points[i]['x'])
+        fixed_point_locations = np.vstack(fixed_point_location)
+        return fixed_point_locations
 
-    def _find_unique_fixed_points(self):
+    def _find_unique_fixed_points(self, fixed_point_locations):
         """Identify fixed points that are unique within a distance threshold
         of """
         d = int(np.round(np.max([0 - np.log10(self.unique_tol)])))
-        ux, idx = np.unique(self.fixed_point_locations.round(decimals=d), axis=0, return_index=True)
+        ux, idx = np.unique(fixed_point_locations.round(decimals=d), axis=0, return_index=True)
 
-        self.unique_fixed_points = ux
-        self.unique_idx = idx
+        return ux, idx
 
     def _print_hps(self):
         COLORS = dict(
@@ -413,10 +437,12 @@ class FixedPointFinder:
         )
         bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
         print(f"-----------------------------------------\n"
-              f"{wn}Architecture to analyse {ec}: {bc}{self.hps['rnn_type']}{ec}\n"
-              f"The layer has {bc}{self.hps['n_hidden']}{ec} recurrent units. \n"
-              f"Using {bc}{self.hps['algorithm']}{ec} for minimization.\n"
+              f"{wn}Architecture to analyse {ec}: {bc}{self.rnn_type}{ec}\n"
+              f"The layer has {bc}{self.n_hidden}{ec} recurrent units. \n"
+              # f"Using {bc}{self.algorithm}{ec} for minimization.\n"
               f"-----------------------------------------\n"
-              f"{wn}HyperParameters{ec}: threshold - {self.hps['threshold']}\n unique_tolerance - {self.hps['unique_tol']}\n"
+              f"{wn}HyperParameters{ec}: threshold - {self.q_threshold}\n unique_tolerance - {self.unique_tol}\n"
               f"-----------------------------------------\n")
 
+
+class FPF_adam(FixedPointFinder):

@@ -12,6 +12,14 @@ def build_rnn_ds(weights, input: None, use_input: bool = False):
 
     return fun
 
+def build_joint_rnn_ds(weights, inputs):
+    recurrentweights, inputweights, b = weights[1], weights[0], weights[2]
+    projection_b = np.matmul(inputs, inputweights) + b
+
+    fun = lambda x: np.mean(0.5 * sum((- x + np.matmul(np.tanh(x), recurrentweights) + projection_b) ** 2))
+
+    return fun
+
 
 def build_gru_ds(weights, n_hidden, input: str = None, use_input: bool = False):
     def sigmoid(x):
