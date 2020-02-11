@@ -1,3 +1,5 @@
+from typing import Optional, Any
+
 import numpy as np
 import multiprocessing as mp
 import numdifftools as nd
@@ -124,173 +126,6 @@ class FixedPointFinder(object):
 
         return sampled_activations
 
-    def find_fixed_points(self, activations, inputs):
-        """"""
-        if not self.use_input:
-            inputs = np.zeros(activations.shape)
-
-
-        if self.algorithm == 'adam' and self.adam_hps['method'] == 'joint':
-            fps = self._joint_adam_optimizer(inputs, activations)
-        elif self.algorithm == 'scipy':
-            fps = self.parallel_minimization(inputs, activations)
-        else:
-            raise ValueError('Unsupported algorithm. Must be either one of'
-                             '\'adam\' or \'scipy\' but was \'%s\'', self.algorithm)
-
-        return fps
-
-
-    def _joint_adam_optimizer(self, inputs, x0):
-        """Function to set up parallel processing of minimization for fixed points using adam as optimizer.
-
-        Args:
-            inputs: constant input at timestep of initial condition (IC).
-                    Object needs to have shape [n_timesteps x n_hidden].
-            x0: object containing ICs to begin optimization from.
-                Object needs to have shape [n_timesteps x n_hidden].
-        Returns:
-            Fixedpointobject"""
-        if self.verbose:
-            print('Running joint adam optimization of %s initial conditions', x0.shape[0])
-
-
-        if self.rnn_type == 'vanilla':
-            fun = build_joint_rnn_ds(self.weights, inputs)
-            fps = adam_optimizer(fun, x0,
-                                 epsilon=self.adam_hps['epsilon'],
-                                 max_iter=self.adam_hps['max_iters'],
-                                 print_every=self.adam_hps['prin_every'],
-                                 agnc=self.agnc_hps['norm_clip'])
-        elif self.rnn_type == 'gru':
-            pass
-        elif self.rnn_type == 'lstm':
-            pass
-        else:
-            raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
-
-
-        return fps
-
-
-
-
-
-
-
-
-    def _sequential_adam_optimizer(self, activations, inputs):
-
-        adam_hps, use_input = self.adam_hps, self.use_input
-        for i in range(self.hps['n_ic'] - self.n_init):  # prepare iterable object for parallelization
-            combind.append((x0[i:(i + self.n_init), :], inputs[i:(i + self.n_init), :], weights, n_hidden, adam_hps))
-
-        pool = mp.Pool(mp.cpu_count())
-        if self.hps['rnn_type'] == 'vanilla':
-            self.fixedpoints = pool.map(backproprnn, combind, chunksize=1)
-        elif self.hps['rnn_type'] == 'gru':
-            self.fixedpoints = pool.map(backpropgru, combind, chunksize=1)
-        else:
-            raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
-        self.fixedpoints = [item for sublist in self.fixedpoints for item in sublist]
-        self._handle_bad_approximations(x0, inputs)
-
-    def parallel_minimization(self, inputs, x0):
-        """Function to set up parallel processing of minimization for fixed points using minimize from scipy.
-
-        Args:
-            inputs: constant input at timestep of initial condition (IC). Object needs to have shape [n_timesteps x n_hidden].
-            x0: object containing ICs to begin optimization from. Object needs to have shape [n_timesteps x n_hidden].
-        """
-        pool = mp.Pool(mp.cpu_count())
-        print(self.n_ic, " minimizations to parallelize.")
-        weights, n_hidden, combind = self.weights, self.hps['n_hidden'], []
-
-        for i in range(self.n_ic):  # prepare iterable object for parallelization
-            combind.append((x0[i, :], inputs[i, :], weights, self.scipy_hps, n_hidden, self.use_input))
-
-        if self.hps['rnn_type'] == 'vanilla':
-            self.fixedpoints = pool.map(self._minimizrnn, combind, chunksize=1)
-        elif self.hps['rnn_type'] == 'gru':
-            self.fixedpoints = pool.map(self._minimizgru, combind, chunksize=1)
-        elif self.hps['rnn_type'] == 'lstm':
-            self.fixedpoints = pool.map(self._minimizlstm, combind, chunksize=1)
-        else:
-            raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
-
-        self._handle_bad_approximations(x0, inputs)
-
-
-    @staticmethod
-    def _minimizrnn(combined):
-        x0, input, weights, scipy_hps, n_hidden, use_input = combined[0], combined[1], combined[2], combined[3], \
-                                                          combined[4], combined[5]
-
-
-        fun = build_rnn_ds(weights, input, use_input=use_input)
-        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-
-        print("First function evaluation:", fun(x0))
-        options = {'disp': scipy_hps['display']}
-        fixed_point = minimize(fun, x0, method=scipy_hps['method'], jac=jac, hess=hes,
-                               options=options)
-
-        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x) ** 2)
-        fixed_point.jac = jac_fun(fixed_point.x)
-        fixedpoint = {'fun': fixed_point.fun,
-                      'x': fixed_point.x,
-                      'jac': fixed_point.jac}
-        return fixedpoint
-
-    @staticmethod
-    def _minimizgru(combined):
-        x0, input, weights, scipy_hps, n_hidden, use_input = combined[0], combined[1], combined[2], combined[3], \
-                                                          combined[4], combined[5]
-
-        fun, dynamical_system = build_gru_ds(weights, input, n_hidden, use_input=use_input)
-
-        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-
-        print("First function evaluation:", fun(x0))
-        options = {'disp': scipy_hps['display']}
-        fixed_point = minimize(fun, x0, method=scipy_hps['method'], jac=jac, hess=hes,
-                               options=options)
-
-        jac_fun = nd.Jacobian(dynamical_system)
-        fixed_point.jac = jac_fun(fixed_point.x)
-        fixedpoint = {'fun': fixed_point.fun,
-                      'x': fixed_point.x,
-                      'jac': fixed_point.jac}
-
-        return fixedpoint
-
-    @staticmethod
-    def _minimizlstm(combined):
-        """There is not yet code to extract the lstm state tuple. Thus there would be h but no c vector. NOT YET WORKING"""
-        x0, input, weights, method, n_hidden, use_input = combined[0], \
-                                               combined[1], \
-                                               combined[2], combined[3], combined[4], combined[5]
-
-        fun, dynamical_system = build_lstm_ds(weights, input, n_hidden, use_input=use_input)
-
-        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-
-        print("First function evaluation:", fun(x0))
-        options = {'disp': True}
-        fixed_point = minimize(fun, x0, method=method, jac=jac, hess=hes,
-                               options=options)
-
-        jac_fun = nd.Jacobian(dynamical_system)
-        fixed_point.jac = jac_fun(fixed_point.x)
-        fixedpoint = {'fun': fixed_point.fun,
-                      'x': fixed_point.x,
-                      'jac': fixed_point.jac}
-
-        return fixedpoint
-
     def _handle_bad_approximations(self, fps):
         """This functions identifies approximations where the minmization
         was
@@ -314,11 +149,13 @@ class FixedPointFinder(object):
         Args:
              """
 
-        if self.hps['rnn_type'] == 'vanilla':
+        if self.rnn_type == 'vanilla':
             func = build_rnn_ds(self.weights, input, use_input=False)
-        elif self.hps['rnn_type'] == 'gru':
+        elif self.rnn_type == 'gru':
             weights, n_hidden = self.weights, self.hps['n_hidden']
             func, _ = build_gru_ds(weights, n_hidden, input, use_input=False)
+        elif self.rnn_type == 'lstm':
+
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -346,7 +183,35 @@ class FixedPointFinder(object):
         X_pca = pca.transform(activations)
         new_pca = pca.transform(self.unique_fixed_points)
 
+
+
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.plot(X_pca[:self.n_points, 0], X_pca[:self.n_points, 1], X_pca[:self.n_points, 2],
+                linewidth=0.2)
+        for i in range(len(x_modes)):
+            if not x_modes[i]:
+                ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
+                           marker='.', s=30, c='k')
+            else:
+                ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
+                           marker='.', s=30, c='r')
+                for p in range(len(x_directions)):
+                    direction_matrix = pca.transform(x_directions[p])
+                    ax.plot(direction_matrix[:, 0], direction_matrix[:, 1], direction_matrix[:, 2],
+                            c='r', linewidth=0.8)
+
+        plt.title('PCA using modeltype: ' + self.hps['rnn_type'])
+        ax.set_xlabel('PC1')
+        ax.set_ylabel('PC2')
+        ax.set_zlabel('PC3')
+        plt.show()
+
+    @staticmethod
+    def classify_fixedpoints(fps):
+
         # somehow this block of code does not return values if put in function
+
         x_modes = []
         x_directions = []
         scale = 2
@@ -384,27 +249,8 @@ class FixedPointFinder(object):
             else:
                 print('fixed point manifold was found.')
 
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        ax.plot(X_pca[:self.n_points, 0], X_pca[:self.n_points, 1], X_pca[:self.n_points, 2],
-                linewidth=0.2)
-        for i in range(len(x_modes)):
-            if not x_modes[i]:
-                ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
-                           marker='.', s=30, c='k')
-            else:
-                ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
-                           marker='.', s=30, c='r')
-                for p in range(len(x_directions)):
-                    direction_matrix = pca.transform(x_directions[p])
-                    ax.plot(direction_matrix[:, 0], direction_matrix[:, 1], direction_matrix[:, 2],
-                            c='r', linewidth=0.8)
+    def compute_unstable_modes(self):
 
-        plt.title('PCA using modeltype: ' + self.hps['rnn_type'])
-        ax.set_xlabel('PC1')
-        ax.set_ylabel('PC2')
-        ax.set_zlabel('PC3')
-        plt.show()
 
     @staticmethod
     def _extract_fixed_point_locations(good_fixed_points):
@@ -446,3 +292,12 @@ class FixedPointFinder(object):
 
 
 class FPF_adam(FixedPointFinder):
+
+
+    def find_fixed_points(self):
+        pass
+
+class FPF_scipy(FixedPointFinder):
+
+    def find_fixed_points(self):
+        pass
