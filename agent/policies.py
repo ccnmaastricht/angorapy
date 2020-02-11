@@ -98,7 +98,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         """Sample an action from a discrete action distribution predicted by the given policy for a given state."""
         action = self.sample(log_probabilities)
-        return action, log_probabilities[0][action]
+        return action, tf.squeeze(log_probabilities)[action]
 
     def sample(self, log_probabilities):
         """Sample an action from the distribution."""
@@ -213,8 +213,6 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         log_likelihoods = (- tf.reduce_sum(log_stdevs, axis=-1)
                            - tf.math.log(2 * np.pi)
                            - (0.5 * tf.reduce_sum(tf.square(((samples - means) / tf.exp(log_stdevs))), axis=-1)))
-
-        # log_likelihoods = tf.math.log(gaussian_pdf(samples, means, tf.exp(log_stdevs)))
 
         return log_likelihoods
 

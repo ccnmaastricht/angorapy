@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow_core.python.keras.layers import TimeDistributed
 
 from utilities.util import flatten
+from inspect import getfullargspec as fargs
 
 
 def is_recurrent_model(model: tf.keras.Model):
@@ -16,6 +17,11 @@ def is_recurrent_model(model: tf.keras.Model):
             return True
 
     return False
+
+
+def requires_batch_size(model_builder) -> bool:
+    """Check if model building function requires a batch size when building."""
+    return "bs" in fargs(model_builder).args + fargs(model_builder).kwonlyargs
 
 
 def list_layer_names(network, only_para_layers=True) -> List[str]:

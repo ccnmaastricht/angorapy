@@ -28,7 +28,8 @@ from agent.gather import Gatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import condense_stats
-from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked
+from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
+    requires_batch_size
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, BaseRunningMeanWrapper
 
@@ -311,7 +312,7 @@ class PPOAgent:
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
-            {"bs": batch_size} if "bs" in fargs(self.model_builder).args else {}))
+            {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
         available_cpus = multiprocessing.cpu_count()
