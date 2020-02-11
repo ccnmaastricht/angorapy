@@ -130,7 +130,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1580042580)
+    agent_007 = PPOAgent.from_agent_state(1581374430, from_iteration="b")
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)

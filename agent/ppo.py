@@ -10,7 +10,7 @@ import statistics
 import time
 from collections import OrderedDict
 from inspect import getfullargspec as fargs
-from typing import List, Tuple
+from typing import List, Tuple, Any, Union
 
 import gym
 import numpy
@@ -27,7 +27,7 @@ from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
-from utilities.datatypes import ModelTuple, condense_stats
+from utilities.datatypes import condense_stats
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, BaseRunningMeanWrapper
@@ -276,12 +276,14 @@ class PPOAgent:
         return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
-              separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False) -> "PPOAgent":
+              separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False,
+              save_best=True) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
         Args:
+            save_best:
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
             batch_size (int): batch size for the optimization
@@ -316,19 +318,7 @@ class PPOAgent:
         if not ray_is_initialized:
             ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
 
-        # set up the persistent workers
-        worker_options: dict = {}
-        if self.n_workers == 1:
-            # worker_options["num_gpus"] = 1
-            worker_options["num_cpus"] = available_cpus
-        elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
-            worker_options["num_cpus"] = available_cpus // self.n_workers
-
-        print(f"{self.n_workers} workers each use: {worker_options}")
-
-        workers = [Gatherer.options(**worker_options).remote(self.builder_function_name,
-                                                             self.distribution.__class__.__name__,
-                                                             self.env_name, i) for i in range(self.n_workers)]
+        workers = self._make_workers(verbose=True)
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -412,6 +402,10 @@ class PPOAgent:
             time_dict["evaluating"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
+            # save if best
+            if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
+                self.save_agent_state(name="best")
+
             # early stopping
             if self.env.spec.reward_threshold is not None and stop_early:
                 if numpy.all(numpy.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
@@ -423,6 +417,7 @@ class PPOAgent:
             self.report()
             cycle_start = time.time()
 
+            # OPTIMIZE
             flat_print("Optimizing...")
             self.optimize_model(dataset, epochs, batch_size)
 
@@ -455,6 +450,26 @@ class PPOAgent:
         print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
 
         return self
+
+    def _make_workers(self, verbose=False):
+        available_cpus = multiprocessing.cpu_count()
+
+        # set up the persistent workers
+        worker_options: dict = {}
+        if self.n_workers == 1:
+            worker_options["num_gpus"] = 1
+            worker_options["num_cpus"] = available_cpus
+        elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
+            worker_options["num_cpus"] = available_cpus // self.n_workers
+
+        workers = [Gatherer.options(**worker_options).remote(self.builder_function_name,
+                                                             self.distribution.__class__.__name__,
+                                                             self.env_name, i) for i in range(self.n_workers)]
+
+        if verbose:
+            print(f"{self.n_workers} workers each use: {worker_options}")
+
+        return workers
 
     @tf.function
     def _learn_on_batch(self, batch):
@@ -587,7 +602,7 @@ class PPOAgent:
         available_cpus = multiprocessing.cpu_count()
         worker_options: dict = {}
         if n == 1:
-            worker_options["num_gpus"] = 1
+            # worker_options["num_gpus"] = 1
             worker_options["num_cpus"] = available_cpus
         elif available_cpus % n == 0 and n != available_cpus:
             worker_options["num_cpus"] = available_cpus // n
@@ -607,6 +622,10 @@ class PPOAgent:
     def report(self):
         """Print a report of the current state of the training."""
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
+        reward_col = ac
+        if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None:
+            if self.env.spec.reward_threshold < self.cycle_reward_history[-1]:
+                reward_col = COLORS["GREEN"]
 
         # calculate percentages of computation spend on different phases of the iteration
         time_distribution_string = ""
@@ -632,8 +651,8 @@ class PPOAgent:
 
         # print the report
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
-                   f"r: {ac}{0 if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
-                   f"len: {nc}{0 if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
+                   f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
+                   f"len: {nc}{'-' if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
                    f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
                    f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
                    f"lr: {nc}{current_lr:.2e}{ec}; "
@@ -643,11 +662,13 @@ class PPOAgent:
                    f"fps: {fps_string} {time_distribution_string}; "
                    f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
 
-    def save_agent_state(self):
+    def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
-        self.joint.save_weights(self.agent_directory + f"/{self.iteration}/weights")
+        if name is None:
+            name = str(self.iteration)
 
-        with open(self.agent_directory + f"/{self.iteration}/parameters.json", "w") as f:
+        self.joint.save_weights(self.agent_directory + f"/{name}/weights")
+        with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
 
     def get_parameters(self):
@@ -666,12 +687,13 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int, from_iteration: int = None) -> "PPOAgent":
+    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None) -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
             agent_id:           the ID of the agent to be loaded
-            from_iteration:     from which iteration to load, if None (default) use most recent
+            from_iteration:     from which iteration to load, if None (default) use most recent, can be iteration int
+                                or ["b", "best"] for best, if such was saved.
 
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
@@ -687,6 +709,9 @@ class PPOAgent:
         latest_matches = PPOAgent.get_saved_iterations(agent_id)
         if from_iteration is None:
             from_iteration = max(latest_matches)
+        elif isinstance(from_iteration, str):
+            assert from_iteration.lower() in ["best", "b"], "Unknown string identifier, can only be 'best'/'b' or int."
+            from_iteration = "best"
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 

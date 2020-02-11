@@ -18,7 +18,9 @@ def derive_config(original: dict, overrules: dict):
     return derived
 
 
-# DISCRETE
+# DISCRETE: general hp settings that solve
+#   - CartPole (turn of state and reward normalization though)
+#   - Acrobot
 
 discrete = make_config(
     batch_size=128,
@@ -38,6 +40,8 @@ discrete = make_config(
 discrete_no_ent = derive_config(discrete, {"c_entropy": 0.0})
 discrete_rnn = derive_config(discrete, {"model": "rnn"})
 discrete_gru = derive_config(discrete, {"model": "gru"})
+discrete_no_norms = derive_config(discrete, {"no_state_norming": True,
+                                             "no_reward_norming": True})
 
 # CONTINUOUS DEFAULT
 

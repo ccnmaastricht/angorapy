@@ -1,4 +1,5 @@
 import json
+import math
 
 import matplotlib.pyplot as plt
 import argparse
@@ -9,28 +10,32 @@ from utilities.plotting import plot_with_confidence
 colors = ["red", "green", "blue", "orange"]
 
 parser = argparse.ArgumentParser()
-parser.add_argument("exp", nargs="*", type=str, default=["LunarLanderContinuous_continuous_continuous_beta"],
+parser.add_argument("exp", nargs="*", type=str, default=["default_Acrobot-v1"],
                     help="name of the experiment")
 
 args = parser.parse_args()
 
-results = {}
+benchmark_data = {}
 for exp in args.exp:
     with open(f"docs/benchmarks/{exp}.json") as f:
-        results.update(json.load(f))
+        benchmark_data.update(json.load(f))
 
-plt.axhline(results["reward_threshold"]) if results["reward_threshold"] is not None else None
-results.pop("reward_threshold")
+results = benchmark_data["results"]
+meta = benchmark_data["meta"]
 
+plt.axhline(meta["reward_threshold"]) if meta["reward_threshold"] is not None else None
 
-x = list(range(1, len(results[list(results.keys())[0]][0]) + 1))
+x = list(range(1, len(results[list(results.keys())[0]]["means"]) + 1))
 
 for i, name in enumerate(results):
     sub_exp = results[name]
 
-    plot_with_confidence(x=sub_exp[0],
-                         lb=np.array(sub_exp[0]) - np.array(sub_exp[1]),
-                         ub=np.array(sub_exp[0]) + np.array(sub_exp[1]),
+    means = sub_exp["means"]
+    stdevs = np.sqrt(sub_exp["var"])
+
+    plot_with_confidence(x=means,
+                         lb=np.array(means) - np.array(stdevs),
+                         ub=np.array(means) + np.array(stdevs),
                          label=name,
                          col=colors[i])
 
