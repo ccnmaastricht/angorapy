@@ -5,7 +5,7 @@ def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, 
                 env='CartPole-v1', epochs=3, eval=False, export_file=None, grad_norm=0.5, horizon=1024,
                 iterations=1000, lam=0.97, load_from=None, lr_pi=0.001, clip_values=False, save_every=0,
                 workers=8, tbptt: int = 16, lr_schedule=None, no_state_norming=False, no_reward_norming=False,
-                model="ffn", early_stopping=False, distribution=None):
+                model="ffn", early_stopping=False, distribution=None, shared=False):
     """Make a config from scratch."""
     return dict(**locals())
 

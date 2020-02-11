@@ -16,13 +16,13 @@ from utilities.util import env_extract_dims
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper, SkipWrapper
 
 
-def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool = True):
+def test_environment(env_name, settings, n: int, init_ray: bool = True):
     """Train on an environment and return the reward history."""
     env = gym.make(env_name)
     state_dim, action_dim = env_extract_dims(env)
 
     # model
-    build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
+    build_models = get_model_builder(model_type=settings["model"], shared=settings["shared"])
 
     # distribution
     if settings["distribution"] is not None:
@@ -116,8 +116,7 @@ if __name__ == '__main__':
 
         for i in range(args.repetitions):
             print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with config {conf_name}.")
-            reward_history = np.array(test_environment(args.env, config, model_type=config["model"],
-                                                       n=args.cycles, init_ray=should_init))
+            reward_history = np.array(test_environment(args.env, config, n=args.cycles, init_ray=should_init))
             should_init = False
 
             current_n = benchmark_dict["results"][conf_name]["n"]
