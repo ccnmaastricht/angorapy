@@ -57,7 +57,7 @@ def overview():
 
 
 @app.route("/benchmarks")
-def overview():
+def benchmarks():
     """Write Benchmark page."""
     exp_dir = PATH_TO_EXPERIMENTS
     experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]

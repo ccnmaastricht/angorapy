@@ -119,7 +119,7 @@ class BaseRunningMeanWrapper(BaseWrapper, abc.ABC):
 
         The method can handle multi input states where the observation is a tuple of numpy arrays. For each element
         a separate mean/variance is tracked. Any non-vector input will be skipped as they are assumed to be images
-        and should be handled differently.
+        and should be handled seperatly.
         """
         self.n += 1
 

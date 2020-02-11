@@ -9,7 +9,7 @@ import configs
 from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from configs import derive_config
-from models import build_ffn_models, build_rnn_models
+from models import build_ffn_models, build_rnn_models, get_model_builder
 from utilities.const import PATH_TO_BENCHMARKS
 from utilities.statistics import increment_mean_var
 from utilities.util import env_extract_dims
@@ -23,9 +23,7 @@ def test_environment(env_name, settings, model_type: str, n: int, init_ray: bool
 
     # model
     if model_type == "ffn":
-        build_models = build_ffn_models
-    elif model_type == "rnn":
-        build_models = build_rnn_models
+        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
     else:
         raise ValueError("Unknown Model Type.")
 

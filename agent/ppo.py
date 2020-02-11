@@ -127,8 +127,9 @@ class PPOAgent:
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
-        self.policy, self.value, self.joint = model_builder(self.env, self.distribution, **({"bs": 1} if "bs" in fargs(
-            model_builder).args else {}))
+        print(self.model_builder)
+        self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
+                                                            **({"bs": 1} if requires_batch_size(model_builder) else {}))
 
         if pretrained_components is not None:
             print("Loading pretrained components:")

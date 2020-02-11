@@ -2,6 +2,7 @@ import argparse
 import logging
 
 import argcomplete
+from gym.spaces import Box
 
 from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
@@ -35,7 +36,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
 
-    if env.spec.max_episode_steps > settings.horizon and not settings.eval:
+    if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings.horizon and not settings.eval:
         logging.warning("Careful! Your horizon is lower than the max reward, this will most likely skew stats heavily.")
 
     # choose and make policy distribution
@@ -47,7 +48,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
     # setting appropriate model building function
     if "ShadowHand" in settings.env:
         if env.visual_input:
-            build_models = build_shadow_brain_v1
+            build_models = get_model_builder(model="shadow", model_type=settings.model, shared=settings.shared)
         else:
             build_models = build_blind_shadow_brain_v1
     else:

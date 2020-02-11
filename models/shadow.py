@@ -2,10 +2,8 @@
 """Hybrid policy networks that utilize both visual and unstructured input data."""
 import os
 import time
-from typing import Iterable
 
 import tensorflow as tf
-from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
 from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
@@ -15,14 +13,20 @@ from environments import *
 from models.components import _build_fcn_component
 from models.convolutional import _build_visual_encoder
 from utilities.const import VISION_WH
+from utilities.model_utils import is_recurrent_model
 from utilities.util import env_extract_dims
-from utilities.model_utils import calc_max_memory_usage
 
 
-def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int):
+def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
+                          **kwargs):
     """Build network for the shadow hand task."""
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
+
+    rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
+                  "lstm": tf.keras.layers.LSTM,
+                  "gru": tf.keras.layers.GRU}[
+        model_type]
 
     # inputs
     visual_in = tf.keras.Input(batch_shape=(bs, None, VISION_WH, VISION_WH, 3), name="visual_input")
@@ -47,7 +51,7 @@ def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs
     x = tf.keras.layers.Concatenate()([x, goal_in])
 
     # recurrent layer
-    o = tf.keras.layers.GRU(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
+    o = rnn_choice(hidden_dimensions, stateful=True, return_sequences=True, batch_size=bs)(x)
 
     # output heads
     policy_out = distribution.build_action_head(n_actions, o.shape[1:], bs)(o)
@@ -64,7 +68,7 @@ def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs
     return policy, value, joint
 
 
-def build_blind_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int):
+def build_blind_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, **kwargs):
     """Build network for the shadow hand task but without visual inputs."""
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
@@ -109,7 +113,7 @@ def build_blind_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistributi
     return policy, value, joint
 
 
-def build_shadow_brain_v2(env: gym.Env, distribution: BasePolicyDistribution, bs: int):
+def build_shadow_brain_v2(env: gym.Env, distribution: BasePolicyDistribution, bs: int, **kwargs):
     """Build network for the shadow hand task, version 2."""
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32

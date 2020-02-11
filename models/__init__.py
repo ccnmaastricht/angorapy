@@ -1,14 +1,13 @@
 """A collection of builder functions for models usable with different environments in PPO."""
 
-from models.convolutional import *
-from models.simple import *
-from models.shadow import *
 from models.components import *
-
+from models.convolutional import *
 from models.mighty_maker import *
+from models.shadow import *
+from models.simple import *
 
 
-def get_model_builder(model_type: str, shared: bool):
+def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = True):
     """Get a builder function for a model with the described parameters."""
     # TODO shared seems not to work yet
     params = locals()

@@ -67,12 +67,11 @@ continuous_beta = derive_config(continuous, {"distribution": "beta"})
 # BIPEDAL
 
 bipedal = derive_config(continuous, dict(
-    batch_size=32,
-    lr_pi=0.0001,
     iterations=400,
 ))
 
 bipedal_rnn = derive_config(bipedal, dict(model="rnn"))
+bipedal_gru = derive_config(bipedal, dict(model="gru"))
 bipedal_beta = derive_config(bipedal, dict(distribution="beta"))
 
 
