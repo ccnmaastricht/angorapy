@@ -98,11 +98,8 @@ def backpropgru(combined):
     return fixedpoints
 
 
-def adam_optimizer(fun, x0,
-                   epsilon,
-                   max_iter,
-                   print_every,
-                   agnc):
+def adam_optimizer(fun, x0, epsilon, max_iter, print_every, agnc):
+
     def print_update(q):
         print("Function value:", q)
 

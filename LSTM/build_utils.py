@@ -5,10 +5,8 @@ def build_rnn_ds(weights, input: None, use_input: bool = False):
     weights, inputweights, b = weights[1], weights[0], weights[2]
     projection_b = np.matmul(input, inputweights) + b
 
-    if use_input:
-        fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2)
-    else:
-        fun = lambda x: 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + b) ** 2)
+    def fun(x):
+        return 0.5 * sum((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2)
 
     return fun
 
@@ -50,6 +48,29 @@ def build_gru_ds(weights, n_hidden, input: str = None, use_input: bool = False):
 
     return fun, dynamical_system
 
+def build_joint_gru_ds(weights, n_hidden, input):
+    def sigmoid(x):
+        return 1 / (1 + np.exp(-x))
+
+    z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
+    W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
+    U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
+    b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
+
+    z_projection_b = np.matmul(input, W_z) + b_z
+    r_projection_b = np.matmul(input, W_r) + b_r
+    g_projection_b = np.matmul(input, W_h) + b_h
+
+    z_fun = lambda x: sigmoid(np.matmul(x, U_z) + b_z)
+    r_fun = lambda x: sigmoid(np.matmul(x, U_r) + b_r)
+    g_fun = lambda x: np.tanh((r_fun(x) * np.matmul(x, U_h) + b_h))
+
+    fun = lambda x: np.mean(0.5 * np.sum((((1 - z_fun(x)) * (g_fun(x) - x)) ** 2), axis=1))
+
+    dynamical_system = lambda x: (1 - z_fun(x)) * (g_fun(x) - x)
+
+    return fun, dynamical_system
+
 def build_lstm_ds(weights, input, n_hidden, use_input: bool = False):
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
@@ -73,3 +94,5 @@ def build_lstm_ds(weights, input, n_hidden, use_input: bool = False):
     dynamical_system = lambda x, c: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]
 
     return fun, dynamical_system
+
+

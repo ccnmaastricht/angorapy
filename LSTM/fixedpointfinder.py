@@ -8,7 +8,8 @@ import sklearn.decomposition as skld
 import matplotlib.pyplot as plt
 from LSTM.minimization import backproprnn, backpropgru
 from mayavi import mlab
-from LSTM.build_utils import build_rnn_ds, build_joint_rnn_ds, build_gru_ds, build_lstm_ds
+from LSTM.build_utils import build_rnn_ds, build_joint_rnn_ds, \
+    build_gru_ds, build_lstm_ds, build_joint_gru_ds
 from LSTM.minimization import adam_optimizer
 
 
@@ -165,48 +166,6 @@ class FixedPointFinder(object):
         velocities = func(activations)
         return velocities
 
-
-# TODO: velocities as output as functionality
-    def plot_fixed_points(self, activations, fixedpoints=None):
-        if fixedpoints is not None:
-            self.good_fixed_points = fixedpoints
-        self._extract_fixed_point_locations()
-        self._find_unique_fixed_points()
-        self.unique_jac = [self.good_fixed_points[i] for i in self.unique_idx]
-
-
-
-        activations = np.vstack(activations)
-
-        pca = skld.PCA(3)
-        pca.fit(activations)
-        X_pca = pca.transform(activations)
-        new_pca = pca.transform(self.unique_fixed_points)
-
-
-
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        ax.plot(X_pca[:self.n_points, 0], X_pca[:self.n_points, 1], X_pca[:self.n_points, 2],
-                linewidth=0.2)
-        for i in range(len(x_modes)):
-            if not x_modes[i]:
-                ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
-                           marker='.', s=30, c='k')
-            else:
-                ax.scatter(new_pca[i, 0], new_pca[i, 1], new_pca[i, 2],
-                           marker='.', s=30, c='r')
-                for p in range(len(x_directions)):
-                    direction_matrix = pca.transform(x_directions[p])
-                    ax.plot(direction_matrix[:, 0], direction_matrix[:, 1], direction_matrix[:, 2],
-                            c='r', linewidth=0.8)
-
-        plt.title('PCA using modeltype: ' + self.hps['rnn_type'])
-        ax.set_xlabel('PC1')
-        ax.set_ylabel('PC2')
-        ax.set_zlabel('PC3')
-        plt.show()
-
     @staticmethod
     def classify_fixedpoints(fps):
 
@@ -215,31 +174,31 @@ class FixedPointFinder(object):
         x_modes = []
         x_directions = []
         scale = 2
-        for n in range(len(self.unique_jac)):
+        for n in range(len(unique_jac)):
 
-            trace = np.matrix.trace(self.unique_jac[n]['jac'])
-            det = np.linalg.det(self.unique_jac[n]['jac'])
+            trace = np.matrix.trace(unique_jac[n]['jac'])
+            det = np.linalg.det(unique_jac[n]['jac'])
 
             if det < 0:
                 print('saddle_point')
                 x_modes.append(True)
-                e_val, e_vecs = np.linalg.eig(self.unique_jac[n]['jac'])
+                e_val, e_vecs = np.linalg.eig(unique_jac[n]['jac'])
                 ids = np.argwhere(np.real(e_val) > 0)
                 for i in range(len(ids)):
-                    x_plus = self.unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                    x_minus = self.unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                    x_direction = np.vstack((x_plus, self.unique_jac[n]['x'], x_minus))
+                    x_plus = unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                    x_minus = unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                    x_direction = np.vstack((x_plus, unique_jac[n]['x'], x_minus))
                     x_directions.append(np.real(x_direction))
             elif det > 0:
                 if trace ** 2 - 4 * det > 0 and trace < 0:
                     print('stable fixed point was found.')
                     x_modes.append(False)
-                    e_val, e_vecs = np.linalg.eig(self.unique_jac[n]['jac'])
+                    e_val, e_vecs = np.linalg.eig(unique_jac[n]['jac'])
                     ids = np.argwhere(np.real(e_val) > 0)
                     for i in range(len(ids)):
-                        x_plus = self.unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                        x_minus = self.unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
-                        x_direction = np.vstack((x_plus, self.unique_jac[n]['x'], x_minus))
+                        x_plus = unique_jac[n]['x'] + scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                        x_minus = unique_jac[n]['x'] - scale * e_val[ids[i]] * np.real(e_vecs[:, ids[i]].transpose())
+                        x_direction = np.vstack((x_plus, unique_jac[n]['x'], x_minus))
                         x_directions.append(np.real(x_direction))
                 elif trace ** 2 - 4 * det > 0 and trace > 0:
                     print('unstable fixed point was found')
@@ -293,9 +252,34 @@ class FixedPointFinder(object):
 
 class FPF_adam(FixedPointFinder):
 
+    def find_fixed_points(self, x0, inputs):
+        if self.rnn_type == 'vanilla':
+            fun = build_joint_rnn_ds(self.weights, inputs)
+            per_point_fun = build_rnn_ds(self.weights, inputs)
+        elif self.rnn_type == 'gru':
+            fun, dynamical_system = build_joint_gru_ds(self.weights, self.n_hidden, inputs)
+        else:
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
+        joint_fun = np.mean(fun)
+        x0 = adam_optimizer(joint_fun, x0,
+                            epsilon=self.adam_hps['epsilon'],
+                            max_iter=self.adam_hps['max_iters'],
+                            print_every=self.agnc_hps['norm_clip'])
 
-    def find_fixed_points(self):
-        pass
+        jac_fun = nd.Jacobian(dynamical_system)
+        fixedpoints = []
+        for i in range(len(x0)):
+            jacobian = jac_fun(x0[i, :])
+            q = fun(x0[i, :])
+            fixedpoint = {'fun': q,
+                          'x': x0[i, :],
+                          'jac': jacobian}
+            fixedpoints.append(fixedpoint)
+
+        return fixedpoints
+
+
 
 class FPF_scipy(FixedPointFinder):
 
