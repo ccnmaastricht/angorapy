@@ -5,11 +5,8 @@ import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
 import sklearn.decomposition as skld
-import matplotlib.pyplot as plt
 from LSTM.minimization import backproprnn, backpropgru
-from mayavi import mlab
-from LSTM.build_utils import build_rnn_ds, build_joint_rnn_ds, \
-    build_gru_ds, build_lstm_ds, build_joint_gru_ds
+from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
 from LSTM.minimization import adam_optimizer
 from scipy.spatial.distance import pdist, squareform
 
@@ -142,7 +139,6 @@ class FixedPointFinder(object):
         velocities = func(activations)
         return velocities
 
-
     def _find_unique_fixed_points(self, fps):
         """Identify fixed points that are unique within a distance threshold
         of """
@@ -150,19 +146,18 @@ class FixedPointFinder(object):
         def extract_fixed_point_locations(fps):
             """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
             puts all coordinates in single array."""
-            fixed_point_location = []
-            for fp in fps:
-                fixed_point_location.append(fp['x'])
+            fixed_point_location = [fp['x'] for fp in fps]
+
             fixed_point_locations = np.vstack(fixed_point_location)
+
             return fixed_point_locations
 
         fps_locations = extract_fixed_point_locations(fps)
         d = int(np.round(np.max([0 - np.log10(self.unique_tol)])))
         ux, idx = np.unique(fps_locations.round(decimals=d), axis=0, return_index=True)
 
-        unique_fps = []
-        for id in idx:
-            unique_fps.append(fps[id])
+        unique_fps = [fps[id] for id in idx]
+
         # TODO: use pdist and also select based on lowest q(x)
 
         return unique_fps
@@ -197,42 +192,42 @@ class Adamfixedpointfinder(FixedPointFinder):
                                      'method': 'joint',
                                      'print_every': 200}}
 
-    def __init__(self, weights, rnn_type,
+    def __init__(self, weights, rnn_type, q_threshold,
                  alr_hps=adam_default_hps['alr_hps'],
                  agnc_hps=adam_default_hps['agnc_hps'],
-                 adam_hps=adam_default_hps['adam_hps'],
-                 ):
-        FixedPointFinder.__init__(self, weights, rnn_type)
+                 adam_hps=adam_default_hps['adam_hps']):
+        FixedPointFinder.__init__(self, weights, rnn_type, q_threshold=q_threshold)
         self.alr_hps = alr_hps
         self.agnc_hps = agnc_hps
         self.adam_hps = adam_hps
 
-
-
     def find_fixed_points(self, x0, inputs):
         if self.rnn_type == 'vanilla':
-            fun = build_joint_rnn_ds(self.weights, inputs)
-            # per_point_fun = build_rnn_ds(self.weights, inputs)
+            fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, self.adam_hps['method'])
         elif self.rnn_type == 'gru':
-            fun, dynamical_system = build_joint_gru_ds(self.weights, self.n_hidden, inputs)
+            fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, self.adam_hps['method'])
+        elif self.rnn_type == 'lstm':
+            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.adam_hps['method'])
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-        x0 = adam_optimizer(fun, x0,
+        # if not self.adam_hps['method'] == 'joint':
+
+
+        fps = adam_optimizer(fun, x0,
                             epsilon=self.adam_hps['epsilon'],
                             max_iter=self.adam_hps['max_iters'],
-                            print_every=200,
+                            print_every=self.adam_hps['print_every'],
                             agnc=self.agnc_hps['norm_clip'])
-        n_hidden, weights = self.n_hidden, self.weights[1]
-        jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x) ** 2)
-        # nd.Jacobian(dynamical_system)
+
+
         fixedpoints = []
-        for i in range(len(x0)):
-            jacobian = jac_fun(x0[i, :])
-            q = fun(x0[i, :])
+        for i in range(len(fps)):
+            jacobian = jac_fun(fps[i, :])
+            q = fun(fps[i, :])
             fixedpoint = {'fun': q,
-                          'x': x0[i, :],
+                          'x': fps[i, :],
                           'jac': jacobian}
             fixedpoints.append(fixedpoint)
 
@@ -248,10 +243,9 @@ class Scipyfixedpointfinder(FixedPointFinder):
                          'display': True}
 
     def __init__(self, weights, rnn_type,
-                 scipy_hps=scipy_default_hps['scipy_hps']):
+                 scipy_hps=scipy_default_hps):
         FixedPointFinder.__init__(self, weights, rnn_type)
         self.scipy_hps = scipy_hps
-
 
     def find_fixed_points(self):
         pass

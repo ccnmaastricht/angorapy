@@ -34,10 +34,10 @@ def plot_fixed_points(self, activations, fixedpoints, n_points):
     def extract_fixed_point_locations(fps):
         """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
         puts all coordinates in single array."""
-        fixed_point_location = []
-        for fp in fps:
-            fixed_point_location.append(fp['x'])
+        fixed_point_location = [fp['x'] for fp in fps]
+
         fixed_point_locations = np.vstack(fixed_point_location)
+
         return fixed_point_locations
 
     def classify_fixedpoints(fps, unique_jac):

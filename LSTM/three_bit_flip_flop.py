@@ -47,7 +47,8 @@ class Flipflopper:
                          'n_bits': 3,
                          'p_flip': 0.2}
         # data_hps may be changed but are recommended to remain at their default values
-
+        self.model = self._build_model()
+        self.rng = npr.RandomState(125)
     def _build_model(self):
         '''Builds model that can be used to train the 3-Bit Flip-Flop task.
 
@@ -73,8 +74,10 @@ class Flipflopper:
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
         x = tf.keras.layers.Dense(3)(x)
-        self.model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
-        self.model.summary()
+        model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
+        model.summary()
+
+        return model
 
 
     def generate_flipflop_trials(self):
@@ -92,7 +95,7 @@ class Flipflopper:
                 the correct behavior of the FlipFlop memory device.'''
 
 
-        self.rng = npr.RandomState(125)
+
         data_hps = self.data_hps
         n_batch = data_hps['n_batch']
         n_time = data_hps['n_time']
@@ -134,7 +137,7 @@ class Flipflopper:
         return {'inputs': inputs, 'output': output}
 
     def train(self, stim):
-        '''Function to train an RNN model and visualize training history.
+        '''Function to train an RNN model This function will save the trained model afterwards.
 
         Args:
             stim: dict containing 'inputs' and 'output' as input and target data for training the model.
@@ -146,21 +149,13 @@ class Flipflopper:
 
         Returns:
             None.'''
-        self._build_model()
+
         self.model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
-        self.history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
+        history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
                             tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=4000)
 
         self._save_model()
-
-        plt.figure()
-        plt.plot(self.history.history['loss'], label='loss')
-        plt.plot(self.history.history['accuracy'], label='accuracy')
-        plt.title('Training history')
-        plt.xlabel('Epochs')
-        plt.legend()
-        plt.show()
 
     def visualize_flipflop(self, stim):
         prediction = self.model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
@@ -201,8 +196,8 @@ class Flipflopper:
                                  'print_every': 200}}
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
         # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
-        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'])
-        states = self.ffinder.sample_states(self.activation, 8)
+        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-07)
+        states = self.ffinder.sample_states(self.activation, 25)
         inputs = np.zeros((states.shape[0], 3))
         fps = self.ffinder.find_fixed_points(states, inputs)
         return fps
@@ -228,7 +223,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
+    rnn_type = 'gru'
     n_hidden = 64
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
