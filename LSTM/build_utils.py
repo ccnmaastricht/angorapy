@@ -42,7 +42,8 @@ def build_gru_ds(weights, n_hidden, input, method: str = 'joint'):
         def fun(x):
             return 0.5 * np.sum((((1 - z_fun(x)) * (g_fun(x) - x)) ** 2), axis=1)
 
-    dynamical_system = lambda x: (1 - z_fun(x)) * (g_fun(x) - x)
+    def dynamical_system(x):
+        return (1 - z_fun(x)) * (g_fun(x) - x)
     jac_fun = nd.Jacobian(dynamical_system)
 
     return fun, jac_fun

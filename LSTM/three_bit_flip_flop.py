@@ -7,6 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder
 from tensorflow.keras.models import load_model
 import os
+from LSTM.plot_utils import plot_fixed_points
 
 class Flipflopper:
     ''' Class for training an RNN to implement a 3-Bit Flip-Flop task as
@@ -41,14 +42,17 @@ class Flipflopper:
 
         self.hps = {'rnn_type': rnn_type,
                     'n_hidden': n_hidden,
-                    'model_name': 'flipflopmodel'}
+                    'model_name': 'flipflopmodel',
+                    'verbose': False}
         self.data_hps = {'n_batch': 128,
                          'n_time': 256,
                          'n_bits': 3,
-                         'p_flip': 0.2}
+                         'p_flip': 0.5}
+        self.verbose = self.hps['verbose']
         # data_hps may be changed but are recommended to remain at their default values
         self.model = self._build_model()
         self.rng = npr.RandomState(125)
+
     def _build_model(self):
         '''Builds model that can be used to train the 3-Bit Flip-Flop task.
 
@@ -75,7 +79,8 @@ class Flipflopper:
 
         x = tf.keras.layers.Dense(3)(x)
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
-        model.summary()
+        if self.verbose:
+            model.summary()
 
         return model
 
@@ -180,7 +185,6 @@ class Flipflopper:
         '''Intialize class FixedPointFinder'''
 
         self._load_model()
-        self._get_activations(stim)
         self.hps = {'rnn_type': self.hps['rnn_type'],
                     'n_hidden': self.hps['n_hidden'],
                     'unique_tol': 1e-03,
@@ -189,18 +193,21 @@ class Flipflopper:
                     'algorithm': "adam",
                     'scipy_hps': {'method': "Newton-CG",
                                   'display': True},
-                    'adam_hps': {'max_iter': 5000,
+                    'adam_hps': {'max_iter': 10000,
                                  'lr': 0.001,
                                  'n_init': 4,
                                  'gradientnormclip': 1.0,
                                  'print_every': 200}}
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
+        activations = self._get_activations(stim)
+
         # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
-        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-07)
-        states = self.ffinder.sample_states(self.activation, 25)
+        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-05)
+        states = self.ffinder.sample_states(activations, 100)
         inputs = np.zeros((states.shape[0], 3))
         fps = self.ffinder.find_fixed_points(states, inputs)
-        return fps
+
+        return fps, activations, states
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
@@ -215,7 +222,9 @@ class Flipflopper:
 
     def _get_activations(self, stim):
         sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
-        self.activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
+        activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
+
+        return activation
 
 
 
@@ -224,15 +233,17 @@ class Flipflopper:
 
 if __name__ == "__main__":
     rnn_type = 'gru'
-    n_hidden = 64
+    n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    # flopper.train(stim)
+    flopper.train(stim)
 
-    # flopper.visualize_flipflop(stim)
+    flopper.visualize_flipflop(stim)
 
-    fps = flopper.find_fixed_points(stim)
+    fps, activations, states = flopper.find_fixed_points(stim)
+
+    plot_fixed_points(activations, fps, 4000)
 
 

@@ -8,7 +8,7 @@ import sklearn.decomposition as skld
 from LSTM.minimization import backproprnn, backpropgru
 from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
 from LSTM.minimization import adam_optimizer
-from scipy.spatial.distance import pdist, squareform
+
 
 
 class FixedPointFinder(object):
@@ -187,7 +187,7 @@ class Adamfixedpointfinder(FixedPointFinder):
     adam_default_hps = {'alr_hps': {'decay_rate': 0.001},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
-                        'adam_hps': {'epsilon': 1e-02,
+                        'adam_hps': {'epsilon': 1e-03,
                                      'max_iters': 5000,
                                      'method': 'joint',
                                      'print_every': 200}}
@@ -221,15 +221,18 @@ class Adamfixedpointfinder(FixedPointFinder):
                             print_every=self.adam_hps['print_every'],
                             agnc=self.agnc_hps['norm_clip'])
 
-
+        inputs = np.zeros(3)
+        # _, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, 'sequential')
         fixedpoints = []
-        for i in range(len(fps)):
-            jacobian = jac_fun(fps[i, :])
-            q = fun(fps[i, :])
-            fixedpoint = {'fun': q,
-                          'x': fps[i, :],
-                          'jac': jacobian}
+        jacobians = jac_fun(fps)
+        i = 0
+        for fp in fps:
+
+            fixedpoint = {'fun': fun(fp),
+                          'x': fp,
+                          'jac': jacobians[i, :, :]}
             fixedpoints.append(fixedpoint)
+            i += 1
 
         good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
         unique_fps = self._find_unique_fixed_points(good_fps)
