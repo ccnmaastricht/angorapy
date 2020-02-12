@@ -12,7 +12,8 @@ COLORS = dict(
     ENDC='\033[0m',
     BOLD='\033[1m',
     UNDERLINE='\033[4m',
-    GREEN='\u001b[32m'
+    GREEN='\u001b[32m',
+    ORANGE="\033[33m"
 )
 
 # STORAGE

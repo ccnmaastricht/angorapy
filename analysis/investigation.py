@@ -48,7 +48,7 @@ class Investigator:
 
     def get_layer_weights(self, layer_name):
         """Get the weights of a layer identified by its unique name."""
-        return self.get_layers_by_names(layer_name).get_weights()
+        return self.get_layers_by_names(layer_name)[0].get_weights()
 
     def get_weight_dict(self):
         """Get a dictionary mapping layer names to the weights of the layers."""
@@ -57,6 +57,59 @@ class Investigator:
             out[layer_name] = self.get_layer_weights(layer_name)
 
         return out
+
+    def dissect_recurrent_layer_weights(self, layer_name):
+        layer = self.get_layers_by_names(layer_name)[0]
+
+        if not is_recurrent_model(layer):
+            raise ValueError("Cannot dissect non-recurrent layer...")
+
+        units = layer.units
+
+        # stolen from https://stackoverflow.com/a/51484524/5407682
+        W = layer.get_weights()[0]
+        U = layer.get_weights()[1]
+        b = layer.get_weights()[2]
+
+        if isinstance(layer, tf.keras.layers.SimpleRNN):
+            return dict(
+                W=W,
+                U=U,
+                b=b
+            )
+        elif isinstance(layer, tf.keras.layers.GRU):
+            return dict(
+                W_z=W[:, :units],
+                W_r=W[:, units: units * 2],
+                W_c=W[:, units * 2:],
+
+                U_z=U[:, :units],
+                U_r=U[:, units: units * 2],
+                U_c=U[:, units * 2:],
+
+                b_z=b[:units],
+                b_r=b[units: units * 2],
+                b_c=b[units * 2:],
+            )
+        elif isinstance(layer, tf.keras.layers.LSTM):
+            return dict(
+                W_i=W[:, :units],
+                W_f=W[:, units: units * 2],
+                W_c=W[:, units * 2: units * 3],
+                W_o=W[:, units * 3:],
+
+                U_i=U[:, :units],
+                U_f=U[:, units: units * 2],
+                U_c=U[:, units * 2: units * 3],
+                U_o=U[:, units * 3:],
+
+                b_i=b[:units],
+                b_f=b[units: units * 2],
+                b_c=b[units * 2: units * 3],
+                b_o=b[units * 3:],
+            )
+        else:
+            raise ValueError("Recurrent layer type not understood. Is it custom?")
 
     def get_layer_activations(self, layer_name: str, input_tensor=None):
         """Get activations of a layer. If no input tensor is given, a random tensor is used."""
@@ -130,7 +183,10 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1581374430, from_iteration="b")
+    agent_007 = PPOAgent.from_agent_state(1581527443, from_iteration="b")
     inv = Investigator.from_agent(agent_007)
 
-    inv.render_episode(agent_007.env)
+    # inv.render_episode(agent_007.env)
+    weights = inv.dissect_recurrent_layer_weights("policy_recurrent_layer")
+    print(weights)
+    # print(inv.get_weight_dict())

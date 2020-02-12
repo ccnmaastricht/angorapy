@@ -61,6 +61,8 @@ continuous = make_config(
 )
 
 continuous_rnn = derive_config(continuous, {"model": "rnn"})
+continuous_gru = derive_config(continuous, {"model": "gru"})
+continuous_lstm = derive_config(continuous, {"model": "lstm"})
 continuous_beta = derive_config(continuous, {"distribution": "beta"})
 
 
@@ -72,6 +74,7 @@ bipedal = derive_config(continuous, dict(
 
 bipedal_rnn = derive_config(bipedal, dict(model="rnn"))
 bipedal_gru = derive_config(bipedal, dict(model="gru"))
+bipedal_lstm = derive_config(bipedal, dict(model="lstm"))
 bipedal_beta = derive_config(bipedal, dict(distribution="beta"))
 
 

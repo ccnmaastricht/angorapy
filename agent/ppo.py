@@ -127,7 +127,6 @@ class PPOAgent:
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
-        print(self.model_builder)
         self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
                                                             **({"bs": 1} if requires_batch_size(model_builder) else {}))
 
@@ -625,9 +624,14 @@ class PPOAgent:
         """Print a report of the current state of the training."""
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
+        half_way_there_threshold = (self.cycle_reward_history[0]
+                                    + 0.5 * (self.env.spec.reward_threshold - self.cycle_reward_history[0]))
         if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None:
             if self.env.spec.reward_threshold < self.cycle_reward_history[-1]:
                 reward_col = COLORS["GREEN"]
+            elif self.cycle_reward_history[-1] > half_way_there_threshold:
+                reward_col = COLORS["ORANGE"]
+
 
         # calculate percentages of computation spend on different phases of the iteration
         time_distribution_string = ""

@@ -114,21 +114,20 @@ class Gatherer:
                 # calculate advantages for the finished episode, where the last value is 0 since it refers to the
                 # terminal state that we just observed
                 episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
-                                                                 values[-episode_steps:] + [0],
+                                                                 values[-episode_steps:] + [0],  # TODO check if this makes sense with reard norming
                                                                  discount, lam)
                 episode_returns = episode_advantages + values[-episode_steps:]
 
                 if not self.is_recurrent:
                     advantages.append(episode_advantages)
                 else:
-                    buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
-
-                    # skip as many steps as are missing to fill the subsequence, then reset rnn states for next episode
+                    # skip as many steps as are missing to fill the subsequence, then push adv ant ret to buffer
                     t += subseq_length - (t % subseq_length) - 1
-                    self.joint.reset_states()
+                    buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
 
                 # reset environment to receive next episodes initial state
                 state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None))[0]
+                self.joint.reset_states()
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
