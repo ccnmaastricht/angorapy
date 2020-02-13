@@ -16,7 +16,7 @@ from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
-from LSTM.fixedpointfinder import FixedPointFinder
+from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder
 from mayavi import mlab
 
 
@@ -164,8 +164,12 @@ class Chiefinvestigator:
                'threshold': 1e-01,
                'algorithm': 'backprop'}
 
-        self.finder = FixedPointFinder(hps, weights, input, activation)
-
+        # self.finder = FixedPointFinder(hps, weights, input, activation)
+        self.ffinder = Adamfixedpointfinder(weights, 'vanilla', q_threshold=1e-01)
+        states = self.ffinder.sample_states(activations, 200)
+        inputs = np.zeros((states.shape[0], 64))
+        fps = self.ffinder.find_fixed_points(states, inputs)
+        return fps
 
 
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states

@@ -204,7 +204,7 @@ class Flipflopper:
         # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
         self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-12)
         # self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
-        states = self.ffinder.sample_states(activations, 1024)
+        states = self.ffinder.sample_states(activations, 200)
         inputs = np.zeros((states.shape[0], 3))
         fps = self.ffinder.find_fixed_points(states, inputs)
 
@@ -233,7 +233,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'gru'
+    rnn_type = 'vanilla'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)

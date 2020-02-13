@@ -269,7 +269,7 @@ class Adamfixedpointfinder(FixedPointFinder):
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
                         'adam_hps': {'epsilon': 1e-02,
-                                     'max_iters': 8000,
+                                     'max_iters': 5000,
                                      'method': 'joint',
                                      'print_every': 200}}
 
