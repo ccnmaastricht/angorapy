@@ -4,7 +4,6 @@ import numpy as np
 import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
-import sklearn.decomposition as skld
 from LSTM.minimization import backproprnn, backpropgru
 from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
 from LSTM.minimization import adam_optimizer
@@ -368,5 +367,40 @@ class Scipyfixedpointfinder(FixedPointFinder):
         FixedPointFinder.__init__(self, weights, rnn_type)
         self.scipy_hps = scipy_hps
 
-    def find_fixed_points(self):
-        pass
+    def find_fixed_points(self, x0, inputs):
+# this function will probably make use of parallelization for optimization
+        if self.rnn_type == 'vanilla':
+            fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, 'sequential')
+        elif self.rnn_type == 'gru':
+            fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, 'sequential')
+        elif self.rnn_type == 'lstm':
+            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
+        else:
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
+
+        pool = mp.Pool(mp.cpu_count())
+        combined_objects = []
+        for i in range(len(x0)):
+            combined_objects.append((fun, x0[i, :], inputs[i, :], self.scipy_hps))
+        fps = pool.map(self._scipy_optimization, combined_objects)
+        fps = np.asarray(fps)
+        fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
+
+        good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
+        unique_fps = self._find_unique_fixed_points(good_fps)
+
+        unique_fps = self._compute_jacobian(unique_fps)
+
+        return unique_fps
+    @staticmethod
+    def _scipy_optimization(combined_object):
+        fun, x0, inputs, scipy_hps = combined_object[0], combined_object[1], \
+                                     combined_object[2], combined_object[3]
+
+        jac, hes = nd.Jacobian(fun), nd.Hessian(fun)
+        options = {'gtol': scipy_hps['gtol'], 'disp': scipy_hps['display']}
+
+        fp = minimize(fun, x0, jac=jac, hess=hes, method=scipy_hps['method'],
+                      options=options)
+        return fp.x

@@ -4,7 +4,7 @@ import numpy.random as npr
 import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
 from mpl_toolkits.mplot3d import Axes3D
-from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder
+from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder, Scipyfixedpointfinder
 from tensorflow.keras.models import load_model
 import os
 from LSTM.plot_utils import plot_fixed_points
@@ -202,8 +202,9 @@ class Flipflopper:
         activations = self._get_activations(stim)
 
         # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
-        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-08)
-        states = self.ffinder.sample_states(activations, 40)
+        # self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-08)
+        self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
+        states = self.ffinder.sample_states(activations, 4)
         inputs = np.zeros((states.shape[0], 3))
         fps = self.ffinder.find_fixed_points(states, inputs)
 
