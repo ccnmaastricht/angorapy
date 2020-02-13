@@ -4,7 +4,6 @@ import numpy as np
 import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
-from LSTM.minimization import backproprnn, backpropgru
 from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
 from LSTM.minimization import adam_optimizer
 
@@ -100,7 +99,31 @@ class FixedPointFinder(object):
 
         sampled_activations = activations[init_idx, :]
 
+        sampled_activations = self._add_gaussian_noise(sampled_activations, 0.5)
+
         return sampled_activations
+
+    def _add_gaussian_noise(self, data, noise_scale=0.0):
+        ''' Adds IID Gaussian noise to Numpy data.
+        Args:
+            data: Numpy array.
+            noise_scale: (Optional) non-negative scalar indicating the
+            standard deviation of the Gaussian noise samples to be generated.
+            Default: 0.0.
+        Returns:
+            Numpy array with shape matching that of data.
+        Raises:
+            ValueError if noise_scale is negative.
+        '''
+
+        # Add IID Gaussian noise
+        if noise_scale == 0.0:
+            return data # no noise to add
+        if noise_scale > 0.0:
+            return data + noise_scale * self.rng.randn(*data.shape)
+        elif noise_scale < 0.0:
+            raise ValueError('noise_scale must be non-negative,'
+                             ' but was %f' % noise_scale)
 
     def _handle_bad_approximations(self, fps):
         """This functions identifies approximations where the minmization
@@ -242,11 +265,11 @@ class FixedPointFinder(object):
 
 
 class Adamfixedpointfinder(FixedPointFinder):
-    adam_default_hps = {'alr_hps': {'decay_rate': 0.001},
+    adam_default_hps = {'alr_hps': {'decay_rate': 0.0001},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
-                        'adam_hps': {'epsilon': 1e-03,
-                                     'max_iters': 5000,
+                        'adam_hps': {'epsilon': 1e-02,
+                                     'max_iters': 8000,
                                      'method': 'joint',
                                      'print_every': 200}}
 
