@@ -9,8 +9,7 @@ import shutil
 import statistics
 import time
 from collections import OrderedDict
-from inspect import getfullargspec as fargs
-from typing import List, Tuple, Any, Union
+from typing import List, Tuple, Union
 
 import gym
 import numpy
@@ -24,7 +23,7 @@ import models
 from agent import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
-from agent.gather import Gatherer
+from agent.gather import Gatherer, RemoteGatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.datatypes import condense_stats
@@ -277,13 +276,14 @@ class PPOAgent:
         return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
-              separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False,
-              save_best=True) -> "PPOAgent":
+              separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False, save_best=True,
+              parallel=True) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
         Args:
+            parallel:
             save_best:
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
@@ -316,10 +316,12 @@ class PPOAgent:
         self.joint.set_weights(weights)
 
         available_cpus = multiprocessing.cpu_count()
-        if not ray_is_initialized:
-            ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
 
-        workers = self._make_workers(verbose=True)
+        if parallel:
+            if not ray_is_initialized:
+                ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+
+        workers = self._make_workers(parallel, verbose=True)
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -337,13 +339,22 @@ class PPOAgent:
                 self.joint.save(f"{self.model_export_dir}/{name_key}/model")
                 model_representation = f"{self.model_export_dir}/{name_key}/"
 
-            # distribute the current policy to the workers
-            [actor.update_weights.remote(self.joint.get_weights()) for actor in workers]
+            if parallel:
+                # distribute the current policy to the workers
+                [actor.update_weights.remote(self.joint.get_weights()) for actor in workers]
 
-            # create processes and execute them
-            split_stats, split_preprocessors = zip(*ray.get(
-                [actor.collect.remote(self.horizon, self.discount, self.lam, self.tbptt_length,
-                                      self.preprocessor.serialize()) for actor in workers]))
+                # create processes and execute them
+                split_stats, split_preprocessors = zip(*ray.get(
+                    [actor.collect.remote(self.horizon, self.discount, self.lam, self.tbptt_length,
+                                          self.preprocessor.serialize()) for actor in workers]))
+            else:
+                # distribute the current policy to the workers
+                [actor.update_weights(self.joint.get_weights()) for actor in workers]
+
+                # create processes and execute them
+                split_stats, split_preprocessors = zip(
+                    *[actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length,
+                                    self.preprocessor.serialize()) for actor in workers])
 
             stats = condense_stats(split_stats)
 
@@ -452,23 +463,31 @@ class PPOAgent:
 
         return self
 
-    def _make_workers(self, verbose=False):
-        available_cpus = multiprocessing.cpu_count()
+    def _make_workers(self, parallel, verbose=False):
+        if parallel:
+            available_cpus = multiprocessing.cpu_count()
 
-        # set up the persistent workers
-        worker_options: dict = {}
-        if self.n_workers == 1:
-            worker_options["num_gpus"] = 1
-            worker_options["num_cpus"] = available_cpus
-        elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
-            worker_options["num_cpus"] = available_cpus // self.n_workers
+            # set up the persistent workers
+            worker_options: dict = {}
+            if self.n_workers == 1:
+                worker_options["num_gpus"] = 1
+                worker_options["num_cpus"] = available_cpus
+            elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
+                worker_options["num_cpus"] = available_cpus // self.n_workers
 
-        workers = [Gatherer.options(**worker_options).remote(self.builder_function_name,
-                                                             self.distribution.__class__.__name__,
-                                                             self.env_name, i) for i in range(self.n_workers)]
+            workers = [RemoteGatherer.options(**worker_options).remote(self.builder_function_name,
+                                                                       self.distribution.__class__.__name__,
+                                                                       self.env_name, i) for i in range(self.n_workers)]
 
-        if verbose:
-            print(f"{self.n_workers} workers each use: {worker_options}")
+            if verbose:
+                print(f"{self.n_workers} workers each use: {worker_options}")
+        else:
+            workers = [Gatherer(self.builder_function_name,
+                                self.distribution.__class__.__name__,
+                                self.env_name, i) for i in range(self.n_workers)]
+
+            if verbose:
+                print(f"{self.n_workers} sequential workers initialized.")
 
         return workers
 
@@ -608,9 +627,7 @@ class PPOAgent:
         elif available_cpus % n == 0 and n != available_cpus:
             worker_options["num_cpus"] = available_cpus // n
 
-        workers = [Gatherer.options(**worker_options).remote(self.builder_function_name,
-                                                             self.distribution.__class__.__name__,
-                                                             self.env_name, i) for i in range(n)]
+        workers = self._make_workers(True)
 
         for w in workers:
             w.update_weights.remote(self.joint.get_weights())

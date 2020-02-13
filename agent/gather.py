@@ -23,7 +23,6 @@ from utilities.util import parse_state, add_state_dims, flatten, env_extract_dim
 from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
 
 
-@ray.remote
 class Gatherer:
     """Remote Gathering class."""
 
@@ -207,6 +206,11 @@ class Gatherer:
             steps += 1
 
         return steps, cumulative_reward
+
+
+@ray.remote
+class RemoteGatherer(Gatherer):
+    pass
 
 
 if __name__ == "__main__":

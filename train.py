@@ -97,7 +97,7 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
                       iterations=settings.iterations, config_name=settings.config)
     agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
                 export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval,
-                stop_early=settings.stop_early)
+                stop_early=settings.stop_early, parallel=not settings.sequential)
 
     agent.save_agent_state()
     env.close()
@@ -124,6 +124,7 @@ if __name__ == "__main__":
     # meta arguments
     parser.add_argument("--config", type=str, default=None, help="config name (utilities/configs.py) to be loaded")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
+    parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")

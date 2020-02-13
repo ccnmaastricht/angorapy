@@ -46,6 +46,7 @@ discrete_no_norms = derive_config(discrete, {"no_state_norming": True,
                                              "no_reward_norming": True})
 
 # CONTINUOUS DEFAULT
+#   - LunarLanderContinuous
 
 continuous = make_config(
     batch_size=64,
@@ -69,16 +70,16 @@ continuous_beta = derive_config(continuous, {"distribution": "beta"})
 continuous_no_norms = derive_config(continuous, {"no_state_norming": True,
                                                  "no_reward_norming": True})
 
-
-# PENDULUM
+# PENDULUM (for, well, Pendulum-v0)
 
 pendulum = derive_config(continuous, dict(
     horizon=512,
     epochs=10,
     discount=0.99,
-    distribution="beta"
+    distribution="gaussian"
 ))
 
+pendulum_beta = derive_config(pendulum, {"distribution": "beta"})
 
 # BIPEDAL
 
@@ -163,4 +164,20 @@ hand = make_config(
     discount=0.998,
     grad_norm=0.5,
     clip_values=False
+)
+
+# RECOMMENDED CONFIGS FOR ENVs
+
+recommended_config = dict(
+    **dict.fromkeys(
+        ["CartPole-v2", "CartPole-v1"], discrete_no_norms
+    ), **dict.fromkeys(
+        ["Acrobot-v1", "MountainCar-v0"], discrete
+    ), **dict.fromkeys(
+        ["BipedalWalker-v2", "BipedalWalkerHardcore-v2"], bipedal
+    ), **dict.fromkeys(
+        ["Pendulum-v0"], pendulum_beta
+    ), **dict.fromkeys(
+        ["LunarLanderContinuous-v2"], continuous_beta
+    ),
 )

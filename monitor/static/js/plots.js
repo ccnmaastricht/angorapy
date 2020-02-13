@@ -170,6 +170,7 @@ $.when(
         marker: {color: "Red"}
     }, {
         y: prog["lengths"]["last_cycle"],
+        yaxis: 'y2',
         boxpoints: 'all',
         jitter: 0.3,
         pointpos: -1.8,
@@ -180,7 +181,9 @@ $.when(
 
     Plotly.newPlot(reward_boxplot_div, data, {
             ...standard_layout,
-            title: "Episode Reward and Length Distribution"
+            title: "Episode Reward and Length Distribution",
+            yaxis2: {title: "Episode Steps", side: "right", overlaying: 'y', showgrid: false},
+
         },
         {responsive: true});
 

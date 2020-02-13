@@ -20,7 +20,7 @@ if args.id is None:
     args.id = max(ids)
 
 start = time.time()
-agent = PPOAgent.from_agent_state(args.id)
+agent = PPOAgent.from_agent_state(args.id, "b")
 print(f"Agent {args.id} successfully loaded.")
 
 lengths, rewards = agent.evaluate(args.n)

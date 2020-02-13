@@ -45,7 +45,8 @@ def test_environment(env_name, settings, n: int, init_ray: bool = True):
 
     # train
     agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,
-                ray_is_initialized=not init_ray, stop_early=settings["stop_early"], save_best=True)
+                stop_early=settings["stop_early"], ray_is_initialized=not init_ray, save_best=True)
+    agent.save_agent_state()
     env.close()
 
     return agent.cycle_reward_history
@@ -123,17 +124,29 @@ if __name__ == '__main__':
             current_n = benchmark_dict["results"][conf_name]["n"]
             if current_n == 0:
                 means, var = reward_history, np.zeros_like(reward_history)
+                mean_max, var_max = np.max(reward_history), np.array(0)
             else:
                 means, var = increment_mean_var(np.array(benchmark_dict["results"][conf_name]["means"]),
                                                 np.array(benchmark_dict["results"][conf_name]["var"]),
                                                 reward_history,
                                                 np.zeros_like(reward_history),
                                                 current_n)
+                mean_max, var_max = increment_mean_var(benchmark_dict["results"][conf_name]["mean_max"],
+                                                       benchmark_dict["results"][conf_name]["var_max"],
+                                                       np.max(reward_history),
+                                                       np.array(0),
+                                                       current_n)
 
             benchmark_dict["results"][conf_name].update({
                 "n": benchmark_dict["results"][conf_name]["n"] + 1,
+
+                # mean/var per cycle
                 "means": means.tolist(),
-                "var": var.tolist()
+                "var": var.tolist(),
+
+                # max cycle performance
+                "mean_max": mean_max.item(),
+                "var_max": var_max.item()
             })
 
             with open(results_path, "w") as f:

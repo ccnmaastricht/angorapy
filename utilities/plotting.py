@@ -84,11 +84,11 @@ class InteractiveLegend(object):
         plt.show()
 
 
-def plot_with_confidence(x, lb, ub, label, col=None):
+def plot_with_confidence(x, lb, ub, label, col=None, alpha=0.2):
     """Plot a line with confidence Intervals."""
     x = np.array(x)
-    plt.fill_between(range(x.shape[0]), lb, ub, alpha=0.3, color=col, label=f"{label}")
-    plt.plot(x, color=col)
+    plt.fill_between(range(x.shape[0]), lb, ub, alpha=alpha, color=col)
+    plt.plot(x, color=col, label=f"{label}")
 
 
 def lighten_color(color, amount=0.5):
