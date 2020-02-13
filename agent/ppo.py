@@ -624,14 +624,13 @@ class PPOAgent:
         """Print a report of the current state of the training."""
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
-        half_way_there_threshold = (self.cycle_reward_history[0]
-                                    + 0.5 * (self.env.spec.reward_threshold - self.cycle_reward_history[0]))
         if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None:
+            half_way_there_threshold = (self.cycle_reward_history[0]
+                                        + 0.5 * (self.env.spec.reward_threshold - self.cycle_reward_history[0]))
             if self.env.spec.reward_threshold < self.cycle_reward_history[-1]:
                 reward_col = COLORS["GREEN"]
             elif self.cycle_reward_history[-1] > half_way_there_threshold:
                 reward_col = COLORS["ORANGE"]
-
 
         # calculate percentages of computation spend on different phases of the iteration
         time_distribution_string = ""

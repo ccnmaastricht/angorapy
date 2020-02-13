@@ -47,7 +47,8 @@ def overview():
                         "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
                             progress["rewards"]["mean"]) > reward_threshold),
-                        "bookmark": meta["bookmark"] if "bookmark" in meta else False
+                        "bookmark": meta["bookmark"] if "bookmark" in meta else False,
+                        "config_name": meta["config"] if "config" in meta else "unknown",
                     }
                 })
 

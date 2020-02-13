@@ -41,6 +41,7 @@ def test_environment(env_name, settings, n: int, init_ray: bool = True):
                      clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
                      gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
                      tbptt_length=settings["tbptt"], distribution=distribution, preprocessor=preprocessor)
+    print(f"Agent has ID {agent.agent_id}")
 
     # train
     agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,

@@ -17,8 +17,7 @@ from utilities.model_utils import is_recurrent_model
 from utilities.util import env_extract_dims
 
 
-def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
-                          **kwargs):
+def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn"):
     """Build network for the shadow hand task."""
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
@@ -159,6 +158,20 @@ def build_shadow_brain_v2(env: gym.Env, distribution: BasePolicyDistribution, bs
                            outputs=[policy_out, value_out], name="shadow_brain_v2")
 
     return policy, value, joint
+
+
+def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
+                              blind: bool = False, **kwargs):
+    """Build shadow brain networks (policy, value, joint) for given parameter settings."""
+
+    # this function is just a wrapper routing the requests for broader options to specific functions
+    if model_type == "ffn":
+        raise NotImplementedError("No non recurrent version of this ShadowBrain abailable.")
+
+    if not blind:
+        return build_shadow_brain_v1(env=env, distribution=distribution, bs=bs, model_type=model_type)
+    else:
+        return build_blind_shadow_brain_v1(env=env, distribution=distribution, bs=bs, model_type=model_type)
 
 
 if __name__ == "__main__":

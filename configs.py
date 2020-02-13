@@ -21,6 +21,7 @@ def derive_config(original: dict, overrules: dict):
 # DISCRETE: general hp settings that solve
 #   - CartPole (turn of state and reward normalization though)
 #   - Acrobot
+#   - MountainCar (norming is absolutely crucial here
 
 discrete = make_config(
     batch_size=128,
@@ -40,6 +41,7 @@ discrete = make_config(
 discrete_no_ent = derive_config(discrete, {"c_entropy": 0.0})
 discrete_rnn = derive_config(discrete, {"model": "rnn"})
 discrete_gru = derive_config(discrete, {"model": "gru"})
+discrete_lstm = derive_config(discrete, {"model": "lstm"})
 discrete_no_norms = derive_config(discrete, {"no_state_norming": True,
                                              "no_reward_norming": True})
 
@@ -64,6 +66,18 @@ continuous_rnn = derive_config(continuous, {"model": "rnn"})
 continuous_gru = derive_config(continuous, {"model": "gru"})
 continuous_lstm = derive_config(continuous, {"model": "lstm"})
 continuous_beta = derive_config(continuous, {"distribution": "beta"})
+continuous_no_norms = derive_config(continuous, {"no_state_norming": True,
+                                                 "no_reward_norming": True})
+
+
+# PENDULUM
+
+pendulum = derive_config(continuous, dict(
+    horizon=512,
+    epochs=10,
+    discount=0.99,
+    distribution="beta"
+))
 
 
 # BIPEDAL
@@ -76,7 +90,6 @@ bipedal_rnn = derive_config(bipedal, dict(model="rnn"))
 bipedal_gru = derive_config(bipedal, dict(model="gru"))
 bipedal_lstm = derive_config(bipedal, dict(model="lstm"))
 bipedal_beta = derive_config(bipedal, dict(distribution="beta"))
-
 
 # FROM PAPERS
 
@@ -96,11 +109,10 @@ beta_paper = make_config(
     clip_values=False
 )
 
-
 # MUJOCO
 
 mujoco = make_config(
-    iterations=1000000//2048,   # one million timesteps
+    iterations=1000000 // 2048,  # one million timesteps
     workers=1,
     batch_size=64,
     horizon=2048,
@@ -117,11 +129,10 @@ mujoco = make_config(
 mujoco_beta = derive_config(mujoco, {"distribution": "beta"})
 mujoco_vc = derive_config(mujoco, {"clip_values": True})
 
-
 # ROBOSCHOOL TASKS
 
 roboschool = make_config(
-    iterations=50000000//2048,   # 50 million timesteps
+    iterations=50000000 // 2048,  # 50 million timesteps
     workers=16,
     batch_size=4096,
     horizon=1024,
@@ -135,7 +146,6 @@ roboschool = make_config(
     grad_norm=0.5,
     clip_values=False
 )
-
 
 # HAND ENVS
 
@@ -153,9 +163,4 @@ hand = make_config(
     discount=0.998,
     grad_norm=0.5,
     clip_values=False
-)
-
-
-env_to_default_config_mapping = dict(
-    **dict.fromkeys(["Humanoid-v2", "HumanoidStandup-v2"])
 )

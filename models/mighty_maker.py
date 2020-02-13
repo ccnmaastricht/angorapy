@@ -4,7 +4,7 @@ from collections import OrderedDict
 from functools import partial
 
 from models.shadow import build_shadow_brain_v1
-from models.simple import build_ffn_models, build_rnn_models
+from models.simple import build_ffn_models, build_rnn_models, build_simple_models
 
 arguments = OrderedDict(sorted([
     ("model", ["simple", "shadow"]),
@@ -17,7 +17,7 @@ parameter_dicts = list(map(lambda c: dict(zip(arguments.keys(), c)), combination
 
 for pd in parameter_dicts:
     if pd["model"] == "simple":
-        base_function = build_ffn_models if pd["model_type"] == "ffn" else build_rnn_models
+        base_function = build_simple_models
     elif pd["model"] == "shadow":
         base_function = build_shadow_brain_v1
     else:

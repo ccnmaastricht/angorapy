@@ -14,7 +14,7 @@ from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, **kwargs):
+def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False):
     """Build simple two-layer model."""
 
     # preparation
@@ -50,7 +50,9 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
                      model_type: str = "rnn"):
     """Build simple policy and value models having a recurrent layer before their heads."""
     state_dimensionality, n_actions = env_extract_dims(env)
-    rnn_choice = {"rnn": tf.keras.layers.SimpleRNN, "lstm": tf.keras.layers.LSTM, "gru": tf.keras.layers.GRU}[
+    rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
+                  "lstm": tf.keras.layers.LSTM,
+                  "gru": tf.keras.layers.GRU}[
         model_type]
 
     inputs = tf.keras.Input(batch_shape=(bs, None, state_dimensionality,))
@@ -82,6 +84,17 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     value = tf.keras.Model(inputs=inputs, outputs=out_value, name="simple_rnn_value")
 
     return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="simple_rnn")
+
+
+def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+                        model_type: str = "rnn", **kwargs):
+    """Build simple networks (policy, value, joint) for given parameter settings."""
+
+    # this function is just a wrapper routing the requests for ffn and rnns
+    if model_type == "ffn":
+        return build_ffn_models(env, distribution, shared)
+    else:
+        return build_rnn_models(env, distribution, shared, bs=bs, model_type=model_type)
 
 
 if __name__ == '__main__':

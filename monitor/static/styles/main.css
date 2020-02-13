@@ -285,4 +285,8 @@ a.button-control:hover {
   color: #343a40 !important;
 }
 
+#agentId {
+  cursor: copy;
+}
+
 /*# sourceMappingURL=main.css.map */
