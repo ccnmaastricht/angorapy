@@ -20,6 +20,7 @@ def plot_velocities(activations, velocities, n_points: int = 5000):
 
      Returns:
          None."""
+    activations = np.vstack(activations)
     pca = skld.PCA(3)
     pca.fit(activations)
     X_pca = pca.transform(activations)
@@ -46,7 +47,7 @@ def plot_fixed_points(activations, fps, n_points):
         # somehow this block of code does not return values if put in function
 
         x_directions = []
-        scale = 2
+        scale = 0.9
         for fp in fps:
 
             trace = np.matrix.trace(fp['jac'])

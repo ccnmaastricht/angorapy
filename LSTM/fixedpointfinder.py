@@ -124,15 +124,14 @@ class FixedPointFinder(object):
 
         Args:
              """
-
+        input = np.zeros(3)
         if self.rnn_type == 'vanilla':
-            func = build_rnn_ds(self.weights, input)
+            func = build_rnn_ds(self.weights, self.n_hidden, input, 'sequential')
         elif self.rnn_type == 'gru':
-            weights, n_hidden = self.weights, self.hps['n_hidden']
-            func, _ = build_gru_ds(weights, n_hidden, input)
+            func, _ = build_gru_ds(self.weights, self.n_hidden, input, 'sequential')
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
+                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
         activations = np.vstack(activations)
         # get velocity at point
@@ -161,6 +160,36 @@ class FixedPointFinder(object):
         # TODO: use pdist and also select based on lowest q(x)
 
         return unique_fps
+
+    def _creat_fixedpoint_object(self, fun, fps, x0, inputs):
+        fixedpoints = []
+        k = 0
+        for fp in fps:
+
+            fixedpointobject = {'fun': fun(fp),
+                          'x': fp,
+                          'x_init': x0[k, :],
+                          'input_init': inputs[k, :]}
+            fixedpoints.append(fixedpointobject)
+            k += 1
+
+        return fixedpoints
+
+    def _compute_jacobian(self, fixedpoints):
+        for fp in fixedpoints:
+            if self.rnn_type == 'vanilla':
+                fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, fp['input_init'], 'sequential')
+            elif self.rnn_type == 'gru':
+                fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, fp['input_init'], 'sequential')
+            elif self.rnn_type == 'lstm':
+                fun, jac_fun = build_lstm_ds(self.weights, fp['input_init'], self.n_hidden, 'sequential')
+            else:
+                raise ValueError('Hyperparameter rnn_type must be one of'
+                                 '[vanilla, gru, lstm] but was %s', self.rnn_type)
+            fp['jac'] = jac_fun(fp['x'])
+
+        return fixedpoints
+
 
     def _print_hps(self):
         COLORS = dict(
@@ -202,6 +231,36 @@ class Adamfixedpointfinder(FixedPointFinder):
         self.adam_hps = adam_hps
 
     def find_fixed_points(self, x0, inputs):
+
+        if self.adam_hps['method'] == 'joint':
+            fixedpoints = self._joint_optimization(x0, inputs)
+        elif self.adam_hps['method'] == 'sequential':
+            fixedpoints = self._sequential_optimization(x0, inputs)
+        else:
+            raise ValueError('HyperParameter for adam optimizer: method must be either "joint"'
+                             'or "sequential". However, it was %s', self.adam_hps['method'])
+
+        good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
+        unique_fps = self._find_unique_fixed_points(good_fps)
+
+        unique_fps = self._compute_jacobian(unique_fps)
+
+
+        return unique_fps
+
+    def _joint_optimization(self, x0, inputs):
+        """Function to perform joint optimization. All inputs and initial conditions
+        will be optimized simultaneously.
+
+        Args:
+            x0: numpy array containing a set of initial conditions. Must have dimensions
+            [n_init x n_units]. No default.
+
+            inputs: numpy array containing a set of inputs to the recurrent layer corresponding
+            to the activations in x0. Must have dimensions [n_init x n_units]. No default.
+
+        Returns:
+            Fixed points optimized jointly using adam."""
         if self.rnn_type == 'vanilla':
             fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, self.adam_hps['method'])
         elif self.rnn_type == 'gru':
@@ -212,32 +271,50 @@ class Adamfixedpointfinder(FixedPointFinder):
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-        # if not self.adam_hps['method'] == 'joint':
-
-
         fps = adam_optimizer(fun, x0,
                             epsilon=self.adam_hps['epsilon'],
                             max_iter=self.adam_hps['max_iters'],
                             print_every=self.adam_hps['print_every'],
                             agnc=self.agnc_hps['norm_clip'])
 
-        inputs = np.zeros(3)
-        # _, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, 'sequential')
-        fixedpoints = []
-        jacobians = jac_fun(fps)
-        i = 0
-        for fp in fps:
+        fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
 
-            fixedpoint = {'fun': fun(fp),
-                          'x': fp,
-                          'jac': jacobians[i, :, :]}
-            fixedpoints.append(fixedpoint)
-            i += 1
+        return fixedpoints
 
-        good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
-        unique_fps = self._find_unique_fixed_points(good_fps)
+    def _sequential_optimization(self, x0, inputs):
+        """Function to perform sequential optimization. All inputs and initial conditions
+        will be optimized individually.
 
-        return unique_fps
+        Args:
+            x0: numpy array containing a set of initial conditions. Must have dimensions
+            [n_init x n_units]. No default.
+
+            inputs: numpy array containing a set of inputs to the recurrent layer corresponding
+            to the activations in x0. Must have dimensions [n_init x n_units]. No default.
+
+        Returns:
+            Fixed points optimized jointly using adam."""
+        fps = np.empty(x0.shape)
+        for i in range(len(x0)):
+            if self.rnn_type == 'vanilla':
+                fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs[i, :], self.adam_hps['method'])
+            elif self.rnn_type == 'gru':
+                fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs[i, :], self.adam_hps['method'])
+            elif self.rnn_type == 'lstm':
+                fun, jac_fun = build_lstm_ds(self.weights, inputs[i, :], self.n_hidden, self.adam_hps['method'])
+            else:
+                raise ValueError('Hyperparameter rnn_type must be one of'
+                                 '[vanilla, gru, lstm] but was %s', self.rnn_type)
+
+            fps[i, :] = adam_optimizer(fun, x0[i, :],
+                                epsilon=self.adam_hps['epsilon'],
+                                max_iter=self.adam_hps['max_iters'],
+                                print_every=self.adam_hps['print_every'],
+                                agnc=self.agnc_hps['norm_clip'])
+
+        fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
+
+        return fixedpoints
 
 
 class Scipyfixedpointfinder(FixedPointFinder):
