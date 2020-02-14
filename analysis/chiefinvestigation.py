@@ -18,6 +18,7 @@ from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder
 from mayavi import mlab
+from LSTM.plot_utils import plot_fixed_points
 
 
 class Chiefinvestigator:
@@ -165,10 +166,10 @@ class Chiefinvestigator:
                'algorithm': 'backprop'}
 
         # self.finder = FixedPointFinder(hps, weights, input, activation)
-        self.ffinder = Adamfixedpointfinder(weights, 'vanilla', q_threshold=1e-01)
-        states = self.ffinder.sample_states(activations, 200)
-        inputs = np.zeros((states.shape[0], 64))
-        fps = self.ffinder.find_fixed_points(states, inputs)
+        self.ffinder = Adamfixedpointfinder(weights, 'vanilla', q_threshold=1e-05)
+        states = self.ffinder.sample_states(activation, 1000)
+        input = np.zeros((states.shape[0], 64))
+        fps = self.ffinder.find_fixed_points(states, input)
         return fps
 
 
@@ -209,14 +210,15 @@ if __name__ == "__main__":
         actionss.append(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
     activationss, inputss = np.vstack(activationss), np.vstack(inputss)
-    # chiefinvesti.findfixedpoints(weights, activationss, inputss)
+    fps = chiefinvesti.findfixedpoints(weights, activationss, inputss)
     actionss = np.concatenate(actionss, axis=0)
 
-    pca = skld.PCA(3)
-    pca.fit(activationss)
-    X_pca = pca.transform(activationss)
+    plot_fixed_points(activationss, fps, 4000)
+    # pca = skld.PCA(3)
+    # pca.fit(activationss)
+    # X_pca = pca.transform(activationss)
 
-    n_points = 3000
-    p = mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2])
+    # n_points = 3000
+    # p = mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2])
 
 

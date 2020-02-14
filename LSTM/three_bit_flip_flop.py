@@ -44,8 +44,8 @@ class Flipflopper:
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 128,
-                         'n_time': 256,
+        self.data_hps = {'n_batch': 512,
+                         'n_time': 64,
                          'n_bits': 3,
                          'p_flip': 0.5}
         self.verbose = self.hps['verbose']
@@ -68,11 +68,11 @@ class Flipflopper:
         inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
 
         if self.hps['rnn_type'] == 'vanilla':
-            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True)(inputs)
+            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'gru':
-            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True)(inputs)
+            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
-            x = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+            x = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True, return_state=True)(inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -202,9 +202,9 @@ class Flipflopper:
         activations = self._get_activations(stim)
 
         # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
-        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-12)
-        # self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
-        states = self.ffinder.sample_states(activations, 200)
+        # self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-10)
+        self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
+        states = self.ffinder.sample_states(activations, 4)
         inputs = np.zeros((states.shape[0], 3))
         fps = self.ffinder.find_fixed_points(states, inputs)
 

@@ -47,7 +47,7 @@ def plot_fixed_points(activations, fps, n_points):
         # somehow this block of code does not return values if put in function
 
         x_directions = []
-        scale = 0.9
+        scale = 4
         for fp in fps:
 
             trace = np.matrix.trace(fp['jac'])

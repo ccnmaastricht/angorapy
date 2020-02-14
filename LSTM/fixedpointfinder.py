@@ -183,7 +183,8 @@ class FixedPointFinder(object):
 
         return unique_fps
 
-    def _creat_fixedpoint_object(self, fun, fps, x0, inputs):
+    @staticmethod
+    def _creat_fixedpoint_object(fun, fps, x0, inputs):
         """Initial creation of a fixedpoint object. A fixedpoint object is a dictionary
         providing information about a fixedpoint. Initial information is specified in
         parameters of this function. Please note that e.g. jacobian matrices will be added
@@ -382,7 +383,7 @@ class Adamfixedpointfinder(FixedPointFinder):
 
 class Scipyfixedpointfinder(FixedPointFinder):
     scipy_default_hps = {'method': 'Newton-CG',
-                         'gtol': 1e-20,
+                         'xtol': 1e-20,
                          'display': True}
 
     def __init__(self, weights, rnn_type,
@@ -391,39 +392,47 @@ class Scipyfixedpointfinder(FixedPointFinder):
         self.scipy_hps = scipy_hps
 
     def find_fixed_points(self, x0, inputs):
-# this function will probably make use of parallelization for optimization
-        if self.rnn_type == 'vanilla':
-            fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, 'sequential')
-        elif self.rnn_type == 'gru':
-            fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, 'sequential')
-        elif self.rnn_type == 'lstm':
-            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
-        else:
-            raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.rnn_type)
-
         pool = mp.Pool(mp.cpu_count())
         combined_objects = []
         for i in range(len(x0)):
-            combined_objects.append((fun, x0[i, :], inputs[i, :], self.scipy_hps))
-        fps = pool.map(self._scipy_optimization, combined_objects)
-        fps = np.asarray(fps)
-        fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
+            combined_objects.append((x0[i, :], inputs[i, :], self.scipy_hps, self.rnn_type,
+                                     self.n_hidden, self.weights))
+        fps = pool.map(self._scipy_optimization, combined_objects, chunksize=1)
+        fps = [item for sublist in fps for item in sublist]
 
-        good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
+        good_fps, bad_fps = self._handle_bad_approximations(fps)
         unique_fps = self._find_unique_fixed_points(good_fps)
 
         unique_fps = self._compute_jacobian(unique_fps)
 
         return unique_fps
+
     @staticmethod
     def _scipy_optimization(combined_object):
-        fun, x0, inputs, scipy_hps = combined_object[0], combined_object[1], \
-                                     combined_object[2], combined_object[3]
+        x0, inputs, scipy_hps, rnn_type, n_hidden, weights = combined_object[0], combined_object[1], \
+                                                             combined_object[2], combined_object[3], \
+                                                             combined_object[4], combined_object[5]
 
-        jac, hes = nd.Jacobian(fun), nd.Hessian(fun)
-        options = {'gtol': scipy_hps['gtol'], 'disp': scipy_hps['display']}
+        if rnn_type == 'vanilla':
+            fun, jac_fun = build_rnn_ds(weights, n_hidden, inputs, 'sequential')
+        elif rnn_type == 'gru':
+            fun, jac_fun = build_gru_ds(weights, n_hidden, inputs, 'sequential')
+        elif rnn_type == 'lstm':
+            fun, jac_fun = build_lstm_ds(weights, inputs, n_hidden, 'sequential')
+        else:
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', rnn_type)
 
-        fp = minimize(fun, x0, jac=jac, hess=hes, method=scipy_hps['method'],
+
+        jac, hes = nd.Gradient(fun), nd.Hessian(fun)
+        options = {'disp': scipy_hps['display']}
+
+        fp = minimize(fun, x0, method=scipy_hps['method'], jac=jac, hess=hes,
                       options=options)
-        return fp.x
+
+        fpx = fp.x.reshape((1, len(fp.x)))
+        x0 = x0.reshape((1, len(x0)))
+        inputs = inputs.reshape((1, len(inputs)))
+
+        fixedpoint = FixedPointFinder._creat_fixedpoint_object(fun, fpx, x0, inputs)
+        return fixedpoint
