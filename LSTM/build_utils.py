@@ -55,22 +55,26 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
 
     W_i, W_f, W_c, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
                          W[:, 2 * n_hidden:3 * n_hidden], W[:, 3 * n_hidden:4 * n_hidden]
-    U_i, U_f, U_c, U_o = U[:, :n_hidden].transpose(), U[:, n_hidden:2 * n_hidden].transpose(), \
-                         U[:, 2 * n_hidden:3 * n_hidden].transpose(), U[:, 3 * n_hidden:4 * n_hidden].transpose()
-    b_i, b_f, b_c, b_o = b[0, :n_hidden].transpose(), b[0, n_hidden:2 * n_hidden].transpose(), \
-                         b[0, 2 * n_hidden:3 * n_hidden].transpose(), b[0, 3 * n_hidden:4 * n_hidden].transpose()
-    f_fun = lambda x: sigmoid(np.matmul(input, W_f) + np.matmul(U_f, x[0:n_hidden]) + b_f)
-    i_fun = lambda x: sigmoid(np.matmul(input, W_i) + np.matmul(U_i, x[0:n_hidden]) + b_i)
-    o_fun = lambda x: sigmoid(np.matmul(input, W_o) + np.matmul(U_o, x[0:n_hidden]) + b_o)
-    c_fun = lambda x, c: f_fun(x[0:n_hidden]) * c[0:n_hidden] + i_fun(x[0:n_hidden]) * \
-                         np.tanh((np.matmul(W_c, input) + np.matmul(U_c, x[0:n_hidden]) + b_c) - c[0:n_hidden])
+    U_i, U_f, U_c, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
+                         U[:, 2 * n_hidden:3 * n_hidden], U[:, 3 * n_hidden:4 * n_hidden]
+    b_i, b_f, b_c, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
+                         b[2 * n_hidden:3 * n_hidden], b[3 * n_hidden:4 * n_hidden]
+    f_fun = lambda x: sigmoid(np.matmul(input, W_f) + np.matmul(x, U_f) + b_f)
+    i_fun = lambda x: sigmoid(np.matmul(input, W_i) + np.matmul(x, U_i) + b_i)
+    o_fun = lambda x: sigmoid(np.matmul(input, W_o) + np.matmul(x, U_o) + b_o)
+    c_fun = lambda x, c: f_fun(x) * c + i_fun(x) * \
+                         np.tanh((np.matmul(input, W_c) + np.matmul(x, U_c) + b_c) - c)
     # perhaps put h and c in as one object to minimize and split up in functions
     if method == 'joint':
-        fun = lambda x, c: np.mean(0.5 * sum((o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]) ** 2))
+        def fun(x):
+            h, c = x[:, :n_hidden], x[:, n_hidden:]
+            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(h, c)) - h) ** 2), axis=1))
     else:
-        fun = lambda x, c: 0.5 * sum((o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]) ** 2)
+        def fun(x):
+            h, c = x[:n_hidden], x[n_hidden:]
+            return 0.5 * np.sum((o_fun(h) * np.tanh(c_fun(h, c)) - h) ** 2)
 
-    dynamical_system = lambda x, c: o_fun(x[0:n_hidden]) * np.tanh(c_fun(x[0:n_hidden], c)) - x[0:n_hidden]
+    dynamical_system = lambda h, c: o_fun(h) * np.tanh(c_fun(h, c)) - h
     jac_fun = nd.Jacobian(dynamical_system)
 
     return fun, jac_fun

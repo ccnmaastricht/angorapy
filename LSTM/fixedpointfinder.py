@@ -13,7 +13,6 @@ class FixedPointFinder(object):
 
     _default_hps = {'q_threshold': 1e-12,
                     'tol_unique': 1e-03,
-                    'use_input': False,
                     'verbose': True,
                     'random_seed': 0}
 
@@ -21,7 +20,6 @@ class FixedPointFinder(object):
     def __init__(self, weights, rnn_type,
                  q_threshold=_default_hps['q_threshold'],
                  tol_unique=_default_hps['tol_unique'],
-                 use_input=_default_hps['use_input'],
                  verbose=_default_hps['verbose'],
                  random_seed=_default_hps['random_seed']):
         """The class FixedPointFinder creates a fixedpoint dictionary. A fixedpoint dictionary contain 'fun',
@@ -72,7 +70,6 @@ class FixedPointFinder(object):
         self.unique_tol = tol_unique
 
         self.verbose = verbose
-        self.use_input = use_input
 
         self.rng = np.random.RandomState(random_seed)
 
@@ -239,7 +236,11 @@ class FixedPointFinder(object):
             else:
                 raise ValueError('Hyperparameter rnn_type must be one of'
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
-            fp['jac'] = jac_fun(fp['x'])
+            if self.rnn_type == 'lstm':
+                h, c = fp['x'][:self.n_hidden], fp['x'][self.n_hidden:]
+                fp['jac'] = jac_fun(h, c)
+            else:
+                fp['jac'] = jac_fun(fp['x'])
 
         return fixedpoints
 
@@ -261,15 +262,19 @@ class FixedPointFinder(object):
               f"The layer has {bc}{self.n_hidden}{ec} recurrent units. \n"
               # f"Using {bc}{self.algorithm}{ec} for minimization.\n"
               f"-----------------------------------------\n"
-              f"{wn}HyperParameters{ec}: threshold - {self.q_threshold}\n unique_tolerance - {self.unique_tol}\n"
+              f"{wn}HyperParameters{ec}: \n"
+              f" threshold - {self.q_threshold}\n "
+              f"unique_tolerance - {self.unique_tol}\n"
+              f"unique_tolerance - {self.unique_tol}\n"
               f"-----------------------------------------\n")
 
 
 class Adamfixedpointfinder(FixedPointFinder):
+    # TODO: get hyperparameters in order with parent class
     adam_default_hps = {'alr_hps': {'decay_rate': 0.0001},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
-                        'adam_hps': {'epsilon': 1e-02,
+                        'adam_hps': {'epsilon': 1e-03,
                                      'max_iters': 5000,
                                      'method': 'joint',
                                      'print_every': 200}}
@@ -340,6 +345,9 @@ class Adamfixedpointfinder(FixedPointFinder):
                             max_iter=self.adam_hps['max_iters'],
                             print_every=self.adam_hps['print_every'],
                             agnc=self.agnc_hps['norm_clip'])
+
+        if self.rnn_type == 'lstm':
+            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
 
         fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
 
