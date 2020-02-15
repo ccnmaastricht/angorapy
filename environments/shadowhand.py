@@ -4,10 +4,23 @@ import os
 
 import numpy as np
 from gym import utils, spaces
+from gym.envs.robotics import HandReachEnv
 from gym.envs.robotics.hand import manipulate
-from gym.envs.robotics.hand.manipulate_touch_sensors import MANIPULATE_BLOCK_XML, MANIPULATE_EGG_XML
+from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS
+from gym.envs.robotics.utils import robot_get_obs
 
 from utilities.const import VISION_WH
+
+MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
+                                    "assets/hand",
+                                    'manipulate_block_touch_sensors.xml')
+
+MANIPULATE_EGG_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
+                                  "assets/hand",
+                                  'manipulate_egg_touch_sensors.xml')
+
+
+# DEFAULT_INITIAL_QPOS = {k: v * 0 for k, v in DEFAULT_INITIAL_QPOS.items()}
 
 
 class ShadowHand(manipulate.ManipulateEnv):
@@ -156,10 +169,10 @@ class ShadowHand(manipulate.ManipulateEnv):
             d_pos, d_rot = self._goal_distance(achieved_goal, goal)
             # We weigh the difference in position to avoid that `d_pos` (in meters) is completely
             # dominated by `d_rot` (in radians).
-            return (- (10. * d_pos + d_rot)     # distance rewards
-                    - 1                         # constant punishment to encourage speed
-                    + success * 5               # reward for finishing
-                                                # TODO dropping penalty
+            return (- (10. * d_pos + d_rot)  # distance rewards
+                    - 1  # constant punishment to encourage speed
+                    + success * 5  # reward for finishing
+                    # TODO dropping penalty
                     )
 
 
@@ -197,15 +210,46 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
                             max_steps=max_steps)
 
 
+# RELATED HAND TASKS
+
+class ShadowHandReach(HandReachEnv):
+
+    def __init__(self, distance_threshold=0.01, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', ):
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
+
+    def compute_reward(self, achieved_goal, goal, info):
+        r = super().compute_reward(achieved_goal, goal, info)
+        if self._is_success(achieved_goal, desired_goal=goal):
+            r += 10
+            print("REACHED")
+
+        return r
+
+    def _get_obs(self):
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        achieved_goal = self._get_achieved_goal().ravel()
+        observation = np.concatenate([robot_qpos, robot_qvel, achieved_goal, self.goal.copy()])
+
+        return {
+            'observation': observation.copy(),
+            'achieved_goal': achieved_goal.copy(),
+            'desired_goal': self.goal.copy(),
+        }
+
+
 if __name__ == "__main__":
     print(os.environ["LD_PRELOAD"])
 
     from environments import *
-    import matplotlib.pyplot as plt
 
-    env = gym.make("ShadowHand-v0")
+    # env = gym.make("ShadowHand-v0")
+    # env = gym.make("HandManipulateBlock-v0")
+    env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()
     while True:
         env.render()
         action = env.action_space.sample()
-        _, _, _, _ = env.step(np.concatenate([np.zeros(0), np.ones(20)]))
+        s, r, d, info = env.step(action)
+        if d:
+            env.reset()

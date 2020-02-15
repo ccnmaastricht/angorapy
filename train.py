@@ -4,12 +4,12 @@ import logging
 import argcomplete
 from gym.spaces import Box
 
+import configs
 from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import *
 from models import get_model_builder
-from models.shadow import build_shadow_brain_v1, build_blind_shadow_brain_v1
-import configs
+from models.shadow import build_blind_shadow_brain_v1
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
@@ -21,42 +21,44 @@ class InconsistentArgumentError(Exception):
     pass
 
 
-def run_experiment(settings: argparse.Namespace, verbose=True):
-    """Run an experiment with the given settings."""
+def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use_monitor=False) -> PPOAgent:
+    """Run an experiment with the given settings ."""
 
     # sanity checks and warnings for given parameters
-    if args.preload is not None and args.load_from is not None:
+    if settings["preload"] is not None and settings["load_from"] is not None:
         raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
                                         "agent state. This cannot be resolved.")
 
     # setup environment and extract and report information
-    env = gym.make(settings.env)
+    env = gym.make(environment)
     state_dim, number_of_actions = env_extract_dims(env)
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
     env_name = env.unwrapped.spec.id
 
-    if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings.horizon and not settings.eval:
+    if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[
+        "eval"]:
         logging.warning("Careful! Your horizon is lower than the max reward, this will most likely skew stats heavily.")
 
     # choose and make policy distribution
-    if settings.distribution is None:
-        settings.distribution = "categorical" if env_action_space_type == "discrete" else "gaussian"
+    if settings["distribution"] is None:
+        settings["distribution"] = "categorical" if env_action_space_type == "discrete" else "gaussian"
 
-    distribution = get_distribution_by_short_name(settings.distribution)(env)
+    distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if "ShadowHand" in settings.env:
+    if "ShadowHand" in environment:
         if env.visual_input:
-            build_models = get_model_builder(model="shadow", model_type=settings.model, shared=settings.shared)
+            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"])
         else:
             build_models = build_blind_shadow_brain_v1
     else:
-        build_models = get_model_builder(model_type=settings.model, shared=settings.shared)
+        build_models = get_model_builder(model_type=settings["model"], shared=settings["shared"])
 
     # make preprocessor
-    preprocessor = CombiWrapper([StateNormalizationWrapper(state_dim) if not settings.no_state_norming else SkipWrapper(),
-                                 RewardNormalizationWrapper() if not settings.no_reward_norming else SkipWrapper()])
+    preprocessor = CombiWrapper(
+        [StateNormalizationWrapper(state_dim) if not settings["no_state_norming"] else SkipWrapper(),
+         RewardNormalizationWrapper() if not settings["no_reward_norming"] else SkipWrapper()])
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
@@ -65,42 +67,50 @@ def run_experiment(settings: argparse.Namespace, verbose=True):
               f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
               f"{bc}{state_dim}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
               f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
-              f"Config: {settings.config}\n"
+              f"Config: {settings['config']}\n"
               f"Model: {build_models.__name__}\n"
-              f"Distribution: {settings.distribution}\n"
+              f"Distribution: {settings['distribution']}\n"
               f"-----------------------------------------\n")
 
-        print(f"{wn}HyperParameters{ec}: {vars(args)}\n")
+        print(f"{wn}HyperParameters{ec}: {settings}\n")
 
-    if settings.cpu:
+    if settings["cpu"]:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    if settings.load_from is not None:
+    if settings["load_from"] is not None:
         if verbose:
-            print(f"{wn}Loading{ec} from state {settings.load_from}")
-        agent = PPOAgent.from_agent_state(settings.load_from)
+            print(f"{wn}Loading{ec} from state {settings['load_from']}")
+        agent = PPOAgent.from_agent_state(settings["load_from"])
     else:
         # set up the agent and a reporting module
-        agent = PPOAgent(build_models, env, horizon=settings.horizon, workers=settings.workers,
-                         learning_rate=settings.lr_pi, lr_schedule=settings.lr_schedule, discount=settings.discount,
-                         clip=settings.clip, c_entropy=settings.c_entropy, c_value=settings.c_value, lam=settings.lam,
-                         gradient_clipping=settings.grad_norm, clip_values=settings.clip_values,
-                         tbptt_length=settings.tbptt, distribution=distribution, preprocessor=preprocessor,
-                         pretrained_components=None if args.preload is None else [args.preload], debug=settings.debug)
+        agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
+                         learning_rate=settings["lr_pi"], lr_schedule=settings["lr_schedule"],
+                         discount=settings["discount"],
+                         clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
+                         lam=settings["lam"],
+                         gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
+                         tbptt_length=settings["tbptt"], distribution=distribution, preprocessor=preprocessor,
+                         pretrained_components=None if settings["preload"] is None else [settings["preload"]],
+                         debug=settings["debug"])
 
         if verbose:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
-    agent.set_gpu(not settings.cpu)
+    agent.set_gpu(not settings["cpu"])
 
-    monitor = Monitor(agent, env, frequency=settings.monitor_frequency, gif_every=settings.gif_every,
-                      iterations=settings.iterations, config_name=settings.config)
-    agent.drill(n=settings.iterations, epochs=settings.epochs, batch_size=settings.batch_size, monitor=monitor,
-                export=settings.export_file, save_every=settings.save_every, separate_eval=settings.eval,
-                stop_early=settings.stop_early, parallel=not settings.sequential)
+    monitor = None
+    if use_monitor:
+        monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
+                      iterations=settings["iterations"], config_name=settings["config"])
+
+    agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
+                export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
+                stop_early=settings["stop_early"], parallel=not settings["sequential"], ray_is_initialized=not init_ray)
 
     agent.save_agent_state()
     env.close()
+
+    return agent
 
 
 if __name__ == "__main__":
@@ -173,4 +183,4 @@ if __name__ == "__main__":
         tf.config.experimental_run_functions_eagerly(True)
         logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
-    run_experiment(args)
+    run_experiment(args.env, vars(args), monitor=True)

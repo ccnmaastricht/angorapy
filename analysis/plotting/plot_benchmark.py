@@ -7,7 +7,7 @@ import scipy.stats as st
 
 from utilities.plotting import plot_with_confidence
 
-colors = ["red", "green", "blue", "orange", "brown"]
+colors = ["red", "green", "blue", "orange", "brown", "lightblue"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("exp", nargs="*", type=str, default=["default_Acrobot-v1"],

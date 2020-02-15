@@ -470,7 +470,7 @@ class PPOAgent:
             # set up the persistent workers
             worker_options: dict = {}
             if self.n_workers == 1:
-                worker_options["num_gpus"] = 1
+                # worker_options["num_gpus"] = 1
                 worker_options["num_cpus"] = available_cpus
             elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
                 worker_options["num_cpus"] = available_cpus // self.n_workers
@@ -673,8 +673,8 @@ class PPOAgent:
 
         # print the report
         flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
-                   f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else round(self.cycle_reward_history[-1], 2):8.2f}{ec}; "
-                   f"len: {nc}{'-' if self.cycle_length_history[-1] is None else round(self.cycle_length_history[-1], 2):8.2f}{ec}; "
+                   f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
+                   f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
                    f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
                    f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
                    f"lr: {nc}{current_lr:.2e}{ec}; "

@@ -6,51 +6,10 @@ import gym
 import numpy as np
 
 import configs
-from agent.policies import get_distribution_by_short_name
-from agent.ppo import PPOAgent
 from configs import derive_config
-from models import build_ffn_models, build_rnn_models, get_model_builder
+from train import run_experiment
 from utilities.const import PATH_TO_BENCHMARKS
 from utilities.statistics import increment_mean_var
-from utilities.util import env_extract_dims
-from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper, SkipWrapper
-
-
-def test_environment(env_name, settings, n: int, init_ray: bool = True):
-    """Train on an environment and return the reward history."""
-    env = gym.make(env_name)
-    state_dim, action_dim = env_extract_dims(env)
-
-    # model
-    build_models = get_model_builder(model_type=settings["model"], shared=settings["shared"])
-
-    # distribution
-    if settings["distribution"] is not None:
-        distribution = get_distribution_by_short_name(settings["distribution"])(env)
-    else:
-        distribution = None
-
-    # preprocessor
-    preprocessor = CombiWrapper(
-        [StateNormalizationWrapper(state_dim) if not settings["no_state_norming"] else SkipWrapper(),
-         RewardNormalizationWrapper() if not settings["no_reward_norming"] else SkipWrapper()])
-
-    # set up the agent and a reporting module
-    agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
-                     learning_rate=settings["lr_pi"], discount=settings["discount"], lam=settings["lam"],
-                     clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
-                     gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
-                     tbptt_length=settings["tbptt"], distribution=distribution, preprocessor=preprocessor)
-    print(f"Agent has ID {agent.agent_id}")
-
-    # train
-    agent.drill(n=n, epochs=settings["epochs"], batch_size=settings["batch_size"], save_every=0, separate_eval=False,
-                stop_early=settings["stop_early"], ray_is_initialized=not init_ray, save_best=True)
-    agent.save_agent_state()
-    env.close()
-
-    return agent.cycle_reward_history
-
 
 if __name__ == '__main__':
     all_envs = [e.id for e in list(gym.envs.registry.all())]
@@ -91,12 +50,15 @@ if __name__ == '__main__':
 
     should_init = True
     for conf_name, config in configurations.items():
+        config["iterations"] = args.cycles
+        config["config"] = conf_name
+
         conf_up_counter = 1
         original_conf_name = conf_name
         while conf_name in benchmark_dict["results"]:
             conf_compatible = (
                     args.cycles == len(benchmark_dict["results"][conf_name]["means"])
-                    # and config == benchmark_dict["results"][conf_name]["config"]
+                # and config == benchmark_dict["results"][conf_name]["config"]
             )
 
             if conf_compatible:
@@ -118,7 +80,8 @@ if __name__ == '__main__':
 
         for i in range(args.repetitions):
             print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with config {conf_name}.")
-            reward_history = np.array(test_environment(args.env, config, n=args.cycles, init_ray=should_init))
+            reward_history = np.array(run_experiment(
+                args.env, config, init_ray=should_init, verbose=False).cycle_reward_history)
             should_init = False
 
             current_n = benchmark_dict["results"][conf_name]["n"]

@@ -5,7 +5,7 @@ def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, 
                 env='CartPole-v1', epochs=3, eval=False, export_file=None, grad_norm=0.5, horizon=1024,
                 iterations=1000, lam=0.97, load_from=None, lr_pi=0.001, clip_values=False, save_every=0,
                 workers=8, tbptt: int = 16, lr_schedule=None, no_state_norming=False, no_reward_norming=False,
-                model="ffn", early_stopping=False, distribution=None, shared=False):
+                model="ffn", early_stopping=False, distribution=None, shared=False, preload=None, sequential=False):
     """Make a config from scratch."""
     return dict(**locals())
 
@@ -44,6 +44,7 @@ discrete_gru = derive_config(discrete, {"model": "gru"})
 discrete_lstm = derive_config(discrete, {"model": "lstm"})
 discrete_no_norms = derive_config(discrete, {"no_state_norming": True,
                                              "no_reward_norming": True})
+discrete_no_norms_short = derive_config(discrete_no_norms, {"horizon": 512})
 
 # CONTINUOUS DEFAULT
 #   - LunarLanderContinuous
@@ -151,20 +152,22 @@ roboschool = make_config(
 # HAND ENVS
 
 hand = make_config(
-    iterations=100,
+    iterations=1000,
     workers=32,
     batch_size=4096,
     horizon=512,
     c_entropy=0.01,
     lr_pi=0.0003,
     lr_schedule="exponential",
-    epochs=15,
+    epochs=10,
     clip=0.2,
     lam=0.95,
     discount=0.998,
     grad_norm=0.5,
     clip_values=False
 )
+
+hand_beta = derive_config(hand, {"distribution": "beta"})
 
 # RECOMMENDED CONFIGS FOR ENVs
 

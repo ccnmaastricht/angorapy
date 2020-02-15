@@ -19,7 +19,8 @@ Additionally some libraries and permissions will be required. Run
 sudo bash install.sh
 ```
 
-To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) as well as mujoco-py.
+To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) 
+as well as mujoco-py. CUrrently, mujoco-py is buggy with MuJoCo 2.0, you will need version 1.5 of both MuJoCo and mujocopy!
 
 To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`. 
 

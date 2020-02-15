@@ -5,16 +5,10 @@ import gym
 from environments.evasion import Evasion
 from environments.evasionwalls import EvasionWalls
 from environments.race import Race
-from environments.shadowhand import ShadowHandBlock
+from environments.shadowhand import ShadowHandBlock, ShadowHandReach
 from environments.tunnel import Tunnel
 
 # SHADOW HAND #
-
-gym.envs.register(
-    id='ShadowHandBlind-v0',
-    entry_point='environments:ShadowHandBlock',
-    kwargs={"visual_input": False, "max_steps": 500},
-)
 
 gym.envs.register(
     id='ShadowHand-v0',
@@ -23,9 +17,22 @@ gym.envs.register(
 )
 
 gym.envs.register(
+    id='ShadowHandBlind-v0',
+    entry_point='environments:ShadowHandBlock',
+    kwargs={"visual_input": False, "max_steps": 500},
+)
+
+gym.envs.register(
     id='HandReachDenseRelative-v0',
-    entry_point='gym.envs.robotics:HandReachEnv',
-    kwargs={"reward_type": "not_sparse", "relative_control": True},
+    entry_point='environments:ShadowHandReach',
+    kwargs={"reward_type": "dense", "relative_control": True},
+    max_episode_steps=50,
+)
+
+gym.envs.register(
+    id='HandReachDenseAbsolute-v0',
+    entry_point='environments:ShadowHandReach',
+    kwargs={"reward_type": "dense", "relative_control": False},
     max_episode_steps=50,
 )
 
