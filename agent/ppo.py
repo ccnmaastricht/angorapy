@@ -9,7 +9,7 @@ import shutil
 import statistics
 import time
 from collections import OrderedDict
-from typing import List, Tuple, Union
+from typing import Union, List
 
 import gym
 import numpy
@@ -26,7 +26,8 @@ from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer, RemoteGatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
-from utilities.datatypes import condense_stats
+from utilities.const import MIN_STAT_EPS
+from utilities.datatypes import condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
@@ -378,30 +379,33 @@ class PPOAgent:
             if export:
                 shutil.rmtree(f"{self.model_export_dir}/{name_key}")
 
-            # process stats from actors
+            # process some stats from actors
             self.underflow_history.append(stats.tbptt_underflow)
-            if not separate_eval:
-                if stats.numb_completed_episodes == 0:
-                    print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
-                          "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-                self.episode_length_history.append(stats.episode_lengths)
-                self.episode_reward_history.append(stats.episode_rewards)
-                self.cycle_length_history.append(None if stats.numb_completed_episodes == 0
-                                                 else statistics.mean(stats.episode_lengths))
-                self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0
-                                                 else statistics.mean(stats.episode_rewards))
-                self.cycle_length_std_history.append(None if stats.numb_completed_episodes <= 1
-                                                     else statistics.stdev(stats.episode_lengths))
-                self.cycle_reward_std_history.append(None if stats.numb_completed_episodes <= 1
-                                                     else statistics.stdev(stats.episode_rewards))
-            else:
+            # make seperate evaluation if necessary and wanted
+            stats_with_evaluation = stats
+            if separate_eval and stats.numb_completed_episodes < MIN_STAT_EPS:
                 flat_print("Evaluating...")
-                eval_lengths, eval_rewards = self.evaluate(8, ray_already_initialized=True)
-                self.episode_length_history.append(eval_lengths)
-                self.episode_reward_history.append(eval_rewards)
-                self.cycle_length_history.append(statistics.mean(eval_lengths))
-                self.cycle_reward_history.append(statistics.mean(eval_rewards))
+                evaluation_stats = self.evaluate(MIN_STAT_EPS - stats.numb_completed_episodes,
+                                                 ray_already_initialized=True, workers=workers)
+
+                stats_with_evaluation = condense_stats([stats, evaluation_stats])
+
+            elif stats.numb_completed_episodes == 0:
+                print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
+                      "Consider activating separate evaluation in drill() to get meaningful statistics.")
+
+            # record stats in the agent
+            self.episode_length_history.append(stats_with_evaluation.episode_lengths)
+            self.episode_reward_history.append(stats_with_evaluation.episode_rewards)
+            self.cycle_length_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
+                                             else statistics.mean(stats_with_evaluation.episode_lengths))
+            self.cycle_reward_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
+                                             else statistics.mean(stats_with_evaluation.episode_rewards))
+            self.cycle_length_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
+                                                 else statistics.stdev(stats_with_evaluation.episode_lengths))
+            self.cycle_reward_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
+                                                 else statistics.stdev(stats_with_evaluation.episode_rewards))
 
             # record preprocessor stats
             for w in self.preprocessor:
@@ -604,7 +608,7 @@ class PPOAgent:
 
         progressbar.close()
 
-    def evaluate(self, n: int, ray_already_initialized: bool = False) -> Tuple[List[int], List[int]]:
+    def evaluate(self, n: int, ray_already_initialized: bool = False, workers: List[RemoteGatherer] = None) -> StatBundle:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
@@ -615,27 +619,39 @@ class PPOAgent:
         Returns:
             two lists of length n, giving episode lengths and rewards respectively
         """
+
         if not ray_already_initialized:
             ray.init(local_mode=self.debug, logging_level=logging.ERROR)
 
         # set up the persistent workers
-        available_cpus = multiprocessing.cpu_count()
-        worker_options: dict = {}
-        if n == 1:
-            # worker_options["num_gpus"] = 1
-            worker_options["num_cpus"] = available_cpus
-        elif available_cpus % n == 0 and n != available_cpus:
-            worker_options["num_cpus"] = available_cpus // n
+        if workers is None:
+            available_cpus = multiprocessing.cpu_count()
+            worker_options: dict = {}
+            if n == 1:
+                # worker_options["num_gpus"] = 1
+                worker_options["num_cpus"] = available_cpus
+            elif available_cpus % n == 0 and n != available_cpus:
+                worker_options["num_cpus"] = available_cpus // n
 
-        workers = self._make_workers(True)
+            workers = self._make_workers(True)
 
         for w in workers:
             w.update_weights.remote(self.joint.get_weights())
 
-        result_ids = [w.evaluate.remote(self.preprocessor.serialize()) for w in workers]
-        lengths, rewards = zip(*[ray.get(oi) for oi in result_ids])
+        result_ids = []
+        w_id, processes_started = 0, 0
+        while processes_started < n:
+            result_ids.append(workers[w_id].evaluate.remote(self.preprocessor.serialize()))
+            processes_started += 1
 
-        return lengths, rewards
+            # start with the first worker again
+            w_id += 1
+            if w_id > len(workers) - 1:
+                w_id = 0
+
+        all_lengths, all_rewards = zip(*[ray.get(oi) for oi in result_ids])
+
+        return StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=None)
 
     def report(self):
         """Print a report of the current state of the training."""

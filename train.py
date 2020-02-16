@@ -93,8 +93,7 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
                          pretrained_components=None if settings["preload"] is None else [settings["preload"]],
                          debug=settings["debug"])
 
-        if verbose:
-            print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
+        print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
     agent.set_gpu(not settings["cpu"])
 
@@ -138,7 +137,7 @@ if __name__ == "__main__":
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
-    parser.add_argument("--eval", action="store_true", help=f"evaluate separately (instead of using worker experience)")
+    parser.add_argument("--eval", action="store_true", help=f"evaluate additionally to have at least 5 eps")
     parser.add_argument("--save-every", type=int, default=0, help=f"save agent every given number of iterations")
     parser.add_argument("--monitor-frequency", type=int, default=1, help=f"update the monitor every n iterations.")
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
@@ -183,4 +182,4 @@ if __name__ == "__main__":
         tf.config.experimental_run_functions_eagerly(True)
         logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
-    run_experiment(args.env, vars(args), monitor=True)
+    run_experiment(args.env, vars(args), use_monitor=True)

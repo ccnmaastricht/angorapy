@@ -143,17 +143,38 @@ $.when(
             },
             steps: reward_slider_steps
         }],
-        shapes: [{
-            type: 'line',
-            x0: 0, y0: meta["environment"]["reward_threshold"],
-            x1: reward_means.length, y1: meta["environment"]["reward_threshold"],
-            layer: "below",
-            line: {
-                color: 'grey',
-                width: 2,
-                dash: 'dashdot',
-            }
-        },],
+        update_menus: [{
+            buttons: [
+                {
+                    args: ['shapes', []],
+                    label: 'None',
+                    method: 'relayout'
+                },
+                {
+                    args: ['shapes', [{
+                        type: 'line',
+                        x0: 0, y0: meta["environment"]["reward_threshold"],
+                        x1: reward_means.length, y1: meta["environment"]["reward_threshold"],
+                        layer: "below",
+                        line: {
+                            color: 'grey',
+                            width: 2,
+                            dash: 'dashdot',
+                        }
+                    },]],
+                    label: 'Threshold Line',
+                    method: 'relayout'
+                },
+            ],
+            direction: 'left',
+            pad: {'r': 10, 't': 10},
+            showactive: true,
+            type: 'buttons',
+            x: 0,
+            xanchor: 'left',
+            y: 0,
+            yanchor: 'top'
+        },]
     }, standard_layout);
 
     Plotly.newPlot(reward_plot_div, traces, layout, {responsive: true});

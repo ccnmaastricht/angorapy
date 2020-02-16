@@ -5,15 +5,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as st
 
+from utilities.const import QUALITATIVE_COLOR_PALETTE
 from utilities.plotting import plot_with_confidence
-
-colors = ["red", "green", "blue", "orange", "brown", "lightblue"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("exp", nargs="*", type=str, default=["default_Acrobot-v1"],
                     help="name of the experiment")
+parser.add_argument("--show", action="store_true")
 parser.add_argument("--ignore", nargs="*", type=str, default=[], help="list of ignored configs")
-parser.add_argument("--no-conf", action="store_true")
+parser.add_argument("--only", nargs="*", type=str, default=[], help="list of included configs")
+parser.add_argument("--no-confidence", action="store_true")
+parser.add_argument("--cycles", type=int)
 
 args = parser.parse_args()
 
@@ -29,9 +31,13 @@ plt.axhline(meta["reward_threshold"]) if meta["reward_threshold"] is not None el
 
 x = list(range(1, len(results[list(results.keys())[0]]["means"]) + 1))
 
-for i, name in enumerate(results):
-    if name in args.ignore:
-        continue
+include_configs = results.keys()
+if len(args.only) > 0:
+    include_configs = [c for c in include_configs if c in args.only]
+elif len(args.ignore) > 0:
+    include_configs = [c for c in include_configs if c not in args.ignore]
+
+for i, name in enumerate(include_configs):
 
     sub_exp = results[name]
 
@@ -40,17 +46,18 @@ for i, name in enumerate(results):
     n = sub_exp["n"]
     h = st.t.interval(0.95, sub_exp["n"], loc=means, scale=stdevs / np.sqrt(n))
 
-    plot_with_confidence(x=means,
-                         lb=h[0],
-                         ub=h[1],
+    plot_with_confidence(x=means[:args.cycles],
+                         lb=h[0][:args.cycles],
+                         ub=h[1][:args.cycles],
                          label=f"{name} [{sub_exp['n']}]",
-                         col=colors[i],
-                         alpha=0 if args.no_conf else 0.2)
+                         col=QUALITATIVE_COLOR_PALETTE[i],
+                         alpha=0 if args.no_confidence else 0.2)
 
     plt.xlabel("Cycle")
     plt.ylabel("Mean Cumulative Reward")
 
 plt.legend()
-plt.title(f"{args.exp[0].split('_')[1]} ({args.exp[0].split('_')[0]})")
-plt.savefig(f"docs/benchmarks/benchmarking_{'_'.join(args.exp)}.pdf", format="pdf")
-plt.show()
+plt.title(f"{args.exp[0].split('_')[1]}")
+plt.savefig(f"docs/benchmarks/benchmarking-{'-'.join(include_configs)}-{'-'.join(args.exp)}.pdf", format="pdf")
+if args.show:
+    plt.show()

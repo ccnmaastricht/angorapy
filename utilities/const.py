@@ -16,6 +16,26 @@ COLORS = dict(
     ORANGE="\033[33m"
 )
 
+QUALITATIVE_COLOR_PALETTE = [
+    "#1D6996",
+    "#CC503E",
+    "#73AF48",
+    "#0F8554",
+    "#E17C05",
+    "#38A6A5",
+    "#EDAD08",
+    "#94346E",
+    "#5F4690",
+    "#6F4070",
+    "#994E95",
+    "#666666"
+]
+
+#5F4690,#1D6996,#38A6A5,#0F8554,#73AF48,#EDAD08,#E17C05,#CC503E,#94346E,#6F4070,#994E95,#666666
+
+# MISC
+MIN_STAT_EPS = 5
+
 # STORAGE
 BASE_SAVE_PATH = "storage/saved_models/states/"
 STORAGE_DIR = "storage/experience/"
