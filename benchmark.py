@@ -52,6 +52,7 @@ if __name__ == '__main__':
     for conf_name, config in configurations.items():
         config["iterations"] = args.cycles
         config["config"] = conf_name
+        config["eval"] = True
 
         conf_up_counter = 1
         original_conf_name = conf_name
