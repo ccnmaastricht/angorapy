@@ -44,8 +44,8 @@ class Flipflopper:
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 128,
-                         'n_time': 256,
+        self.data_hps = {'n_batch': 512,
+                         'n_time': 64,
                          'n_bits': 3,
                          'p_flip': 0.5}
         self.verbose = self.hps['verbose']
@@ -200,11 +200,11 @@ class Flipflopper:
                                  'gradientnormclip': 1.0,
                                  'print_every': 200}}
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
-        activations = self._get_activations(stim)
+        activations = self.get_activations(stim)
 
-        self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-10)
-        # self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
-        states = self.ffinder.sample_states(activations, 50)
+        # self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-10)
+        self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
+        states = self.ffinder.sample_states(activations, 4)
         inputs = np.zeros((states.shape[0], 3))
         fps = self.ffinder.find_fixed_points(states, inputs)
 
@@ -221,7 +221,7 @@ class Flipflopper:
         self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
         print("Loaded "+self.hps['rnn_type']+" model.")
 
-    def _get_activations(self, stim):
+    def get_activations(self, stim):
         sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
         activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
 
@@ -233,7 +233,7 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'lstm'
+    rnn_type = 'vanilla'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)

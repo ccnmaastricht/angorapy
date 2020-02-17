@@ -86,7 +86,7 @@ class FixedPointFinder(object):
         if self.verbose:
             self._print_hps()
 
-    def sample_states(self, activations, n_inits):
+    def sample_states(self, activations, n_inits, noise_level=0.5):
         """Draws [n_inits] random samples from recurrent layer activations."""
 
         if len(activations.shape) == 3:
@@ -96,7 +96,7 @@ class FixedPointFinder(object):
 
         sampled_activations = activations[init_idx, :]
 
-        sampled_activations = self._add_gaussian_noise(sampled_activations, 0.5)
+        sampled_activations = self._add_gaussian_noise(sampled_activations, noise_level)
 
         return sampled_activations
 
@@ -260,11 +260,9 @@ class FixedPointFinder(object):
         print(f"-----------------------------------------\n"
               f"{wn}Architecture to analyse {ec}: {bc}{self.rnn_type}{ec}\n"
               f"The layer has {bc}{self.n_hidden}{ec} recurrent units. \n"
-              # f"Using {bc}{self.algorithm}{ec} for minimization.\n"
               f"-----------------------------------------\n"
               f"{wn}HyperParameters{ec}: \n"
-              f" threshold - {self.q_threshold}\n "
-              f"unique_tolerance - {self.unique_tol}\n"
+              f"threshold - {self.q_threshold}\n "
               f"unique_tolerance - {self.unique_tol}\n"
               f"-----------------------------------------\n")
 
@@ -456,6 +454,7 @@ class Scipyfixedpointfinder(FixedPointFinder):
         self.display = display
 
     def find_fixed_points(self, x0, inputs):
+        """"""
         pool = mp.Pool(mp.cpu_count())
         combined_objects = []
         for i in range(len(x0)):
@@ -474,6 +473,37 @@ class Scipyfixedpointfinder(FixedPointFinder):
 
     @staticmethod
     def _scipy_optimization(combined_object):
+        """Optimization using minimize from scipy. Theoretically all availabel algorithms
+        are usable while some are not suitable for the problem. Thus, the hyperparameter method
+        should be set to method that make use of the hessian matrix e.g. 'Newton-CG' or 'trust-ncg'.
+
+        Args:
+            combined_object: Single tuple containing eight objects listed below. Due to parallelization
+            as single object was required
+
+            x0: Vector with Initial Condition to begin the minimization from. Must have dimensions
+            [n_units]. No default.
+
+            inputs: Vector with input corresponding to Initial Condition. Must have dimensions [n_units].
+            No default.
+
+            rnn_type: String specifying the rnn_type. No default.
+
+            n_hidden: Integer indicating number of hidden units. No default.
+
+            weights: List of matrices containing recurrent weights, input weights and biases.
+            Structure depends on architecture to analyze. No default.
+
+            method: Method to pass to minimize to use for optimization. Default: 'Newton-CG'.
+
+            xtol: tolerance to pass to minimize. Interpretation of tolerance depends on chosen
+            method. See scipy documentation for further information.
+
+            display: boolean indicating whether minimize should print conversion messages.
+            Default: True.
+
+        Returns:
+            Fixedpoint dictionary containing single fixed point."""
         x0, inputs, rnn_type, n_hidden, weights, method, xtol, display = combined_object[0], combined_object[1], \
                                                                          combined_object[2], combined_object[3], \
                                                                          combined_object[4], combined_object[5], \
@@ -491,10 +521,10 @@ class Scipyfixedpointfinder(FixedPointFinder):
 
 
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-        options = {'xtol': xtol, 'disp': display}
+        options = {'disp': display}
 
         fp = minimize(fun, x0, method=method, jac=jac, hess=hes,
-                      options=options)
+                      options=options, tol=xtol)
 
         fpx = fp.x.reshape((1, len(fp.x)))
         x0 = x0.reshape((1, len(x0)))
