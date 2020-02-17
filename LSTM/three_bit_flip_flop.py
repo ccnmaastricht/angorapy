@@ -43,7 +43,7 @@ class Flipflopper:
         self.hps = {'rnn_type': rnn_type,
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
-                    'verbose': True}
+                    'verbose': False}
         self.data_hps = {'n_batch': 128,
                          'n_time': 256,
                          'n_bits': 3,
@@ -181,34 +181,6 @@ class Flipflopper:
         plt.show()
 # TODO: both visualization of training history and visualization of flipflop need improvement.
 
-    def find_fixed_points(self, stim):
-        '''Intialize class FixedPointFinder'''
-
-        self.load_model()
-        self.hps = {'rnn_type': self.hps['rnn_type'],
-                    'n_hidden': self.hps['n_hidden'],
-                    'unique_tol': 1e-03,
-                    'threshold': 1e-10,
-                    'n_ic': 20,
-                    'algorithm': "adam",
-                    'scipy_hps': {'method': "Newton-CG",
-                                  'display': True},
-                    'adam_hps': {'max_iter': 10000,
-                                 'lr': 0.001,
-                                 'n_init': 4,
-                                 'gradientnormclip': 1.0,
-                                 'print_every': 200}}
-        weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
-        activations = self.get_activations(stim)
-
-        # self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-10)
-        self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
-        states = self.ffinder.sample_states(activations, 4)
-        inputs = np.zeros((states.shape[0], 3))
-        fps = self.ffinder.find_fixed_points(states, inputs)
-
-        return fps, activations, states
-
     def _save_model(self):
         '''Save trained model to JSON file.'''
         self.model.save(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
@@ -238,12 +210,8 @@ if __name__ == "__main__":
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    # flopper.train(stim, 4000)
+    flopper.train(stim, 4000)
 
-    # flopper.visualize_flipflop(stim)
-
-    fps, activations, states = flopper.find_fixed_points(stim)
-
-    plot_fixed_points(activations, fps, 4000)
+    flopper.visualize_flipflop(stim)
 
 

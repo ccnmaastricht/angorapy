@@ -119,11 +119,12 @@ class FixedPointFinder(object):
 
         Args:
              """
-        input = np.zeros(3)
         if self.rnn_type == 'vanilla':
-            func = build_rnn_ds(self.weights, self.n_hidden, input, 'sequential')
+            func, _ = build_rnn_ds(self.weights, self.n_hidden, input, 'sequential')
         elif self.rnn_type == 'gru':
             func, _ = build_gru_ds(self.weights, self.n_hidden, input, 'sequential')
+        elif self.rnn_type == 'lstm':
+            func, _ = build_lstm_ds(self.weights, self.n_hidden, input, 'sequential')
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)

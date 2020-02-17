@@ -47,42 +47,26 @@ def plot_fixed_points(activations, fps, n_points):
         # somehow this block of code does not return values if put in function
 
         x_directions = []
-        scale = 4
+        scale = 0.9
         for fp in fps:
 
-            trace = np.matrix.trace(fp['jac'])
-            det = np.linalg.det(fp['jac'])
-
-            if det < 0:
-                print('saddle_point')
+            # trace = np.matrix.trace(fp['jac'])
+            # det = np.linalg.det(fp['jac'])
+            e_val, e_vecs = np.linalg.eig(fp['jac'])
+            ids = np.argwhere(np.real(e_val) > 0)
+            countgreaterzero = np.sum(e_val > 0)
+            if countgreaterzero == 0:
+                print('stable fixed point was found.')
+                fp['fp_stability'] = 'stable fixed point'
+            elif countgreaterzero > 0:
+                print('saddle point was found.')
                 fp['fp_stability'] = 'saddle point'
-                e_val, e_vecs = np.linalg.eig(fp['jac'])
-                ids = np.argwhere(np.real(e_val) > 0)
                 for id in ids:
                     x_plus = fp['x'] + scale * e_val[id] * np.real(e_vecs[:, id].transpose())
                     x_minus = fp['x'] - scale * e_val[id] * np.real(e_vecs[:, id].transpose())
                     x_direction = np.vstack((x_plus, fp['x'], x_minus))
                     x_directions.append(np.real(x_direction))
-            elif det > 0:
-                if trace ** 2 - 4 * det > 0 and trace < 0:
-                    print('stable fixed point was found.')
-                    fp['fp_stability'] = 'stable fixed point'
-                    e_val, e_vecs = np.linalg.eig(fp['jac'])
-                    ids = np.argwhere(np.real(e_val) > 0)
-                    for id in ids:
-                        x_plus = fp['x'] + scale * e_val[id] * np.real(e_vecs[:, id].transpose())
-                        x_minus = fp['x'] - scale * e_val[id] * np.real(e_vecs[:, id].transpose())
-                        x_direction = np.vstack((x_plus, fp['x'], x_minus))
-                        x_directions.append(np.real(x_direction))
-                elif trace ** 2 - 4 * det > 0 and trace > 0:
-                    print('unstable fixed point was found')
-                    fp['fp_stability'] = 'unstable fixed point'
-                else:
-                    print('center was found.')
-                    fp['fp_stability'] = 'center'
-            else:
-                print('fixed point manifold was found.')
-                fp['fp_stability'] = 'manifold'
+
 
         return fps, x_directions
 
