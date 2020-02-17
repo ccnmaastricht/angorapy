@@ -593,6 +593,15 @@ class PPOAgent:
                 policy_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
 
+                for grad in info["gradients"]:
+                    found = False
+                    if tf.reduce_any(tf.math.is_nan(grad)):
+                        found = True
+
+                    if found:
+                        print(info)
+                        exit()
+
                 # reset RNN states after each outer batch
                 self.joint.reset_states()
 
@@ -688,7 +697,7 @@ class PPOAgent:
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
 
         # print the report
-        flat_print(f"{sc}{f'Iteration {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
+        flat_print(f"{sc}{f'Cycle {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
                    f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
                    f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "

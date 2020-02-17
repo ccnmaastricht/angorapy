@@ -5,7 +5,8 @@ def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, 
                 env='CartPole-v1', epochs=3, eval=False, export_file=None, grad_norm=0.5, horizon=1024,
                 iterations=1000, lam=0.97, load_from=None, lr_pi=0.001, clip_values=False, save_every=0,
                 workers=8, tbptt: int = 16, lr_schedule=None, no_state_norming=False, no_reward_norming=False,
-                model="ffn", early_stopping=False, distribution=None, shared=False, preload=None, sequential=False):
+                model="ffn", early_stopping=False, distribution=None, shared=False, preload=None, sequential=False,
+                architecture="simple"):
     """Make a config from scratch."""
     return dict(**locals())
 
@@ -48,6 +49,7 @@ discrete_no_norms_short = derive_config(discrete_no_norms, {"horizon": 512})
 
 # CONTINUOUS DEFAULT
 #   - LunarLanderContinuous
+#   - BipedalWalker (use beta distribution to crack the reward threshold)
 
 continuous = make_config(
     batch_size=64,
@@ -70,6 +72,8 @@ continuous_lstm = derive_config(continuous, {"model": "lstm"})
 continuous_beta = derive_config(continuous, {"distribution": "beta"})
 continuous_no_norms = derive_config(continuous, {"no_state_norming": True,
                                                  "no_reward_norming": True})
+continuous_with_ent = derive_config(continuous, {"c_entropy": 0.01})
+continuous_beta_with_ent = derive_config(continuous_beta, {"c_entropy": 0.01})
 
 # PENDULUM (for, well, Pendulum-v0)
 
@@ -81,17 +85,6 @@ pendulum = derive_config(continuous, dict(
 ))
 
 pendulum_beta = derive_config(pendulum, {"distribution": "beta"})
-
-# BIPEDAL
-
-bipedal = derive_config(continuous, dict(
-    iterations=400,
-))
-
-bipedal_rnn = derive_config(bipedal, dict(model="rnn"))
-bipedal_gru = derive_config(bipedal, dict(model="gru"))
-bipedal_lstm = derive_config(bipedal, dict(model="lstm"))
-bipedal_beta = derive_config(bipedal, dict(distribution="beta"))
 
 # FROM PAPERS
 
@@ -153,7 +146,7 @@ roboschool = make_config(
 
 hand = make_config(
     iterations=1000,
-    workers=32,
+    workers=16,
     batch_size=4096,
     horizon=512,
     c_entropy=0.01,
@@ -164,10 +157,13 @@ hand = make_config(
     lam=0.95,
     discount=0.998,
     grad_norm=0.5,
-    clip_values=False
+    clip_values=False,
 )
 
 hand_beta = derive_config(hand, {"distribution": "beta"})
+
+hand_shadow = derive_config(hand, {"architecture": "shadow"})
+hand_shadow_beta = derive_config(hand_shadow, {"distribution": "beta"})
 
 # RECOMMENDED CONFIGS FOR ENVs
 
@@ -177,10 +173,8 @@ recommended_config = dict(
     ), **dict.fromkeys(
         ["Acrobot-v1", "MountainCar-v0"], discrete
     ), **dict.fromkeys(
-        ["BipedalWalker-v2", "BipedalWalkerHardcore-v2"], bipedal
-    ), **dict.fromkeys(
         ["Pendulum-v0"], pendulum_beta
     ), **dict.fromkeys(
-        ["LunarLanderContinuous-v2"], continuous_beta
+        ["LunarLanderContinuous-v2", "BipedalWalker-v2", "BipedalWalkerHardcore-v2"], continuous_beta
     ),
 )

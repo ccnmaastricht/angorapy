@@ -57,10 +57,7 @@ if __name__ == '__main__':
         conf_up_counter = 1
         original_conf_name = conf_name
         while conf_name in benchmark_dict["results"]:
-            conf_compatible = (
-                    args.cycles == len(benchmark_dict["results"][conf_name]["means"])
-                # and config == benchmark_dict["results"][conf_name]["config"]
-            )
+            conf_compatible = args.cycles == len(benchmark_dict["results"][conf_name]["means"])
 
             if conf_compatible:
                 print(f"Found compatible config; Extending {conf_name}.")

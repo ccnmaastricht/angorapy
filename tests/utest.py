@@ -89,12 +89,12 @@ class ProbabilityTest(unittest.TestCase):
         alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
         betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
 
-        result_reference = np.prod(beta.pdf(x, alphas, betas), axis=-1)
+        result_reference = np.prod(beta.pdf(distro._scale_sample_to_distribution_range(x), alphas, betas), axis=-1)
         result_pdf = distro.probability(x, alphas, betas).numpy()
         result_log_pdf = np.exp(distro.log_probability(x, alphas, betas).numpy())
 
+        self.assertTrue(np.allclose(result_reference, result_log_pdf), msg="Beta Log PDF returns wrong Result")
         self.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
-        self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
 
     def test_beta_entropy(self):
         distro = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))

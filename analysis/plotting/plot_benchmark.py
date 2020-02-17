@@ -27,7 +27,7 @@ for exp in args.exp:
 results = benchmark_data["results"]
 meta = benchmark_data["meta"]
 
-plt.axhline(meta["reward_threshold"]) if meta["reward_threshold"] is not None else None
+plt.axhline(meta["reward_threshold"], ls="--", color="grey") if meta["reward_threshold"] is not None else None
 
 x = list(range(1, len(results[list(results.keys())[0]]["means"]) + 1))
 
@@ -56,7 +56,7 @@ for i, name in enumerate(include_configs):
     plt.xlabel("Cycle")
     plt.ylabel("Mean Cumulative Reward")
 
-plt.legend()
+plt.legend(loc="lower right")
 plt.title(f"{args.exp[0].split('_')[1]}")
 plt.savefig(f"docs/benchmarks/benchmarking-{'-'.join(include_configs)}-{'-'.join(args.exp)}.pdf", format="pdf")
 if args.show:
