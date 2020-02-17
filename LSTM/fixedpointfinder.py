@@ -165,8 +165,20 @@ class FixedPointFinder(object):
             """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
             puts all coordinates in single array."""
             fixed_point_location = [fp['x'] for fp in fps]
-
-            fixed_point_locations = np.vstack(fixed_point_location)
+            try:
+                fixed_point_locations = np.vstack(fixed_point_location)
+            except:
+                raise ValueError('No fixed points were found with the current settings. \n'
+                                 'It is recommended to rerun after adjusting one or more of the'
+                                 'following settings: \n'
+                                 '1. use more samples \n'
+                                 '2. adjust q_threshold to larger values \n'
+                                 'If you are using adam, try as well:\n'
+                                 '1. adjust learning rate: if optimization seemed unstable, try smaller. If '
+                                 'learning was simply very slow, try larger \n'
+                                 '2. increase maximum number of iterations\n'
+                                 '3. adjust hps for adaptive learning rate and adaptive gradient norm clip \n'
+                                 'Keep in mind that a fixed point does not have to exist.')
 
             return fixed_point_locations
 

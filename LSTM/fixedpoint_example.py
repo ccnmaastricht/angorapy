@@ -15,9 +15,9 @@ flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
 # generate trials
 stim = flopper.generate_flipflop_trials()
 # train the model
-flopper.train(stim)
+# flopper.train(stim)
 # visualize a single batch after training
-flopper.visualize_flipflop(stim)
+# flopper.visualize_flipflop(stim)
 
 ############################################################
 # Initialize fpf and find fixed points
@@ -36,4 +36,4 @@ inputs = np.zeros((states.shape[0], 3))
 # find fixed points
 fps = fpf.find_fixed_points(states, inputs)
 # plot fixed points and state trajectories in 3D
-plot_fixed_points(activations, fps, 4000)
+plot_fixed_points(activations, fps, 2000)
