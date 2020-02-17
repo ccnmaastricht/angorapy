@@ -181,7 +181,7 @@ class FixedPointFinder(object):
         return unique_fps
 
     @staticmethod
-    def _creat_fixedpoint_object(fun, fps, x0, inputs):
+    def _create_fixedpoint_object(fun, fps, x0, inputs):
         """Initial creation of a fixedpoint object. A fixedpoint object is a dictionary
         providing information about a fixedpoint. Initial information is specified in
         parameters of this function. Please note that e.g. jacobian matrices will be added
@@ -270,7 +270,10 @@ class FixedPointFinder(object):
 
 
 class Adamfixedpointfinder(FixedPointFinder):
-    # TODO: get hyperparameters in order with parent class
+    _default_hps = {'q_threshold': 1e-12,
+                    'tol_unique': 1e-03,
+                    'verbose': True,
+                    'random_seed': 0}
     adam_default_hps = {'alr_hps': {'decay_rate': 0.0001},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
@@ -279,14 +282,51 @@ class Adamfixedpointfinder(FixedPointFinder):
                                      'method': 'joint',
                                      'print_every': 200}}
 
-    def __init__(self, weights, rnn_type, q_threshold,
-                 alr_hps=adam_default_hps['alr_hps'],
-                 agnc_hps=adam_default_hps['agnc_hps'],
-                 adam_hps=adam_default_hps['adam_hps']):
-        FixedPointFinder.__init__(self, weights, rnn_type, q_threshold=q_threshold)
-        self.alr_hps = alr_hps
-        self.agnc_hps = agnc_hps
-        self.adam_hps = adam_hps
+    def __init__(self, weights, rnn_type,
+                 q_threshold=_default_hps['q_threshold'],
+                 tol_unique=_default_hps['tol_unique'],
+                 verbose=_default_hps['verbose'],
+                 random_seed=_default_hps['random_seed'],
+                 alr_decayr=adam_default_hps['alr_hps']['decay_rate'],
+                 agnc_normclip=adam_default_hps['agnc_hps']['norm_clip'],
+                 agnc_decayr=adam_default_hps['agnc_hps']['decay_rate'],
+                 epsilon=adam_default_hps['adam_hps']['epsilon'],
+                 max_iters = adam_default_hps['adam_hps']['max_iters'],
+                 method = adam_default_hps['adam_hps']['method'],
+                 print_every = adam_default_hps['adam_hps']['print_every']):
+
+        FixedPointFinder.__init__(self, weights, rnn_type, q_threshold=q_threshold,
+                                  tol_unique=tol_unique,
+                                  verbose=verbose,
+                                  random_seed=random_seed)
+        self.alr_decayr = alr_decayr
+        self.agnc_normclip = agnc_normclip
+        self.agnc_decayr = agnc_decayr
+        self.epsilon = epsilon
+        self.max_iters = max_iters
+        self.method = method
+        self.print_every = print_every
+
+        self._print_adam_hps()
+
+    def _print_adam_hps(self):
+        COLORS = dict(
+            HEADER='\033[95m',
+            OKBLUE='\033[94m',
+            OKGREEN='\033[92m',
+            WARNING='\033[93m',
+            FAIL='\033[91m',
+            ENDC='\033[0m',
+            BOLD='\033[1m',
+            UNDERLINE='\033[4m'
+        )
+        bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
+        print(f"{wn}HyperParameters for adam{ec}: \n"
+              f" learning rate - {self.epsilon}\n "
+              f"maximum iterations - {self.method}\n"
+              f"print every {self.print_every} iterations\n"
+              f"performing {self.method} optimization\n"
+              f"-----------------------------------------\n")
 
     def find_fixed_points(self, x0, inputs):
         """Compute fixedpoints and determine the uniqueness as well as jacobian matrix.
@@ -301,13 +341,13 @@ class Adamfixedpointfinder(FixedPointFinder):
             List of fixedpointobjects that are unique and equipped with their repsective
             jacobian matrix."""
 
-        if self.adam_hps['method'] == 'joint':
+        if self.method == 'joint':
             fixedpoints = self._joint_optimization(x0, inputs)
-        elif self.adam_hps['method'] == 'sequential':
+        elif self.method == 'sequential':
             fixedpoints = self._sequential_optimization(x0, inputs)
         else:
             raise ValueError('HyperParameter for adam optimizer: method must be either "joint"'
-                             'or "sequential". However, it was %s', self.adam_hps['method'])
+                             'or "sequential". However, it was %s', self.method)
 
         good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
         unique_fps = self._find_unique_fixed_points(good_fps)
@@ -331,25 +371,25 @@ class Adamfixedpointfinder(FixedPointFinder):
         Returns:
             Fixedpointobject. See _create_fixedpoint_object for further documenation."""
         if self.rnn_type == 'vanilla':
-            fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, self.adam_hps['method'])
+            fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, self.method)
         elif self.rnn_type == 'gru':
-            fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, self.adam_hps['method'])
+            fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, self.method)
         elif self.rnn_type == 'lstm':
-            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.adam_hps['method'])
+            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.method)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
         fps = adam_optimizer(fun, x0,
-                            epsilon=self.adam_hps['epsilon'],
-                            max_iter=self.adam_hps['max_iters'],
-                            print_every=self.adam_hps['print_every'],
-                            agnc=self.agnc_hps['norm_clip'])
+                            epsilon=self.epsilon,
+                            max_iter=self.max_iters,
+                            print_every=self.print_every,
+                            agnc=self.agnc_normclip)
 
         if self.rnn_type == 'lstm':
             fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
 
-        fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
+        fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
 
         return fixedpoints
 
@@ -369,42 +409,59 @@ class Adamfixedpointfinder(FixedPointFinder):
         fps = np.empty(x0.shape)
         for i in range(len(x0)):
             if self.rnn_type == 'vanilla':
-                fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs[i, :], self.adam_hps['method'])
+                fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs[i, :], self.method)
             elif self.rnn_type == 'gru':
-                fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs[i, :], self.adam_hps['method'])
+                fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs[i, :], self.method)
             elif self.rnn_type == 'lstm':
-                fun, jac_fun = build_lstm_ds(self.weights, inputs[i, :], self.n_hidden, self.adam_hps['method'])
+                fun, jac_fun = build_lstm_ds(self.weights, inputs[i, :], self.n_hidden, self.method)
             else:
                 raise ValueError('Hyperparameter rnn_type must be one of'
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
         # TODO: implement parallel sequential optimization
             fps[i, :] = adam_optimizer(fun, x0[i, :],
-                                epsilon=self.adam_hps['epsilon'],
-                                max_iter=self.adam_hps['max_iters'],
-                                print_every=self.adam_hps['print_every'],
-                                agnc=self.agnc_hps['norm_clip'])
+                                epsilon=self.epsilon,
+                                max_iter=self.max_iters,
+                                print_every=self.print_every,
+                                agnc=self.agnc_normclip)
 
-        fixedpoints = self._creat_fixedpoint_object(fun, fps, x0, inputs)
+        fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
 
         return fixedpoints
 
 
 class Scipyfixedpointfinder(FixedPointFinder):
+    _default_hps = {'q_threshold': 1e-12,
+                    'tol_unique': 1e-03,
+                    'verbose': True,
+                    'random_seed': 0}
     scipy_default_hps = {'method': 'Newton-CG',
                          'xtol': 1e-20,
                          'display': True}
 
     def __init__(self, weights, rnn_type,
-                 scipy_hps=scipy_default_hps):
-        FixedPointFinder.__init__(self, weights, rnn_type)
-        self.scipy_hps = scipy_hps
+                 q_threshold=_default_hps['q_threshold'],
+                 tol_unique=_default_hps['tol_unique'],
+                 verbose=_default_hps['verbose'],
+                 random_seed=_default_hps['random_seed'],
+                 method=scipy_default_hps['method'],
+                 xtol=scipy_default_hps['xtol'],
+                 display=scipy_default_hps['display']):
+        FixedPointFinder.__init__(self, weights, rnn_type,
+                                  q_threshold=q_threshold,
+                                  tol_unique=tol_unique,
+                                  verbose=verbose,
+                                  random_seed=random_seed)
+        self.method = method
+        self.xtol = xtol
+        self.display = display
 
     def find_fixed_points(self, x0, inputs):
         pool = mp.Pool(mp.cpu_count())
         combined_objects = []
         for i in range(len(x0)):
-            combined_objects.append((x0[i, :], inputs[i, :], self.scipy_hps, self.rnn_type,
-                                     self.n_hidden, self.weights))
+            combined_objects.append((x0[i, :], inputs[i, :], self.rnn_type,
+                                     self.n_hidden, self.weights, self.method,
+                                     self.xtol, self.display))
         fps = pool.map(self._scipy_optimization, combined_objects, chunksize=1)
         fps = [item for sublist in fps for item in sublist]
 
@@ -417,9 +474,10 @@ class Scipyfixedpointfinder(FixedPointFinder):
 
     @staticmethod
     def _scipy_optimization(combined_object):
-        x0, inputs, scipy_hps, rnn_type, n_hidden, weights = combined_object[0], combined_object[1], \
-                                                             combined_object[2], combined_object[3], \
-                                                             combined_object[4], combined_object[5]
+        x0, inputs, rnn_type, n_hidden, weights, method, xtol, display = combined_object[0], combined_object[1], \
+                                                                         combined_object[2], combined_object[3], \
+                                                                         combined_object[4], combined_object[5], \
+                                                                         combined_object[6], combined_object[7]
 
         if rnn_type == 'vanilla':
             fun, jac_fun = build_rnn_ds(weights, n_hidden, inputs, 'sequential')
@@ -433,14 +491,14 @@ class Scipyfixedpointfinder(FixedPointFinder):
 
 
         jac, hes = nd.Gradient(fun), nd.Hessian(fun)
-        options = {'disp': scipy_hps['display']}
+        options = {'xtol': xtol, 'disp': display}
 
-        fp = minimize(fun, x0, method=scipy_hps['method'], jac=jac, hess=hes,
+        fp = minimize(fun, x0, method=method, jac=jac, hess=hes,
                       options=options)
 
         fpx = fp.x.reshape((1, len(fp.x)))
         x0 = x0.reshape((1, len(x0)))
         inputs = inputs.reshape((1, len(inputs)))
 
-        fixedpoint = FixedPointFinder._creat_fixedpoint_object(fun, fpx, x0, inputs)
+        fixedpoint = FixedPointFinder._create_fixedpoint_object(fun, fpx, x0, inputs)
         return fixedpoint

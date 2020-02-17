@@ -202,7 +202,6 @@ class Flipflopper:
         weights = self.model.get_layer(self.hps['rnn_type']).get_weights()
         activations = self._get_activations(stim)
 
-        # self.finder = FixedPointFinder(weights, self.hps['rnn_type'])
         self.ffinder = Adamfixedpointfinder(weights, self.hps['rnn_type'], q_threshold=1e-10)
         # self.ffinder = Scipyfixedpointfinder(weights, self.hps['rnn_type'])
         states = self.ffinder.sample_states(activations, 50)
