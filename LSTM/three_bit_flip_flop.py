@@ -3,11 +3,8 @@ import numpy as np
 import numpy.random as npr
 import matplotlib.pyplot as plt
 from utilities.model_management import build_sub_model_to
-from mpl_toolkits.mplot3d import Axes3D
-from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder, Scipyfixedpointfinder
 from tensorflow.keras.models import load_model
 import os
-from LSTM.plot_utils import plot_fixed_points
 
 class Flipflopper:
     ''' Class for training an RNN to implement a 3-Bit Flip-Flop task as
@@ -180,6 +177,7 @@ class Flipflopper:
 
         plt.show()
 # TODO: both visualization of training history and visualization of flipflop need improvement.
+# TODO: both things also need to be removed from class
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
