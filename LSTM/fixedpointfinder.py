@@ -26,42 +26,18 @@ class FixedPointFinder(object):
         the function evaluation at the fixedpoint 'x' and the corresponding 'jacobian'.
 
         Args:
-            hps: Dictionary of hyperparameters.
+            tol_unique: Tolerance for when a fixedpoint will be considered unique, i.e. when two points are further
+            away from each than the tolerance, they will be considered unique and discarded otherwise. Default: 1e-03.
 
-                unique_tol: Tolerance for when a fixedpoint will be considered unique, i.e. when two points are further
-                away from each than the tolerance, they will be considered unique and discarded otherwise. Default: 1e-03.
+            threshold: Minimization criteria. A fixedpoint must evaluate below the threshold in order to be considered
+            a slow/fixed point. This value depends on the task of the RNN. Default for 3-Bit Flip-FLop: 1e-12.
 
-                threshold: Minimization criteria. A fixedpoint must evaluate below the threshold in order to be considered
-                a slow/fixed point. This value depends on the task of the RNN. Default for 3-Bit Flip-FLop: 1e-12.
+            rnn_type: Specifying the architecture of the network. The network architecture defines the dynamical system.
+            Must be one of ['vanilla', 'gru', 'lstm']. No default.
 
-                rnn_type: Specifying the architecture of the network. The network architecture defines the dynamical system.
-                Must be one of ['vanilla', 'gru', 'lstm']. No default.
+            verbose: Boolean indicating if fixedpointfinder should act verbose. Default: True.
 
-                n_hidden: Specifiying the number of hidden units in the recurrent layer. No default.
-
-                algorithm: Algorithm that shall be employed for the minimization. Must be one of: scipy, adam. It is recommended
-                to use any of the two for vanilla architectures but adam for gru and lstm architectures. No default.
-
-                n_points: Number of points to use to plot the trajectories the network took. Recommended 200-5000, otherwise
-                the plot will look too sparse or too crowded. Default: 3000.
-
-                use_input: boolean parameter indicating if input to the recurrent layer shall be used during minimization or
-                not. Default: False
-
-            scipy_hps: Dictionary of hyperparameters specifically for minimize from scipy.
-
-                method: Method to employ for minimization using the scipy package. Default: "Newton-CG".
-
-                display: boolean array indication, if information about the minimization shall be printed to the console
-
-            adam_hps: Dictionary of hyperparameters specifically for adam optimizer.
-
-                max_iter: maximum number of iterations to run backpropagation for. Default: 5000.
-
-
-
-            weights: list of weights as returned by tensorflow.keras for recurrent layer. The list must contain three objects:
-            input weights, recurrent weights and biases."""
+            random_seed: Random seed to make sampling of states reproducible. Default: 0"""
 
         self.weights = weights
         self.rnn_type = rnn_type
@@ -317,7 +293,8 @@ class Adamfixedpointfinder(FixedPointFinder):
         self.method = method
         self.print_every = print_every
 
-        self._print_adam_hps()
+        if self.verbose:
+            self._print_adam_hps()
 
     def _print_adam_hps(self):
         COLORS = dict(
