@@ -62,8 +62,62 @@ class FixedPointFinder(object):
         if self.verbose:
             self._print_hps()
 
+    def sample_inputs_and_states(self, activations, inputs, n_inits, noise_level):
+        """Draws [n_inits] random samples from recurrent layer activations.
+
+        Args:
+            activations: numpy array containing input dependent activations of
+            the recurrent layer. Can have either shape [n_batches x n_time x n_units]
+            or [n_time x n_units]. no default.
+
+            inputs: numpy array containing inputs corresponding to activations
+            of recurrent layer. Can have either shape [n_batches x n_time x n_units]
+            or [n_time x n_units]. no default.
+
+            n_inits: integer specifying how many samples shall be drawn from the
+            numpy array.
+
+            noise_level: non-negative integer specifying gaussian radius of noise added
+            to the samples.
+
+        Returns:
+            sampled_activations: numpy array of sampled activations. Will have dimensions
+            [n_init x n_units].
+
+            sampled_inputs: numpy array of sampled inputs. Will have dimensions
+            [n_init x n_units]."""
+
+        if len(activations.shape) == 3:
+            activations = np.vstack(activations)
+            inputs = np.vstack(inputs)
+
+        init_idx = self.rng.randint(activations.shape[0], size=n_inits)
+
+        sampled_activations = activations[init_idx, :]
+        sampled_inputs = inputs[init_idx, :]
+
+        sampled_activations = self._add_gaussian_noise(sampled_activations, noise_level)
+
+        return sampled_activations, sampled_inputs
+
+
     def sample_states(self, activations, n_inits, noise_level=0.5):
-        """Draws [n_inits] random samples from recurrent layer activations."""
+        """Draws [n_inits] random samples from recurrent layer activations.
+
+        Args:
+            activations: numpy array containing input dependent activations of
+            the recurrent layer. Can have either shape [n_batches x n_time x n_units]
+            or [n_time x n_units]. no default.
+
+            n_inits: integer specifying how many samples shall be drawn from the
+            numpy array.
+
+            noise_level: non-negative integer specifying gaussian radius of noise added
+            to the samples.
+
+        Returns:
+            sampled_activations: numpy array of sampled activations. Will have dimensions
+            [n_init x n_units]."""
 
         if len(activations.shape) == 3:
             activations = np.vstack(activations)
