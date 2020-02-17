@@ -9,9 +9,15 @@ def build_rnn_ds(weights, n_hidden, inputs, method: str = 'joint'):
     if method == 'joint':
         def fun(x):
             return np.mean(0.5 * np.sum(((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2), axis=1))
-    else:
+    elif method == 'sequential':
         def fun(x):
             return 0.5 * np.sum((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2)
+    elif method == 'velocity':
+        def fun(x):
+            return 0.5 * np.sum(((- x + np.matmul(np.tanh(x), weights) + projection_b) ** 2), axis=1)
+    else:
+        raise ValueError('Method argument to build function must be one of '
+                         '[joint, sequential, velocity] but was', method)
 
     jac_fun = lambda x: - np.eye(n_hidden, n_hidden) + weights * (1 - np.tanh(x) ** 2)
 
@@ -38,8 +44,13 @@ def build_gru_ds(weights, n_hidden, input, method: str = 'joint'):
     if method == 'joint':
         def fun(x):
             return np.mean(0.5 * np.sum((((1 - z_fun(x)) * (g_fun(x) - x)) ** 2), axis=1))
-    else:
+    elif method == 'sequential':
         fun = lambda x: 0.5 * np.sum(((1 - z_fun(x)) * (g_fun(x) - x)) ** 2)
+    elif method == 'velocity':
+        fun = lambda x: 0.5 * np.sum((((1 - z_fun(x)) * (g_fun(x) - x)) ** 2), axis=1)
+    else:
+        raise ValueError('Method argument to build function must be one of '
+                     '[joint, sequential, velocity] but was', method)
 
     def dynamical_system(x):
         return (1 - z_fun(x)) * (g_fun(x) - x)
@@ -69,10 +80,17 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
         def fun(x):
             h, c = x[:, :n_hidden], x[:, n_hidden:]
             return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(h, c)) - h) ** 2), axis=1))
-    else:
+    elif method == 'sequential':
         def fun(x):
             h, c = x[:n_hidden], x[n_hidden:]
             return 0.5 * np.sum((o_fun(h) * np.tanh(c_fun(h, c)) - h) ** 2)
+    elif method == 'velocity':
+        def fun(x):
+            h, c = x[:n_hidden], x[n_hidden:]
+            return 0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(h, c)) - h) ** 2), axis=1)
+    else:
+        raise ValueError('Method argument to build function must be one of '
+                         '[joint, sequential, velocity] but was', method)
 
     dynamical_system = lambda h, c: o_fun(h) * np.tanh(c_fun(h, c)) - h
     jac_fun = nd.Jacobian(dynamical_system)

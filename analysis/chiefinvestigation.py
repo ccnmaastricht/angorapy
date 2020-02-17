@@ -16,9 +16,9 @@ from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
-from LSTM.fixedpointfinder import FixedPointFinder, Adamfixedpointfinder
+from LSTM.fixedpointfinder import Adamfixedpointfinder
 from mayavi import mlab
-from LSTM.plot_utils import plot_fixed_points
+from LSTM.plot_utils import plot_fixed_points, plot_velocities
 
 
 class Chiefinvestigator:
@@ -157,21 +157,6 @@ class Chiefinvestigator:
         H = model.components_
         return W, H
 
-    def findfixedpoints(self, weights, activation, input):
-        method = "Newton-CG"
-        hps = {'rnn_type': 'vanilla',
-               'n_hidden': 64,
-               'unique_tol': 1e-03,
-               'threshold': 1e-01,
-               'algorithm': 'backprop'}
-
-        # self.finder = FixedPointFinder(hps, weights, input, activation)
-        self.ffinder = Adamfixedpointfinder(weights, 'vanilla', q_threshold=1e-05)
-        states = self.ffinder.sample_states(activation, 1000)
-        input = np.zeros((states.shape[0], 64))
-        fps = self.ffinder.find_fixed_points(states, input)
-        return fps
-
 
 #  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
 # -> construct small amounts of points (perhaps belonging to one action into
@@ -210,15 +195,19 @@ if __name__ == "__main__":
         actionss.append(actions)
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
     activationss, inputss = np.vstack(activationss), np.vstack(inputss)
-    fps = chiefinvesti.findfixedpoints(weights, activationss, inputss)
     actionss = np.concatenate(actionss, axis=0)
 
-    plot_fixed_points(activationss, fps, 4000)
-    # pca = skld.PCA(3)
-    # pca.fit(activationss)
-    # X_pca = pca.transform(activationss)
+    adamfpf = Adamfixedpointfinder(weights, 'vanilla',
+                                   q_threshold=1e-02,
+                                   epsilon=0.01,
+                                   alr_decayr=1e-05,
+                                   max_iters=5000)
+    states = adamfpf.sample_states(activationss, 10)
+    input = np.zeros((states.shape[0], 64))
+    fps = adamfpf.find_fixed_points(states, input)
+    vel = adamfpf.compute_velocities(activationss, inputss)
+    # plot_fixed_points(activationss, fps, 4000, 4)
+    plot_velocities(activationss, vel, 3000)
 
-    # n_points = 3000
-    # p = mlab.plot3d(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2])
 
 

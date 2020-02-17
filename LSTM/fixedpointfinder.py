@@ -173,17 +173,22 @@ class FixedPointFinder(object):
 
         Args:
              """
+        if len(activations.shape) == 3:
+            activations = np.vstack(activations)
+            input = np.vstack(input)
+
         if self.rnn_type == 'vanilla':
-            func, _ = build_rnn_ds(self.weights, self.n_hidden, input, 'sequential')
+            func, _ = build_rnn_ds(self.weights, self.n_hidden, input, 'velocity')
         elif self.rnn_type == 'gru':
-            func, _ = build_gru_ds(self.weights, self.n_hidden, input, 'sequential')
+            func, _ = build_gru_ds(self.weights, self.n_hidden, input, 'velocity')
         elif self.rnn_type == 'lstm':
-            func, _ = build_lstm_ds(self.weights, self.n_hidden, input, 'sequential')
+            func, _ = build_lstm_ds(self.weights, self.n_hidden, input, 'velocity')
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-        activations = np.vstack(activations)
+        if len(activations.shape) == 3:
+            activations = np.vstack(activations)
         # get velocity at point
         velocities = func(activations)
         return velocities
