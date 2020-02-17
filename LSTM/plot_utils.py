@@ -2,6 +2,7 @@ import sklearn.decomposition as skld
 from mayavi import mlab
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def plot_velocities(activations, velocities, n_points: int = 5000):
@@ -30,7 +31,7 @@ def plot_velocities(activations, velocities, n_points: int = 5000):
     mlab.colorbar(orientation='vertical')
     mlab.show()
 
-def plot_fixed_points(activations, fps, n_points):
+def plot_fixed_points(activations, fps, n_points, scale):
 
     def extract_fixed_point_locations(fps):
         """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
@@ -42,12 +43,12 @@ def plot_fixed_points(activations, fps, n_points):
         return fixed_point_locations
 
 
-    def classify_fixedpoints(fps):
+    def classify_fixedpoints(fps, scale):
 
         # somehow this block of code does not return values if put in function
 
         x_directions = []
-        scale = 0.9
+        scale = scale
         for fp in fps:
 
             # trace = np.matrix.trace(fp['jac'])
@@ -72,7 +73,7 @@ def plot_fixed_points(activations, fps, n_points):
 
     # def compute_unstable_modes(self):
       # pass
-    fps, x_directions = classify_fixedpoints(fps)
+    fps, x_directions = classify_fixedpoints(fps, scale)
 
     fixedpoints = extract_fixed_point_locations(fps)
     if len(activations.shape) == 3:

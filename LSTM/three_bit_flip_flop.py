@@ -41,8 +41,8 @@ class Flipflopper:
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 128,
-                         'n_time': 256,
+        self.data_hps = {'n_batch': 512,
+                         'n_time': 64,
                          'n_bits': 3,
                          'p_flip': 0.2}
         self.verbose = self.hps['verbose']
