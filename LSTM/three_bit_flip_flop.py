@@ -43,11 +43,11 @@ class Flipflopper:
         self.hps = {'rnn_type': rnn_type,
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
-                    'verbose': False}
-        self.data_hps = {'n_batch': 512,
-                         'n_time': 64,
+                    'verbose': True}
+        self.data_hps = {'n_batch': 128,
+                         'n_time': 256,
                          'n_bits': 3,
-                         'p_flip': 0.5}
+                         'p_flip': 0.2}
         self.verbose = self.hps['verbose']
         # data_hps may be changed but are recommended to remain at their default values
         self.model = self._build_model()
@@ -72,8 +72,7 @@ class Flipflopper:
         elif self.hps['rnn_type'] == 'gru':
             x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
-            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True,
-                                                       return_state=True)(inputs)
+            x = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -142,7 +141,7 @@ class Flipflopper:
 
         return {'inputs': inputs, 'output': output}
 
-    def train(self, stim):
+    def train(self, stim, epochs, save_model: bool = True):
         '''Function to train an RNN model This function will save the trained model afterwards.
 
         Args:
@@ -159,9 +158,9 @@ class Flipflopper:
         self.model.compile(optimizer="adam", loss="mse",
                   metrics=['accuracy'])
         history = self.model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
-                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=4000)
-
-        self._save_model()
+                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=epochs)
+        if save_model:
+            self._save_model()
 
     def visualize_flipflop(self, stim):
         prediction = self.model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
@@ -185,7 +184,7 @@ class Flipflopper:
     def find_fixed_points(self, stim):
         '''Intialize class FixedPointFinder'''
 
-        self._load_model()
+        self.load_model()
         self.hps = {'rnn_type': self.hps['rnn_type'],
                     'n_hidden': self.hps['n_hidden'],
                     'unique_tol': 1e-03,
@@ -215,7 +214,7 @@ class Flipflopper:
         self.model.save(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
         print("Saved "+self.hps['rnn_type']+" model.")
 
-    def _load_model(self):
+    def load_model(self):
         """Load saved model from JSON file.
         The function will overwrite the current model, if it exists."""
         self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
@@ -239,7 +238,7 @@ if __name__ == "__main__":
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    # flopper.train(stim)
+    # flopper.train(stim, 4000)
 
     # flopper.visualize_flipflop(stim)
 
