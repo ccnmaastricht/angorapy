@@ -31,7 +31,7 @@ activations = flopper.get_activations(stim)
 # initialize adam fpf
 fpf = Adamfixedpointfinder(weights, flopper.hps['rnn_type'], epsilon=0.01)
 # sample states, i.e. a number of ICs
-states = fpf.sample_states(activations, 300)
+states = fpf.sample_states(activations, 200)
 # generate corresponding input as zeros for flip flop task
 # please that the input does not need to be zero for all tasks
 inputs = np.zeros((states.shape[0], 3))

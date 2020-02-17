@@ -261,7 +261,7 @@ class Adamfixedpointfinder(FixedPointFinder):
                     'tol_unique': 1e-03,
                     'verbose': True,
                     'random_seed': 0}
-    adam_default_hps = {'alr_hps': {'decay_rate': 0.0001},
+    adam_default_hps = {'alr_hps': {'decay_rate': 0.0005},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
                         'adam_hps': {'epsilon': 1e-03,
@@ -369,10 +369,13 @@ class Adamfixedpointfinder(FixedPointFinder):
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
         fps = adam_optimizer(fun, x0,
-                            epsilon=self.epsilon,
-                            max_iter=self.max_iters,
-                            print_every=self.print_every,
-                            agnc=self.agnc_normclip)
+                             epsilon=self.epsilon,
+                             alr_decayr=self.alr_decayr,
+                             max_iter=self.max_iters,
+                             print_every=self.print_every,
+                             init_agnc=self.agnc_normclip,
+                             agnc_decayr=self.agnc_decayr,
+                             verbose=self.verbose)
 
         if self.rnn_type == 'lstm':
             fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
@@ -407,10 +410,13 @@ class Adamfixedpointfinder(FixedPointFinder):
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
         # TODO: implement parallel sequential optimization
             fps[i, :] = adam_optimizer(fun, x0[i, :],
-                                epsilon=self.epsilon,
-                                max_iter=self.max_iters,
-                                print_every=self.print_every,
-                                agnc=self.agnc_normclip)
+                                       epsilon=self.epsilon,
+                                       alr_decayr=self.alr_decayr,
+                                       max_iter=self.max_iters,
+                                       print_every=self.print_every,
+                                       init_agnc=self.agnc_normclip,
+                                       agnc_decayr=self.agnc_decayr,
+                                       verbose=self.verbose)
 
         fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
 
