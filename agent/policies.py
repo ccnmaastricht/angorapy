@@ -311,7 +311,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         actions = np.random.beta(alphas, betas).astype("float32")
 
         # we need to prevent 0 and 1 as actions, otherwise log in probability calculation can fuck up
-        actions = np.where(actions == 0 or actions == 1, actions + EPSILON, actions)
+        # actions = np.where(actions == 0 or actions == 1, actions + EPSILON, actions)
 
         # scale to action space and get probabilities
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
