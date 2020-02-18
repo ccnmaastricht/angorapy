@@ -74,6 +74,7 @@ continuous_no_norms = derive_config(continuous, {"no_state_norming": True,
                                                  "no_reward_norming": True})
 continuous_with_ent = derive_config(continuous, {"c_entropy": 0.01})
 continuous_beta_with_ent = derive_config(continuous_beta, {"c_entropy": 0.01})
+continuous_beta_lstm = derive_config(continuous_lstm, {"distribution": "beta"})
 
 # PENDULUM (for, well, Pendulum-v0)
 
@@ -175,6 +176,11 @@ recommended_config = dict(
     ), **dict.fromkeys(
         ["Pendulum-v0"], pendulum_beta
     ), **dict.fromkeys(
-        ["LunarLanderContinuous-v2", "BipedalWalker-v2", "BipedalWalkerHardcore-v2"], continuous_beta
+        ["LunarLanderContinuous-v2", "BipedalWalker-v3", "BipedalWalkerHardcore-v2"], continuous_beta
+    ), **dict.fromkeys(
+        ["HalfCheetah-v2", "Hopper-v2", "InvertedPendulum-v2", "InvertedDoublePendulum-v2",
+         "Swimmer-v2", "Walker2d-v2"], mujoco_beta
+    ), **dict.fromkeys(
+        ["Reacher-v2"], mujoco
     ),
 )

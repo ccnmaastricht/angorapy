@@ -27,7 +27,7 @@ matplotlib.use('Agg')
 def scale(vector):
     """Min Max scale a vector."""
     divisor = max(vector) - min(vector)
-    return (numpy.array(vector) - min(vector)) / (divisor if divisor != 0 else const.EPS)
+    return (numpy.array(vector) - min(vector)) / (divisor if divisor != 0 else const.EPSILON)
 
 
 class Monitor:

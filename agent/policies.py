@@ -12,6 +12,7 @@ import tensorflow as tf
 from agent.layers import StdevLayer
 from utilities.util import env_extract_dims
 
+from utilities.const import EPSILON
 
 class BasePolicyDistribution(abc.ABC):
     """Abstract base class for policy distributions.
@@ -308,6 +309,11 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
     def act(self, alphas: tf.Tensor, betas: tf.Tensor):
         """Sample an action from a beta distribution."""
         actions = np.random.beta(alphas, betas).astype("float32")
+
+        # we need to prevent 0 and 1 as actions, otherwise log in probability calculation can fuck up
+        actions = np.where(actions == 0 or actions == 1, actions + EPSILON, actions)
+
+        # scale to action space and get probabilities
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
         probabilities = tf.squeeze(self.log_probability(actions, alphas, betas)).numpy()
 
@@ -348,9 +354,6 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         Output Shape: (B,)
         """
         samples = self._scale_sample_to_distribution_range(samples)
-
-        # top = tf.pow(samples, tf.subtract(alphas, 1.)) * tf.pow(tf.subtract(1., samples), tf.subtract(betas, 1.))
-        # log_pdf = tf.math.log(top) - tf.math.lgamma(alphas) - tf.math.lgamma(betas) + tf.math.lgamma(alphas + betas)
 
         log_top = tf.math.log(samples) * tf.subtract(alphas, 1.) + tf.math.log(tf.subtract(1., samples)) * tf.subtract(betas, 1.)
         log_pdf = log_top - tf.math.lgamma(alphas) - tf.math.lgamma(betas) + tf.math.lgamma(alphas + betas)

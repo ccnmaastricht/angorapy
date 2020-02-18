@@ -8,7 +8,7 @@ from typing import Tuple, Iterable, Union, List
 import gym
 import numpy as np
 
-from utilities.const import EPS, NP_FLOAT_PREC
+from utilities.const import EPSILON, NP_FLOAT_PREC
 from utilities.util import parse_state
 
 
@@ -202,7 +202,7 @@ class StateNormalizationWrapper(BaseRunningMeanWrapper):
 
         normed_o = []
         for i, op in enumerate(filter(lambda a: len(a.shape) == 1, o)):
-            normed_o.append(np.clip((op - self.mean[i]) / (np.sqrt(self.variance[i] + EPS)), -10., 10.))
+            normed_o.append(np.clip((op - self.mean[i]) / (np.sqrt(self.variance[i] + EPSILON)), -10., 10.))
 
         normed_o = normed_o[0] if len(normed_o) == 1 else tuple(normed_o)
         return normed_o, r, done, info
@@ -245,7 +245,7 @@ class RewardNormalizationWrapper(BaseRunningMeanWrapper):
             self.update(self.ret)
 
         # normalize
-        r = np.clip(r / (np.sqrt(self.variance[0] + EPS)), -10., 10.)
+        r = np.clip(r / (np.sqrt(self.variance[0] + EPSILON)), -10., 10.)
 
         if done:
             self.ret = 0.

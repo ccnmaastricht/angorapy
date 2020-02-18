@@ -532,7 +532,9 @@ class PPOAgent:
 
         info = {
             "policy_output": policy_output,
+            "actions": batch["action"],
             "action_probabilities": action_probabilities,
+            "old_action_probabilities": batch["action_prob"],
             "value_output": value_output,
             "gradients": gradients
         }
