@@ -316,10 +316,6 @@ class FixedPointFinder(object):
 
 
 class Adamfixedpointfinder(FixedPointFinder):
-    _default_hps = {'q_threshold': 1e-12,
-                    'tol_unique': 1e-03,
-                    'verbose': True,
-                    'random_seed': 0}
     adam_default_hps = {'alr_hps': {'decay_rate': 0.0005},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
@@ -329,10 +325,10 @@ class Adamfixedpointfinder(FixedPointFinder):
                                      'print_every': 200}}
 
     def __init__(self, weights, rnn_type,
-                 q_threshold=_default_hps['q_threshold'],
-                 tol_unique=_default_hps['tol_unique'],
-                 verbose=_default_hps['verbose'],
-                 random_seed=_default_hps['random_seed'],
+                 q_threshold=FixedPointFinder._default_hps['q_threshold'],
+                 tol_unique=FixedPointFinder._default_hps['tol_unique'],
+                 verbose=FixedPointFinder._default_hps['verbose'],
+                 random_seed=FixedPointFinder._default_hps['random_seed'],
                  alr_decayr=adam_default_hps['alr_hps']['decay_rate'],
                  agnc_normclip=adam_default_hps['agnc_hps']['norm_clip'],
                  agnc_decayr=adam_default_hps['agnc_hps']['decay_rate'],
@@ -483,19 +479,15 @@ class Adamfixedpointfinder(FixedPointFinder):
 
 
 class Scipyfixedpointfinder(FixedPointFinder):
-    _default_hps = {'q_threshold': 1e-12,
-                    'tol_unique': 1e-03,
-                    'verbose': True,
-                    'random_seed': 0}
     scipy_default_hps = {'method': 'Newton-CG',
                          'xtol': 1e-20,
                          'display': True}
 
     def __init__(self, weights, rnn_type,
-                 q_threshold=_default_hps['q_threshold'],
-                 tol_unique=_default_hps['tol_unique'],
-                 verbose=_default_hps['verbose'],
-                 random_seed=_default_hps['random_seed'],
+                 q_threshold=FixedPointFinder._default_hps['q_threshold'],
+                 tol_unique=FixedPointFinder._default_hps['tol_unique'],
+                 verbose=FixedPointFinder._default_hps['verbose'],
+                 random_seed=FixedPointFinder._default_hps['random_seed'],
                  method=scipy_default_hps['method'],
                  xtol=scipy_default_hps['xtol'],
                  display=scipy_default_hps['display']):
@@ -558,7 +550,7 @@ class Scipyfixedpointfinder(FixedPointFinder):
             Default: True.
 
         Returns:
-            Fixedpoint dictionary containing single fixed point."""
+            Fixedpoint dictionary containing a single fixed point."""
         x0, inputs, rnn_type, n_hidden, weights, method, xtol, display = combined_object[0], combined_object[1], \
                                                                          combined_object[2], combined_object[3], \
                                                                          combined_object[4], combined_object[5], \
