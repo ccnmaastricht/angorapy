@@ -23,6 +23,12 @@ MANIPULATE_EGG_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpa
 # DEFAULT_INITIAL_QPOS = {k: v * 0 for k, v in DEFAULT_INITIAL_QPOS.items()}
 
 
+def get_palm_position(sim):
+    """Return the robotic hand's palm's center."""
+    palm_idx = sim.model.body_names.index("robot0:palm")
+    return np.array(sim.model.body_pos[palm_idx])
+
+
 class ShadowHand(manipulate.ManipulateEnv):
     """Adjusted version of ManipulateTouchSensorsEnv Environment in the gym package to fit the projects needs."""
 
@@ -51,7 +57,7 @@ class ShadowHand(manipulate.ManipulateEnv):
         if visual_input:
             # init rendering [IMPORTANT]
             from mujoco_py import GlfwContext
-            GlfwContext(offscreen=True, quiet=True)
+            GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
 
         self.touch_visualisation = touch_visualisation
         self.touch_get_obs = touch_get_obs
@@ -148,10 +154,34 @@ class ShadowHand(manipulate.ManipulateEnv):
             "desired_goal": self.goal.ravel().copy(),
         }
 
+    def _is_success(self, achieved_goal, desired_goal):
+        """We determine success only by means of rotational goals."""
+        _, d_rot = self._goal_distance(achieved_goal, desired_goal)
+        return (d_rot < self.rotation_threshold).astype(np.float32)
+
+    def _is_dropped(self) -> bool:
+        """Heuristically determine whether the object still is in the hand."""
+
+        # determin object center position
+        obj_center_idx = self.sim.model.site_name2id('object:center')
+        obj_center_pos = self.sim.data.site_xpos[obj_center_idx]
+
+        # determine palm center position
+        palm_center_pos = get_palm_position(self.sim)
+
+        dropped = (
+            obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
+        )
+
+        return dropped
+
     def step(self, action):
         """Make step in environment."""
         self.total_steps += 1
         obs, reward, done, info = super().step(action)
+        dropped = self._is_dropped()
+        done = done or dropped
+
         return obs, reward, done if self.total_steps < self.max_steps else True, info
 
     def reset(self):
@@ -161,26 +191,20 @@ class ShadowHand(manipulate.ManipulateEnv):
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute the reward."""
-        if self.reward_type == 'sparse':
-            success = self._is_success(achieved_goal, goal).astype(np.float32)
-            return success - 1.
-        else:
-            success = self._is_success(achieved_goal, goal).astype(np.float32)
-            d_pos, d_rot = self._goal_distance(achieved_goal, goal)
-            # We weigh the difference in position to avoid that `d_pos` (in meters) is completely
-            # dominated by `d_rot` (in radians).
-            return (- (10. * d_pos + d_rot)  # distance rewards
-                    - 1  # constant punishment to encourage speed
-                    + success * 5  # reward for finishing
-                    # TODO dropping penalty
-                    )
+        success = self._is_success(achieved_goal, goal).astype(np.float32)
+        _, d_rot = self._goal_distance(achieved_goal, goal)
+
+        return (- d_rot                     # convergence to goal reward
+                - 1                         # constant punishment to encourage fast solutions
+                + success * 5               # reward for finishing
+                + 20 * self._is_dropped())  # dropping penalty
 
 
 class ShadowHandBlock(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with a Block as an object."""
 
-    def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='not_sparse', visual_input: bool = False, max_steps=100):
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+                 reward_type='dense', visual_input: bool = False, max_steps=100):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         ShadowHand.__init__(self,
                             model_path=MANIPULATE_BLOCK_XML,
@@ -196,8 +220,8 @@ class ShadowHandBlock(ShadowHand, utils.EzPickle):
 class ShadowHandEgg(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with an Egg as an object."""
 
-    def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='not_sparse', visual_input: bool = False, max_steps=100):
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+                 reward_type='dense', visual_input: bool = False, max_steps=100):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         ShadowHand.__init__(self,
                             model_path=MANIPULATE_EGG_XML,
@@ -239,13 +263,11 @@ class ShadowHandReach(HandReachEnv):
 
 
 if __name__ == "__main__":
-    print(os.environ["LD_PRELOAD"])
-
     from environments import *
 
-    # env = gym.make("ShadowHand-v0")
+    env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
-    env = gym.make("HandReachDenseRelative-v0")
+    # env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()
     while True:
         env.render()
