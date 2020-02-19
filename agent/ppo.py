@@ -185,6 +185,7 @@ class PPOAgent:
         self.cycle_length_history = []
         self.cycle_reward_std_history = []
         self.cycle_length_std_history = []
+        self.cycle_stat_n_history = []
         self.entropy_history = []
         self.policy_loss_history = []
         self.value_loss_history = []
@@ -278,7 +279,7 @@ class PPOAgent:
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False, save_best=True,
-              parallel=True) -> "PPOAgent":
+              parallel=True, radical_evaluation=False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -384,12 +385,19 @@ class PPOAgent:
 
             # make seperate evaluation if necessary and wanted
             stats_with_evaluation = stats
-            if separate_eval and stats.numb_completed_episodes < MIN_STAT_EPS:
-                flat_print("Evaluating...")
-                evaluation_stats = self.evaluate(MIN_STAT_EPS - stats.numb_completed_episodes,
-                                                 ray_already_initialized=True, workers=workers)
+            if separate_eval:
+                if not radical_evaluation and not stats.numb_completed_episodes < MIN_STAT_EPS:
+                    # we do not want to do it radically, and have enough episodes already
+                    continue
 
-                stats_with_evaluation = condense_stats([stats, evaluation_stats])
+                flat_print("Evaluating...")
+                n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
+                evaluation_stats = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
+
+                if radical_evaluation:
+                    stats_with_evaluation = evaluation_stats
+                else:
+                    stats_with_evaluation = condense_stats([stats, evaluation_stats])
 
             elif stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
@@ -406,6 +414,7 @@ class PPOAgent:
                                                  else statistics.stdev(stats_with_evaluation.episode_lengths))
             self.cycle_reward_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
                                                  else statistics.stdev(stats_with_evaluation.episode_rewards))
+            self.cycle_stat_n_history.append(stats_with_evaluation.numb_completed_episodes)
 
             # record preprocessor stats
             for w in self.preprocessor:
@@ -430,7 +439,7 @@ class PPOAgent:
 
             if cycle_start is not None:
                 self.cycle_timings.append(round(time.time() - cycle_start, 2))
-            self.report()
+            self.report(total_iterations=n)
             cycle_start = time.time()
 
             # OPTIMIZE
@@ -664,7 +673,7 @@ class PPOAgent:
 
         return StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=0)
 
-    def report(self):
+    def report(self, total_iterations):
         """Print a report of the current state of the training."""
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
@@ -699,9 +708,10 @@ class PPOAgent:
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
 
         # print the report
-        flat_print(f"{sc}{f'Cycle {self.iteration:5d}' if self.iteration != 0 else 'Before Training'}{ec}: "
+        flat_print(f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
                    f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
                    f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
+                   f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
                    f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
                    f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
                    f"lr: {nc}{current_lr:.2e}{ec}; "

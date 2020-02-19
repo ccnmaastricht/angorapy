@@ -25,7 +25,7 @@ if __name__ == '__main__':
                              "and configs")
     parser.add_argument("--repetitions", "-r", type=int, help="number of repetitions of each configuration for means"
                         , default=10)
-    parser.add_argument("--cycles", "-i", type=int, help="number of cycles during one drill", default=100)
+    parser.add_argument("--cycles", "-i", type=int, help="number of cycles during one drill", default=None)
     parser.add_argument("--configs", "-c", type=str, nargs="+", help="a list of configurations to be compared")
     parser.add_argument("--stop-early", "-e", action="store_true", help="allow independent early stopping")
     args = parser.parse_args()
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     should_init = True
     for conf_name, config in configurations.items():
-        config["iterations"] = args.cycles
+        config["iterations"] = args.cycles if args.cycles is not None else config["iterations"]
         config["config"] = conf_name
         config["eval"] = True
 

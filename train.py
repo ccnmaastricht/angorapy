@@ -104,7 +104,8 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
     agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
                 export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
-                stop_early=settings["stop_early"], parallel=not settings["sequential"], ray_is_initialized=not init_ray)
+                stop_early=settings["stop_early"], parallel=not settings["sequential"], ray_is_initialized=not init_ray,
+                radical_evaluation=settings["radical_evaluation"])
 
     agent.save_agent_state()
     env.close()
@@ -139,6 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate additionally to have at least 5 eps")
+    parser.add_argument("--radical-evaluation", action="store_true", help=f"only record stats from seperate evaluation")
     parser.add_argument("--save-every", type=int, default=0, help=f"save agent every given number of iterations")
     parser.add_argument("--monitor-frequency", type=int, default=1, help=f"update the monitor every n iterations.")
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")

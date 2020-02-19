@@ -171,6 +171,8 @@ class ShadowHand(manipulate.ManipulateEnv):
 
         dropped = (
             obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
+            # we could add smth like checking for contacts between palm and object here, but the above works
+            # pretty well already tbh
         )
 
         return dropped
@@ -180,9 +182,9 @@ class ShadowHand(manipulate.ManipulateEnv):
         self.total_steps += 1
         obs, reward, done, info = super().step(action)
         dropped = self._is_dropped()
-        done = done or dropped
+        done = done or dropped or self.total_steps >= self.max_steps
 
-        return obs, reward, done if self.total_steps < self.max_steps else True, info
+        return obs, reward, done, info
 
     def reset(self):
         """Reset the environment."""
