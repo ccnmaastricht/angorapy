@@ -532,11 +532,11 @@ class PPOAgent:
 
         info = {
             "policy_output": policy_output,
-            "actions": batch["action"],
-            "action_probabilities": action_probabilities,
-            "old_action_probabilities": batch["action_prob"],
-            "value_output": value_output,
-            "gradients": gradients
+            # "actions": batch["action"],
+            # "action_probabilities": action_probabilities,
+            # "old_action_probabilities": batch["action_prob"],
+            # "value_output": value_output,
+            # "gradients": gradients
         }
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
@@ -595,14 +595,14 @@ class PPOAgent:
                 policy_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
 
-                for grad in info["gradients"]:
-                    found = False
-                    if tf.reduce_any(tf.math.is_nan(grad)):
-                        found = True
-
-                    if found:
-                        print(info)
-                        exit()
+                # for grad in info["gradients"]:
+                #     found = False
+                #     if tf.reduce_any(tf.math.is_nan(grad)):
+                #         found = True
+                #
+                #     if found:
+                #         print(info)
+                #         exit()
 
                 # reset RNN states after each outer batch
                 self.joint.reset_states()
@@ -662,7 +662,7 @@ class PPOAgent:
 
         all_lengths, all_rewards = zip(*[ray.get(oi) for oi in result_ids])
 
-        return StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=None)
+        return StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=0)
 
     def report(self):
         """Print a report of the current state of the training."""

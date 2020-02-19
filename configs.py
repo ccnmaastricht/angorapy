@@ -72,9 +72,13 @@ continuous_lstm = derive_config(continuous, {"model": "lstm"})
 continuous_beta = derive_config(continuous, {"distribution": "beta"})
 continuous_no_norms = derive_config(continuous, {"no_state_norming": True,
                                                  "no_reward_norming": True})
+
 continuous_with_ent = derive_config(continuous, {"c_entropy": 0.01})
 continuous_beta_with_ent = derive_config(continuous_beta, {"c_entropy": 0.01})
-continuous_beta_lstm = derive_config(continuous_lstm, {"distribution": "beta"})
+
+continuous_beta_lstm = derive_config(continuous_beta, {"model": "lstm"})
+continuous_beta_gru = derive_config(continuous_beta, {"model": "gru"})
+continuous_beta_rnn = derive_config(continuous_beta, {"model": "rnn"})
 
 # PENDULUM (for, well, Pendulum-v0)
 
@@ -123,15 +127,18 @@ mujoco = make_config(
 )
 
 mujoco_beta = derive_config(mujoco, {"distribution": "beta"})
+mujoco_beta_rnn = derive_config(mujoco_beta, {"model": "rnn"})
+mujoco_beta_gru = derive_config(mujoco_beta, {"model": "gru"})
+mujoco_beta_lstm = derive_config(mujoco_beta, {"model": "lstm"})
 mujoco_vc = derive_config(mujoco, {"clip_values": True})
 
 # ROBOSCHOOL TASKS
 
 roboschool = make_config(
     iterations=50000000 // 2048,  # 50 million timesteps
-    workers=16,
+    workers=32,
     batch_size=4096,
-    horizon=1024,
+    horizon=512,
     c_entropy=0.0,
     lr_pi=0.0003,
     lr_schedule="exponential",  # should be a linear annealing

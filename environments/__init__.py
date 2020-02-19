@@ -7,6 +7,8 @@ from environments.evasionwalls import EvasionWalls
 from environments.race import Race
 from environments.shadowhand import ShadowHandBlock, ShadowHandReach
 from environments.tunnel import Tunnel
+from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
+    LunarLanderContinuousNoVel
 
 # SHADOW HAND #
 
@@ -43,6 +45,34 @@ gym.envs.register(
     entry_point='gym.envs.classic_control:MountainCarEnv',
     max_episode_steps=500,
     reward_threshold=-110.0,
+)
+
+gym.envs.register(
+    id="InvertedPendulumNoVel-v2",
+    entry_point="environments:InvertedPendulumNoVelEnv",
+    max_episode_steps=1000,
+    reward_threshold=950.0,
+)
+
+gym.envs.register(
+    id='ReacherNoVel-v2',
+    entry_point='environments:ReacherNoVelEnv',
+    max_episode_steps=50,
+    reward_threshold=-3.75,
+)
+
+gym.envs.register(
+    id='HalfCheetahNoVel-v2',
+    entry_point='environments:HalfCheetahNoVelEnv',
+    max_episode_steps=1000,
+    reward_threshold=4800.0,
+)
+
+gym.envs.register(
+    id='LunarLanderContinuousNoVel-v2',
+    entry_point='environments:LunarLanderContinuousNoVel',
+    max_episode_steps=1000,
+    reward_threshold=200,
 )
 
 # CUSTOM SIMPLE GAMES FROM RLASPA PROJECT

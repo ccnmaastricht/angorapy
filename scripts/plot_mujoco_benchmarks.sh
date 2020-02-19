@@ -4,5 +4,3 @@ python -m analysis.plotting.plot_benchmark.py default_InvertedPendulum-v2 --only
 python -m analysis.plotting.plot_benchmark.py default_InvertedDoublePendulum-v2 --only mujoco_beta
 python -m analysis.plotting.plot_benchmark.py default_Hopper-v2 --only mujoco_beta
 python -m analysis.plotting.plot_benchmark.py workstation_Walker2d-v2 --only mujoco_beta
-python -m analysis.plotting.plot_benchmark.py default_Swimmer-v2 --only mujoco_beta
-python -m analysis.plotting.plot_benchmark.py default_Ant-v2 --only mujoco_beta
