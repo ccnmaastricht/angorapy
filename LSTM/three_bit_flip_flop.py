@@ -35,22 +35,86 @@ class Flipflopper:
 
     '''
 
-    def __init__(self, rnn_type: str = 'vanilla', n_hidden: int = 24):
+    def __init__(self, rnn_type: str = 'vanilla', n_hidden: int = 24,
+                 recurrentweights=None):
 
         self.hps = {'rnn_type': rnn_type,
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 512,
-                         'n_time': 64,
+        self.data_hps = {'n_batch': 128,
+                         'n_time': 256,
                          'n_bits': 3,
-                         'p_flip': 0.2}
+                         'p_flip': 0.3}
         self.verbose = self.hps['verbose']
         # data_hps may be changed but are recommended to remain at their default values
-        self.model = self._build_model()
+        self.model = self._build_model(recurrentweights)
         self.rng = npr.RandomState(125)
 
-    def _build_model(self):
+    def _build_model(self, recurrentweights):
+        '''Builds model that can be used to train the 3-Bit Flip-Flop task.
+
+        Args:
+            None.
+
+        Returns:
+            None.'''
+        n_hidden = self.hps['n_hidden']
+        name = self.hps['model_name']
+        weights = self.build_pretrained_model(recurrentweights)
+        n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
+
+        inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
+
+        if self.hps['rnn_type'] == 'vanilla':
+            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+        elif self.hps['rnn_type'] == 'gru':
+            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+        elif self.hps['rnn_type'] == 'lstm':
+            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True,
+                                     return_state=True)(inputs)
+        else:
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
+
+        x = tf.keras.layers.Dense(3)(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
+        model.get_layer(self.hps['rnn_type']).set_weights(weights)
+        if self.verbose:
+            model.summary()
+
+        return model
+
+    def build_pretrained_model(self, recurrentweights):
+        n_hidden = self.hps['n_hidden']
+
+        n_bits = self.data_hps['n_bits']
+
+        inputweights = np.random.randn(n_bits, n_hidden) * 1e-03
+        recurrentbias = np.random.randn(n_hidden) * 1e-03
+
+        return [inputweights, recurrentweights, recurrentbias]
+
+    def train_pretrained_model(self, stim, recurrentweights):
+        inputs = stim['inputs']
+        output = stim['output']
+
+        inputweights, outputweights, outputbias, recurrentweights, recurrentbias = self.build_pretrained_model(recurrentweights)
+
+        h_recurrent = np.zeros(n_hidden)
+        # forward pass
+        h_recurrent = np.matmul(np.tanh(h_recurrent), recurrentweights) + np.matmul(inputs, inputweights) + recurrentbias
+
+        h_out = np.matmul(h_recurrent, outputweights) + outputbias
+
+        error =np.square(np.subtract(output, h_out)).mean()
+
+        delta_out = output - h_out
+        d_outputweights = delta_out * h_out
+        d_outputbias = delta_out
+
+    def pretrained_model(self, recurrentweights, fix):
+
         '''Builds model that can be used to train the 3-Bit Flip-Flop task.
 
         Args:
@@ -61,25 +125,49 @@ class Flipflopper:
         n_hidden = self.hps['n_hidden']
         name = self.hps['model_name']
         n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
+        weights = self.build_pretrained_model(recurrentweights)
 
         inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
 
         if self.hps['rnn_type'] == 'vanilla':
-            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True, trainable=fix)(inputs)
         elif self.hps['rnn_type'] == 'gru':
             x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
-            x = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True,
+                                     return_state=True)(inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
         x = tf.keras.layers.Dense(3)(x)
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
+        model.get_layer(self.hps['rnn_type']).set_weights(weights)
         if self.verbose:
             model.summary()
 
         return model
+    def train_pretrained(self, stim, epochs, recurrentweights, fix):
+        '''Function to train an RNN model This function will save the trained model afterwards.
+
+        Args:
+            stim: dict containing 'inputs' and 'output' as input and target data for training the model.
+
+                'inputs': [n_batch x n_time x n_bits] numpy array containing
+                input pulses.
+                'outputs': [n_batch x n_time x n_bits] numpy array specifying
+                the correct behavior of the FlipFlop memory device.
+
+        Returns:
+            None.'''
+        model = self.pretrained_model(recurrentweights, fix)
+        model.compile(optimizer="adam", loss="mse",
+                  metrics=['accuracy'])
+        history = model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
+                            tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=epochs)
+
+
+        return history
 
 
     def generate_flipflop_trials(self):
@@ -158,6 +246,7 @@ class Flipflopper:
                             tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=epochs)
         if save_model:
             self._save_model()
+        return history
 
     def visualize_flipflop(self, stim):
         prediction = self.model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
@@ -175,7 +264,7 @@ class Flipflopper:
         ax1.xaxis.set_visible(False)
         ax2.xaxis.set_visible(False)
 
-        plt.show()
+        # plt.show()
 # TODO: both visualization of training history and visualization of flipflop need improvement.
 # TODO: both things also need to be removed from class
 
@@ -202,13 +291,13 @@ class Flipflopper:
 
 
 if __name__ == "__main__":
-    rnn_type = 'vanilla'
+    rnn_type = 'lstm'
     n_hidden = 24
 
     flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
     stim = flopper.generate_flipflop_trials()
 
-    flopper.train(stim, 4000)
+    flopper.train(stim, epochs=2000)
 
     flopper.visualize_flipflop(stim)
 

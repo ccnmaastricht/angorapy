@@ -197,17 +197,20 @@ if __name__ == "__main__":
     activationss, inputss = np.vstack(activationss), np.vstack(inputss)
     actionss = np.concatenate(actionss, axis=0)
 
-    adamfpf = Adamfixedpointfinder(weights, 'vanilla',
-                                   q_threshold=1e-02,
-                                   epsilon=0.01,
-                                   alr_decayr=1e-05,
-                                   max_iters=5000)
-    states = adamfpf.sample_states(activationss, 10)
-    input = np.zeros((states.shape[0], 64))
-    fps = adamfpf.find_fixed_points(states, input)
-    vel = adamfpf.compute_velocities(activationss, inputss)
+    # adamfpf = Adamfixedpointfinder(weights, 'vanilla',
+                               #    q_threshold=1e-02,
+                               #    epsilon=0.01,
+                               #    alr_decayr=1e-05,
+                               #    max_iters=5000)
+    #states = adamfpf.sample_states(activationss, 10)
+    #input = np.zeros((states.shape[0], 64))
+    #fps = adamfpf.find_fixed_points(states, input)
+    #vel = adamfpf.compute_velocities(activationss, inputss)
     # plot_fixed_points(activationss, fps, 4000, 4)
-    plot_velocities(activationss, vel, 3000)
+    # plot_velocities(activationss, actionss[:, 0], 3000)
+    idx = actionss[:, 1] < 0
+    actionss[idx, 1] = 0
+    plot_velocities(activationss, actionss[:, 1], 3000)
 
 
 

@@ -4,8 +4,8 @@ import numpy as np
 import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
-from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
-from LSTM.minimization import adam_optimizer
+from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds, build_lstm_c_ds
+from LSTM.minimization import adam_optimizer, adam_maximizer
 
 
 
@@ -118,6 +118,8 @@ class FixedPointFinder(object):
         Returns:
             sampled_activations: numpy array of sampled activations. Will have dimensions
             [n_init x n_units]."""
+        if self.rnn_type == 'lstm':
+            activations = np.hstack((activations[1], activations[2]))
 
         if len(activations.shape) == 3:
             activations = np.vstack(activations)
@@ -182,13 +184,13 @@ class FixedPointFinder(object):
         elif self.rnn_type == 'gru':
             func, _ = build_gru_ds(self.weights, self.n_hidden, input, 'velocity')
         elif self.rnn_type == 'lstm':
-            func, _ = build_lstm_ds(self.weights, self.n_hidden, input, 'velocity')
+            c = activations[:, self.n_hidden:]
+            activations = activations[:, :self.n_hidden]
+            func, _ = build_lstm_c_ds(self.weights, input, self.n_hidden, c, 'velocity')
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-        if len(activations.shape) == 3:
-            activations = np.vstack(activations)
         # get velocity at point
         velocities = func(activations)
         return velocities
@@ -207,14 +209,13 @@ class FixedPointFinder(object):
                 raise ValueError('No fixed points were found with the current settings. \n'
                                  'It is recommended to rerun after adjusting one or more of the'
                                  'following settings: \n'
-                                 '1. use more samples \n'
-                                 '2. adjust q_threshold to larger values \n'
+                                 '1. use more samples. \n'
+                                 '2. adjust q_threshold to larger values. \n'
                                  'If you are using adam, try as well:\n'
                                  '1. adjust learning rate: if optimization seemed unstable, try smaller. If '
-                                 'learning was simply very slow, try larger \n'
-                                 '2. increase maximum number of iterations\n'
-                                 '3. adjust hps for adaptive learning rate and adaptive gradient norm clip \n'
-                                 'Keep in mind that a fixed point does not have to exist.')
+                                 'learning was simply very slow, try larger. \n'
+                                 '2. increase maximum number of iterations.\n'
+                                 '3. adjust hps for adaptive learning rate and/or adaptive gradient norm clip.')
 
             return fixed_point_locations
 
@@ -273,22 +274,22 @@ class FixedPointFinder(object):
 
         Retruns: fixedpoints: fixedpointobject that now contains a jacobian matrix in fp['jac'].
         The jacobian matrix will have the dimensions [n_units x n_units]."""
-
+        k = 0
         for fp in fixedpoints:
             if self.rnn_type == 'vanilla':
                 fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, fp['input_init'], 'sequential')
             elif self.rnn_type == 'gru':
                 fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, fp['input_init'], 'sequential')
             elif self.rnn_type == 'lstm':
-                fun, jac_fun = build_lstm_ds(self.weights, fp['input_init'], self.n_hidden, 'sequential')
+                pass
+                #fun, jac_fun = build_lstm_c_ds(self.weights, fp['input_init'], self.n_hidden, c[k, :], 'sequential')
             else:
                 raise ValueError('Hyperparameter rnn_type must be one of'
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
-            if self.rnn_type == 'lstm':
-                h, c = fp['x'][:self.n_hidden], fp['x'][self.n_hidden:]
-                fp['jac'] = jac_fun(h, c)
-            else:
-                fp['jac'] = jac_fun(fp['x'])
+
+
+            fp['jac'] = jac_fun(fp['x'])
+            k += 1
 
         return fixedpoints
 
@@ -394,9 +395,8 @@ class Adamfixedpointfinder(FixedPointFinder):
 
         good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
         unique_fps = self._find_unique_fixed_points(good_fps)
-
+        c = x0[:, self.n_hidden:]
         unique_fps = self._compute_jacobian(unique_fps)
-
 
         return unique_fps
 
@@ -413,12 +413,15 @@ class Adamfixedpointfinder(FixedPointFinder):
 
         Returns:
             Fixedpointobject. See _create_fixedpoint_object for further documenation."""
+
         if self.rnn_type == 'vanilla':
             fun, jac_fun = build_rnn_ds(self.weights, self.n_hidden, inputs, self.method)
         elif self.rnn_type == 'gru':
             fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, self.method)
         elif self.rnn_type == 'lstm':
-            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.method)
+            c = x0[:, self.n_hidden:]
+            x0 = x0[:, :self.n_hidden]
+            fun, jac_fun = build_lstm_c_ds(self.weights, inputs, self.n_hidden, c, self.method)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
@@ -432,9 +435,9 @@ class Adamfixedpointfinder(FixedPointFinder):
                              agnc_decayr=self.agnc_decayr,
                              verbose=self.verbose)
 
-        if self.rnn_type == 'lstm':
-            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
-
+        #if self.rnn_type == 'lstm':
+        #    fun, _ = build_lstm_c_ds(self.weights, inputs, self.n_hidden, c, 'sequential')
+# TODO: need better handling of c .. when evaluating single function it has to be a vector too
         fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
 
         return fixedpoints
