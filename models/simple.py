@@ -5,20 +5,19 @@ import os
 
 import gym
 import tensorflow as tf
-from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
 from tensorflow_core.python.keras.utils import plot_model
 
-from models.components import _build_encoding_sub_model, _build_continuous_head, _build_discrete_head
-from utilities.normalization import RunningNormalization
+from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution, \
+    BetaPolicyDistribution
+from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
+def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False):
     """Build simple two-layer model."""
 
     # preparation
-    continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
     encoding_layer_sizes = (64, 64)
 
@@ -28,10 +27,7 @@ def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
     # policy network
     latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=encoding_layer_sizes,
                                        name="policy_encoder")(inputs)
-    if continuous_control:
-        out_policy = _build_continuous_head(n_actions, (64,), None)(latent)
-    else:
-        out_policy = _build_discrete_head(n_actions, (64,), None)(latent)
+    out_policy = distribution.build_action_head(n_actions, (64,), None)(latent)
 
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
 
@@ -50,11 +46,14 @@ def build_ffn_models(env: gym.Env, shared: bool = False, **kwargs):
     return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, value_out], name="policy_value")
 
 
-def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type: str = "rnn"):
+def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+                     model_type: str = "rnn"):
     """Build simple policy and value models having a recurrent layer before their heads."""
-    continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
-    RNNChoice = {"rnn": tf.keras.layers.SimpleRNN, "lstm": tf.keras.layers.LSTM, "gru": tf.keras.layers.GRU}[model_type]
+    rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
+                  "lstm": tf.keras.layers.LSTM,
+                  "gru": tf.keras.layers.GRU}[
+        model_type]
 
     inputs = tf.keras.Input(batch_shape=(bs, None, state_dimensionality,))
     masked = tf.keras.layers.Masking()(inputs)
@@ -63,19 +62,18 @@ def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type
     x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="policy_encoder"),
            name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x, *_ = RNNChoice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs, name="policy_recurrent_layer")(x)
+    x, *_ = rnn_choice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs,
+                       name="policy_recurrent_layer")(x)
 
-    if continuous_control:
-        out_policy = _build_continuous_head(n_actions, x.shape[1:], bs)(x)
-    else:
-        out_policy = _build_discrete_head(n_actions, x.shape[1:], bs)(x)
+    out_policy = distribution.build_action_head(n_actions, x.shape[1:], bs)(x)
 
     # value network
     if not shared:
         x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="value_encoder"),
                name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
-        x, *_ = RNNChoice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs, name="value_recurrent_layer")(x)
+        x, *_ = rnn_choice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs,
+                           name="value_recurrent_layer")(x)
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(x)
     else:
@@ -88,15 +86,33 @@ def build_rnn_models(env: gym.Env, bs: int = 1, shared: bool = False, model_type
     return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="simple_rnn")
 
 
+def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+                        model_type: str = "rnn", **kwargs):
+    """Build simple networks (policy, value, joint) for given parameter settings."""
+
+    # this function is just a wrapper routing the requests for ffn and rnns
+    if model_type == "ffn":
+        return build_ffn_models(env, distribution, shared)
+    else:
+        return build_rnn_models(env, distribution, shared, bs=bs, model_type=model_type)
+
+
 if __name__ == '__main__':
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    _, _, ffn_distinct = build_ffn_models(gym.make("LunarLanderContinuous-v2"), False)
-    _, _, ffn_shared = build_ffn_models(gym.make("LunarLanderContinuous-v2"), True)
-    _, _, rnn_distinct = build_rnn_models(gym.make("LunarLanderContinuous-v2"), 1, False, "lstm")
-    _, _, rnn_shared = build_rnn_models(gym.make("LunarLanderContinuous-v2"), 1, True, "gru")
+    cont_env = gym.make("LunarLanderContinuous-v2")
+    disc_env = gym.make("LunarLander-v2")
 
-    plot_model(ffn_distinct, "ffn_distinct.png")
-    plot_model(ffn_shared, "ffn_shared.png")
-    plot_model(rnn_distinct, "rnn_distinct.png")
-    plot_model(rnn_shared, "rnn_shared.png")
+    _, _, ffn_distinct = build_ffn_models(cont_env, GaussianPolicyDistribution(), False)
+    _, _, ffn_shared = build_ffn_models(cont_env, BetaPolicyDistribution(), True)
+    _, _, ffn_distinct_discrete = build_ffn_models(disc_env, CategoricalPolicyDistribution(), True)
+    _, _, rnn_distinct = build_rnn_models(cont_env, BetaPolicyDistribution(), False, 1, "lstm")
+    _, _, rnn_shared = build_rnn_models(cont_env, GaussianPolicyDistribution(), True, 1, "gru")
+    _, _, rnn_shared_discrete = build_rnn_models(disc_env, CategoricalPolicyDistribution(), True)
+
+    plot_model(ffn_distinct, "ffn_distinct.png", expand_nested=True)
+    plot_model(ffn_distinct_discrete, "ffn_distinct_discrete.png", expand_nested=True)
+    plot_model(ffn_shared, "ffn_shared.png", expand_nested=True)
+    plot_model(rnn_distinct, "rnn_distinct.png", expand_nested=True)
+    plot_model(rnn_shared, "rnn_shared.png", expand_nested=True)
+    plot_model(rnn_shared_discrete, "rnn_shared_discrete.png", expand_nested=True)

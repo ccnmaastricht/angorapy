@@ -17,7 +17,7 @@ rnn_type = 'vanilla'
 n_hidden = 24
 recurrentweights = np.random.randn(24, 24) * 1e-03
 # initialize Flipflopper class
-flopper = Flipflopper(recurrentweights=recurrentweights, rnn_type=rnn_type, n_hidden=n_hidden)
+flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
 # generate trials
 stim = flopper.generate_flipflop_trials()
 # train the model
@@ -56,7 +56,7 @@ class Rnnconstructor():
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
                         'adam_hps': {'epsilon': 1e-03,
-                                     'max_iters': 2000,
+                                     'max_iters': 50000,
                                      'method': 'joint',
                                      'print_every': 200}}
 
@@ -98,11 +98,11 @@ class Rnnconstructor():
 
         return fun
 
-    def train_recurrentweights(self, fps):
+    def train_recurrentweights(self, fps, weights):
 
         fun = self.build_model(fps)
 
-        weights = np.random.randn(24, 24) * 1e-03
+        # weights = np.random.randn(24, 24) * 1e-03
         # weights, _ = np.linalg.qr(weights)
         #p = 24
         #A = np.random.rand(p, p)
@@ -126,7 +126,8 @@ class Rnnconstructor():
 plot_fixed_points(activations, fps, 2000, 2)
 reco = Rnnconstructor(fps)
 
-recurrentweights = reco.train_recurrentweights(fps)
+recurrentweights = reco.train_recurrentweights(fps, flopper.weights[1])
+recurrentweights = np.multiply(recurrentweights, recurrentweights)
 # weights[1] = recurrentweights
 h = np.zeros(24)
 inputs = np.vstack(stim['inputs'])
@@ -149,7 +150,7 @@ for i in range(len(fps)):
     fph[i]['fun'] = fun(fps[i]['x'])
 
 
-plot_fixed_points(np.vstack(recorded_h), fph, 2000, 4)
+plot_fixed_points(activations, fph, 2000, 4)
 
 
 retrained_history = flopper.train_pretrained(stim, 1000, recurrentweights, True)

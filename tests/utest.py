@@ -12,12 +12,12 @@ from scipy.signal import lfilter
 from scipy.stats import norm, entropy, beta
 
 from agent.core import extract_discrete_action_probabilities, estimate_advantage
-from agent.policy import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
+from agent.policies import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from models import get_model_builder
-from utilities.const import NUMPY_FLOAT_PRECISION
-from utilities.model_management import reset_states_masked
+from utilities.const import NP_FLOAT_PREC
+from utilities.model_utils import reset_states_masked
 from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
 
@@ -54,7 +54,7 @@ class ProbabilityTest(unittest.TestCase):
     # GAUSSIAN
 
     def test_gaussian_pdf(self):
-        distro = GaussianPolicyDistribution()
+        distro = GaussianPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         x = tf.convert_to_tensor([[2, 3], [4, 3], [2, 1]], dtype=tf.float32)
         mu = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
@@ -68,12 +68,12 @@ class ProbabilityTest(unittest.TestCase):
         self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
 
     def test_gaussian_entropy(self):
-        distro = GaussianPolicyDistribution()
+        distro = GaussianPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         mu = tf.convert_to_tensor([[2.0, 3.0], [2.0, 1.0]], dtype=tf.float32)
         sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
 
-        result_reference = np.sum(norm._entropy_from_params(loc=mu, scale=sig), axis=-1)
+        result_reference = np.sum(norm.entropy(loc=mu, scale=sig), axis=-1)
         result_log = distro.entropy(np.log(sig)).numpy()
         result = distro._entropy_from_params(sig).numpy()
 
@@ -83,26 +83,26 @@ class ProbabilityTest(unittest.TestCase):
     # BETA
 
     def test_beta_pdf(self):
-        distro = BetaPolicyDistribution()
+        distro = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         x = tf.convert_to_tensor([[0.2, 0.3], [0.4, 0.3], [0.2, 0.1]], dtype=tf.float32)
         alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
         betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
 
-        result_reference = np.prod(beta.pdf(x, alphas, betas), axis=-1)
+        result_reference = np.prod(beta.pdf(distro._scale_sample_to_distribution_range(x), alphas, betas), axis=-1)
         result_pdf = distro.probability(x, alphas, betas).numpy()
         result_log_pdf = np.exp(distro.log_probability(x, alphas, betas).numpy())
 
+        self.assertTrue(np.allclose(result_reference, result_log_pdf), msg="Beta Log PDF returns wrong Result")
         self.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
-        self.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
 
     def test_beta_entropy(self):
-        distro = BetaPolicyDistribution()
+        distro = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
 
         alphas = tf.convert_to_tensor([[2, 1], [1, 3], [2, 2]], dtype=tf.float32)
         betas = tf.convert_to_tensor([[2, 2], [1, 2], [2, 1]], dtype=tf.float32)
 
-        result_reference = np.sum(beta._entropy_from_params(alphas, betas), axis=-1)
+        result_reference = np.sum(beta.entropy(alphas, betas), axis=-1)
         result_pdf = distro._entropy_from_params((alphas, betas)).numpy()
 
         self.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
@@ -110,7 +110,7 @@ class ProbabilityTest(unittest.TestCase):
     # CATEGORICAL
 
     def test_categorical_entropy(self):
-        distro = CategoricalPolicyDistribution()
+        distro = CategoricalPolicyDistribution(gym.make("CartPole-v1"))
 
         probs = tf.convert_to_tensor([[0.1, 0.4, 0.2, 0.25, 0.05],
                                       [0.1, 0.4, 0.2, 0.2, 0.1],
@@ -194,7 +194,7 @@ class WrapperTest(unittest.TestCase):
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
-            o, _, _, _ = normalizer.wrap_a_step((sample, 1, 1, 1))
+            o, _, _, _ = normalizer.modulate((sample, 1, 1, 1))
 
         self.assertTrue(np.allclose(true_mean, normalizer.mean))
         self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))
@@ -207,7 +207,7 @@ class WrapperTest(unittest.TestCase):
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
-            o, _, _, _ = normalizer.wrap_a_step((1, sample, 1, 1))
+            o, _, _, _ = normalizer.modulate((1, sample, 1, 1))
 
         self.assertTrue(np.allclose(true_mean, normalizer.mean))
         self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))
@@ -217,9 +217,9 @@ class WrapperTest(unittest.TestCase):
         normalizer_b = StateNormalizationWrapper(10)
         normalizer_c = StateNormalizationWrapper(10)
 
-        inputs_a = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
-        inputs_b = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
-        inputs_c = [tf.random.normal([10], dtype=NUMPY_FLOAT_PRECISION) for _ in range(10)]
+        inputs_a = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
+        inputs_b = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
+        inputs_c = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
 
         true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
         true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
@@ -313,6 +313,8 @@ class InvestigatorTest(unittest.TestCase):
         out_single = inv.get_activations_over_episode(inv.list_layer_names()[0], environment)
 
         self.assertTrue(True)
+
+
 
 
 if __name__ == '__main__':

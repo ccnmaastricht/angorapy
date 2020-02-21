@@ -1,13 +1,15 @@
 docs/analysis/*
 MUJOCO_LOG.TXT
 
-monitor/experiments/
+monitor/static/experiments/
 storage/*
 
 analysis/monitor/experiments/
 analysis/storage/
 
 docs/monitor/experiments/
+docs/benchmarks/backup/*
+docs/benchmarks/*.pdf
 docs/storage/
 
 

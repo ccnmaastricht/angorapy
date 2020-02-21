@@ -35,8 +35,7 @@ class Flipflopper:
 
     '''
 
-    def __init__(self, rnn_type: str = 'vanilla', n_hidden: int = 24,
-                 recurrentweights=None):
+    def __init__(self, rnn_type: str = 'vanilla', n_hidden: int = 24):
 
         self.hps = {'rnn_type': rnn_type,
                     'n_hidden': n_hidden,
@@ -48,10 +47,10 @@ class Flipflopper:
                          'p_flip': 0.3}
         self.verbose = self.hps['verbose']
         # data_hps may be changed but are recommended to remain at their default values
-        self.model = self._build_model(recurrentweights)
+        self.model, self.weights = self._build_model()
         self.rng = npr.RandomState(125)
 
-    def _build_model(self, recurrentweights):
+    def _build_model(self):
         '''Builds model that can be used to train the 3-Bit Flip-Flop task.
 
         Args:
@@ -61,7 +60,7 @@ class Flipflopper:
             None.'''
         n_hidden = self.hps['n_hidden']
         name = self.hps['model_name']
-        weights = self.build_pretrained_model(recurrentweights)
+        # weights = self.build_pretrained_model(recurrentweights)
         n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
 
         inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
@@ -79,39 +78,18 @@ class Flipflopper:
 
         x = tf.keras.layers.Dense(3)(x)
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
-        model.get_layer(self.hps['rnn_type']).set_weights(weights)
+        weights = model.get_layer(self.hps['rnn_type']).get_weights()
         if self.verbose:
             model.summary()
 
-        return model
+        return model, weights
 
     def build_pretrained_model(self, recurrentweights):
-        n_hidden = self.hps['n_hidden']
 
-        n_bits = self.data_hps['n_bits']
-
-        inputweights = np.random.randn(n_bits, n_hidden) * 1e-03
-        recurrentbias = np.random.randn(n_hidden) * 1e-03
+        inputweights = self.weights[0]
+        recurrentbias = self.weights[2]
 
         return [inputweights, recurrentweights, recurrentbias]
-
-    def train_pretrained_model(self, stim, recurrentweights):
-        inputs = stim['inputs']
-        output = stim['output']
-
-        inputweights, outputweights, outputbias, recurrentweights, recurrentbias = self.build_pretrained_model(recurrentweights)
-
-        h_recurrent = np.zeros(n_hidden)
-        # forward pass
-        h_recurrent = np.matmul(np.tanh(h_recurrent), recurrentweights) + np.matmul(inputs, inputweights) + recurrentbias
-
-        h_out = np.matmul(h_recurrent, outputweights) + outputbias
-
-        error =np.square(np.subtract(output, h_out)).mean()
-
-        delta_out = output - h_out
-        d_outputweights = delta_out * h_out
-        d_outputbias = delta_out
 
     def pretrained_model(self, recurrentweights, fix):
 

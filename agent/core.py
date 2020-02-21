@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.signal import lfilter
 
-from utilities.const import NUMPY_FLOAT_PRECISION, DETERMINISTIC, DEBUG
+from utilities.const import NP_FLOAT_PREC, DETERMINISTIC, DEBUG
 
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):
@@ -61,7 +61,7 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
 def estimate_episode_advantages(rewards, values, gamma, lam):
     """Estimate advantage of a single episode (or part of it), taken from Open AI's spinning up repository."""
     deltas = np.array(rewards) + gamma * np.array(values[1:]) - np.array(values[:-1])
-    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(NUMPY_FLOAT_PRECISION)
+    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(NP_FLOAT_PREC)
 
 
 @tf.function

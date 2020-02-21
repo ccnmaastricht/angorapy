@@ -13,30 +13,32 @@ import numpy
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
-from matplotlib.axes import Axes
-from scipy.signal import savgol_filter
 
 from agent.ppo import PPOAgent
+from models import get_model_type
 from utilities import const
+from utilities.const import PATH_TO_EXPERIMENTS
 from utilities.util import parse_state, add_state_dims, flatten
+from utilities.wrappers import RewardNormalizationWrapper, StateNormalizationWrapper
 
-PATH_TO_EXPERIMENTS = "monitor/experiments/"
 matplotlib.use('Agg')
 
 
 def scale(vector):
     """Min Max scale a vector."""
     divisor = max(vector) - min(vector)
-    return (numpy.array(vector) - min(vector)) / (divisor if divisor != 0 else const.EPS)
+    return (numpy.array(vector) - min(vector)) / (divisor if divisor != 0 else const.EPSILON)
 
 
 class Monitor:
-    """Monitor for learning progress."""
+    """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None, config_name: str = "unknown"):
         self.agent = agent
         self.env = env
         self.iterations = iterations
+
+        self.config_name = config_name
 
         self.frequency = frequency
         self.gif_every = gif_every
@@ -65,8 +67,8 @@ class Monitor:
                                             **({"bs": 1} if "bs" in fargs(self.agent.model_builder).args else {}))
         pi.set_weights(self.agent.policy.get_weights())
 
-        for i in range(n):
-            episode_letter = chr(97 + i)
+        for j in range(n):
+            episode_letter = chr(97 + j)
 
             # collect an episode
             done = False
@@ -101,6 +103,8 @@ class Monitor:
         """Write meta data information about experiment into json file."""
         metadata = dict(
             date=str(datetime.datetime.now()),
+            config=self.config_name,
+            iterations=self.iterations,
             environment=dict(
                 name=self.agent.env_name,
                 action_space=str(self.agent.env.action_space),
@@ -108,19 +112,25 @@ class Monitor:
                 deterministic=str(self.agent.env.spec.nondeterministic),
                 max_steps=str(self.agent.env.spec.max_episode_steps),
                 reward_threshold=str(self.agent.env.spec.reward_threshold),
+                max_action_values=str(self.agent.env.action_space.high) if hasattr(self.agent.env.action_space, "high") else "None",
+                min_action_values=str(self.agent.env.action_space.low) if hasattr(self.agent.env.action_space, "low") else "None",
             ),
             hyperparameters=dict(
                 continuous=str(self.agent.continuous_control),
+                distribution=self.agent.distribution.short_name,
+                model=get_model_type(self.agent.model_builder),
                 learning_rate=str(self.agent.learning_rate),
                 epsilon_clip=str(self.agent.clip),
                 entropy_coefficient=str(self.agent.c_entropy.numpy().item()),
                 value_coefficient=str(self.agent.c_value.numpy().item()),
                 horizon=str(self.agent.horizon),
-                workers=str(self.agent.workers),
+                workers=str(self.agent.n_workers),
                 discount=str(self.agent.discount),
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
+                reward_norming=str(RewardNormalizationWrapper in self.agent.preprocessor),
+                state_norming=str(StateNormalizationWrapper in self.agent.preprocessor),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
             )
         )
@@ -131,89 +141,23 @@ class Monitor:
     def write_progress(self):
         """Write training statistics into json file."""
         progress = dict(
-            rewards=self.agent.cycle_reward_history,
-            lengths=self.agent.cycle_length_history,
-            entropies=self.agent.entropy_history
+            rewards=dict(
+                mean=[round(v, 2) for v in self.agent.cycle_reward_history],
+                stdev=[round(v, 2) for v in self.agent.cycle_reward_std_history],
+                last_cycle=self.agent.episode_reward_history[-1] if self.agent.iteration > 1 else []),
+            lengths=dict(
+                mean=[round(v, 2) for v in self.agent.cycle_length_history],
+                stdev=[round(v, 2) for v in self.agent.cycle_length_std_history],
+                last_cycle=self.agent.episode_length_history[-1] if self.agent.iteration > 1 else []),
+            entropies=[round(v, 4) for v in self.agent.entropy_history],
+            vloss=[round(v, 4) for v in self.agent.value_loss_history],
+            ploss=[round(v, 4) for v in self.agent.policy_loss_history],
+            preprocessors=self.agent.preprocessor_stat_history
         )
 
         with open(f"{self.story_directory}/progress.json", "w") as f:
             json.dump(progress, f)
 
-    def _make_graph(self, ax, lines, labels, name):
-        if self.iterations is not None:
-            ax.set_xbound(0, self.iterations)
-        ax.set_title(ax.get_title(),
-                     fontdict={'fontsize': "large",
-                               'fontweight': "bold",
-                               'verticalalignment': 'baseline',
-                               'horizontalalignment': "center"}
-                     )
-        ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15),
-                  fancybox=True, shadow=True, ncol=5)
-        plt.savefig(f"{self.story_directory}/{name}.svg", format="svg", bbox_inches="tight")
-
-    def update_graphs(self):
-        """Update graphs."""
-
-        # reward plot
-        fig, ax = plt.subplots()
-        ax.set_title("Mean Rewards and Episode Lengths.")
-        ax.set_xlabel("Iteration (Cycle)")
-        ax.set_ylabel("Mean Episode Reward")
-        twin_ax = ax.twinx()
-        twin_ax.set_ylabel("Episode Steps")
-
-        # average lengths
-        l_line = twin_ax.plot(self.agent.cycle_length_history, "--", label="Episode Length", color="orange", alpha=0.3)
-        if len(self.agent.cycle_reward_history) > 11:
-            l_line = twin_ax.plot(savgol_filter(self.agent.cycle_length_history, 11, 3), color="orange",
-                                  label="Episode Length")
-
-        # average rewards
-        r_line = ax.plot(self.agent.cycle_reward_history, label="Average Reward", color="red", alpha=0.3, zorder=10)
-        if len(self.agent.cycle_reward_history) > 11:
-            r_line = ax.plot(savgol_filter(self.agent.cycle_reward_history, 11, 3), color="red", label="Average Reward")
-
-        if self.agent.env.spec.reward_threshold is not None:
-            ax.axhline(self.agent.env.spec.reward_threshold, color="green", linestyle="dashed", lw=1)
-
-        lines = l_line + r_line
-        labels = [l.get_label() for l in lines]
-
-        self._make_graph(ax, lines, labels, "reward_plot")
-        plt.close(fig)
-
-        # entropy, loss plot
-        fig, ax = plt.subplots()
-        ax: Axes
-        ax.set_title("Entropy and Loss.")
-        ax.set_xlabel("Epoch")
-        ax.set_ylabel("Loss")
-        twin_ax = ax.twinx()
-        twin_ax.set_ylabel("Entropy")
-
-        policy_loss_line = ax.plot(scale(self.agent.policy_loss_history), label="Policy Loss (Normalized)", alpha=0.3)
-        if len(self.agent.policy_loss_history) > 11:
-            policy_loss_line = ax.plot(savgol_filter(scale(self.agent.policy_loss_history), 11, 3),
-                                       color=policy_loss_line[-1].get_color(), label="Policy Loss (Normalized)")
-
-        value_loss_line = ax.plot(scale(self.agent.value_loss_history), label="Value Loss (Normalized)", alpha=0.3)
-        if len(self.agent.value_loss_history) > 11:
-            value_loss_line = ax.plot(savgol_filter(scale(self.agent.value_loss_history), 11, 3),
-                                      color=value_loss_line[-1].get_color(), label="Value Loss (Normalized)")
-
-        entropy_line = twin_ax.plot(self.agent.entropy_history, label="Entropy", color="green", alpha=0.3)
-        if len(self.agent.entropy_history) > 11:
-            entropy_line = ax.plot(savgol_filter(scale(self.agent.entropy_history), 11, 3),
-                                   color=entropy_line[-1].get_color(), label="Entropy")
-
-        lines = policy_loss_line + value_loss_line + entropy_line
-        labels = [l.get_label() for l in lines]
-
-        self._make_graph(ax, lines, labels, "loss_plot")
-        plt.close(fig)
-
     def update(self):
         """Update different components of the Monitor."""
         self.write_progress()
-        self.update_graphs()
