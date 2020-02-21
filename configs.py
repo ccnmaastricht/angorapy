@@ -152,6 +152,8 @@ roboschool = make_config(
                                 # statistics towards failing episodes
 )
 
+roboschool_beta = derive_config(roboschool, {"distribution": "beta"})
+
 # HAND ENVS
 
 hand = make_config(

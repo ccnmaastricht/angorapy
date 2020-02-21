@@ -332,7 +332,7 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # run simulations in parallel
-            flat_print("Gathering...")
+            flat_print(f"Gathering cycle {self.iteration}...")
 
             # export the current state of the policy and value network under unique (-enough) key
             if export:
@@ -386,18 +386,15 @@ class PPOAgent:
             # make seperate evaluation if necessary and wanted
             stats_with_evaluation = stats
             if separate_eval:
-                if not radical_evaluation and not stats.numb_completed_episodes < MIN_STAT_EPS:
-                    # we do not want to do it radically, and have enough episodes already
-                    continue
+                if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
+                    flat_print("Evaluating...")
+                    n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
+                    evaluation_stats = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
 
-                flat_print("Evaluating...")
-                n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
-                evaluation_stats = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
-
-                if radical_evaluation:
-                    stats_with_evaluation = evaluation_stats
-                else:
-                    stats_with_evaluation = condense_stats([stats, evaluation_stats])
+                    if radical_evaluation:
+                        stats_with_evaluation = evaluation_stats
+                    else:
+                        stats_with_evaluation = condense_stats([stats, evaluation_stats])
 
             elif stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
