@@ -66,11 +66,11 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
 
     W, U, b = weights[0], weights[1], weights[2]
 
-    W_i, W_f, W_c, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
+    W_i, W_c, W_f, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
                          W[:, 2 * n_hidden:3 * n_hidden], W[:, 3 * n_hidden:]
-    U_i, U_f, U_c, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
+    U_i, U_c, U_f, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
                          U[:, 2 * n_hidden:3 * n_hidden], U[:, 3 * n_hidden:]
-    b_i, b_f, b_c, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
+    b_i, b_c, b_f, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
                          b[2 * n_hidden:3 * n_hidden], b[3 * n_hidden:]
 
     f_projection_b = np.matmul(input, W_f) + b_f
@@ -81,12 +81,12 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
     f_fun = lambda x: sigmoid(np.matmul(x, U_f) + f_projection_b)
     i_fun = lambda x: sigmoid(np.matmul(x, U_i) + i_projection_b)
     o_fun = lambda x: sigmoid(np.matmul(x, U_o) + o_projection_b)
-    c_fun = lambda c, h: f_fun(h) * c + i_fun(h) * np.tanh((np.matmul(h, U_c) + c_projection_b)) - c
+    c_fun = lambda c, h: f_fun(h) * c + i_fun(h) * np.tanh((np.matmul(h, U_c) + c_projection_b))
 
     if method == 'joint':
         def fun(x):
             c, h = x[:, n_hidden:], x[:, :n_hidden]
-            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2), axis=1))
+            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h)) - h - c) ** 2), axis=1))
     elif method == 'sequential':
         def fun(x):
             c, h = x[n_hidden:], x[:n_hidden]
