@@ -2,7 +2,6 @@ import pickle
 
 from LSTM.fixedpointfinder import Adamfixedpointfinder
 from LSTM.three_bit_flip_flop import Flipflopper
-from LSTM.plot_utils import plot_fixed_points
 import autograd.numpy as np
 from LSTM.minimization import adam_weights_optimizer
 from LSTM.build_utils import build_rnn_ds
@@ -122,6 +121,7 @@ class Rnnconstructor():
                                          verbose=self.verbose)
 
         return weights
+
 
 plot_fixed_points(activations, fps, 2000, 2)
 reco = Rnnconstructor(fps)

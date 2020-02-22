@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import numpy.random as npr
 import matplotlib.pyplot as plt
-from utilities.model_management import build_sub_model_to
+from utilities.model_utils import build_sub_model_to
 from tensorflow.keras.models import load_model
 import os
 
@@ -41,8 +41,8 @@ class Flipflopper:
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 128,
-                         'n_time': 256,
+        self.data_hps = {'n_batch': 128*256,
+                         'n_time': 1,
                          'n_bits': 3,
                          'p_flip': 0.3}
         self.verbose = self.hps['verbose']
@@ -70,8 +70,8 @@ class Flipflopper:
         elif self.hps['rnn_type'] == 'gru':
             x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
-            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True,
-                                     return_state=True)(inputs)
+            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True,
+                                                       stateful=True, return_state=True)(inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])

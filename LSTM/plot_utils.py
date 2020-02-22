@@ -54,7 +54,7 @@ def plot_fixed_points(activations, fps, n_points, scale):
             # trace = np.matrix.trace(fp['jac'])
             # det = np.linalg.det(fp['jac'])
             e_val, e_vecs = np.linalg.eig(fp['jac'])
-            ids = np.argwhere(np.real(e_val) > 0)
+            # ids = np.argwhere(np.real(e_val) > 0)
             countgreaterzero = np.sum(e_val > 0)
             if countgreaterzero == 0:
                 print('stable fixed point was found.')
@@ -62,17 +62,14 @@ def plot_fixed_points(activations, fps, n_points, scale):
             elif countgreaterzero > 0:
                 print('saddle point was found.')
                 fp['fp_stability'] = 'saddle point'
-                for id in ids:
-                    x_plus = fp['x'] + scale * e_val[id] * np.real(e_vecs[:, id].transpose())
-                    x_minus = fp['x'] - scale * e_val[id] * np.real(e_vecs[:, id].transpose())
-                    x_direction = np.vstack((x_plus, fp['x'], x_minus))
-                    x_directions.append(np.real(x_direction))
-
+                #for id in ids:
+                    #x_plus = fp['x'] + scale * e_val[id] * np.real(e_vecs[:, id].transpose())
+                    #x_minus = fp['x'] - scale * e_val[id] * np.real(e_vecs[:, id].transpose())
+                    #x_direction = np.vstack((x_plus, fp['x'], x_minus))
+                    #x_directions.append(np.real(x_direction))
 
         return fps, x_directions
 
-    # def compute_unstable_modes(self):
-      # pass
     fps, x_directions = classify_fixedpoints(fps, scale)
 
     fixedpoints = extract_fixed_point_locations(fps)

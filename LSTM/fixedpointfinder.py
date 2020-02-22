@@ -4,8 +4,8 @@ import numpy as np
 import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
-from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds, build_lstm_c_ds
-from LSTM.minimization import adam_optimizer, adam_maximizer
+from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
+from LSTM.minimization import adam_optimizer
 
 
 
@@ -86,7 +86,9 @@ class FixedPointFinder(object):
 
             sampled_inputs: numpy array of sampled inputs. Will have dimensions
             [n_init x n_units]."""
-
+        if self.rnn_type == 'lstm':
+            activations = np.hstack((activations[1], activations[2]))
+            inputs = np.concatenate(inputs, axis=0)
         if len(activations.shape) == 3:
             activations = np.vstack(activations)
             inputs = np.vstack(inputs)
@@ -184,9 +186,7 @@ class FixedPointFinder(object):
         elif self.rnn_type == 'gru':
             func, _ = build_gru_ds(self.weights, self.n_hidden, input, 'velocity')
         elif self.rnn_type == 'lstm':
-            c = activations[:, self.n_hidden:]
-            activations = activations[:, :self.n_hidden]
-            func, _ = build_lstm_c_ds(self.weights, input, self.n_hidden, c, 'velocity')
+            func, _ = build_lstm_ds(self.weights, input, self.n_hidden, 'velocity')
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
@@ -281,14 +281,14 @@ class FixedPointFinder(object):
             elif self.rnn_type == 'gru':
                 fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, fp['input_init'], 'sequential')
             elif self.rnn_type == 'lstm':
-                pass
-                #fun, jac_fun = build_lstm_c_ds(self.weights, fp['input_init'], self.n_hidden, c[k, :], 'sequential')
+                fun, jac_fun = build_lstm_ds(self.weights, fp['input_init'], self.n_hidden, 'sequential')
             else:
                 raise ValueError('Hyperparameter rnn_type must be one of'
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-
-            fp['jac'] = jac_fun(fp['x'])
+            fp['jac'] = jac_fun(fp['x'][:self.n_hidden], fp['x'][self.n_hidden:])
+            if self.rnn_type == 'lstm':
+                fp['jac'] = fp['jac']
             k += 1
 
         return fixedpoints
@@ -419,9 +419,7 @@ class Adamfixedpointfinder(FixedPointFinder):
         elif self.rnn_type == 'gru':
             fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, self.method)
         elif self.rnn_type == 'lstm':
-            c = x0[:, self.n_hidden:]
-            x0 = x0[:, :self.n_hidden]
-            fun, jac_fun = build_lstm_c_ds(self.weights, inputs, self.n_hidden, c, self.method)
+            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.method)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
@@ -435,8 +433,8 @@ class Adamfixedpointfinder(FixedPointFinder):
                              agnc_decayr=self.agnc_decayr,
                              verbose=self.verbose)
 
-        #if self.rnn_type == 'lstm':
-        #    fun, _ = build_lstm_c_ds(self.weights, inputs, self.n_hidden, c, 'sequential')
+        if self.rnn_type == 'lstm':
+            fun, _ = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
 # TODO: need better handling of c .. when evaluating single function it has to be a vector too
         fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
 

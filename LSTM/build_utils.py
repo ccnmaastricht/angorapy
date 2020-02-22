@@ -58,51 +58,8 @@ def build_gru_ds(weights, n_hidden, input, method: str = 'joint'):
 
     return fun, jac_fun
 
+
 def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
-    def sigmoid(x):
-        return 1 / (1 + np.exp(-x))
-
-    W, U, b = weights[0], weights[1], weights[2]
-
-    W_i, W_f, W_c, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
-                         W[:, 2 * n_hidden:3 * n_hidden], W[:, 3 * n_hidden:4 * n_hidden]
-    U_i, U_f, U_c, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
-                         U[:, 2 * n_hidden:3 * n_hidden], U[:, 3 * n_hidden:4 * n_hidden]
-    b_i, b_f, b_c, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
-                         b[2 * n_hidden:3 * n_hidden], b[3 * n_hidden:4 * n_hidden]
-    f_fun = lambda x: sigmoid(np.matmul(input, W_f) + np.matmul(x, U_f) + b_f)
-    i_fun = lambda x: sigmoid(np.matmul(input, W_i) + np.matmul(x, U_i) + b_i)
-    o_fun = lambda x: sigmoid(np.matmul(input, W_o) + np.matmul(x, U_o) + b_o)
-    c_fun = lambda x: f_fun(x[:n_hidden]) * x[n_hidden:] + i_fun(x[:n_hidden]) * \
-                         np.tanh((np.matmul(input, W_c) + np.matmul(x[:n_hidden], U_c) + b_c) - x[n_hidden:])
-    # perhaps put h and c in as one object to minimize and split up in functions
-    if method == 'joint':
-        c_fun = lambda x: f_fun(x[:, :n_hidden]) * x[:, n_hidden:] + i_fun(x[:, :n_hidden]) * \
-                          np.tanh((np.matmul(input, W_c) + np.matmul(x[:, :n_hidden], U_c) + b_c) - x[:, n_hidden:])
-        def fun(x):
-            return np.mean(0.5 * np.sum(((o_fun(x[:, :n_hidden]) * np.tanh(c_fun(x)) - x[:, :n_hidden]) ** 2), axis=1))
-    elif method == 'sequential':
-        def fun(x):
-            return 0.5 * np.sum((o_fun(x[:n_hidden]) * np.tanh(c_fun(x)) - x[:n_hidden]) ** 2)
-    elif method == 'velocity':
-        def fun(x):
-            c_fun = lambda x: f_fun(x[:, :n_hidden]) * x[:, n_hidden:] + i_fun(x[:, :n_hidden]) * \
-                              np.tanh((np.matmul(input, W_c) + np.matmul(x[:, :n_hidden], U_c) + b_c) - x[:, n_hidden:])
-            return 0.5 * np.sum(((o_fun(x[:, :n_hidden]) * np.tanh(c_fun(x)) - x[:, :n_hidden]) ** 2), axis=1)
-    else:
-        raise ValueError('Method argument to build function must be one of '
-                         '[joint, sequential, velocity] but was', method)
-    def dynamical_system(h, c):
-        # h, c = x[:n_hidden], x[n_hidden:]
-        c_fun = lambda h, c: f_fun(h) * c + i_fun(h) * \
-                          np.tanh((np.matmul(input, W_c) + np.matmul(h, U_c) + b_c) - c)
-        return o_fun(h) * np.tanh(c_fun(h, c)) - c
-    jac_fun = nd.Jacobian(dynamical_system)
-
-    return fun, jac_fun
-
-
-def build_lstm_c_ds(weights, input, n_hidden, c, method: str = 'joint'):
 
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
@@ -110,11 +67,11 @@ def build_lstm_c_ds(weights, input, n_hidden, c, method: str = 'joint'):
     W, U, b = weights[0], weights[1], weights[2]
 
     W_i, W_f, W_c, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
-                         W[:, 2 * n_hidden:3 * n_hidden], W[:, 3 * n_hidden:4 * n_hidden]
+                         W[:, 2 * n_hidden:3 * n_hidden], W[:, 3 * n_hidden:]
     U_i, U_f, U_c, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
-                         U[:, 2 * n_hidden:3 * n_hidden], U[:, 3 * n_hidden:4 * n_hidden]
+                         U[:, 2 * n_hidden:3 * n_hidden], U[:, 3 * n_hidden:]
     b_i, b_f, b_c, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
-                         b[2 * n_hidden:3 * n_hidden], b[3 * n_hidden:4 * n_hidden]
+                         b[2 * n_hidden:3 * n_hidden], b[3 * n_hidden:]
 
     f_projection_b = np.matmul(input, W_f) + b_f
     i_projection_b = np.matmul(input, W_i) + b_i
@@ -124,23 +81,27 @@ def build_lstm_c_ds(weights, input, n_hidden, c, method: str = 'joint'):
     f_fun = lambda x: sigmoid(np.matmul(x, U_f) + f_projection_b)
     i_fun = lambda x: sigmoid(np.matmul(x, U_i) + i_projection_b)
     o_fun = lambda x: sigmoid(np.matmul(x, U_o) + o_projection_b)
-    c_fun = lambda x: f_fun(x) * c + i_fun(x) * np.tanh((np.matmul(x, U_c) + c_projection_b))
+    c_fun = lambda c, h: f_fun(h) * c + i_fun(h) * np.tanh((np.matmul(h, U_c) + c_projection_b)) - c
 
     if method == 'joint':
         def fun(x):
-            return np.mean(0.5 * np.sum(((o_fun(x) * np.tanh(c_fun(x)) - x) ** 2), axis=1))
+            c, h = x[:, n_hidden:], x[:, :n_hidden]
+            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2), axis=1))
     elif method == 'sequential':
         def fun(x):
-            return 0.5 * np.sum((o_fun(x) * np.tanh(c_fun(x)) - x) ** 2)
+            c, h = x[n_hidden:], x[:n_hidden]
+            return 0.5 * np.sum((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2)
     elif method == 'velocity':
         def fun(x):
-            return 0.5 * np.sum(((o_fun(x) * np.tanh(c_fun(x)) - x) ** 2), axis=1)
+            c, h = x[:, n_hidden:], x[:, :n_hidden]
+            return 0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h))) ** 2), axis=1)
     else:
         raise ValueError('Method argument to build function must be one of '
                          '[joint, sequential, velocity] but was', method)
 
-    def dynamical_system(x):
-        return (o_fun(x) * np.tanh(c_fun(x)) - x)
+    def dynamical_system(h, c):
+        return o_fun(h) * np.tanh(c_fun(c, h)) - h
+
     jac_fun = nd.Jacobian(dynamical_system)
 
     return fun, jac_fun
