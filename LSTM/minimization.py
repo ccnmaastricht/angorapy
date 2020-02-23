@@ -98,7 +98,7 @@ def adam_lstm(fun, x0,
         return initial_clip * (1.0 / (1.0 + decay * iteration))
 
     beta_1, beta_2 = 0.9, 0.999
-    eps = 1e-08
+    eps = 1e-07
     m, v = np.zeros(x0.shape), np.zeros(x0.shape)
     for t in range(max_iter):
         q = fun(x0)

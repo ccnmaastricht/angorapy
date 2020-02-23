@@ -122,18 +122,11 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
         raise ValueError('Method argument to build function must be one of '
                          '[joint, sequential, velocity] but was', method)
 
-    def h_dynamical_system(x):
-        c, h = x[n_hidden:], x[:n_hidden]
-        return o_fun(h) * np.tanh(c_fun(c, h)) - h
-    def j_dynamical_system(x):
-        c, h = x[n_hidden:], x[:n_hidden]
-        return c_fun(c, h) - c
+    def dynamical_system(x):
+        return np.hstack((h_fun(x), cfun(x))) - x
 
+    jac_fun = nd.Jacobian(dynamical_system)
 
-
-    h_jac_fun = nd.Jacobian(h_dynamical_system)
-    c_jac_fun = nd.Jacobian(j_dynamical_system)
-
-    return fun, h_jac_fun, c_jac_fun
+    return fun, jac_fun
 
 
