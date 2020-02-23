@@ -5,7 +5,7 @@ import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
 from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
-from LSTM.minimization import adam_optimizer
+from LSTM.minimization import adam_optimizer, adam_lstm
 
 
 
@@ -264,6 +264,21 @@ class FixedPointFinder(object):
 
         return fixedpoints
 
+    @staticmethod
+    def _creat_lstm_fixedpoint(h_fun, c_fun, fps, x0, inputs):
+        fixedpoints = []
+        k = 0
+        for fp in fps:
+
+            fixedpointobject = {'fun': np.min((h_fun(fp), c_fun(fp))),
+                              'x': fp,
+                              'x_init': x0[k, :],
+                              'input_init': inputs[k, :]}
+            fixedpoints.append(fixedpointobject)
+            k += 1
+
+        return fixedpoints
+
     def _compute_jacobian(self, fixedpoints):
         """Computes jacobians of fixedpoints. It is a linearization around the fixedpoint
         in all dimensions.
@@ -281,14 +296,16 @@ class FixedPointFinder(object):
             elif self.rnn_type == 'gru':
                 fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, fp['input_init'], 'sequential')
             elif self.rnn_type == 'lstm':
-                fun, jac_fun = build_lstm_ds(self.weights, fp['input_init'], self.n_hidden, 'sequential')
+                h_fun, c_fun, h_jac_fun, c_jac_fun = build_lstm_ds(self.weights, fp['input_init'],
+                                                                   self.n_hidden, 'sequential')
             else:
                 raise ValueError('Hyperparameter rnn_type must be one of'
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
-
-            fp['jac'] = jac_fun(fp['x'][:self.n_hidden], fp['x'][self.n_hidden:])
+            fp['jac'] = jac_fun(fp['x'])
             if self.rnn_type == 'lstm':
-                fp['jac'] = fp['jac']
+                h_jac = h_jac_fun(fp['x'])
+                c_jac = c_jac_fun(fp['x'])
+                fp['jac'] = np.vstack((h_jac, c_jac))
             k += 1
 
         return fixedpoints
@@ -395,7 +412,7 @@ class Adamfixedpointfinder(FixedPointFinder):
 
         good_fps, bad_fps = self._handle_bad_approximations(fixedpoints)
         unique_fps = self._find_unique_fixed_points(good_fps)
-        c = x0[:, self.n_hidden:]
+
         unique_fps = self._compute_jacobian(unique_fps)
 
         return unique_fps
@@ -419,24 +436,36 @@ class Adamfixedpointfinder(FixedPointFinder):
         elif self.rnn_type == 'gru':
             fun, jac_fun = build_gru_ds(self.weights, self.n_hidden, inputs, self.method)
         elif self.rnn_type == 'lstm':
-            fun, jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.method)
+            h_fun, c_fun, h_jac_fun, c_jac_fun = build_lstm_ds(self.weights, inputs, self.n_hidden, self.method)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-        fps = adam_optimizer(fun, x0,
-                             epsilon=self.epsilon,
-                             alr_decayr=self.alr_decayr,
-                             max_iter=self.max_iters,
-                             print_every=self.print_every,
-                             init_agnc=self.agnc_normclip,
-                             agnc_decayr=self.agnc_decayr,
-                             verbose=self.verbose)
+
 
         if self.rnn_type == 'lstm':
-            fun, _ = build_lstm_ds(self.weights, inputs, self.n_hidden, 'sequential')
-# TODO: need better handling of c .. when evaluating single function it has to be a vector too
-        fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
+            fps = adam_lstm(h_fun, c_fun, x0,
+                                 epsilon=self.epsilon,
+                                 alr_decayr=self.alr_decayr,
+                                 max_iter=self.max_iters,
+                                 print_every=self.print_every,
+                                 init_agnc=self.agnc_normclip,
+                                 agnc_decayr=self.agnc_decayr,
+                                 verbose=self.verbose)
+            h_fun, c_fun, h_jac_fun, c_jac_fun = build_lstm_ds(self.weights, inputs,
+                                                               self.n_hidden, 'sequential')
+            fixedpoints = self._creat_lstm_fixedpoint(h_fun, c_fun, fps, x0, inputs)
+        else:
+            fps = adam_optimizer(fun, x0,
+                                 epsilon=self.epsilon,
+                                 alr_decayr=self.alr_decayr,
+                                 max_iter=self.max_iters,
+                                 print_every=self.print_every,
+                                 init_agnc=self.agnc_normclip,
+                                 agnc_decayr=self.agnc_decayr,
+                                 verbose=self.verbose)
+
+            fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
 
         return fixedpoints
 

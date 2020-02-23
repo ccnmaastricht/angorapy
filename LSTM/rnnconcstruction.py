@@ -78,11 +78,6 @@ class Rnnconstructor():
 
         self.verbose = True
 
-        self.fun_val = np.empty(len(fps))
-        for i in range(len(fps)):
-            self.fun_val[i] = fps[i]['fun']
-        self.mean_velocity = np.mean(self.fun_val)
-
     def build_model(self, fps):
 
         def create_target(fps):
@@ -111,7 +106,7 @@ class Rnnconstructor():
         #vals, vecs = np.linalg.eig(P)
         #weights = vecs[:, 0:p] * 1e-03
 
-        weights = adam_weights_optimizer(fun, weights, self.mean_velocity,
+        weights = adam_weights_optimizer(fun, weights, 0,
                                          epsilon=self.epsilon,
                                          alr_decayr=self.alr_decayr,
                                          max_iter=self.max_iters,
@@ -153,7 +148,7 @@ for i in range(len(fps)):
 plot_fixed_points(activations, fph, 2000, 4)
 
 
-retrained_history = flopper.train_pretrained(stim, 1000, recurrentweights, True)
+retrained_history = flopper.train_pretrained(stim, 1000, recurrentweights, False)
 # retrained_fixed = flopper.train_pretrained(stim, 1000, recurrentweights, False)
 
 history = pickle.load(open('firsttrainhistory', "rb"))

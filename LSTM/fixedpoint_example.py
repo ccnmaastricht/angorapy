@@ -29,85 +29,82 @@ flopper.load_model()
 # Initialize fpf and find fixed points
 ############################################################
 # get weights and activations of trained model
-random_seed = 123
-rng = np.random.RandomState(random_seed)
-
+#random_seed = 123
+#rng = np.random.RandomState(random_seed)
+#n = 1024
 weights = flopper.model.get_layer(flopper.hps['rnn_type']).get_weights()
 activations = flopper.get_activations(stim)
-activations = np.hstack(activations[1:])
-states = activations + 0.1 * rng.randn(*activations.shape)
+#activations = np.hstack(activations[1:])
+#states = activations + 0.1 * rng.randn(*activations.shape)
 # lstmcell = build_sub_model_to(flopper.model, [flopper.hps['rnn_type']])
-init_c_h = states
+#init_c_h = states
 # input = np.vstack(stim['inputs'][:20, :, :])
-input = np.zeros((2, 3))
-c = init_c_h[0:2, n_hidden:]  # [n_batch x n_dims]
-h = init_c_h[0:2, :n_hidden]  # [n_batch x n_dims]
+#input = np.zeros((n, 3))
+#c = init_c_h[0:n, n_hidden:]  # [n_batch x n_dims]
+#h = init_c_h[0:n, :n_hidden]  # [n_batch x n_dims]
 
-lstmcell = tf.keras.layers.LSTMCell(n_hidden)
+#lstmcell = tf.keras.layers.LSTMCell(n_hidden)
 
-inputs = tf.constant(input, dtype='float32')
+#inputs = tf.constant(input, dtype='float32')
 
-tuple = tf.Variable([tf.convert_to_tensor(h), tf.convert_to_tensor(c)],
-                    dtype='float32')
+#tuple = tf.Variable([tf.convert_to_tensor(h), tf.convert_to_tensor(c)],
+                 #   dtype='float32')
 
-output, next_state = lstmcell(inputs, tuple)
-lstmcell.set_weights(weights)
-lstmcell.trainable = False
-tuple = tf.reshape(tuple, [2, 2*n_hidden])
-F = tf.concat((next_state[0], next_state[1]), axis=1)
-q = 0.5 * tf.reduce_sum(tf.square(F - tuple), axis=1)
-q_scalar = tf.reduce_mean(q)
-with tf.compat.v1.Session() as sess:
-    q_scalar = sess.run(tuple)
+#output, next_state = lstmcell(inputs, tuple)
+#lstmcell.set_weights(weights)
+#lstmcell.trainable = False
+# tuple = tf.reshape(tuple, [2, 2*n_hidden])
+# F = tf.concat((next_state[0], next_state[1]), axis=1)
 
-optimizer = tf.keras.optimizers.Adam()
-for i in range(5000):
-    with tf.GradientTape() as tape:
-        q = 0.5 * tf.reduce_sum(tf.square(F - tuple), axis=1)
-        q_scalar = tf.reduce_mean(q)
+#optimizer = tf.keras.optimizers.Adam(0.001)
+#for i in range(5000):
+#    with tf.GradientTape() as tape:
+ #       q = 0.5 * tf.reduce_sum(tf.square(next_state - tuple), axis=1)
+ #       q_scalar = tf.reduce_mean(q)
+ #       gradients = tape.gradient(q_scalar, [tuple])
+ #   optimizer.apply_gradients(zip(gradients, [tuple]))
 
-        gradients = tape.gradient(q_scalar, [tuple])
-    optimizer.apply_gradients(zip(gradients, [tuple]))
-
-# print(q_scalar.numpy(), q.numpy())
+  #  print(q_scalar.numpy())
+  #  print(tf.reduce_mean(tuple))
+#jac = tape.jacobian(q, [tuple])
 # initialize adam fpf
-#fpf = Adamfixedpointfinder(weights, rnn_type,
-  #                         q_threshold=1e-06,
-  #                         epsilon=0.001,
-  #                         alr_decayr=0.0001,
-  #                         max_iters=5000)
+fpf = Adamfixedpointfinder(weights, rnn_type,
+                           q_threshold=1e-01,
+                           epsilon=0.001,
+                           alr_decayr=0.0001,
+                           max_iters=5000)
 # sample states, i.e. a number of ICs
-#states = fpf.sample_states(activations, 24, 0.5)
+states = fpf.sample_states(activations, 24, 0.5)
 # vel = fpf.compute_velocities(np.hstack(activations[1:]), np.zeros((32768, 3)))
 # generate corresponding input as zeros for flip flop task
 # please keep in mind that the input does not need to be zero for all tasks
-#inputs = np.zeros((states.shape[0], 3))
+inputs = np.zeros((states.shape[0], 3))
 # find fixed points
-#fps = fpf.find_fixed_points(states, inputs)
+fps = fpf.find_fixed_points(states, inputs)
 # plot fixed points and state trajectories in 3D
-#if rnn_type == 'lstm':
-#    activations = np.hstack(activations[1:])
-#plot_fixed_points(activations, fps, 3000, 4)
+if rnn_type == 'lstm':
+    activations = np.hstack(activations[1:])
+plot_fixed_points(activations, fps, 3000, 4)
 
 import sklearn.decomposition as skld
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 # q_true = q.numpy() < 1e-12
 
-n_points = 2000
-pca = skld.PCA(3)
-pca.fit(activations)
-X_pca = pca.transform(activations)
-new_pca = pca.transform(np.concatenate(tuple.numpy(), axis=1))
+#n_points = 10000
+#pca = skld.PCA(3)
+#pca.fit(activations)
+#X_pca = pca.transform(activations)
+#new_pca = pca.transform(np.concatenate(tuple.numpy(), axis=1))
 
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-ax.plot(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
-        linewidth=0.2)
+#fig = plt.figure()
+#ax = fig.add_subplot(projection='3d')
+#ax.plot(X_pca[:n_points, 0], X_pca[:n_points, 1], X_pca[:n_points, 2],
+  #      linewidth=0.2)
 
-ax.scatter(new_pca[:, 0], new_pca[:, 1], new_pca[:, 2],
-           marker='.', s=30, c='k')
+#ax.scatter(new_pca[:, 0], new_pca[:, 1], new_pca[:, 2],
+ #          marker='.', s=30, c='k')
 
-ax.set_xlabel('PC1')
-ax.set_ylabel('PC2')
-ax.set_zlabel('PC3')
-plt.show()
+#ax.set_xlabel('PC1')
+#ax.set_ylabel('PC2')
+#ax.set_zlabel('PC3')
+#plt.show()

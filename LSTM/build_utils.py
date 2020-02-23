@@ -66,11 +66,11 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
 
     W, U, b = weights[0], weights[1], weights[2]
 
-    W_i, W_c, W_f, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
+    W_i, W_f, W_c, W_o = W[:, :n_hidden], W[:, n_hidden:2 * n_hidden], \
                          W[:, 2 * n_hidden:3 * n_hidden], W[:, 3 * n_hidden:]
-    U_i, U_c, U_f, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
+    U_i, U_f, U_c, U_o = U[:, :n_hidden], U[:, n_hidden:2 * n_hidden], \
                          U[:, 2 * n_hidden:3 * n_hidden], U[:, 3 * n_hidden:]
-    b_i, b_c, b_f, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
+    b_i, b_f, b_c, b_o = b[:n_hidden], b[n_hidden:2 * n_hidden], \
                          b[2 * n_hidden:3 * n_hidden], b[3 * n_hidden:]
 
     f_projection_b = np.matmul(input, W_f) + b_f
@@ -84,26 +84,39 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
     c_fun = lambda c, h: f_fun(h) * c + i_fun(h) * np.tanh((np.matmul(h, U_c) + c_projection_b))
 
     if method == 'joint':
-        def fun(x):
+        def h_fun(x):
             c, h = x[:, n_hidden:], x[:, :n_hidden]
-            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h)) - h - c) ** 2), axis=1))
+            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2), axis=1))
+        def cfun(x):
+            c, h = x[:, n_hidden:], x[:, :n_hidden]
+            return np.mean(0.5 * np.sum(((c_fun(c, h) - c) ** 2), axis=1))
+
     elif method == 'sequential':
-        def fun(x):
+        def h_fun(x):
             c, h = x[n_hidden:], x[:n_hidden]
             return 0.5 * np.sum((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2)
+        def cfun(x):
+            c, h = x[n_hidden:], x[:n_hidden]
+            return 0.5 * np.sum((c_fun(c, h) - c) ** 2)
+
     elif method == 'velocity':
-        def fun(x):
+        def h_fun(x):
             c, h = x[:, n_hidden:], x[:, :n_hidden]
             return 0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h))) ** 2), axis=1)
     else:
         raise ValueError('Method argument to build function must be one of '
                          '[joint, sequential, velocity] but was', method)
 
-    def dynamical_system(h, c):
+    def h_dynamical_system(x):
+        c, h = x[n_hidden:], x[:n_hidden]
         return o_fun(h) * np.tanh(c_fun(c, h)) - h
+    def j_dynamical_system(x):
+        c, h = x[n_hidden:], x[:n_hidden]
+        return c_fun(c, h) - c
 
-    jac_fun = nd.Jacobian(dynamical_system)
+    h_jac_fun = nd.Jacobian(h_dynamical_system)
+    c_jac_fun = nd.Jacobian(j_dynamical_system)
 
-    return fun, jac_fun
+    return h_fun, cfun, h_jac_fun, c_jac_fun
 
 
