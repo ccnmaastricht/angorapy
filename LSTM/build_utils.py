@@ -86,23 +86,38 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
     if method == 'joint':
         def h_fun(x):
             c, h = x[:, n_hidden:], x[:, :n_hidden]
-            return np.mean(0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2), axis=1))
+            return o_fun(h) * np.tanh(c_fun(c, h))
+
         def cfun(x):
             c, h = x[:, n_hidden:], x[:, :n_hidden]
-            return np.mean(0.5 * np.sum(((c_fun(c, h) - c) ** 2), axis=1))
+            return c_fun(c, h)
+
+        def fun(x):
+            return np.mean(0.5 * np.sum(np.square(np.hstack((h_fun(x), cfun(x))) - x), axis=1))
 
     elif method == 'sequential':
         def h_fun(x):
             c, h = x[n_hidden:], x[:n_hidden]
-            return 0.5 * np.sum((o_fun(h) * np.tanh(c_fun(c, h)) - h) ** 2)
+            return o_fun(h) * np.tanh(c_fun(c, h))
+
         def cfun(x):
             c, h = x[n_hidden:], x[:n_hidden]
-            return 0.5 * np.sum((c_fun(c, h) - c) ** 2)
+            return c_fun(c, h)
+
+        def fun(x):
+            return 0.5 * np.sum(np.square(np.hstack((h_fun(x), cfun(x))) - x))
 
     elif method == 'velocity':
         def h_fun(x):
             c, h = x[:, n_hidden:], x[:, :n_hidden]
-            return 0.5 * np.sum(((o_fun(h) * np.tanh(c_fun(c, h))) ** 2), axis=1)
+            return o_fun(h) * np.tanh(c_fun(c, h))
+
+        def cfun(x):
+            c, h = x[:, n_hidden:], x[:, :n_hidden]
+            return c_fun(c, h)
+
+        def fun(x):
+            return 0.5 * np.sum(np.square(np.hstack((h_fun(x), cfun(x))) - x), axis=1)
     else:
         raise ValueError('Method argument to build function must be one of '
                          '[joint, sequential, velocity] but was', method)
@@ -114,9 +129,11 @@ def build_lstm_ds(weights, input, n_hidden, method: str = 'joint'):
         c, h = x[n_hidden:], x[:n_hidden]
         return c_fun(c, h) - c
 
+
+
     h_jac_fun = nd.Jacobian(h_dynamical_system)
     c_jac_fun = nd.Jacobian(j_dynamical_system)
 
-    return h_fun, cfun, h_jac_fun, c_jac_fun
+    return fun, h_jac_fun, c_jac_fun
 
 

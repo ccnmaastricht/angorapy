@@ -55,7 +55,7 @@ class Rnnconstructor():
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
                         'adam_hps': {'epsilon': 1e-03,
-                                     'max_iters': 50000,
+                                     'max_iters': 1000000,
                                      'method': 'joint',
                                      'print_every': 200}}
 

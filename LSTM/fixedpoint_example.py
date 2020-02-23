@@ -1,6 +1,6 @@
 from LSTM.fixedpointfinder import Adamfixedpointfinder
 from LSTM.three_bit_flip_flop import Flipflopper
-from LSTM.plot_utils import plot_fixed_points
+from LSTM.plot_utils import plot_fixed_points, plot_velocities
 import numpy as np
 import tensorflow as tf
 import os
@@ -69,22 +69,25 @@ activations = flopper.get_activations(stim)
 #jac = tape.jacobian(q, [tuple])
 # initialize adam fpf
 fpf = Adamfixedpointfinder(weights, rnn_type,
-                           q_threshold=1e-01,
+                           q_threshold=1e-05,
                            epsilon=0.001,
-                           alr_decayr=0.0001,
+                           alr_decayr=0.001,
                            max_iters=5000)
 # sample states, i.e. a number of ICs
-states = fpf.sample_states(activations, 24, 0.5)
-# vel = fpf.compute_velocities(np.hstack(activations[1:]), np.zeros((32768, 3)))
+states = fpf.sample_states(activations, 50, 0.5)
+vel = fpf.compute_velocities(np.hstack(activations[1:]), np.zeros((32768, 3)))
 # generate corresponding input as zeros for flip flop task
 # please keep in mind that the input does not need to be zero for all tasks
 inputs = np.zeros((states.shape[0], 3))
 # find fixed points
-fps = fpf.find_fixed_points(states, inputs)
+#fps = fpf.find_fixed_points(states, inputs)
 # plot fixed points and state trajectories in 3D
 if rnn_type == 'lstm':
-    activations = np.hstack(activations[1:])
-plot_fixed_points(activations, fps, 3000, 4)
+    activation = np.hstack(activations[1:])
+#plot_fixed_points(activation, fps, 3000, 4)
+plot_velocities(activation, vel, 3000)
+
+
 
 import sklearn.decomposition as skld
 #import matplotlib.pyplot as plt
