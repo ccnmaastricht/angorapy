@@ -28,14 +28,14 @@ gym.envs.register(
     id='HandReachDenseRelative-v0',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": True},
-    max_episode_steps=50,
+    max_episode_steps=100,
 )
 
 gym.envs.register(
     id='HandReachDenseAbsolute-v0',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": False},
-    max_episode_steps=50,
+    max_episode_steps=100,
 )
 
 # MODIFIED ENVIRONMENTS

@@ -23,6 +23,18 @@ function smooth(arr, windowSize, getter = (value) => value, setter) {
     return result
 }
 
+function addvector(a, b) {
+    return a.map((e, i) => parseFloat(e) + parseFloat(b[i]));
+}
+
+function subtractvector(a, b) {
+    return a.map((e, i) => parseFloat(e) - parseFloat(b[i]));
+}
+
+function sqrtvector(a) {
+    return a.map((e) => Math.sqrt(e));
+}
+
 // PROGRESS PLOTS
 reward_plot_div = document.getElementById('reward-plot');
 reward_boxplot_div = document.getElementById('reward-boxplot');
@@ -260,16 +272,49 @@ $.when(
     }, objective_layout), {responsive: true});
 
     // NORMALIZATION PLOTS
+    let norm_plot_x = _.range(_.size(prog["preprocessors"]["RewardNormalizationWrapper"]["mean"]))
     let rew_norm_traces = [];
     for (let i = 0; i < prog["preprocessors"]["RewardNormalizationWrapper"]["mean"][0].length; i++) {
         rew_norm_traces.push({
-            x: _.range(_.size(prog["preprocessors"]["RewardNormalizationWrapper"]["mean"])),
+            x: norm_plot_x,
             y: prog["preprocessors"]["RewardNormalizationWrapper"]["mean"].map(x => x[i]),
             mode: "lines",
             name: "Running Mean Reward",
             marker: {color: "Green"},
         });
     }
+
+    let weird_x = _.concat(
+        norm_plot_x,
+        _.reverse(_.range(_.size(prog["preprocessors"]["RewardNormalizationWrapper"]["mean"]))))
+
+    let upper_reward_bound = addvector(
+        prog["preprocessors"]["RewardNormalizationWrapper"]["mean"],
+        prog["preprocessors"]["RewardNormalizationWrapper"]["stdev"])
+
+    console.log(upper_reward_bound);
+
+    let lower_reward_bound = subtractvector(
+        prog["preprocessors"]["RewardNormalizationWrapper"]["mean"],
+        prog["preprocessors"]["RewardNormalizationWrapper"]["stdev"])
+
+    rew_norm_traces.push({
+        x: norm_plot_x,
+        y: lower_reward_bound,
+        line: {color: "transparent"},
+        showlegend: false,
+        type: "scatter"
+    })
+
+    rew_norm_traces.push({
+        x: norm_plot_x,
+        y: upper_reward_bound,
+        fill: "tonexty",
+        fillcolor: 'rgba(68, 68, 68, 0.1)',
+        line: {color: "transparent"},
+        showlegend: false,
+        type: "scatter"
+    })
 
     Plotly.newPlot(rew_norm_plot_div, rew_norm_traces, _.merge({
         title: "Reward Normalization",

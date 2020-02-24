@@ -239,6 +239,7 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
 # RELATED HAND TASKS
 
 class ShadowHandReach(HandReachEnv):
+    """Simpler Reaching task."""
 
     def __init__(self, distance_threshold=0.01, n_substeps=20, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', ):
@@ -248,7 +249,7 @@ class ShadowHandReach(HandReachEnv):
         r = super().compute_reward(achieved_goal, goal, info)
         if self._is_success(achieved_goal, desired_goal=goal):
             r += 10
-            print("REACHED")
+            print("SUCCESS!")
 
         return r
 

@@ -6,11 +6,13 @@ from typing import Union
 
 import argcomplete
 import matplotlib.pyplot as plt
+import numpy
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from models.convolutional import _build_visual_encoder, _build_visual_decoder
 from utilities.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
+from utilities.data_generation import gen_cube_quats_prediction_data
 
 
 def pretrain_on_reconstruction(pretrainable_component: Union[tf.keras.Model, str], epochs, name="pretrained_component"):
@@ -114,6 +116,46 @@ def pretrain_on_classification(pretrainable_component: Union[tf.keras.Model, str
     print(results)
 
 
+def pretrain_on_hands(pretrainable_component: Union[tf.keras.Model, str], epochs, name="pretrained_component"):
+    """Pretrain a visual component on the classification of images."""
+
+    # load datas
+    dataset = gen_cube_quats_prediction_data(10000)
+    # dataset = dataset.shuffle(1000)
+
+    test_data = dataset.take(1000).batch(128)
+    train_data = dataset.skip(1000).batch(128)
+
+    # model is constructed from visual component and regression output
+    model = tf.keras.Sequential((
+        pretrainable_component,
+        tf.keras.layers.Dense(7, activation="linear")
+    ))
+
+    if isinstance(pretrainable_component, tf.keras.Model):
+        checkpoint_path = PRETRAINED_COMPONENTS_PATH + "/ckpts/weights.ckpt"
+
+        # Create a callback that saves the model's weights
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                         save_weights_only=True,
+                                                         verbose=1)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        model.compile(optimizer, loss="mse", metrics=["mse"])
+
+        # train and save encoder
+        model.fit(train_data, epochs=epochs, callbacks=[cp_callback])
+        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
+    elif isinstance(pretrainable_component, str):
+        model.load_weights(pretrainable_component)
+    else:
+        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
+
+    # evaluate
+    results = model.evaluate(test_data)
+    print(results)
+
+
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -121,7 +163,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
 
     # general parameters
-    parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "c", "r"], default="c")
+    parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hands", "c", "r", "h"],
+                        default="c")
     parser.add_argument("--name", type=str, default="pretrained_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
@@ -139,5 +182,7 @@ if __name__ == "__main__":
         pretrain_on_classification(visual_component, args.epochs, name=args.name)
     elif args.task in ["reconstruct", "r"]:
         pretrain_on_reconstruction(visual_component, args.epochs, name=args.name)
+    elif args.task in ["hands", "h"]:
+        pretrain_on_hands(visual_component, args.epochs, name=args.name)
     else:
         raise ValueError("I dont know that task type.")

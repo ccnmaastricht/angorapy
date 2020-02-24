@@ -159,10 +159,10 @@ roboschool_beta = derive_config(roboschool, {"distribution": "beta"})
 hand = make_config(
     iterations=1000,
     workers=16,
-    batch_size=4096,
+    batch_size=256,
     horizon=512,
     c_entropy=0.01,
-    lr_pi=0.0003,
+    lr_pi=5e-4,
     lr_schedule="exponential",
     epochs=10,
     clip=0.2,
@@ -183,7 +183,7 @@ recommended_config = dict(
     **dict.fromkeys(
         ["CartPole-v2", "CartPole-v1"], discrete_no_norms
     ), **dict.fromkeys(
-        ["Acrobot-v1", "MountainCar-v0"], discrete
+        ["Acrobot-v1", "MountainCar-v0", "lunarLander-v2"], discrete
     ), **dict.fromkeys(
         ["Pendulum-v0"], pendulum_beta
     ), **dict.fromkeys(
@@ -193,5 +193,7 @@ recommended_config = dict(
          "Swimmer-v2", "Walker2d-v2"], mujoco_beta
     ), **dict.fromkeys(
         ["Reacher-v2"], mujoco
+    ), **dict.fromkeys(
+        ["Humanoid-v2", "HumanoidStandup-v2"], roboschool
     ),
 )

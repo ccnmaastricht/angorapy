@@ -23,15 +23,15 @@ start = time.time()
 agent = PPOAgent.from_agent_state(args.id, "b")
 print(f"Agent {args.id} successfully loaded.")
 
-lengths, rewards = agent.evaluate(args.n)
+stats = agent.evaluate(args.n)
 
-average_reward = round(statistics.mean(rewards), 2)
-average_length = round(statistics.mean(lengths), 2)
-std_reward = round(statistics.stdev(rewards), 2)
-std_length = round(statistics.stdev(lengths), 2)
+average_reward = round(statistics.mean(stats.episode_rewards), 2)
+average_length = round(statistics.mean(stats.episode_lengths), 2)
+std_reward = round(statistics.stdev(stats.episode_rewards), 2)
+std_length = round(statistics.stdev(stats.episode_lengths), 2)
 
 print(f"Evaluated agent on {agent.env_name} and achieved an average reward of {average_reward} [std: {std_reward}; "
-      f"between ({min(rewards)}, {max(rewards)})].\n"
+      f"between ({min(stats.episode_rewards)}, {max(stats.episode_rewards)})].\n"
       f"An episode on average took {average_length} steps [std: {std_length}; "
-      f"between ({min(lengths)}, {max(lengths)})].\n"
+      f"between ({min(stats.episode_lengths)}, {max(stats.episode_lengths)})].\n"
       f"This took me {round(time.time() - start, 2)}s.")

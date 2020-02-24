@@ -305,35 +305,36 @@ class NetworkAnalyzer:
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    f_weights = False
+    f_weights = True
     f_max = False
     f_map = True
-    f_salience = True
+    f_salience = False
     do_tsne = False
 
     tf.random.set_seed(1)
 
-    model = tf.keras.applications.VGG16()
+    model = tf.keras.models.load_model("../storage/pretrained/pretrained_component.h5")
     analyzer = NetworkAnalyzer(model, mode="save")
     print(analyzer.list_layer_names())
 
     if f_weights:
-        analyzer.visualize_layer_weights("block1_conv1")
+        analyzer.visualize_layer_weights("conv2d")
 
     # FEATURE MAXIMIZATION
     if f_max:
-        n_features = analyzer.numb_features_in_layer("block2_conv2")
-        analyzer.visualize_max_filter_respondence("fc1", feature_ids=[])
+        n_features = analyzer.numb_features_in_layer("conv2d")
+        analyzer.visualize_max_filter_respondence("dense", feature_ids=[])
 
     # FEATURE MAPS
     if f_map:
-        reference = mpimg.imread("hand.png")
-        analyzer.visualize_activation_map("block1_conv1", reference, mode="gray")
+        reference = mpimg.imread("img/hand.png")
+        analyzer.visualize_activation_map("conv2d", reference, mode="gray")
 
     # SALIENCE
     if f_salience:
-        reference = mpimg.imread("hand.png")
+        reference = mpimg.imread("img/hand.png")
         analyzer.obtain_saliency_map(reference)
 
     # T-SNE CLUSTERING

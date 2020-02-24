@@ -328,6 +328,13 @@ class PPOAgent:
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
+
+            # every tenth iteration reconstruct workers to prevent tensorflow memory leakage
+            if self.iteration % 100 == 0:
+                flat_print("Recreating Workers...")
+                del workers
+                workers = self._make_workers(parallel)
+
             time_dict = OrderedDict()
             subprocess_start = time.time()
 

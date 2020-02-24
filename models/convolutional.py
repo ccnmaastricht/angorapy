@@ -18,7 +18,6 @@ def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
     # second layer
     x = tf.keras.layers.Conv2D(32, 5, 1, padding="same")(x)
     x = tf.keras.layers.ReLU()(x)
-
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
 
     # third layer

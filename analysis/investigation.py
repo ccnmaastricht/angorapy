@@ -143,8 +143,7 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, _ = env.step(action)
-            observation, reward, done, _ = self.preprocessor.modulate((observation, reward, done, None),
-                                                                      update=False)
+            observation, reward, done, _ = self.preprocessor.modulate((observation, reward, done, None), update=False)
 
             state = observation
             reward_trajectory.append(reward)
@@ -180,7 +179,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1582190129, from_iteration=299)
+    agent_007 = PPOAgent.from_agent_state( 1582547180 , from_iteration="b")
     inv = Investigator.from_agent(agent_007)
 
     inv.render_episode(agent_007.env)
