@@ -332,7 +332,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
     @tf.function
     def _scale_sample_to_distribution_range(self, sample) -> tf.Tensor:
         # clipping just to, you know, be sure
-        return tf.clip_by_value(tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff), 0, 1)
+        return tf.clip_by_value(tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff), EPSILON, 1 - EPSILON)
 
     @tf.function
     def probability(self, samples: tf.Tensor, alphas: tf.Tensor, betas: tf.Tensor):
@@ -570,3 +570,4 @@ if __name__ == '__main__':
 
     print(d.entropy(([[1.5, 3.4]], [[1.2, 1.1]])))
     print(d.act([[1.5, 3.4]], [[1.2, 1.1]]))
+

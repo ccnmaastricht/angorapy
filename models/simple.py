@@ -2,6 +2,7 @@
 """Collection of generic fully connected and recurrent policy networks."""
 
 import os
+from typing import Tuple, Iterable
 
 import gym
 import tensorflow as tf
@@ -14,31 +15,31 @@ from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False):
+def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False,
+                     layer_sizes: Tuple = (64, 64)):
     """Build simple two-layer model."""
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
-    encoding_layer_sizes = (64, 64)
 
     # input preprocessing
     inputs = tf.keras.Input(shape=(state_dimensionality,))
 
     # policy network
-    latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=encoding_layer_sizes,
+    latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes,
                                        name="policy_encoder")(inputs)
-    out_policy = distribution.build_action_head(n_actions, (64,), None)(latent)
+    out_policy = distribution.build_action_head(n_actions, (layer_sizes[-1],), None)(latent)
 
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
 
     # value network
     if not shared:
-        value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=encoding_layer_sizes,
+        value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes,
                                                  name="value_encoder")(inputs)
         value_out = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(value_latent)
     else:
-        value_out = tf.keras.layers.Dense(1, input_dim=64, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+        value_out = tf.keras.layers.Dense(1, input_dim=layer_sizes[-1], kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(latent)
 
     value = tf.keras.Model(inputs=inputs, outputs=value_out, name="value")
@@ -47,7 +48,7 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
 
 def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                     model_type: str = "rnn"):
+                     model_type: str = "rnn", layer_sizes: Tuple = (64, )):
     """Build simple policy and value models having a recurrent layer before their heads."""
     state_dimensionality, n_actions = env_extract_dims(env)
     rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
@@ -59,25 +60,25 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     masked = tf.keras.layers.Masking()(inputs)
 
     # policy network
-    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="policy_encoder"),
+    x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="policy_encoder"),
            name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x, *_ = rnn_choice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs,
+    x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
                        name="policy_recurrent_layer")(x)
 
     out_policy = distribution.build_action_head(n_actions, x.shape[1:], bs)(x)
 
     # value network
     if not shared:
-        x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=(64,), name="value_encoder"),
+        x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="value_encoder"),
                name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
-        x, *_ = rnn_choice(64, stateful=True, return_sequences=True, return_state=True, batch_size=bs,
+        x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
                            name="value_recurrent_layer")(x)
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(x)
     else:
-        out_value = tf.keras.layers.Dense(1, input_dim=64, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
+        out_value = tf.keras.layers.Dense(1, input_dim=x.shape[1:], kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(x)
 
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="simple_rnn_policy")
@@ -95,6 +96,17 @@ def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shar
         return build_ffn_models(env, distribution, shared)
     else:
         return build_rnn_models(env, distribution, shared, bs=bs, model_type=model_type)
+
+
+def build_deeper_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+                        model_type: str = "rnn", **kwargs):
+    """Build deeper simple networks (policy, value, joint) for given parameter settings."""
+
+    # this function is just a wrapper routing the requests for ffn and rnns
+    if model_type == "ffn":
+        return build_ffn_models(env, distribution, shared, layer_sizes=(64, 64, 64, 32))
+    else:
+        return build_rnn_models(env, distribution, shared, bs=bs, model_type=model_type, layer_sizes=(64, 64, 64, 32))
 
 
 if __name__ == '__main__':

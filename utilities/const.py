@@ -46,7 +46,7 @@ PATH_TO_BENCHMARKS = "docs/benchmarks/"
 # NUMERICAL PRECISION
 NP_FLOAT_PREC = np.float64
 NUMPY_INTEGER_PRECISION = np.int64
-EPSILON = 1e-8
+EPSILON = 1e-6  # dont make this lower! 1e-8 would be ignored due to float32 precision
 
 # SHAPES
 VISION_WH = 227
