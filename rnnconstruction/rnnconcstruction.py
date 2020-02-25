@@ -156,7 +156,7 @@ for iter in range(len(iterations)):
     plt.plot(range(len(histories[iter].epoch)), histories[iter].history['loss'])
     # plt.plot(range(len(retrained_fixed.epoch)), retrained_fixed.history['loss'], 'g-')
 
-history = pickle.load(open('../LSTM/firsttrainhistory', "rb"))
+history = pickle.load(open('firsttrainhistory', "rb"))
 plt.plot(range(len(history['loss'])), history['loss'], 'r--')
 plt.ylabel('loss')
 plt.xlabel('epoch')
