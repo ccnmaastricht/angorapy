@@ -7,6 +7,7 @@ from LSTM.minimization import adam_weights_optimizer
 from LSTM.build_utils import build_rnn_ds
 from LSTM.plot_utils import plot_fixed_points
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 ############################################################
 # Create and train recurrent model on 3-Bit FlipFop task
@@ -55,7 +56,7 @@ class Rnnconstructor():
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
                         'adam_hps': {'epsilon': 1e-03,
-                                     'max_iters': 1000000,
+                                     'max_iters': 2,
                                      'method': 'joint',
                                      'print_every': 200}}
 
@@ -117,46 +118,53 @@ class Rnnconstructor():
 
         return weights
 
+iterations = [2, 20, 200, 2000, 10000, 20000]
+histories = []
+for iter in range(len(iterations)):
 
-plot_fixed_points(activations, fps, 2000, 2)
-reco = Rnnconstructor(fps)
+    # plot_fixed_points(activations, fps, 2000, 2)
+    reco = Rnnconstructor(fps, max_iters=iterations[iter])
 
-recurrentweights = reco.train_recurrentweights(fps, flopper.weights[1])
-recurrentweights = np.multiply(recurrentweights, recurrentweights)
-# weights[1] = recurrentweights
-h = np.zeros(24)
-inputs = np.vstack(stim['inputs'])
-def fun(inputs, h):
-    return np.matmul(np.tanh(h), recurrentweights) + np.matmul(inputs, weights[0]) + weights[2]
-
-
-recorded_h = []
-for i in range(len(inputs)):
-    h = fun(inputs[i, :], h)
-    recorded_h.append(h)
-
-new_jacobians = np.empty((len(fps), n_hidden, n_hidden))
-fph = fps
-for i in range(len(fps)):
-    fun, jac_fun = build_rnn_ds(weights, n_hidden, inputs[i, :], 'sequential')
-    new_jacobians[i, :, :] = jac_fun(fps[i]['x'])
-    # print(np.allclose(new_jacobians[i, :, :], fps[i]['jac'], 1e-02))
-    fph[i]['jac'] = new_jacobians[i, :, :]
-    fph[i]['fun'] = fun(fps[i]['x'])
+    recurrentweights = reco.train_recurrentweights(fps, flopper.weights[1])
+    # weights[1] = recurrentweights
+    h = np.zeros(24)
+    inputs = np.vstack(stim['inputs'])
+    def fun(inputs, h):
+        return np.matmul(np.tanh(h), recurrentweights) + np.matmul(inputs, weights[0]) + weights[2]
 
 
-plot_fixed_points(activations, fph, 2000, 4)
+    recorded_h = []
+    for i in range(len(inputs)):
+        h = fun(inputs[i, :], h)
+        recorded_h.append(h)
+
+    new_jacobians = np.empty((len(fps), n_hidden, n_hidden))
+    fph = fps
+    for i in range(len(fps)):
+        fun, jac_fun = build_rnn_ds(weights, n_hidden, inputs[i, :], 'sequential')
+        new_jacobians[i, :, :] = jac_fun(fps[i]['x'])
+        # print(np.allclose(new_jacobians[i, :, :], fps[i]['jac'], 1e-02))
+        fph[i]['jac'] = new_jacobians[i, :, :]
+        fph[i]['fun'] = fun(fps[i]['x'])
 
 
-retrained_history = flopper.train_pretrained(stim, 1000, recurrentweights, False)
-# retrained_fixed = flopper.train_pretrained(stim, 1000, recurrentweights, False)
+    # plot_fixed_points(activations, fph, 2000, 4)
+
+    retrained_history, retrained_model = flopper.train_pretrained(stim, 4000, recurrentweights, True)
+    # retrained_fixed = flopper.train_pretrained(stim, 1000, recurrentweights, False)
+    histories.append(retrained_history)
+    plt.plot(range(len(histories[iter].epoch)), histories[iter].history['loss'])
+    # plt.plot(range(len(retrained_fixed.epoch)), retrained_fixed.history['loss'], 'g-')
 
 history = pickle.load(open('firsttrainhistory', "rb"))
 plt.plot(range(len(history['loss'])), history['loss'], 'r--')
-plt.plot(range(len(retrained_history.epoch)), retrained_history.history['loss'], 'b-')
-# plt.plot(range(len(retrained_fixed.epoch)), retrained_fixed.history['loss'], 'g-')
 plt.ylabel('loss')
 plt.xlabel('epoch')
-plt.legend(['naive training', 'after pretraining',
-            'after pretraining with fixed recurrent weights'], loc='upper right')
+plt.legend(['2 iterations pretraining',
+            '20 iterations pretraining',
+            '200 iterations pretraining',
+            '2000 iterations pretraining',
+            '10000 iterations pretraining',
+            '20000 iterations pretraining',
+            'naive training'], loc='upper right')
 plt.show()
