@@ -4,8 +4,9 @@ import numpy as np
 import multiprocessing as mp
 import numdifftools as nd
 from scipy.optimize import minimize
-from LSTM.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
-from LSTM.minimization import adam_optimizer, adam_lstm
+from fixedpointfinder.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
+from fixedpointfinder.minimization import adam_optimizer, adam_lstm
+from utilities.model_utils import build_sub_model_to
 
 
 
@@ -606,3 +607,100 @@ class Scipyfixedpointfinder(FixedPointFinder):
 
         fixedpoint = FixedPointFinder._create_fixedpoint_object(fun, fpx, x0, inputs)
         return fixedpoint
+
+
+class Tffixedpointfinder(FixedPointFinder):
+    tf_default_hps = {'alr_hps': {'decay_rate': 0.0005},
+                        'agnc_hps': {'norm_clip': 1.0,
+                                     'decay_rate': 1e-03},
+                        'adam_hps': {'epsilon': 1e-03,
+                                     'max_iters': 5000,
+                                     'method': 'joint',
+                                     'print_every': 200}}
+
+    def __init__(self, weights, rnn_type,
+                 q_threshold=FixedPointFinder._default_hps['q_threshold'],
+                 tol_unique=FixedPointFinder._default_hps['tol_unique'],
+                 verbose=FixedPointFinder._default_hps['verbose'],
+                 random_seed=FixedPointFinder._default_hps['random_seed'],
+                 alr_decayr=tf_default_hps['alr_hps']['decay_rate'],
+                 agnc_normclip=tf_default_hps['agnc_hps']['norm_clip'],
+                 agnc_decayr=tf_default_hps['agnc_hps']['decay_rate'],
+                 epsilon=tf_default_hps['adam_hps']['epsilon'],
+                 max_iters=tf_default_hps['adam_hps']['max_iters'],
+                 method=tf_default_hps['adam_hps']['method'],
+                 print_every=tf_default_hps['adam_hps']['print_every']):
+        FixedPointFinder.__init__(self, weights, rnn_type, q_threshold=q_threshold,
+                                  tol_unique=tol_unique,
+                                  verbose=verbose,
+                                  random_seed=random_seed)
+        self.alr_decayr = alr_decayr
+        self.agnc_normclip = agnc_normclip
+        self.agnc_decayr = agnc_decayr
+        self.epsilon = epsilon
+        self.max_iters = max_iters
+        self.method = method
+        self.print_every = print_every
+
+        if self.verbose:
+            self._print_tf_hps()
+
+    def _print_tf_hps(self):
+        COLORS = dict(
+            HEADER='\033[95m',
+            OKBLUE='\033[94m',
+            OKGREEN='\033[92m',
+            WARNING='\033[93m',
+            FAIL='\033[91m',
+            ENDC='\033[0m',
+            BOLD='\033[1m',
+            UNDERLINE='\033[4m'
+        )
+        bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
+        print(f"{wn}HyperParameters for adam{ec}: \n"
+              f" learning rate - {self.epsilon}\n "
+              f"maximum iterations - {self.method}\n"
+              f"print every {self.print_every} iterations\n"
+              f"performing {self.method} optimization\n"
+              f"-----------------------------------------\n")
+
+    def find_fixed_points(self):
+        pass
+        # random_seed = 123
+        # rng = np.random.RandomState(random_seed)
+        # n = 1024
+
+        # activations = np.hstack(activations[1:])
+        # states = activations + 0.1 * rng.randn(*activations.shape)
+        # lstmcell = build_sub_model_to(flopper.model, [flopper.hps['rnn_type']])
+        # init_c_h = states
+        # input = np.vstack(stim['inputs'][:20, :, :])
+        # input = np.zeros((n, 3))
+        # c = init_c_h[0:n, n_hidden:]  # [n_batch x n_dims]
+        # h = init_c_h[0:n, :n_hidden]  # [n_batch x n_dims]
+
+        # lstmcell = tf.keras.layers.LSTMCell(n_hidden)
+
+        # inputs = tf.constant(input, dtype='float32')
+
+        # tuple = tf.Variable([tf.convert_to_tensor(h), tf.convert_to_tensor(c)],
+        #   dtype='float32')
+
+        # output, next_state = lstmcell(inputs, tuple)
+        # lstmcell.set_weights(weights)
+        # lstmcell.trainable = False
+        # tuple = tf.reshape(tuple, [2, 2*n_hidden])
+        # F = tf.concat((next_state[0], next_state[1]), axis=1)
+
+        # optimizer = tf.keras.optimizers.Adam(0.001)
+        # for i in range(5000):
+        #    with tf.GradientTape() as tape:
+        #       q = 0.5 * tf.reduce_sum(tf.square(next_state - tuple), axis=1)
+        #       q_scalar = tf.reduce_mean(q)
+        #       gradients = tape.gradient(q_scalar, [tuple])
+        #   optimizer.apply_gradients(zip(gradients, [tuple]))
+
+        #  print(q_scalar.numpy())
+        #  print(tf.reduce_mean(tuple))
+        # jac = tape.jacobian(q, [tuple])
+

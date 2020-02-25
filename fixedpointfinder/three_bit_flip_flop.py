@@ -41,8 +41,8 @@ class Flipflopper:
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 128*256,
-                         'n_time': 1,
+        self.data_hps = {'n_batch': 128,
+                         'n_time': 256,
                          'n_bits': 3,
                          'p_flip': 0.3}
         self.verbose = self.hps['verbose']
@@ -89,7 +89,7 @@ class Flipflopper:
         inputweights = self.weights[0]
         recurrentbias = self.weights[2]
 
-        return [inputweights, recurrentweights, recurrentbias]
+        return [inputweights, recurrentbias, recurrentweights]
 
     def pretrained_model(self, recurrentweights, fix):
 
@@ -100,6 +100,7 @@ class Flipflopper:
 
         Returns:
             None.'''
+        haha = fix
         n_hidden = self.hps['n_hidden']
         name = self.hps['model_name']
         n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
@@ -108,7 +109,7 @@ class Flipflopper:
         inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
 
         if self.hps['rnn_type'] == 'vanilla':
-            x = tf.keras.layers.SimpleRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True, trainable=fix)(inputs)
+            x = SimplerRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'gru':
             x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
@@ -118,7 +119,7 @@ class Flipflopper:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
 
-        x = tf.keras.layers.Dense(3)(x)
+        x = tf.keras.layers.Dense(3, trainable=False)(x)
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
         model.get_layer(self.hps['rnn_type']).set_weights(weights)
         if self.verbose:
@@ -145,7 +146,7 @@ class Flipflopper:
                             tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=epochs)
 
 
-        return history
+        return history, model
 
 
     def generate_flipflop_trials(self):
@@ -280,3 +281,89 @@ if __name__ == "__main__":
     flopper.visualize_flipflop(stim)
 
 
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import SimpleRNNCell, SimpleRNN
+from tensorflow.python.keras.utils import tf_utils
+
+
+class SimplerRNN(SimpleRNN):
+
+    def __init__(self, units,
+                   activation='tanh',
+                   use_bias=True,
+                   kernel_initializer='glorot_uniform',
+                   recurrent_initializer='orthogonal',
+                   bias_initializer='zeros',
+                   kernel_regularizer=None,
+                   recurrent_regularizer=None,
+                   bias_regularizer=None,
+                   activity_regularizer=None,
+                   kernel_constraint=None,
+                   recurrent_constraint=None,
+                   bias_constraint=None,
+                   dropout=0.,
+                   recurrent_dropout=0.,
+                   return_sequences=False,
+                   return_state=False,
+                   go_backwards=False,
+                   stateful=False,
+                   unroll=False,
+                    **kwargs):
+        cell = SimplerRNNCell(units,
+                              activation=activation,
+                              use_bias=use_bias,
+                              kernel_initializer=kernel_initializer,
+                              recurrent_initializer=recurrent_initializer,
+                              bias_initializer=bias_initializer,
+                                kernel_regularizer=kernel_regularizer,
+                                recurrent_regularizer=recurrent_regularizer,
+                                bias_regularizer=bias_regularizer,
+                                kernel_constraint=kernel_constraint,
+                                recurrent_constraint=recurrent_constraint,
+                                bias_constraint=bias_constraint,
+                                dropout=dropout,
+                                recurrent_dropout=recurrent_dropout,
+                                dtype=kwargs.get('dtype'))
+        super(SimpleRNN, self).__init__(
+            cell,
+            return_sequences=return_sequences,
+            return_state=return_state,
+            go_backwards=go_backwards,
+            stateful=stateful,
+            unroll=unroll,
+            **kwargs)
+        # self.activity_regularizer = regularizers.get(activity_regularizer)
+        # self.input_spec = [InputSpec(ndim=3)]
+
+
+class SimplerRNNCell(SimpleRNNCell):
+    def __init__(self, output_dim, **kwargs):
+        self.output_dim = output_dim
+        super(SimplerRNNCell, self).__init__(output_dim, **kwargs)
+
+    @tf_utils.shape_type_conversion
+    def build(self, input_shape):
+        self.kernel = self.add_weight(
+            shape=(input_shape[-1], self.units),
+            name='kernel',
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            trainable=True)
+        self.recurrent_kernel = self.add_weight(
+            shape=(self.units, self.units),
+            name='recurrent_kernel',
+            initializer=self.recurrent_initializer,
+            regularizer=self.recurrent_regularizer,
+            constraint=self.recurrent_constraint,
+            trainable=False)
+        if self.use_bias:
+            self.bias = self.add_weight(
+                shape=(self.units,),
+                name='bias',
+                initializer=self.bias_initializer,
+                regularizer=self.bias_regularizer,
+                constraint=self.bias_constraint)
+        else:
+            self.bias = None
+        self.built = True
