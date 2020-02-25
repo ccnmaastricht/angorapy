@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import tensorflow as tf
-from utilities.model_management import build_sub_model_to
-from LSTM.fixedpointfinder import FixedPointFinder
+from utilities.model_utils import build_sub_model_to
+from fixedpointfinder.fixedpointfinder import FixedPointFinder
 import sklearn.decomposition as skld
 from tensorflow.keras.models import load_model
 import os

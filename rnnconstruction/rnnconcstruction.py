@@ -1,11 +1,11 @@
 import pickle
 
-from LSTM.fixedpointfinder import Adamfixedpointfinder
-from LSTM.three_bit_flip_flop import Flipflopper
+from fixedpointfinder.fixedpointfinder import Adamfixedpointfinder
+from fixedpointfinder.three_bit_flip_flop import Flipflopper
 import autograd.numpy as np
-from LSTM.minimization import adam_weights_optimizer
-from LSTM.build_utils import build_rnn_ds
-from LSTM.plot_utils import plot_fixed_points
+from fixedpointfinder.minimization import adam_weights_optimizer
+from fixedpointfinder.build_utils import build_rnn_ds
+from fixedpointfinder.plot_utils import plot_fixed_points
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
@@ -156,7 +156,7 @@ for iter in range(len(iterations)):
     plt.plot(range(len(histories[iter].epoch)), histories[iter].history['loss'])
     # plt.plot(range(len(retrained_fixed.epoch)), retrained_fixed.history['loss'], 'g-')
 
-history = pickle.load(open('firsttrainhistory', "rb"))
+history = pickle.load(open('../LSTM/firsttrainhistory', "rb"))
 plt.plot(range(len(history['loss'])), history['loss'], 'r--')
 plt.ylabel('loss')
 plt.xlabel('epoch')
