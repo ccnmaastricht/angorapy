@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 from fixedpointfinder.build_utils import build_rnn_ds, build_gru_ds, build_lstm_ds
 from fixedpointfinder.minimization import adam_optimizer, adam_lstm
 from utilities.model_utils import build_sub_model_to
-
+import tensorflow as tf
 
 
 class FixedPointFinder(object):
@@ -122,7 +122,7 @@ class FixedPointFinder(object):
             sampled_activations: numpy array of sampled activations. Will have dimensions
             [n_init x n_units]."""
         if self.rnn_type == 'lstm':
-            activations = np.hstack((activations[1], activations[2]))
+            activations = np.hstack(activations[1:])
 
         if len(activations.shape) == 3:
             activations = np.vstack(activations)
@@ -136,7 +136,7 @@ class FixedPointFinder(object):
         return sampled_activations
 
     def _add_gaussian_noise(self, data, noise_scale=0.0):
-        ''' Adds IID Gaussian noise to Numpy data.
+        """ Adds IID Gaussian noise to Numpy data.
         Args:
             data: Numpy array.
             noise_scale: (Optional) non-negative scalar indicating the
@@ -146,7 +146,7 @@ class FixedPointFinder(object):
             Numpy array with shape matching that of data.
         Raises:
             ValueError if noise_scale is negative.
-        '''
+        """
 
         # Add IID Gaussian noise
         if noise_scale == 0.0:
@@ -664,24 +664,16 @@ class Tffixedpointfinder(FixedPointFinder):
               f"performing {self.method} optimization\n"
               f"-----------------------------------------\n")
 
-    def find_fixed_points(self):
-        pass
-        # random_seed = 123
-        # rng = np.random.RandomState(random_seed)
-        # n = 1024
+    def find_fixed_points(self, states, inputs, model):
 
-        # activations = np.hstack(activations[1:])
-        # states = activations + 0.1 * rng.randn(*activations.shape)
-        # lstmcell = build_sub_model_to(flopper.model, [flopper.hps['rnn_type']])
+        lstmcell = build_sub_model_to(model, [self.rnn_type])
         # init_c_h = states
         # input = np.vstack(stim['inputs'][:20, :, :])
         # input = np.zeros((n, 3))
         # c = init_c_h[0:n, n_hidden:]  # [n_batch x n_dims]
         # h = init_c_h[0:n, :n_hidden]  # [n_batch x n_dims]
 
-        # lstmcell = tf.keras.layers.LSTMCell(n_hidden)
-
-        # inputs = tf.constant(input, dtype='float32')
+        inputs = tf.constant(inputs, dtype='float32')
 
         # tuple = tf.Variable([tf.convert_to_tensor(h), tf.convert_to_tensor(c)],
         #   dtype='float32')

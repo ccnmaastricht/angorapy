@@ -16,7 +16,7 @@ from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 # from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
-from fixedpointfinder.fixedpointfinder import Adamfixedpointfinder
+from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from mayavi import mlab
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities
 

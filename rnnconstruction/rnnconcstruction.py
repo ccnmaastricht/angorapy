@@ -1,6 +1,6 @@
 import pickle
 
-from fixedpointfinder.fixedpointfinder import Adamfixedpointfinder
+from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from fixedpointfinder.three_bit_flip_flop import Flipflopper
 import autograd.numpy as np
 from fixedpointfinder.minimization import adam_weights_optimizer
