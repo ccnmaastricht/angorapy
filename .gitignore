@@ -11,7 +11,9 @@ docs/monitor/experiments/
 docs/benchmarks/backup/*
 docs/benchmarks/*.pdf
 docs/storage/
-
+monitor/experiments/
+rnnconstruction/firsttrainhistory
+rnnconstruction/saved/
 
 tests/storage/
 fixedpointfinder/saved/
