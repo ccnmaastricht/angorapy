@@ -42,13 +42,13 @@ class Flipflopper:
                     'n_hidden': n_hidden,
                     'model_name': 'flipflopmodel',
                     'verbose': False}
-        self.data_hps = {'n_batch': 128*256,
-                         'n_time': 1,
+        self.data_hps = {'n_batch': 128,
+                         'n_time': 256,
                          'n_bits': 3,
                          'p_flip': 0.3}
         self.verbose = self.hps['verbose']
         # data_hps may be changed but are recommended to remain at their default values
-        self.model = self._build_model()
+        self.model, self.weights = self._build_model()
         self.rng = npr.RandomState(125)
 
     def _build_model(self):
@@ -80,11 +80,12 @@ class Flipflopper:
 
         x = tf.keras.layers.Dense(3)(x)
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
+        weights = model.get_layer(self.hps['rnn_type']).get_weights()
 
         if self.verbose:
             model.summary()
 
-        return model
+        return model, weights
 
     def build_pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
 
@@ -96,7 +97,7 @@ class Flipflopper:
         else:
             return [inputweights, recurrentweights, recurrentbias]
 
-    def pretrained_model(self, recurrentweights, recurrent_trainable=False):
+    def pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
 
         '''Builds model that can be used to train the 3-Bit Flip-Flop task.
 
@@ -126,7 +127,7 @@ class Flipflopper:
         x = tf.keras.layers.Dense(3)(x)
         model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
-        weights = model.get_layer(self.hps['rnn_type']).get_weights()
+        # weights = model.get_layer(self.hps['rnn_type']).get_weights()
         weights = self.build_pretrained_model(weights, recurrentweights, recurrent_trainable)
         model.get_layer(self.hps['rnn_type']).set_weights(weights)
 
@@ -211,7 +212,7 @@ class Flipflopper:
             self._save_model()
         return history
 
-    def train_pretrained(self, stim, epochs, recurrentweights, recurrent_trainable):
+    def train_pretrained(self, stim, epochs, weights, recurrentweights, recurrent_trainable):
         '''Function to train an RNN model This function will save the trained model afterwards.
 
         Args:
@@ -225,13 +226,22 @@ class Flipflopper:
         Returns:
             None.'''
 
-        model = self.pretrained_model(recurrentweights, recurrent_trainable)
+        model = self.pretrained_model(weights, recurrentweights, recurrent_trainable)
         model.compile(optimizer="adam", loss="mse",
                       metrics=['accuracy'])
         history = model.fit(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
                             tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=epochs)
 
         return history
+
+    def pretrained_predict(self,model , stim):
+
+        model.compile(optimizer="adam", loss="mse",
+                      metrics=['accuracy'])
+        score = model.evaluate(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32),
+                               tf.convert_to_tensor(stim['output'], dtype=tf.float32))
+
+        return score
 
     def _save_model(self):
         '''Save trained model to JSON file.'''
