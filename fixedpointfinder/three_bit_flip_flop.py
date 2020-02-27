@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 import numpy.random as npr
-import matplotlib.pyplot as plt
 from utilities.model_utils import build_sub_model_to
 from tensorflow.keras.models import load_model
 import os
@@ -73,7 +72,8 @@ class Flipflopper:
             x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
         elif self.hps['rnn_type'] == 'lstm':
             x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True,
-                                                       stateful=True, return_state=True)(inputs)
+                                                       stateful=True, return_state=True,
+                                                       implementation=1)(inputs)
         else:
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
@@ -149,9 +149,6 @@ class Flipflopper:
                 input pulses.
                 'outputs': [n_batch x n_time x n_bits] numpy array specifying
                 the correct behavior of the FlipFlop memory device.'''
-
-
-
         data_hps = self.data_hps
         n_batch = data_hps['n_batch']
         n_time = data_hps['n_time']
@@ -235,24 +232,6 @@ class Flipflopper:
                             tf.convert_to_tensor(stim['output'], dtype=tf.float32), epochs=epochs)
 
         return history
-
-    def visualize_flipflop(self, stim):
-        prediction = self.model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
-
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharey=True)
-        fig.suptitle('3-Bit Flip-Flop using '+ self.hps['rnn_type'])
-        ax1.plot(prediction[0, :, 0], c='r')
-        ax1.plot(stim['inputs'][0, :, 0], c='k')
-        ax2.plot(stim['inputs'][0, :, 1], c='k')
-        ax2.plot(prediction[0, :, 1], c='g')
-        ax3.plot(stim['inputs'][0, :, 2], c='k')
-        ax3.plot(prediction[0, :, 2], c='b')
-        plt.yticks([-1, +1])
-        plt.xlabel('Time')
-        ax1.xaxis.set_visible(False)
-        ax2.xaxis.set_visible(False)
-
-        # plt.show()
 
     def _save_model(self):
         '''Save trained model to JSON file.'''

@@ -104,3 +104,21 @@ def plot_fixed_points(activations, fps, n_points, scale):
     ax.set_ylabel('PC2')
     ax.set_zlabel('PC3')
     plt.show()
+
+
+def visualize_flipflop(prediction, stim):
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharey=True)
+    fig.suptitle('3-Bit Flip-Flop')
+    ax1.plot(prediction[0, :, 0], c='r')
+    ax1.plot(stim['inputs'][0, :, 0], c='k')
+    ax2.plot(stim['inputs'][0, :, 1], c='k')
+    ax2.plot(prediction[0, :, 1], c='g')
+    ax3.plot(stim['inputs'][0, :, 2], c='k')
+    ax3.plot(prediction[0, :, 2], c='b')
+    plt.yticks([-1, +1])
+    plt.xlabel('Time')
+    ax1.xaxis.set_visible(False)
+    ax2.xaxis.set_visible(False)
+
+    plt.show()

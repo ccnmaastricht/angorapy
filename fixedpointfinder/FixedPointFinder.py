@@ -265,21 +265,6 @@ class FixedPointFinder(object):
 
         return fixedpoints
 
-    @staticmethod
-    def _creat_lstm_fixedpoint(fun, fps, x0, inputs):
-        fixedpoints = []
-        k = 0
-        for fp in fps:
-
-            fixedpointobject = {'fun': fun(fp),
-                              'x': fp,
-                              'x_init': x0[k, :],
-                              'input_init': inputs[k, :]}
-            fixedpoints.append(fixedpointobject)
-            k += 1
-
-        return fixedpoints
-
     def _compute_jacobian(self, fixedpoints):
         """Computes jacobians of fixedpoints. It is a linearization around the fixedpoint
         in all dimensions.
@@ -439,8 +424,6 @@ class Adamfixedpointfinder(FixedPointFinder):
             raise ValueError('Hyperparameter rnn_type must be one of'
                              '[vanilla, gru, lstm] but was %s', self.rnn_type)
 
-
-
         if self.rnn_type == 'lstm':
             fps = adam_lstm(fun, x0,
                             epsilon=self.epsilon,
@@ -452,7 +435,7 @@ class Adamfixedpointfinder(FixedPointFinder):
                             verbose=self.verbose)
             fun, jac_fun = build_lstm_ds(self.weights, inputs,
                                                                self.n_hidden, 'sequential')
-            fixedpoints = self._creat_lstm_fixedpoint(fun, fps, x0, inputs)
+            fixedpoints = self._create_fixedpoint_object(fun, fps, x0, inputs)
         else:
             fps = adam_optimizer(fun, x0,
                                  epsilon=self.epsilon,
