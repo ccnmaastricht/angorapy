@@ -1,9 +1,9 @@
 from fixedpointfinder.three_bit_flip_flop import Flipflopper
 import numpy as np
 from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
-from fixedpointfinder.build_utils import build_rnn_ds
 from rnnconstruction.rnnconcstruct import Rnnconstructor
 from rnnconstruction.plot_utils import plot_history
+from fixedpointfinder.plot_utils import plot_fixed_points
 
 ############################################################
 # Create and train recurrent model on 3-Bit FlipFop task
@@ -44,24 +44,21 @@ inputs = np.zeros((states.shape[0], 3))
 # find fixed points
 fps = fpf.find_fixed_points(states, inputs)
 # get fps to have points to train for
-# plot_fixed_points(activations, fps, 2000, 2)
+plot_fixed_points(activations, fps, 2000, 2)
 
 
-reco = Rnnconstructor(fps,
-                      max_iters=2000)
+reco = Rnnconstructor(fps, n_hidden,
+                      epsilon=0.01,
+                      alr_decayr=0.00001,
+                      max_iters=4000)
 
 recurrentweights = reco.train_recurrentweights(flopper.weights[1])
+weights[1] = recurrentweights
+fph = reco.compute_jacobians(fps, weights, inputs)
+plot_fixed_points(activations, fph, 2000, 4)
 
-# new_jacobians = np.empty((len(fps), n_hidden, n_hidden))
-# fph = fps
-#for i in range(len(fps)):
-#    fun, jac_fun = build_rnn_ds(weights, n_hidden, inputs[i, :], 'sequential')
-#    new_jacobians[i, :, :] = jac_fun(fps[i]['x'])
-#    fph[i]['jac'] = new_jacobians[i, :, :]
-#    fph[i]['fun'] = fun(fps[i]['x'])
-# plot_fixed_points(activations, fph, 2000, 4)
 
-retrained_history, retrained_model = flopper.train_pretrained(stim, 2000, weights, recurrentweights, False)
-score = flopper.pretrained_predict(retrained_model, stim)
+# retrained_history, retrained_model = flopper.train_pretrained(stim, 2000, weights, recurrentweights, False)
+# score = flopper.pretrained_predict(retrained_model, stim)
 
-plot_history(retrained_history)
+# plot_history(retrained_history)
