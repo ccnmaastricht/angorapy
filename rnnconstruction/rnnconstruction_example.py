@@ -3,8 +3,7 @@ import numpy as np
 from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from fixedpointfinder.build_utils import build_rnn_ds
 from rnnconstruction.rnnconcstruct import Rnnconstructor
-import matplotlib.pyplot as plt
-import pickle
+from rnnconstruction.plot_utils import plot_history
 
 ############################################################
 # Create and train recurrent model on 3-Bit FlipFop task
@@ -64,13 +63,5 @@ recurrentweights = reco.train_recurrentweights(flopper.weights[1])
 
 retrained_history, retrained_model = flopper.train_pretrained(stim, 2000, weights, recurrentweights, False)
 score = flopper.pretrained_predict(retrained_model, stim)
-# plt.plot(range(len(retrained_history.epoch)), retrained_history.history['loss'])
 
-
-history = pickle.load(open('firsttrainhistory', "rb"))
-plt.plot(range(len(history['loss'])), history['loss'], 'r--')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['2000 iterations pretraining',
-            'naive training'], loc='upper right')
-plt.show()
+plot_history(retrained_history)
