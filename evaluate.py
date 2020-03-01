@@ -30,7 +30,7 @@ average_length = round(statistics.mean(stats.episode_lengths), 2)
 std_reward = round(statistics.stdev(stats.episode_rewards), 2)
 std_length = round(statistics.stdev(stats.episode_lengths), 2)
 
-print(f"Evaluated agent on {agent.env_name} and achieved an average reward of {average_reward} [std: {std_reward}; "
+print(f"Evaluated agent on {args.n} x {agent.env_name} and achieved an average reward of {average_reward} [std: {std_reward}; "
       f"between ({min(stats.episode_rewards)}, {max(stats.episode_rewards)})].\n"
       f"An episode on average took {average_length} steps [std: {std_length}; "
       f"between ({min(stats.episode_lengths)}, {max(stats.episode_lengths)})].\n"

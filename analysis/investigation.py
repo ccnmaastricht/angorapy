@@ -7,7 +7,8 @@ import tensorflow as tf
 
 from agent.policies import BasePolicyDistribution
 from agent.ppo import PPOAgent
-from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to
+from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
+    extract_layers
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.wrappers import BaseWrapper, SkipWrapper
 
@@ -37,11 +38,24 @@ class Investigator:
         """Get a list of unique string representations of all layers in the network."""
         return list_layer_names(self.network, only_para_layers=only_para_layers)
 
+    def list_convolutional_layer_names(self) -> List[str]:
+        """Get a list of unique string representations of convolutional layers in the network."""
+        return [layer.name for layer in extract_layers(self.network) if is_conv(layer)]
+
+    def list_non_convolutional_layer_names(self) -> List[str]:
+        """Get a list of unique string representations of non-convolutional layers in the network."""
+        return [layer.name for layer in extract_layers(self.network) if
+                not isinstance(layer, CONVOLUTION_BASE_CLASS) and not isinstance(layer, tf.keras.layers.Activation)]
+
     def get_layers_by_names(self, layer_names: Union[List[str], str]):
         """Retrieve the layer object identified from the model by its unique string representation."""
         if not isinstance(layer_names, list):
             layer_names = [layer_names]
         return get_layers_by_names(self.network, layer_names=layer_names)
+
+    def get_layer_by_name(self, layer_name):
+        """Retrieve the layer object identified from the model by its unique string representation."""
+        return self.get_layers_by_names(layer_name)[0]
 
     def get_layer_weights(self, layer_name):
         """Get the weights of a layer identified by its unique name."""
@@ -55,7 +69,12 @@ class Investigator:
 
         return out
 
+    def plot_model(self):
+        """Plot the network graph into a file."""
+        tf.keras.utils.plot_model(self.network, show_shapes=True)
+
     def dissect_recurrent_layer_weights(self, layer_name):
+        """Return a recurrent cells weights and biases in a named dictionary."""
         layer = self.get_layers_by_names(layer_name)[0]
 
         if not is_recurrent_model(layer):
@@ -150,15 +169,16 @@ class Investigator:
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
-    def render_episode(self, env: gym.Env):
+    def render_episode(self, env: gym.Env, to_gif: bool = False) -> None:
         """Render an episode in the given environment."""
         is_recurrent = is_recurrent_model(self.network)
+        self.network.reset_states()
 
         done = False
         state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
         cumulative_reward = 0
         while not done:
-            env.render()
+            env.render() if not to_gif else env.render(mode="rgb_array")
             probabilities = flatten(
                 self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
@@ -175,12 +195,13 @@ class Investigator:
 
 
 if __name__ == "__main__":
+    print("INVESTIGATING")
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(  1582557044  , from_iteration="b")
+    agent_007 = PPOAgent.from_agent_state(1582658038, from_iteration="b")
     inv = Investigator.from_agent(agent_007)
 
-    for i in range(10):
-        inv.render_episode(agent_007.env)
+    for i in range(100):
+        inv.render_episode(agent_007.env, to_gif=False)

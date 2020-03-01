@@ -15,7 +15,6 @@ class StdevLayer(tf.keras.layers.Layer):
         """Build the layer by adding the parameters representing the standard deviations."""
 
         # initializing the log stdevs as zeros essentially means we initialize the true standard deviations to 1
-        # TODO clip the standard deviations to prevent premature convergence?
         self.log_stdevs = self.add_weight("log_stdevs", shape=[self.n_actions, 1], initializer='zeros', trainable=True)
 
     def call(self, input, **kwargs):

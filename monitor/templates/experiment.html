@@ -13,14 +13,34 @@
     |
     <tag class="yellow"> <i class="fas fa-wave-square"></i> {{ info.hps.distribution }}</tag>
     <tag class="blue"> <i class="fas fa-brain"></i> {{ info.hps.model }}</tag>
+    <tag class="green"> <i class="fas fa-sitemap"></i> {{ info.hps.architecture }}</tag>
     <div style="opacity:0">
         <input type="text" id="copyText"/>
     </div>
     <h3 class="mt-3" id="agentId"> {{ info.current_id }} </h3>
 {% endblock %}
 
+{% block side_nav %}
+        <ul class="list-unstyled components">
+            <li class="active"><a href="#statistics-view">Training Statistics</a></li>
+            <li><a href="#hp-view">Hyperparameters</a></li>
+            <li><a href="#episode-gifs-view">Episode GIFs</a></li>
+            <li><a href="#model-view">Network Graph</a></li>
+        </ul>
+{% endblock %}
+
 {% block page_content %}
 
+    <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container-fluid">
+
+                <div class="reload-button">
+                    <button type="button" id="refresh" class="btn btn-circle btn-md">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
 
 <div class="topic-group" id="statistics-view">
     <div class="row justify-content-center">

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 import numpy
 import numpy as np
@@ -69,10 +69,10 @@ def get_layers_by_names(network: tf.keras.Model, layer_names: List[str]):
     return [layers[all_layer_names.index(layer_name)] for layer_name in layer_names]
 
 
-def build_sub_model_to(network: tf.keras.Model, tos: List[str], include_original=False):
+def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.keras.Model]], include_original=False):
     """Build a sub model of a given network that has (multiple) outputs at layer activations defined by a list of layer
     names."""
-    layers = get_layers_by_names(network, tos)
+    layers = get_layers_by_names(network, tos) if isinstance(tos[0], str) else tos
     outputs = []
 
     # probe layers to check if model can be build to them
@@ -154,3 +154,11 @@ def calc_max_memory_usage(model: tf.keras.Model):
     total_memory = (n_shapes + n_parameters + n_activations) * 32
 
     return total_memory * 1.1641532182693481 * 10 ** -10
+
+
+CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
+
+
+def is_conv(layer):
+    """Check if layer is convolutional."""
+    return isinstance(layer, CONVOLUTION_BASE_CLASS)

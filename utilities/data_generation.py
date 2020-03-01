@@ -19,7 +19,7 @@ def gen_cube_quats_prediction_data(n):
     hand_env.reset()
     for i in tqdm(range(n), desc="Sampling Data"):
         sample, r, done, info = hand_env.step(hand_env.action_space.sample())
-        image = sample["observation"][0]
+        image = sample["observation"][0] / 255
         quaternion = sample["achieved_goal"]
         X[i] = image
         Y[i] = quaternion
@@ -27,7 +27,7 @@ def gen_cube_quats_prediction_data(n):
         if done:
             hand_env.reset()
 
-    return tf.data.Dataset.from_tensor_slices((X, Y))
+    return tf.convert_to_tensor(X.astype("float32")), tf.convert_to_tensor(Y.astype("float32"))
 
 
 if __name__ == '__main__':

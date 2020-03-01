@@ -12,34 +12,34 @@ def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
 
     # first layer
     x = tf.keras.layers.Conv2D(32, 11, 4)(inputs)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
 
     # second layer
     x = tf.keras.layers.Conv2D(32, 5, 1, padding="same")(x)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
 
     # third layer
     x = tf.keras.layers.Conv2D(64, 3, 1, padding="same")(x)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
 
     # fourth layer
     x = tf.keras.layers.Conv2D(64, 3, 1, padding="same")(x)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
 
     # fifth layer
     x = tf.keras.layers.Conv2D(32, 3, 1, padding="same")(x)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
 
     x = tf.keras.layers.MaxPool2D(3, 2)(x)
 
     # fully connected layers
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(512)(x)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
     x = tf.keras.layers.Dense(512)(x)
-    x = tf.keras.layers.ReLU()(x)
+    x = tf.keras.layers.Activation("tanh")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 

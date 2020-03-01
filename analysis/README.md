@@ -30,7 +30,7 @@ to be either 1 or 3. For the first convolutional layer of a pretrained VGG16 mod
 ```python
 model = tf.keras.applications.VGG16()
 analyzer = NetworkAnalyzer(model, mode="show")
-analyzer.visualize_layer_weights("block1_conv1")
+analyzer.layer_weights_plot("block1_conv1")
 ```
 
 This produces the following visualization:
@@ -44,7 +44,7 @@ a low input resolution and successively upscales the input. This produces patter
 
 For the first convolutional layer of a pretrained VGG16 model, this can be used as follows:
 ```python
-analyzer.visualize_max_filter_respondence("block2_conv2", feature_ids=[24, 57, 89, 120, 42, 26, 45, 21, 99])
+analyzer.preferred_stimulus("block2_conv2", feature_ids=[24, 57, 89, 120, 42, 26, 45, 21, 99])
 ```
 ![](https://i.postimg.cc/6QgTssV2/feature-maximization-block2-conv2-24-57-89-120-42-26-45-21-99.png)
 
@@ -59,7 +59,7 @@ these images get smaller and smaller and less interpretable.
 
 ```python
 reference = mpimg.imread("hand.png")
-analyzer.visualize_activation_map("block1_conv1", reference, mode="gray")
+analyzer.feature_map("block1_conv1", reference, mode="gray")
 ```
 
 ![](https://i.postimg.cc/sf92rL46/feature-maps-block1-conv1-gray.png)
@@ -71,7 +71,7 @@ image in greyscale, overlayed by this heatmap.
 
 ```python
 reference = mpimg.imread("hand.png")
-analyzer.visualize_activation_map("block1_conv1", reference, mode="heat")
+analyzer.feature_map("block1_conv1", reference, mode="heat")
 ```
 
 ![](https://i.postimg.cc/ZnL2Mp3H/feature-maps-block1-conv1-heat.png)
@@ -82,7 +82,7 @@ spatial dimensions.
 
 ```python
 reference = mpimg.imread("hase.jpg")
-analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
+analyzer.feature_map("block1_conv2", reference, mode="gray")
 ```
 
 ![](https://i.postimg.cc/DyPWSMhH/feature-maps-block1-conv2-plot.png)

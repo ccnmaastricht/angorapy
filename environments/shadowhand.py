@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 from gym import utils, spaces
-from gym.envs.robotics import HandReachEnv
+from gym.envs.robotics import HandReachEnv, HandBlockEnv
 from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS
 from gym.envs.robotics.utils import robot_get_obs
@@ -241,17 +241,14 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
 class ShadowHandReach(HandReachEnv):
     """Simpler Reaching task."""
 
-    def __init__(self, distance_threshold=0.01, n_substeps=20, relative_control=True,
-                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', ):
+    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
+        self.success_multiplier = success_multiplier
 
     def compute_reward(self, achieved_goal, goal, info):
-        r = super().compute_reward(achieved_goal, goal, info)
-        if self._is_success(achieved_goal, desired_goal=goal):
-            r += 10
-            print("SUCCESS!")
-
-        return r
+        """Compute reward with additional success bonus."""
+        return super().compute_reward(achieved_goal, goal, info) + info["is_success"] * self.success_multiplier
 
     def _get_obs(self):
         robot_qpos, robot_qvel = robot_get_obs(self.sim)
@@ -265,6 +262,20 @@ class ShadowHandReach(HandReachEnv):
         }
 
 
+class ShadowHandBlockVector(HandBlockEnv):
+
+    def _get_obs(self):
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        object_qvel = self.sim.data.get_joint_qvel('object:joint')
+        achieved_goal = self._get_achieved_goal().ravel()  # this contains the object position + rotation
+        observation = np.concatenate([robot_qpos, robot_qvel, object_qvel, achieved_goal, self.goal.ravel().copy()])
+        return {
+            'observation': observation.copy(),
+            'achieved_goal': achieved_goal.copy(),
+            'desired_goal': self.goal.ravel().copy(),
+        }
+
+
 if __name__ == "__main__":
     from environments import *
 
@@ -275,6 +286,6 @@ if __name__ == "__main__":
     while True:
         env.render()
         action = env.action_space.sample()
-        s, r, d, info = env.step(action)
+        s, r, d, i = env.step(action)
         if d:
             env.reset()

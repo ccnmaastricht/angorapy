@@ -54,7 +54,7 @@ for i, name in enumerate(include_configs):
                          alpha=0 if args.no_confidence else 0.2)
 
     ax = plt.gca()
-    ax.set_facecolor("#FBFBFB")
+    # ax.set_facecolor("#FBFBFB")
 
     plt.xlabel("Cycle")
     plt.ylabel("Mean Cumulative Reward")

@@ -85,7 +85,7 @@ $.when(
     let meta = req_1[0];
     let prog = req_2[0];
 
-    console.log(prog);
+    console.log(meta["environment"]["reward_threshold"]);
 
     let reward_means = prog["rewards"]["mean"];
 
