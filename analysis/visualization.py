@@ -291,7 +291,8 @@ class Visualizer(Investigator):
         output_gradient = tape.gradient(loss, reference)
         saliency_map = tf.reduce_max(tf.math.abs(output_gradient), axis=-1)
 
-        plt.imshow(saliency_map, cmap="jet")
+        if self.mode != "return":
+            plt.imshow(saliency_map, cmap="jet")
 
         if self.mode == "show":
             plt.show()
@@ -338,19 +339,16 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     f_weights = False
-    f_max = True
+    f_max = False
     f_map = False
-    f_salience = False
+    f_salience = True
     do_tsne = False
 
     tf.random.set_seed(69420)
 
-    model = tf.keras.models.load_model("../storage/pretrained/tanh_c.h5",
+    model = tf.keras.models.load_model("../storage/pretrained/visual_r.h5",
                                        custom_objects={"top_5_accuracy": top_5_accuracy})
-    # model: tf.keras.Model = tf.keras.applications.vgg16.VGG16(weights="imagenet")
-
     analyzer = Visualizer(model, mode="show")
-    print(analyzer.list_layer_names())
 
     # WEIGHT VISUALIZATION
     if f_weights:

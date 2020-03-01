@@ -47,13 +47,18 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
     distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if "ShadowHand" in environment:
+    if "ShadowHand" in environment or settings["architecture"] == "shadow":
+        if settings["model"] == "ffn":
+            print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
+            settings["model"] = "gru"
+
         if env.visual_input:
             build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"])
         else:
             build_models = build_blind_shadow_brain_v1
     else:
-        build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"], shared=settings["shared"])
+        build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
+                                         shared=settings["shared"])
 
     # make preprocessor
     preprocessor = CombiWrapper(

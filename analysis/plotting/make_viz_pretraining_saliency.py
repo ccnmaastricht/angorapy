@@ -22,9 +22,9 @@ tf.random.set_seed(69420)
 reference = mpimg.imread("analysis/img/hand.png")
 
 # ANALYZERS
-analyzer_c = Visualizer.from_saved_model("storage/pretrained/caltech_c.h5", mode="return")
-analyzer_r = Visualizer.from_saved_model("storage/pretrained/visual_r.h5", mode="return")
-analyzer_p = Visualizer.from_saved_model("storage/pretrained/hands_h.h5", mode="return")
+analyzer_c = Visualizer.from_saved_model("storage/pretrained/tanh_c.h5", mode="return")
+analyzer_r = Visualizer.from_saved_model("storage/pretrained/tanh_r.h5", mode="return")
+analyzer_p = Visualizer.from_saved_model("storage/pretrained/tanh_h.h5", mode="return")
 
 axs: List[Axes]
 fig: Figure = plt.figure(figsize=(9, 3))
@@ -39,7 +39,7 @@ for row in [0, 1]:
         if col > 3:
             analyzer = analyzer_p
 
-        salience = analyzer.saliency_map(reference, layer_name="dense", neuron=random.randint(0, 512))
+        salience = analyzer.saliency_map(reference, layer_name="dense_1", neuron=random.randint(0, 512))
 
         print([row, col])
         ax = fig.add_subplot(grid[row, col])
