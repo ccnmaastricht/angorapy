@@ -98,3 +98,4 @@ Saliency maps give indication of the importance of a pixel to the activity of a 
 reference = mpimg.imread("hand.jpg")
 analyzer.saliency_map(reference, layer_name="dense_1", neuron=1)
 ```
+[![pretraining-methods-saliency.png](https://i.postimg.cc/QNgsC2qJ/pretraining-methods-saliency.png)](https://postimg.cc/QVMvnnwF)
