@@ -13,29 +13,26 @@ To install all required python packages run
 pip install -r requirements.txt
 ```
 
-Additionally some libraries and permissions will be required. Run
-
-```bash
-sudo bash install.sh
-```
-
 To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) 
-as well as mujoco-py. CUrrently, mujoco-py is buggy with MuJoCo 2.0, you will need version 1.5 of both MuJoCo and mujocopy!
+as well as mujoco-py. Currently, mujoco-py is buggy with MuJoCo 2.0, you will need version 1.5 of both MuJoCo and mujocopy!
 
 To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`. 
 
-## Usage
+To train on a GPU you will need CUDA 10.0 and cuDNN. Please refer to the <a href="https://www.tensorflow.org/">tensorflow documention</a> for installation instruction.
 
-The python files `train.py` and `evaluate.py` provide ready-made scripts for training 
-and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component
-of a network on classification or reconstruction. `benchmark.py` provides functionality for training a batch of agents 
-possibly using different configs for comparison of strategies.
+## Other READMEs
+We divide READMEs over different modules of this repository. You can find more info at:
+
+ - <a href="analysis/README.md">Analysis</a>
+ - <a href="monitor/README.md">Monitoring</a>
+
+## Usage
+The python files `train.py` and `evaluate.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.
 
 ### Training an Agent
-
 By using the `train.py` script you can train an agent on any environment and set hyperparameters, model and other
- options. Additionally, a monitor will be automatically added to the drilling of the agent, s.t. you can inspect
- the training progress. For more detail consult the monitoring <a href="monitor/README.md">README</a>. 
+options. Additionally, a monitor will be automatically added to the drilling of the agent, s.t. you can inspect
+the training progress. For more detail consult the <a href="monitor/README.md">monitoring page</a>. 
 
 The scripts commandline parameters are as follows:
 
@@ -105,3 +102,34 @@ optional arguments:
   --clip-values         clip value objective
   --stop-early          stop early if threshold of env was surpassed
 ```
+
+### Pretraining a Component
+The python script `pretrain.py` can be used to train the visual component on one of three bootstrapping tasks: classification, pose estimation and reconstruction. Usage is as follows:
+
+    usage: pretrain.py [-h] [--name NAME] [--load LOAD] [--epochs EPOCHS]
+                       [{classify,reconstruct,hands,c,r,h}]
+
+    Pretrain a visual component on classification or reconstruction.
+
+    positional arguments:
+      {classify,reconstruct,hands,c,r,h}
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --name NAME           Name the pretraining to uniquely identify it.
+      --load LOAD           load the weights from checkpoint path
+      --epochs EPOCHS       number of pretraining epochs
+
+### Evaluating an Agent
+Use the `evaluate.py` script to easily evaluate a trained agent. Agents are identified by their ID stated in the beginning of a training. You can also find agent IDs in the monitor. Use the script as follows:
+
+    usage: evaluate.py [-h] [-n N] [id]
+
+    Evaluate an agent.
+
+    positional arguments:
+      id          id of the agent, defaults to newest
+
+    optional arguments:
+      -h, --help  show this help message and exit
+      -n N        number of evaluation episodes

@@ -1,8 +1,11 @@
 # Analysis
 
-## Visualization
+## The Investigator API
 
-The `analysis` module provides the `NetworkAnalyzer` class, which can be used to visualize certain aspects of a trained 
+Analysis software in this framework is structured using the Investigator API. The `Investigator` class should be inherited by any analysis tools to have access to a variety of network manipulation and management functionality
+
+## Visualization
+The `Visualizer` class is implemented in the Investigator API and can be used to visualize certain aspects of a trained 
 model. For any existing model, the Analyzer simply functions as a wrapper for the model:
 
 ```python
@@ -86,3 +89,13 @@ analyzer.feature_map("block1_conv2", reference, mode="gray")
 ```
 
 ![](https://i.postimg.cc/DyPWSMhH/feature-maps-block1-conv2-plot.png)
+
+
+### Sacliency Maps
+Saliency maps give indication of the importance of a pixel to the activity of a neuron, based on the gradients of the input image w.r.t. the neurons response.
+
+```python
+reference = mpimg.imread("hand.jpg")
+analyzer.saliency_map(reference, layer_name="dense_1", neuron=1)
+```
+[![pretraining-methods-saliency.png](https://i.postimg.cc/QNgsC2qJ/pretraining-methods-saliency.png)](https://postimg.cc/QVMvnnwF)
