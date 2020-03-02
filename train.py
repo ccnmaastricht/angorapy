@@ -100,7 +100,10 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
-    agent.set_gpu(not settings["cpu"])
+    if tf.test.is_gpu_available():
+        agent.set_gpu(not settings["cpu"])
+    else:
+        agent.set_gpu(False)
 
     monitor = None
     if use_monitor:
