@@ -47,7 +47,7 @@ fps = fpf.find_fixed_points(states, inputs)
 plot_fixed_points(activations, fps, 2000, 2)
 
 
-reco = Rnnconstructor(fps, n_hidden,
+reco = Rnnconstructor(fps, n_hidden, rnn_type,
                       epsilon=0.01,
                       alr_decayr=0.0001,
                       max_iters=5000)

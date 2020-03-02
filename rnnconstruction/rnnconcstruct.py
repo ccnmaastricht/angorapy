@@ -3,17 +3,20 @@ from fixedpointfinder.build_utils import build_rnn_ds
 import autograd.numpy as np
 from fixedpointfinder.minimization import adam_weights_optimizer
 import tensorflow as tf
+from rnnconstruction.build_utils import build_rnn_ds, build_gru_ds
 
-class Rnnconstructor():
+
+class Rnnconstructor:
+
     adam_default_hps = {'alr_hps': {'decay_rate': 0.0001},
                         'agnc_hps': {'norm_clip': 1.0,
                                      'decay_rate': 1e-03},
-                        'adam_hps': {'epsilon': 1e-03,
-                                     'max_iters': 2,
+                        'adam_hps': {'epsilon': 1e-02,
+                                     'max_iters': 2000,
                                      'method': 'joint',
                                      'print_every': 200}}
 
-    def __init__(self, fps, n_hidden,
+    def __init__(self, fps, n_hidden, rnn_type,
                  alr_decayr=adam_default_hps['alr_hps']['decay_rate'],
                  agnc_normclip=adam_default_hps['agnc_hps']['norm_clip'],
                  agnc_decayr=adam_default_hps['agnc_hps']['decay_rate'],
@@ -26,6 +29,7 @@ class Rnnconstructor():
         The recurrent kernel may afterwars be reimplemented into a neural network
         with a specific recurrent layer. """
         self.n_hidden = n_hidden
+        self.rnn_type = rnn_type
         self.alr_decayr = alr_decayr
         self.agnc_normclip = agnc_normclip
         self.agnc_decayr = agnc_decayr
@@ -47,8 +51,10 @@ class Rnnconstructor():
             return target
 
         target = create_target(self.fps)
-        def fun(x):
-            return np.max(0.5 * np.sum(((- target + np.matmul(np.tanh(target), x)) ** 2), axis=1))
+        if self.rnn_type == 'vanilla':
+            fun = build_rnn_ds(target)
+        elif self.rnn_type == 'gru':
+            fun = build_gru_ds(target)
 
         return fun
 
