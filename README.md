@@ -2,6 +2,8 @@
 
 # Dexterous Robot Hand
 
+[![handreach.gif](https://i.postimg.cc/ZYgWRqFM/handreach.gif)](https://postimg.cc/vDrY2bKr)
+
 ### Requirements
 
 This project was scripted and tested for `python 3.6` and should also work on any newer version of python.
@@ -37,12 +39,13 @@ the training progress. For more detail consult the <a href="monitor/README.md">m
 The scripts commandline parameters are as follows:
 
 ```
-usage: train.py [{any registered environment}]
-                [-h] [--model {ffn,rnn,lstm,gru}]
+usage: train.py [-h] [--architecture {simple,deeper,shadow}]
+                [--model {ffn,rnn,lstm,gru}]
                 [--distribution {categorical,gaussian,beta}] [--shared]
                 [--iterations ITERATIONS] [--config CONFIG] [--cpu]
-                [--load-from LOAD_FROM] [--preload PRELOAD]
-                [--export-file EXPORT_FILE] [--eval] [--save-every SAVE_EVERY]
+                [--sequential] [--load-from LOAD_FROM] [--preload PRELOAD]
+                [--export-file EXPORT_FILE] [--eval] [--radical-evaluation]
+                [--save-every SAVE_EVERY]
                 [--monitor-frequency MONITOR_FREQUENCY]
                 [--gif-every GIF_EVERY] [--debug] [--workers WORKERS]
                 [--horizon HORIZON] [--discount DISCOUNT] [--lam LAM]
@@ -51,12 +54,17 @@ usage: train.py [{any registered environment}]
                 [--lr-schedule {None,exponential}] [--clip CLIP]
                 [--c-entropy C_ENTROPY] [--c-value C_VALUE] [--tbptt TBPTT]
                 [--grad-norm GRAD_NORM] [--clip-values] [--stop-early]
+                [{any valid gym env}]
+
+Train a PPO Agent on some task.
 
 positional arguments:
-  {... any registered environment} the target environment
+  {any valid gym env}   the target environment
 
 optional arguments:
   -h, --help            show this help message and exit
+  --architecture {simple,deeper,shadow}
+                        architecture of the policy
   --model {ffn,rnn,lstm,gru}
                         model type if not shadowhand
   --distribution {categorical,gaussian,beta}
@@ -66,13 +74,14 @@ optional arguments:
                         number of iterations before training ends
   --config CONFIG       config name (utilities/configs.py) to be loaded
   --cpu                 use cpu only
+  --sequential          run worker sequentially workers
   --load-from LOAD_FROM
                         load from given agent id
   --preload PRELOAD     load visual component weights from pretraining
   --export-file EXPORT_FILE
                         save policy to be loaded in workers into file
-  --eval                evaluate separately (instead of using worker
-                        experience)
+  --eval                evaluate additionally to have at least 5 eps
+  --radical-evaluation  only record stats from seperate evaluation
   --save-every SAVE_EVERY
                         save agent every given number of iterations
   --monitor-frequency MONITOR_FREQUENCY
@@ -81,7 +90,7 @@ optional arguments:
                         make a gif every n iterations.
   --debug               run in debug mode
   --workers WORKERS     the number of workers exploring the environment
-  --horizon HORIZON     the number of optimization epochs in each cycle
+  --horizon HORIZON     number of timesteps one worker generates
   --discount DISCOUNT   discount factor for future rewards
   --lam LAM             lambda parameter in the GAE algorithm
   --no-state-norming    do not normalize states
@@ -101,6 +110,7 @@ optional arguments:
                         norm for gradient clipping, 0 deactivates
   --clip-values         clip value objective
   --stop-early          stop early if threshold of env was surpassed
+
 ```
 
 ### Pretraining a Component
