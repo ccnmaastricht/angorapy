@@ -129,7 +129,7 @@ if __name__ == "__main__":
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs,
                         help="the target environment")
-    parser.add_argument("--architecture", choices=["simple", "deeper", "shadow"], default=None,
+    parser.add_argument("--architecture", choices=["simple", "deeper", "shadow"], default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if not shadowhand")
