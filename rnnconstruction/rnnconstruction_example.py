@@ -49,8 +49,8 @@ plot_fixed_points(activations, fps, 2000, 2)
 
 reco = Rnnconstructor(fps, n_hidden,
                       epsilon=0.01,
-                      alr_decayr=0.00001,
-                      max_iters=4000)
+                      alr_decayr=0.0001,
+                      max_iters=5000)
 
 recurrentweights = reco.train_recurrentweights(flopper.weights[1])
 weights[1] = recurrentweights
