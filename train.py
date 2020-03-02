@@ -100,7 +100,10 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
-    agent.set_gpu(not settings["cpu"])
+    if tf.test.is_gpu_available():
+        agent.set_gpu(not settings["cpu"])
+    else:
+        agent.set_gpu(False)
 
     monitor = None
     if use_monitor:
@@ -129,7 +132,7 @@ if __name__ == "__main__":
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs,
                         help="the target environment")
-    parser.add_argument("--architecture", choices=["simple", "deeper", "shadow"], default=None,
+    parser.add_argument("--architecture", choices=["simple", "deeper", "shadow"], default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if not shadowhand")

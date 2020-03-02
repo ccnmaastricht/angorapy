@@ -1,0 +1,29 @@
+\begin{tabular}{lllllll}
+\toprule
+{} & discrete & continuous &  pendulum &  mujoco &   roboschool &         hand \\
+\midrule
+\textbf{architecture     } &   simple &     simple &    simple &  simple &       simple &       simple \\
+\textbf{shared           } &    False &      False &     False &   False &        False &        False \\
+\textbf{distribution     } &     None &       None &  gaussian &    None &         None &         None \\
+\textbf{early\_stopping   } &    False &      False &     False &   False &        False &        False \\
+\textbf{model            } &      ffn &        ffn &       ffn &     ffn &          ffn &          ffn \\
+\textbf{no\_reward\_norming} &    False &      False &     False &   False &        False &        False \\
+\textbf{no\_state\_norming } &    False &      False &     False &   False &        False &        False \\
+\textbf{lr\_schedule      } &     None &       None &      None &    None &  exponential &  exponential \\
+\textbf{tbptt            } &       16 &         16 &        16 &      16 &           16 &           16 \\
+\textbf{workers          } &        8 &          8 &         8 &       1 &           32 &           16 \\
+\textbf{clip\_values      } &    False &      False &     False &   False &        False &        False \\
+\textbf{lr\_pi            } &   0.0003 &     0.0003 &    0.0003 &  0.0003 &       0.0003 &       0.0005 \\
+\textbf{lam              } &     0.95 &       0.95 &      0.95 &    0.95 &         0.95 &         0.95 \\
+\textbf{iterations       } &      100 &        100 &       100 &     488 &         3051 &         5000 \\
+\textbf{horizon          } &     2048 &       2048 &       512 &    2048 &          512 &          512 \\
+\textbf{grad\_norm        } &      0.5 &        0.5 &       0.5 &     0.5 &          0.5 &          0.5 \\
+\textbf{eval             } &    False &      False &     False &   False &        False &        False \\
+\textbf{epochs           } &       10 &         10 &        10 &      10 &           15 &           10 \\
+\textbf{discount         } &     0.99 &       0.99 &      0.99 &    0.99 &         0.99 &        0.998 \\
+\textbf{clip             } &      0.2 &        0.2 &       0.2 &     0.2 &          0.2 &          0.2 \\
+\textbf{c\_value          } &        1 &          1 &         1 &       1 &            1 &            1 \\
+\textbf{c\_entropy        } &     0.01 &          0 &         0 &       0 &            0 &         0.01 \\
+\textbf{batch\_size       } &      128 &         64 &        64 &      64 &         4096 &          256 \\
+\bottomrule
+\end{tabular}
