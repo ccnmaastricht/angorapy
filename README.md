@@ -2,6 +2,8 @@
 
 # Dexterous Robot Hand
 
+[![handreach.gif](https://i.postimg.cc/ZYgWRqFM/handreach.gif)](https://postimg.cc/vDrY2bKr)
+
 ### Requirements
 
 This project was scripted and tested for `python 3.6` and should also work on any newer version of python.
