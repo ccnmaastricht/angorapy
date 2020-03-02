@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""TODO Module Docstring."""
+"""Data reading and writing utilities for distributed learning."""
 import os
 import random
 

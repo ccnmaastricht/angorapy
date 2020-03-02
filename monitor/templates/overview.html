@@ -6,11 +6,48 @@
     {#                <h3> A Subtitle </h3>#}
 {% endblock %}
 
-
+{% block side_nav %}
+        <ul class="list-unstyled components">
+            <li class="active"><a href="#bookmark-view">Bookmarked Experiments</a></li>
+            <li><a href="#all-view">Other Experiments</a></li>
+        </ul>
+{% endblock %}
 
 {% block page_content %}
 
-    <div class="topic-group">
+    <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container-fluid">
+
+                <div class="reload-button">
+                    <button type="button" id="refresh" class="btn btn-circle btn-md">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+
+                <div>
+                    <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i>
+                        Clear All Empty
+                    </button>
+
+                    <button type="button" class="btn btn-warning" id="clear-short"><i class="fas fa-trash-alt"></i>
+                        Clear All Short
+                    </button>
+                </div>
+
+                <div>
+                    {#                <label for="filter-env">Show</label>#}
+                    <select class="custom-select" id="filter-env">
+                        <option selected>Show All</option>
+                        {% for env in envs_available|sort(reverse=true) %}
+                            <option value="{{ env }}">{{ env }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+        </nav>
+
+    <div class="topic-group"  id="bookmark-view">
 
         <table class="table table-hover">
             <thead class="thead-dark bookmarked">
@@ -47,7 +84,7 @@
         </table>
     </div>
 
-    <div class="topic-group">
+    <div class="topic-group"  id="all-view">
 
         <table class="table table-hover">
             <thead class="thead-dark">

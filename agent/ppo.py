@@ -328,11 +328,18 @@ class PPOAgent:
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
+
+            # every tenth iteration reconstruct workers to prevent tensorflow memory leakage
+            if self.iteration % 50 == 0:
+                flat_print("Recreating Workers...")
+                del workers
+                workers = self._make_workers(parallel)
+
             time_dict = OrderedDict()
             subprocess_start = time.time()
 
             # run simulations in parallel
-            flat_print("Gathering...")
+            flat_print(f"Gathering cycle {self.iteration}...")
 
             # export the current state of the policy and value network under unique (-enough) key
             if export:
@@ -386,18 +393,15 @@ class PPOAgent:
             # make seperate evaluation if necessary and wanted
             stats_with_evaluation = stats
             if separate_eval:
-                if not radical_evaluation and not stats.numb_completed_episodes < MIN_STAT_EPS:
-                    # we do not want to do it radically, and have enough episodes already
-                    continue
+                if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
+                    flat_print("Evaluating...")
+                    n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
+                    evaluation_stats = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
 
-                flat_print("Evaluating...")
-                n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
-                evaluation_stats = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
-
-                if radical_evaluation:
-                    stats_with_evaluation = evaluation_stats
-                else:
-                    stats_with_evaluation = condense_stats([stats, evaluation_stats])
+                    if radical_evaluation:
+                        stats_with_evaluation = evaluation_stats
+                    else:
+                        stats_with_evaluation = condense_stats([stats, evaluation_stats])
 
             elif stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
@@ -637,7 +641,7 @@ class PPOAgent:
             ray_already_initialized (bool): if True, do not initialize ray again (default False)
 
         Returns:
-            two lists of length n, giving episode lengths and rewards respectively
+            StatBundle with evaluation results
         """
 
         if not ray_already_initialized:
@@ -746,7 +750,7 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None) -> "PPOAgent":
+    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None, path_modifier="") -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
@@ -758,9 +762,10 @@ class PPOAgent:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
         """
         # TODO also load the state of the optimizers
-        agent_path = BASE_SAVE_PATH + f"/{agent_id}"
+        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}"
+        print(agent_path)
         if not os.path.isdir(agent_path):
-            raise FileNotFoundError("The given agent ID does not match any existing save history.")
+            raise FileNotFoundError("The given agent ID does not match any existing save history from your current path.")
 
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID's save history is empty.")

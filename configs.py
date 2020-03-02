@@ -40,6 +40,7 @@ discrete = make_config(
 )
 
 discrete_no_ent = derive_config(discrete, {"c_entropy": 0.0})
+discrete_shared = derive_config(discrete, {"shared": True})
 discrete_rnn = derive_config(discrete, {"model": "rnn"})
 discrete_gru = derive_config(discrete, {"model": "gru"})
 discrete_lstm = derive_config(discrete, {"model": "lstm"})
@@ -66,6 +67,7 @@ continuous = make_config(
     clip_values=False
 )
 
+continuous_shared = derive_config(continuous, {"shared": True})
 continuous_rnn = derive_config(continuous, {"model": "rnn"})
 continuous_gru = derive_config(continuous, {"model": "gru"})
 continuous_lstm = derive_config(continuous, {"model": "lstm"})
@@ -131,11 +133,12 @@ mujoco_beta_rnn = derive_config(mujoco_beta, {"model": "rnn"})
 mujoco_beta_gru = derive_config(mujoco_beta, {"model": "gru"})
 mujoco_beta_lstm = derive_config(mujoco_beta, {"model": "lstm"})
 mujoco_vc = derive_config(mujoco, {"clip_values": True})
+mujoco_beta_shared = derive_config(mujoco_beta, {"shared": True})
 
 # ROBOSCHOOL TASKS
 
 roboschool = make_config(
-    iterations=50000000 // 2048,  # 50 million timesteps
+    iterations=50000000 // (32 * 512),  # 50 million timesteps
     workers=32,
     batch_size=4096,
     horizon=512,
@@ -152,15 +155,17 @@ roboschool = make_config(
                                 # statistics towards failing episodes
 )
 
+roboschool_beta = derive_config(roboschool, {"distribution": "beta"})
+
 # HAND ENVS
 
 hand = make_config(
-    iterations=1000,
+    iterations=5000,
     workers=16,
-    batch_size=4096,
+    batch_size=256,
     horizon=512,
     c_entropy=0.01,
-    lr_pi=0.0003,
+    lr_pi=5e-4,
     lr_schedule="exponential",
     epochs=10,
     clip=0.2,
@@ -171,6 +176,7 @@ hand = make_config(
 )
 
 hand_beta = derive_config(hand, {"distribution": "beta"})
+hand_beta_no_ent = derive_config(hand_beta, {"c_entropy": 0.0})
 
 hand_shadow = derive_config(hand, {"architecture": "shadow"})
 hand_shadow_beta = derive_config(hand_shadow, {"distribution": "beta"})
@@ -181,7 +187,7 @@ recommended_config = dict(
     **dict.fromkeys(
         ["CartPole-v2", "CartPole-v1"], discrete_no_norms
     ), **dict.fromkeys(
-        ["Acrobot-v1", "MountainCar-v0"], discrete
+        ["Acrobot-v1", "MountainCar-v0", "lunarLander-v2"], discrete
     ), **dict.fromkeys(
         ["Pendulum-v0"], pendulum_beta
     ), **dict.fromkeys(
@@ -191,5 +197,28 @@ recommended_config = dict(
          "Swimmer-v2", "Walker2d-v2"], mujoco_beta
     ), **dict.fromkeys(
         ["Reacher-v2"], mujoco
+    ), **dict.fromkeys(
+        ["Humanoid-v2", "HumanoidStandup-v2"], roboschool
     ),
 )
+
+
+if __name__ == '__main__':
+    import pandas as pd
+
+    config_table = pd.DataFrame.from_dict(
+        dict(
+            discrete=discrete,
+            continuous=continuous,
+            pendulum=pendulum,
+            mujoco=mujoco,
+            roboschool=roboschool,
+            hand=hand
+        )
+    )
+
+    config_table = config_table.drop(["env", "radical_evaluation", "preload", "sequential", "debug", "cpu", "export_file",
+                       "load_from", "save_every"])
+
+    with open("docs/hp_table.tex", "w") as f:
+        config_table.to_latex(f, bold_rows=True)

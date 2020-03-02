@@ -25,6 +25,8 @@ from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNo
 
 class Gatherer:
     """Remote Gathering class."""
+    joint: tf.keras.Model
+    policy: tf.keras.Model
 
     def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int):
         model_builder = getattr(models, model_builder_name)
@@ -57,6 +59,9 @@ class Gatherer:
             self.env.seed(1)
 
         preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
+
+        # reset states of potentially recurrent net
+        self.joint.reset_states()
 
         # buffer storing the experience and stats
         if self.is_recurrent:
@@ -113,7 +118,7 @@ class Gatherer:
                 # calculate advantages for the finished episode, where the last value is 0 since it refers to the
                 # terminal state that we just observed
                 episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
-                                                                 values[-episode_steps:] + [0],  # TODO check if this makes sense with reard norming
+                                                                 values[-episode_steps:] + [0],
                                                                  discount, lam)
                 episode_returns = episode_advantages + values[-episode_steps:]
 
@@ -187,6 +192,9 @@ class Gatherer:
     def evaluate(self, preprocessor_serialized: dict) -> Tuple[int, int]:
         """Evaluate one episode of the given environment following the given policy. Remote implementation."""
         preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
+
+        # reset policy states as it might be recurrent
+        self.policy.reset_states()
 
         done = False
         state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None), update=False)[0]

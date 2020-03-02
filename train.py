@@ -47,13 +47,18 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
     distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if "ShadowHand" in environment:
+    if "ShadowHand" in environment or settings["architecture"] == "shadow":
+        if settings["model"] == "ffn":
+            print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
+            settings["model"] = "gru"
+
         if env.visual_input:
             build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"])
         else:
             build_models = build_blind_shadow_brain_v1
     else:
-        build_models = get_model_builder(model_type=settings["model"], shared=settings["shared"])
+        build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
+                                         shared=settings["shared"])
 
     # make preprocessor
     preprocessor = CombiWrapper(
@@ -124,7 +129,8 @@ if __name__ == "__main__":
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs,
                         help="the target environment")
-    parser.add_argument("--architecture", choices=["simple", "shadow"], default=None, help="architecture of the policy")
+    parser.add_argument("--architecture", choices=["simple", "deeper", "shadow"], default=None,
+                        help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if not shadowhand")
     parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta"])

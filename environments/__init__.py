@@ -2,13 +2,13 @@
 
 import gym
 
+from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
+    LunarLanderContinuousNoVel
 from environments.evasion import Evasion
 from environments.evasionwalls import EvasionWalls
 from environments.race import Race
-from environments.shadowhand import ShadowHandBlock, ShadowHandReach
+from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector
 from environments.tunnel import Tunnel
-from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
-    LunarLanderContinuousNoVel
 
 # SHADOW HAND
 
@@ -28,14 +28,28 @@ gym.envs.register(
     id='HandReachDenseRelative-v0',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": True},
-    max_episode_steps=50,
+    max_episode_steps=100,
 )
 
 gym.envs.register(
     id='HandReachDenseAbsolute-v0',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": False},
-    max_episode_steps=50,
+    max_episode_steps=100,
+)
+
+gym.envs.register(
+    id='HandReachDenseAbsolute-v1',
+    entry_point='environments:ShadowHandReach',
+    kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
+    max_episode_steps=100,
+)
+
+gym.envs.register(
+    id='EasyBlockManipulate-v0',
+    entry_point='environments:ShadowHandBlockVector',
+    kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "reward_type": "dense"},
+    max_episode_steps=100,
 )
 
 # MODIFIED ENVIRONMENTS

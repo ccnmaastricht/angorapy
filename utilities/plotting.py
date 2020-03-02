@@ -1,7 +1,10 @@
 """interactive plotting from https://stackoverflow.com/a/31417070/5407682"""
 import colorsys
+import math
+from typing import List
 
 import matplotlib.pyplot as plt
+import numpy
 import numpy as np
 from matplotlib import pyplot as plt, colors as mc
 
@@ -100,3 +103,32 @@ def lighten_color(color, amount=0.5):
     c = colorsys.rgb_to_hls(*mc.to_rgb(c))
 
     return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
+
+
+def plot_image_tiling(images: List[numpy.ndarray], cmap: str = None):
+    # prepare subplots
+    n_filters = len(images)
+    tiles_per_row = math.ceil(math.sqrt(n_filters))
+    fig, axes = plt.subplots(tiles_per_row, tiles_per_row)
+    plt.subplots_adjust(wspace=0.05, hspace=0.05)
+
+    i = 0
+    axes = [[axes]] if not isinstance(axes, numpy.ndarray) else axes
+    for row_of_axes in axes:
+        for axis in row_of_axes:
+            if i < n_filters:
+                axis.imshow(images[i], cmap=cmap) if cmap is not None else axis.imshow(images[i])
+            else:
+                axis.axis("off")
+            axis.set_xticks([])
+            axis.set_yticks([])
+            i += 1
+
+    return fig, axes
+
+
+def transparent_cmap(cmap, N=255):
+    """https://stackoverflow.com/questions/42481203/heatmap-on-top-of-image"""
+    cmap._init()
+    cmap._lut[:, -1] = numpy.linspace(0, 0.8, N + 4)
+    return cmap

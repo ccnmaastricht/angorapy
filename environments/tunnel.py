@@ -123,7 +123,7 @@ class Tunnel(gym.Env):
         return representation
 
     def render(self, mode='human', close=False):
-        """Render the dungeon. TODO this is not rendering"""
+        """Render the dungeon."""
         return self.dungeon
 
 

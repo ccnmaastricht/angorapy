@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
 import datetime
-import json
+import simplejson as json
 import os
 import time
 from inspect import getfullargspec as fargs
@@ -33,7 +33,8 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None, config_name: str = "unknown"):
+    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None,
+                 config_name: str = "unknown"):
         self.agent = agent
         self.env = env
         self.iterations = iterations
@@ -132,11 +133,12 @@ class Monitor:
                 reward_norming=str(RewardNormalizationWrapper in self.agent.preprocessor),
                 state_norming=str(StateNormalizationWrapper in self.agent.preprocessor),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
+                architecture=self.agent.builder_function_name.split("_")[1]
             )
         )
 
         with open(f"{self.story_directory}/meta.json", "w") as f:
-            json.dump(metadata, f)
+            json.dump(metadata, f, ignore_nan=True)
 
     def write_progress(self):
         """Write training statistics into json file."""
@@ -156,7 +158,7 @@ class Monitor:
         )
 
         with open(f"{self.story_directory}/progress.json", "w") as f:
-            json.dump(progress, f)
+            json.dump(progress, f, ignore_nan=True)
 
     def update(self):
         """Update different components of the Monitor."""

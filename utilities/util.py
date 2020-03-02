@@ -64,7 +64,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Union[int, Tuple[int]], int]:
 def normalize(x, is_img=False) -> numpy.ndarray:
     """Normalize a numpy array to have all values in range (0, 1)."""
     x = tf.convert_to_tensor(x).numpy()
-    return x / 255 if not is_img else (x - x.min()) / (x.max() - x.min())
+    return x / 255 if is_img else (x - x.min()) / (x.max() - x.min())
 
 
 def flatten(some_list):

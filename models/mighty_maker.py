@@ -4,10 +4,10 @@ from collections import OrderedDict
 from functools import partial
 
 from models.shadow import build_shadow_brain_v1
-from models.simple import build_ffn_models, build_rnn_models, build_simple_models
+from models.simple import build_ffn_models, build_rnn_models, build_simple_models, build_deeper_models
 
 arguments = OrderedDict(sorted([
-    ("model", ["simple", "shadow"]),
+    ("model", ["simple", "deeper", "shadow"]),
     ("model_type", ["ffn", "rnn", "lstm", "gru"]),
     ("shared", [True, False]),
 ], key=lambda x: x[0]))
@@ -20,6 +20,8 @@ for pd in parameter_dicts:
         base_function = build_simple_models
     elif pd["model"] == "shadow":
         base_function = build_shadow_brain_v1
+    elif pd["model"] == "deeper":
+        base_function = build_deeper_models
     else:
         raise ValueError("Unknown model name registered.")
 

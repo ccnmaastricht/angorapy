@@ -21,6 +21,8 @@ from utilities.model_utils import reset_states_masked
 from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
 
+from tests import *
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -124,31 +126,6 @@ class ProbabilityTest(unittest.TestCase):
         self.assertTrue(np.allclose(result_log, result_reference), msg="Discrete entropy from log returns wrong result")
 
 
-# class AdvantageTest(unittest.TestCase):
-#
-#     def test_gae_estimation(self):
-#         def discount(x, gamma):
-#             return lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
-#
-#         rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0, 10, 10, 4, 9, 4])
-#         values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 4, 10, 5, 7, 8, 9])
-#         terminals = np.array(
-#             [False, False, False, False, False, False, False, False, False, False, True,
-#              False, False, False, False, False])
-#
-#         rewards = np.array([5, 7, 9, 2, 9, 5, 7, 3, 7, 8, 4.0])
-#         values = np.array([9, 7, 7, 5, 6, 8, 2, 2, 5, 3, 3.0, 0])
-#         terminals = np.array([False, False, False, False, False, False, False, False, False, False, True])
-#
-#         gamma = 1
-#         lamb = 1
-#
-#         result = estimate_advantage(rewards, values, terminals, gamma=gamma, lam=lamb)
-#
-#         prep = rewards + gamma * values[1:] * (1 - terminals) - values[:-1]
-#         result_reference = discount(prep, gamma * lamb)
-
-
 class UtilTest(unittest.TestCase):
 
     def test_masked_state_reset(self):
@@ -175,13 +152,6 @@ class UtilTest(unittest.TestCase):
             [9, 9, 9, 9, 9],
             [0, 0, 0, 0, 0],
         ]))
-
-
-class GatheringTest(unittest.TestCase):
-
-    def test_type_equivalence(self):
-        """Test if recurrent and non-recurrent gathering both produce the same experience."""
-        pass
 
 
 class WrapperTest(unittest.TestCase):
@@ -265,59 +235,8 @@ class WrapperTest(unittest.TestCase):
         self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance)))
 
 
-class AgentTest(unittest.TestCase):
-
-    def test_saving_loading(self):
-        try:
-            agent = PPOAgent(get_model_builder("ffn", True), gym.make("CartPole-v1"), 100, 8)
-            agent.save_agent_state()
-            new_agent = PPOAgent.from_agent_state(agent.agent_id)
-        except Exception:
-            self.assertTrue(False)
-
-    def test_evaluate(self):
-        ray.init(local_mode=True, logging_level=logging.CRITICAL)
-
-        try:
-            agent = PPOAgent(get_model_builder("ffn", True), gym.make("CartPole-v1"), 100, 8)
-            agent.evaluate(2, ray_already_initialized=True)
-        except Exception:
-            self.assertTrue(False)
-
-
-class InvestigatorTest(unittest.TestCase):
-
-    def test_get_activations(self):
-        env = gym.make("LunarLanderContinuous-v2")
-
-        for model_type, shared in itertools.product(["ffn", "rnn"], [True, False]):
-            try:
-                network, _, _ = get_model_builder(model_type, shared)(env)
-                inv = Investigator(network, GaussianPolicyDistribution())
-                print(inv.list_layer_names())
-
-                # get activations
-                input_tensor = tf.random.normal(insert_unknown_shape_dimensions(network.input_shape))
-                for layer_name in inv.list_layer_names():
-                    activation_rec = inv.get_layer_activations(layer_name, input_tensor=input_tensor)
-                    print(activation_rec)
-            except Exception:
-                self.assertTrue(False)
-
-    def test_get_activations_over_episode(self):
-        environment = gym.make("LunarLanderContinuous-v2")
-        environment.seed(1)
-        network, _, _ = get_model_builder("rnn", False)(environment)
-        inv = Investigator(network, GaussianPolicyDistribution())
-        out_group = inv.get_activations_over_episode(inv.list_layer_names(), environment)
-        out_single = inv.get_activations_over_episode(inv.list_layer_names()[0], environment)
-
-        self.assertTrue(True)
-
-
-
-
 if __name__ == '__main__':
     tf.config.experimental_run_functions_eagerly(True)
 
-    unittest.main()
+    testsuite = unittest.TestLoader().discover('.')
+    unittest.TextTestRunner(verbosity=1).run(testsuite)

@@ -17,7 +17,7 @@ from utilities.model_utils import is_recurrent_model
 from utilities.util import env_extract_dims
 
 
-def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn"):
+def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn", **kwargs):
     """Build network for the shadow hand task."""
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32
