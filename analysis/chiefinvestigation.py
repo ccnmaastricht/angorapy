@@ -211,8 +211,9 @@ if __name__ == "__main__":
     # plot_velocities(activations, actions[:, 1], 3000)
 
     rsa = RSA(activations)
-    rdm = rsa.compare_cross_timeintervals(5)
-    plt.imshow(rdm)
+    # rdm_time = rsa.compare_cross_timeintervals(5)
+    rdm_neurons = rsa.compare_cross_neurons()
+    plt.imshow(rdm_neurons)
     plt.colorbar()
     plt.show()
 
