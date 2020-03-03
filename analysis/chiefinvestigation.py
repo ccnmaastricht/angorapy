@@ -19,7 +19,7 @@ from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNo
 from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from mayavi import mlab
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities
-
+from analysis.rsa.rsa import RSA
 
 class Chiefinvestigator:
 
@@ -208,7 +208,13 @@ if __name__ == "__main__":
     #vel = adamfpf.compute_velocities(activationss, inputss)
     # plot_fixed_points(activationss, fps, 4000, 4)
     # plot_velocities(activationss, actionss[:, 0], 3000)
-    plot_velocities(activationss, actionss[:, 0], 3000)
+    # plot_velocities(activations, actions[:, 1], 3000)
+
+    rsa = RSA(activations)
+    rdm = rsa.compare_cross_timeintervals(5)
+    plt.imshow(rdm)
+    plt.colorbar()
+    plt.show()
 
 
 
