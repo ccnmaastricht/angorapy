@@ -30,7 +30,7 @@ class Chiefinvestigator:
             agent_id: ID of agent that will be analyzed.
             env_name: Name of the gym environment that the agent was trained in. Default is set to CartPole-v1
         """
-        self.agent = PPOAgent.from_agent_state(agent_id)
+        self.agent = PPOAgent.from_agent_state(agent_id, from_iteration='best')
         self.env = self.agent.env
         if enforce_env_name is not None:
             print(f"Enforcing environment {enforce_env_name} over agents original environment. If you want to use"
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     #os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id = 1578664065  # 1576849128 # 1576692646 from tonio
+    agent_id = 1583180664 # 1576849128 # 1576692646 from tonio
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
@@ -208,9 +208,7 @@ if __name__ == "__main__":
     #vel = adamfpf.compute_velocities(activationss, inputss)
     # plot_fixed_points(activationss, fps, 4000, 4)
     # plot_velocities(activationss, actionss[:, 0], 3000)
-    idx = actionss[:, 1] < 0
-    actionss[idx, 1] = 0
-    plot_velocities(activationss, actionss[:, 1], 3000)
+    plot_velocities(activationss, actionss[:, 0], 3000)
 
 
 

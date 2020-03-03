@@ -150,7 +150,7 @@ class Investigator:
 
         done = False
         state = env.reset()
-        state = self.preprocessor.modulate((state, None, None, None))
+        state = self.preprocessor.modulate((state, None, None, None))[0]
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
             activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
@@ -200,8 +200,10 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1582658038, from_iteration="b")
+    agent_007 = PPOAgent.from_agent_state(1583180664, from_iteration="b")
     inv = Investigator.from_agent(agent_007)
+
+    inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     for i in range(100):
         inv.render_episode(agent_007.env, to_gif=False)
