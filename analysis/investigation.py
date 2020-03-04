@@ -150,7 +150,7 @@ class Investigator:
 
         done = False
         state = env.reset()
-        state = self.preprocessor.modulate((state, None, None, None))[0]
+        state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
             activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
@@ -162,7 +162,8 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, _ = env.step(action)
-            observation, reward, done, _ = self.preprocessor.modulate((observation, reward, done, None), update=False)
+            observation, reward, done, _ = self.preprocessor.modulate((parse_state(observation), reward, done, None),
+                                                                      update=False)
 
             state = observation
             reward_trajectory.append(reward)
@@ -202,6 +203,9 @@ if __name__ == "__main__":
 
     agent_007 = PPOAgent.from_agent_state( 1583256614 , from_iteration="b")
     inv = Investigator.from_agent(agent_007)
+    print(inv.list_layer_names())
+
+    inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     for i in range(100):
         inv.render_episode(agent_007.env, to_gif=False)
