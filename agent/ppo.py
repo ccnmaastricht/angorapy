@@ -772,8 +772,12 @@ class PPOAgent:
 
         latest_matches = PPOAgent.get_saved_iterations(agent_id)
         if from_iteration is None:
-            from_iteration = max(latest_matches)
-        elif isinstance(from_iteration, str):
+            if len(latest_matches) > 0:
+                from_iteration = max(latest_matches)
+            else:
+                from_iteration = "best"
+
+        if isinstance(from_iteration, str):
             assert from_iteration.lower() in ["best", "b"], "Unknown string identifier, can only be 'best'/'b' or int."
             from_iteration = "best"
         else:
