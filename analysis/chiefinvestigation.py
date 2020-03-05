@@ -37,6 +37,8 @@ class Chiefinvestigator:
         self.agent.preprocessor = CombiWrapper([StateNormalizationWrapper(self.agent.state_dim),
                                                 RewardNormalizationWrapper()])  # dirty fix, TODO remove soon
         self.slave_investigator = Investigator.from_agent(self.agent)
+        self.weights = self.slave_investigator.get_layer_weights('policy_recurrent_layer')
+
 
     def get_layer_names(self):
         return self.slave_investigator.list_layer_names()
@@ -67,7 +69,7 @@ class Chiefinvestigator:
 
         activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
         for i in range(n_episodes):
-            states, activations, rewards, actions = chiefinvesti.parse_data(layer_name, previous_layer_name)
+            states, activations, rewards, actions = self.parse_data(layer_name, previous_layer_name)
             inputs = np.reshape(activations[2], (activations[2].shape[0], 32))
             activations = np.reshape(activations[1], (activations[1].shape[0], 32))
             activations_over_all_episodes.append(activations)
@@ -100,38 +102,30 @@ if __name__ == "__main__":
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
-
-    weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
     activations_over_all_episodes, inputs_over_all_episodes, \
-    activations_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes=20,
-                                                                        "policy_recurrent_layer",layer_names[1])
-    findfixedpoints = True
-    if findfixedpoints:
-        adamfpf = Adamfixedpointfinder(weights, 'gru',
-                                       q_threshold=1e-04,
-                                       epsilon=0.001,
-                                       alr_decayr=1e-04,
-                                       max_iters=5000)
-        statis, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
-                                                                  inputs_over_all_episodes,
-                                                                  100, 0.2)
-        sampled_inputs = np.zeros((statis.shape[0], 32))
-        fps = adamfpf.find_fixed_points(statis, sampled_inputs)
-        #vel = adamfpf.compute_velocities(activationss, inputss)
-        plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
-        # plot_velocities(activations_over_all_episodes, actions_over_all_episodes[:, 0], 7000)
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(20,
+                                                                    "policy_recurrent_layer",
+                                                                    layer_names[1])
 
-        left_engine = actions_over_all_episodes
-        engine_off = left_engine[:, 1] > -0.5
-        left_engine[engine_off, 1] = 0
-        # plot_velocities(activations_over_all_episodes, left_engine[:, 1], 3000)
+    # employ fixedpointfinder
+    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, 'gru',
+                                        q_threshold=1e-04,
+                                        epsilon=0.001,
+                                        alr_decayr=1e-04,
+                                        max_iters=5000)
+    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
+                                                              inputs_over_all_episodes,
+                                                              100, 0.2)
+    sampled_inputs = np.zeros((states.shape[0], 32))
+    fps = adamfpf.find_fixed_points(states, sampled_inputs)
+    plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
 
-        rsa = RSA(actions)
-        rdm_time = rsa.compare_cross_timeintervals(1)
-        # rdm_neurons = rsa.compare_cross_neurons()
-        plt.imshow(rdm_time)
-        plt.colorbar()
-        plt.show()
+    rsa = RSA()
+    rdm_time = rsa.compare_cross_timeintervals(1)
+    # rdm_neurons = rsa.compare_cross_neurons()
+    plt.imshow(rdm_time)
+    plt.colorbar()
+    plt.show()
 
     # pca
     angles = np.cos(actions)
