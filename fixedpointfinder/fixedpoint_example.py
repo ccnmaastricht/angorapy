@@ -10,7 +10,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # Create and train recurrent model on 3-Bit FlipFop task
 ############################################################
 # specify architecture e.g. 'vanilla' and number of hidden units
-rnn_type = 'lstm'
+rnn_type = 'gru'
 n_hidden = 24
 
 # initialize Flipflopper class
@@ -18,14 +18,14 @@ flopper = Flipflopper(rnn_type=rnn_type, n_hidden=n_hidden)
 # generate trials
 stim = flopper.generate_flipflop_trials()
 # train the model
-flopper.train(stim, 2000, save_model=True)
+# flopper.train(stim, 2000, save_model=True)
 
 # visualize a single batch after training
 # prediction = flopper.model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
 # visualize_flipflop(stim)
 
 # if a trained model has been saved, it may also be loaded
-# flopper.load_model()
+flopper.load_model()
 ############################################################
 # Initialize fpf and find fixed points
 ############################################################
@@ -47,7 +47,5 @@ inputs = np.zeros((states.shape[0], 3))
 # find fixed points
 fps = fpf.find_fixed_points(states, inputs)
 # plot fixed points and state trajectories in 3D
-if rnn_type == 'lstm':
-    activations = np.hstack(activations[1:])
 plot_fixed_points(activations, fps, 3000, 4)
 
