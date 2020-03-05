@@ -1,9 +1,10 @@
 
-from fixedpointfinder.build_utils import build_rnn_ds
+from fixedpointfinder.build_utils import build_rnn_ds, build_gru_ds
 import autograd.numpy as np
 from fixedpointfinder.minimization import adam_weights_optimizer
 import tensorflow as tf
-from rnnconstruction.build_utils import build_rnn_ds, build_gru_ds
+from rnnconstruction.build_utils import build_rnn_inducer, build_gru_inducer
+
 
 
 class Rnnconstructor:
@@ -52,9 +53,9 @@ class Rnnconstructor:
 
         target = create_target(self.fps)
         if self.rnn_type == 'vanilla':
-            fun = build_rnn_ds(target)
+            fun = build_rnn_inducer(target)
         elif self.rnn_type == 'gru':
-            fun = build_gru_ds(target)
+            fun = build_gru_inducer(target, self.n_hidden)
 
         return fun
 
@@ -75,7 +76,10 @@ class Rnnconstructor:
 
         fph = fps
         for i in range(len(fps)):
-            fun, jac_fun = build_rnn_ds(weights, self.n_hidden, inputs[i, :], 'sequential')
+            if self.rnn_type == 'vanilla':
+                fun, jac_fun = build_rnn_ds(weights, self.n_hidden, inputs[i, :], 'sequential')
+            elif self.rnn_type == 'gru':
+                fun, jac_fun = build_gru_ds(weights, self.n_hidden, inputs[i, :], 'sequential')
             fph[i]['jac'] = jac_fun(fps[i]['x'])
             fph[i]['fun'] = fun(fps[i]['x'])
 
