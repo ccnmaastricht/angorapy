@@ -43,7 +43,7 @@ class RSA:
             corr = np.empty(interval_size)
             for i in range(interval_size):
                 corr[i], _ = pearsonr(a[i, :], b[i, :])
-            correlations.append(np.sum(corr)/interval_size)
+            correlations.append(np.mean(corr))
 
         n_intervals = int(np.sqrt(len(correlations)))
         similarity_matrix = np.reshape(np.vstack(correlations), (n_intervals, n_intervals))

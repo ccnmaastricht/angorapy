@@ -1,15 +1,11 @@
 import os
-
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy as sp
 import sklearn.decomposition as skld
-from matplotlib import animation
 import matplotlib.image as mpimg
 from sklearn.decomposition import NMF
 from sklearn.svm import SVC
-import sklearn.manifold as sklm
 from mpl_toolkits.mplot3d import Axes3D
 
 from agent.ppo import PPOAgent
@@ -20,6 +16,7 @@ from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from mayavi import mlab
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities
 from analysis.rsa.rsa import RSA
+from sklearn.decomposition import pca
 
 class Chiefinvestigator:
 
@@ -66,158 +63,95 @@ class Chiefinvestigator:
 
         return states, activations, rewards, actions
 
-    def plot_results(self, results, action_data, fixed_point, title: str = "Results", dreiD: bool = False):
-        """Plot results of analysis performed by chiefinvestigator
+    def get_data_over_episodes(self, n_episodes: int, layer_name: str, previous_layer_name: str):
 
-        Args:
-            results: Results of analysis to be plotted.
-            action_data: Actions selected by agent that are used to color the plots.
-            title: Title of the plot. Default is set to "Results"
-            :param dreiD:
-            :param fixed_point:
+        activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
+        for i in range(n_episodes):
+            states, activations, rewards, actions = chiefinvesti.parse_data(layer_name, previous_layer_name)
+            inputs = np.reshape(activations[2], (activations[2].shape[0], 32))
+            activations = np.reshape(activations[1], (activations[1].shape[0], 32))
+            activations_over_all_episodes.append(activations)
+            inputs_over_all_episodes.append(inputs)
+            actions = np.vstack(actions)
+            actions_over_all_episodes.append(actions)
 
-        Returns:
-            Plot of data to be visualized
+        activations_over_all_episodes, inputs_over_all_episodes = np.vstack(activations_over_all_episodes), \
+                                                                  np.vstack(inputs_over_all_episodes)
+        actions_over_all_episodes = np.concatenate(actions_over_all_episodes, axis=0)
 
-        """
-        if dreiD is True:
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-            ax.scatter(results[:, 0], results[:, 1], results[:, 2],
-                       marker='o', s=5, c=action_data[:])
-            if fixed_point is not None:
-                ax.scatter(fixed_point[:, 0], fixed_point[:, 1], fixed_point[:, 2],
-                           marker='x', s=30)
-            plt.title(title)
-            ax.set_xlabel('PC1')
-            ax.set_ylabel('PC2')
-            ax.set_zlabel('PC3')
-            plt.show()
+        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes
 
-        if dreiD is False:
-            plt.figure()
-            plt.scatter(results[:, 1], results[:, 0],
-                        c=action_data[:],
-                        label=action_data[:])
-            #legend_elements = [Line2D([0], [0], marker='o', label='Action: 0', color='w',
-             #                         markerfacecolor='y', markersize=10),
-             #                  Line2D([0], [0], marker='o', label='Action: 1', color='w',
-              #                        markerfacecolor='tab:purple', markersize=10)]
-            #plt.legend(handles=legend_elements)
-            plt.title(title)
-            plt.xlabel('second component')
-            plt.ylabel('first component')
-        # plt.pause(0.5)
-            plt.show()
-
-
-    def plot_rewards(self, rewards):
-        plt.plot(list(range(len(rewards))), rewards)
-        plt.xlabel('Number of steps in episode')
-        plt.ylabel('Numerical reward')
-        plt.title('Reward over episode')
-        plt.show()
-
-    def timestepwise_pca(self, activation_data, action_data, title: str = "Results"):
-        zscores = sp.stats.zscore(activation_data)  # normalization
-
-        pca = skld.PCA(3)
-        pca.fit(zscores)
-        X_pca = pca.transform(zscores)
-
-        fig = plt.figure()
-        plt.xlim([-3, 4])
-        plt.ylim([-7.5, 10.5])
-
-        def update(i):
-            chiefinvesti.plot_results(X_pca[i:(i + 10), :], action_data[i:(i + 10), 0], title)  # plot pca results
-
-        anim = animation.FuncAnimation(fig, update, frames=int(len(X_pca) - 1), interval=100)
-        anim.save("moving_pca.gif",
-                  writer='pillow')
-
-    def svm_classifier(self, x_activation_data, action_data):
-        size_train = 0.7
-        x_train = x_activation_data[0:int(size_train*x_activation_data.shape[0]), :]
-        x_test = x_activation_data[-int(size_train*x_activation_data.shape[0]):-1, :]
-        y_train = action_data[0:int(size_train*x_activation_data.shape[0])]
-        y_test = action_data[-int(size_train*x_activation_data.shape[0]):-1]
-
-        clf = SVC(gamma='auto')
-        clf.fit(x_train, y_train)
-        clf.predict(x_test)
-        score = clf.score(x_test, y_test)
-        print("Classification accuracy", score)
-
-    def nmfactor(self, activation):
-        minimum = np.min(activation)
-        activation = activation - minimum
-        model = NMF(n_components=2)
-        W = model.fit_transform(activation)
-        H = model.components_
-        return W, H
-
-
-#  TODO: pca of whole activation over episode -> perhaps attempt to set in context of states
-# -> construct small amounts of points (perhaps belonging to one action into
-# -> dimensionality reduced space -> add them over time and see where they end up
-# TODO: investigate role of momentum! take change along a principle component over time and see how that associates with action
-# same for t-SNE
-# TODO: apply unsupervised clustering stuff on the results of these techniques and the dataset -> through time stuff
 # TODO: build neural network to predict grasp -> we trained a simple prediction model fp(z) containing one hidden
 # layer with 64 units and ReLU activation, followed by a sigmoid output.
-# perhaps even environmental factors
-# TODO: look at weights
-# TODO: dynamical systems and eigengrasps
+# TODO: take reaching task as state not an action as the hand stays rather the same.
+# TODO: classify reaching tasks against each other
+
 # TODO: sequence analysis ideas -> sequence pattern and so forth:
-# one possibility could be sequence alignment, time series analysis (datacamp)
+# one possibility could be sequence alignment, time series analysis (datacamp), rsa
 
 if __name__ == "__main__":
-    #os.chdir("../")  # remove if you want to search for ids in the analysis directory
+    os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id = 1583180664 # 1576849128 # 1576692646 from tonio
+    # agent_id = 1583404415 # 1583180664 # lunarlandercont
+    agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
-    activ = chiefinvesti.slave_investigator.get_layer_activations(layer_names[3])
-    activationss, inputss, actionss = [], [], []
-    for i in range(20):
-        states, activations, rewards, actions = chiefinvesti.parse_data(layer_names[1],
-                                                                        "policy_recurrent_layer")
-        inputs = np.reshape(activations[2], (activations[2].shape[0], 64))
-        activations = np.reshape(activations[1], (activations[1].shape[0], 64))
-        activationss.append(activations)
-        inputss.append(inputs)
-        actions = np.vstack(actions)
-        actionss.append(actions)
+
     weights = chiefinvesti.slave_investigator.get_layer_weights('policy_recurrent_layer')
-    activationss, inputss = np.vstack(activationss), np.vstack(inputss)
-    actionss = np.concatenate(actionss, axis=0)
+    activations_over_all_episodes, inputs_over_all_episodes, \
+    activations_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes=20,
+                                                                        "policy_recurrent_layer",layer_names[1])
+    findfixedpoints = True
+    if findfixedpoints:
+        adamfpf = Adamfixedpointfinder(weights, 'gru',
+                                       q_threshold=1e-04,
+                                       epsilon=0.001,
+                                       alr_decayr=1e-04,
+                                       max_iters=5000)
+        statis, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
+                                                                  inputs_over_all_episodes,
+                                                                  100, 0.2)
+        sampled_inputs = np.zeros((statis.shape[0], 32))
+        fps = adamfpf.find_fixed_points(statis, sampled_inputs)
+        #vel = adamfpf.compute_velocities(activationss, inputss)
+        plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+        # plot_velocities(activations_over_all_episodes, actions_over_all_episodes[:, 0], 7000)
 
-    # adamfpf = Adamfixedpointfinder(weights, 'vanilla',
-                               #    q_threshold=1e-02,
-                               #    epsilon=0.01,
-                               #    alr_decayr=1e-05,
-                               #    max_iters=5000)
-    #states = adamfpf.sample_states(activationss, 10)
-    #input = np.zeros((states.shape[0], 64))
-    #fps = adamfpf.find_fixed_points(states, input)
-    #vel = adamfpf.compute_velocities(activationss, inputss)
-    # plot_fixed_points(activationss, fps, 4000, 4)
-    # plot_velocities(activationss, actionss[:, 0], 3000)
-    # plot_velocities(activations, actions[:, 1], 3000)
+        left_engine = actions_over_all_episodes
+        engine_off = left_engine[:, 1] > -0.5
+        left_engine[engine_off, 1] = 0
+        # plot_velocities(activations_over_all_episodes, left_engine[:, 1], 3000)
 
-    rsa = RSA(activations)
-    rdm_time = rsa.compare_cross_timeintervals(12)
-    # rdm_neurons = rsa.compare_cross_neurons()
-    plt.imshow(rdm_time)
-    plt.colorbar()
-    plt.show()
+        rsa = RSA(actions)
+        rdm_time = rsa.compare_cross_timeintervals(1)
+        # rdm_neurons = rsa.compare_cross_neurons()
+        plt.imshow(rdm_time)
+        plt.colorbar()
+        plt.show()
 
+    # pca
+    angles = np.cos(actions)
+    # none_actions = angles > 0.7
+    # angles[none_actions] = 0
 
+    every_hundredth = np.arange(98, 3000, 100)
+    gradients = np.gradient(angles, axis=0)
+    none_actions = abs(gradients) < 0.15
+    gradients[none_actions] = 0
+    added_gradients_across_digits = np.sum(gradients, axis=1)
 
+    added_gradients = np.sum(gradients, axis=0)
+    gradients_across_digits = np.gradient(angles, axis=1)
+    all_gradients = gradients + gradients_across_digits
+    difference_beginning_to_end = actions[0, :] - actions[-1, :]
+    ratio_accumulative_change_to_total_change = added_gradients/difference_beginning_to_end
 
+    distinct_grasps = activations_over_all_episodes[every_hundredth, :]
 
+    pca = skld.PCA(3)
+    pca.fit(distinct_grasps)
+    X_pca = pca.transform(distinct_grasps)
