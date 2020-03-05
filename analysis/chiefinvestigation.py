@@ -36,7 +36,7 @@ class Chiefinvestigator:
         self._get_rnn_type()
 
     def _get_rnn_type(self):
-        if self.weights[1].shape[1] / self.weights[1].shape[0] == 0:
+        if self.weights[1].shape[1] / self.weights[1].shape[0] == 1:
             self.rnn_type = 'vanilla'
         elif self.weights[1].shape[1] / self.weights[1].shape[0] == 3:
             self.rnn_type = 'gru'
@@ -92,8 +92,7 @@ class Chiefinvestigator:
         return activations, inputs, actions
 # TODO: build neural network to predict grasp -> we trained a simple prediction model fp(z) containing one hidden
 # layer with 64 units and ReLU activation, followed by a sigmoid output.
-# TODO: take reaching task as state not an action as the hand stays rather the same.
-# TODO: classify reaching tasks against each other
+# TODO: classify reaching tasks against each other. s.a.
 
 # TODO: sequence analysis ideas -> sequence pattern and so forth:
 # one possibility could be sequence alignment, time series analysis (datacamp), rsa
@@ -103,27 +102,27 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    # agent_id = 1583404415 # 1583180664 # lunarlandercont
-    agent_id = 1583256614 # reach task
+    agent_id = 1583404415  # 1583180664 lunarlandercont
+    # agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
     activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(2,
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(20,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
                                    q_threshold=1e-04,
-                                   epsilon=0.001,
+                                   epsilon=0.01,
                                    alr_decayr=1e-04,
                                    max_iters=5000)
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
-                                                              100, 0.2)
-    sampled_inputs = np.zeros((states.shape[0], 32))
+                                                              1000, 0.2)
+    sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
