@@ -1,22 +1,16 @@
 import os
 import gym
-import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.decomposition as skld
-import matplotlib.image as mpimg
-from sklearn.decomposition import NMF
-from sklearn.svm import SVC
 from mpl_toolkits.mplot3d import Axes3D
 
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
-# from utilities.util import insert_unknown_shape_dimensions
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
-from mayavi import mlab
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities
 from analysis.rsa.rsa import RSA
-from sklearn.decomposition import pca
+
 
 class Chiefinvestigator:
 
@@ -38,7 +32,16 @@ class Chiefinvestigator:
                                                 RewardNormalizationWrapper()])  # dirty fix, TODO remove soon
         self.slave_investigator = Investigator.from_agent(self.agent)
         self.weights = self.slave_investigator.get_layer_weights('policy_recurrent_layer')
+        self.n_hidden = self.weights[1].shape[0]
+        self._get_rnn_type()
 
+    def _get_rnn_type(self):
+        if self.weights[1].shape[1] / self.weights[1].shape[0] == 0:
+            self.rnn_type = 'vanilla'
+        elif self.weights[1].shape[1] / self.weights[1].shape[0] == 3:
+            self.rnn_type = 'gru'
+        elif self.weights[1].shape[1] / self.weights[1].shape[0] == 4:
+            self.rnn_type = 'lstm'
 
     def get_layer_names(self):
         return self.slave_investigator.list_layer_names()
@@ -54,14 +57,10 @@ class Chiefinvestigator:
         """
         states, activations, rewards, actions = self.slave_investigator.get_activations_over_episode(
             [layer_name, previous_layer_name],
-            self.env, False
-        )
+            self.env, False)
 
         # merge activations per layer into matrices where first dimension are timesteps
         activations = list(map(np.array, activations))
-
-        # activations = np.reshape(activations, (activations.shape[0], 64))
-        # previous_activation = np.reshape(previous_activation, (previous_activation.shape[0], 64))
 
         return states, activations, rewards, actions
 
@@ -70,8 +69,8 @@ class Chiefinvestigator:
         activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
         for i in range(n_episodes):
             states, activations, rewards, actions = self.parse_data(layer_name, previous_layer_name)
-            inputs = np.reshape(activations[2], (activations[2].shape[0], 32))
-            activations = np.reshape(activations[1], (activations[1].shape[0], 32))
+            inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
+            activations = np.reshape(activations[1], (activations[1].shape[0], self.n_hidden))
             activations_over_all_episodes.append(activations)
             inputs_over_all_episodes.append(inputs)
             actions = np.vstack(actions)
@@ -83,6 +82,14 @@ class Chiefinvestigator:
 
         return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes
 
+    def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
+
+        states, activations, rewards, actions = self.parse_data(layer_name, previous_layer_name)
+        inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
+        activations = np.reshape(activations[1], (activations[1].shape[0], self.n_hidden))
+        actions = np.vstack(actions)
+
+        return activations, inputs, actions
 # TODO: build neural network to predict grasp -> we trained a simple prediction model fp(z) containing one hidden
 # layer with 64 units and ReLU activation, followed by a sigmoid output.
 # TODO: take reaching task as state not an action as the hand stays rather the same.
@@ -90,6 +97,7 @@ class Chiefinvestigator:
 
 # TODO: sequence analysis ideas -> sequence pattern and so forth:
 # one possibility could be sequence alignment, time series analysis (datacamp), rsa
+
 
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
@@ -103,49 +111,19 @@ if __name__ == "__main__":
     print(layer_names)
 
     activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(20,
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(2,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
 
     # employ fixedpointfinder
-    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, 'gru',
-                                        q_threshold=1e-04,
-                                        epsilon=0.001,
-                                        alr_decayr=1e-04,
-                                        max_iters=5000)
+    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
+                                   q_threshold=1e-04,
+                                   epsilon=0.001,
+                                   alr_decayr=1e-04,
+                                   max_iters=5000)
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
                                                               100, 0.2)
     sampled_inputs = np.zeros((states.shape[0], 32))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
-
-    rsa = RSA()
-    rdm_time = rsa.compare_cross_timeintervals(1)
-    # rdm_neurons = rsa.compare_cross_neurons()
-    plt.imshow(rdm_time)
-    plt.colorbar()
-    plt.show()
-
-    # pca
-    angles = np.cos(actions)
-    # none_actions = angles > 0.7
-    # angles[none_actions] = 0
-
-    every_hundredth = np.arange(98, 3000, 100)
-    gradients = np.gradient(angles, axis=0)
-    none_actions = abs(gradients) < 0.15
-    gradients[none_actions] = 0
-    added_gradients_across_digits = np.sum(gradients, axis=1)
-
-    added_gradients = np.sum(gradients, axis=0)
-    gradients_across_digits = np.gradient(angles, axis=1)
-    all_gradients = gradients + gradients_across_digits
-    difference_beginning_to_end = actions[0, :] - actions[-1, :]
-    ratio_accumulative_change_to_total_change = added_gradients/difference_beginning_to_end
-
-    distinct_grasps = activations_over_all_episodes[every_hundredth, :]
-
-    pca = skld.PCA(3)
-    pca.fit(distinct_grasps)
-    X_pca = pca.transform(distinct_grasps)
