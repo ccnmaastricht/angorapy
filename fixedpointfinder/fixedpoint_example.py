@@ -61,13 +61,15 @@ activations_first_episode = activations[:256, :]
 activations = np.vstack(activations)
 pca = skld.PCA(3)
 pca.fit(activations)
-X_pca = pca.transform(activations)
+X_pca = pca.transform(activations_first_number)
 loadings = pca.components_
 
 loadings = loadings.transpose()
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
-ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2])
+ax.plot(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2])
+plt.ylim((-2, 2)), plt.xlim((-2, 2))
+ax.set_zlim(-2, 2)
 
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
@@ -78,24 +80,45 @@ output_weights = flopper.model.get_layer('dense').get_weights()
 
 activations_reconstructed = np.matmul(output_first_batch, output_weights[0].transpose())
 
-def classify_neurons(output_weights):
+def classify_neurons(output_weights, threshold):
     weights_by_number = {'number_one': {'weights': [], 'index': []},
                          'number_two': {'weights': [], 'index': []},
                          'number_three': {'weights': [], 'index': []}}
     k = 0
 
     for weights_per_neuron in output_weights:
-        big_weights = np.abs(weights_per_neuron) > 0.15
-        if big_weights[0]:
-            weights_by_number['number_one']['weights'].append(weights_per_neuron)
-            weights_by_number['number_one']['index'].append(k)
-        elif big_weights[1]:
-            weights_by_number['number_two']['weights'].append(weights_per_neuron)
-            weights_by_number['number_two']['index'].append(k)
-        elif big_weights[2]:
-            weights_by_number['number_three']['weights'].append(weights_per_neuron)
-            weights_by_number['number_three']['index'].append(k)
+        big_weights = np.abs(weights_per_neuron) > threshold
+        for i in range(len(big_weights)):
+            if big_weights[i] and i == 0:
+                weights_by_number['number_one']['weights'].append(weights_per_neuron)
+                weights_by_number['number_one']['index'].append(k)
+            elif big_weights[i] and i == 1:
+                weights_by_number['number_two']['weights'].append(weights_per_neuron)
+                weights_by_number['number_two']['index'].append(k)
+            elif big_weights[i] and i == 2:
+                weights_by_number['number_three']['weights'].append(weights_per_neuron)
+                weights_by_number['number_three']['index'].append(k)
         k +=1
     return weights_by_number
 
-weights_by_number = classify_neurons(output_weights[0])
+def unique_neurons(weights_by_number):
+    pass
+
+def reconstruct_model_with_domains(weights, weights_by_number):
+    def recurrent_layer(inputs, activations):
+        inputweights, recurrentweights, recurrentbias = weights[0], weights[1], weights[2]
+        return np.matmul(np.tanh(activations), recurrentweights) + np.matmul(inputs, inputweights) + recurrentbias
+weights_by_number = classify_neurons(output_weights[0], 0.35)
+
+mean_neuron_activations = np.mean(activations, axis=0)
+# activations_first_number = np.zeros(activations.shape)
+activations_first_number = np.repeat(np.reshape(mean_neuron_activations, (-1, 24)), activations.shape[0], axis=0)
+first_bit_neurons = np.asarray(weights_by_number['number_one']['index'])
+activations_first_number[:, first_bit_neurons] = activations[:, first_bit_neurons]
+
+first_bit_neuron_weights = np.vstack(weights_by_number['number_one']['weights'])
+
+outputs = np.vstack(stim['output'])
+firstbit_neuron_activations_reconstructed = np.matmul(outputs, first_bit_neuron_weights.transpose())
+
+activations_first_number[:, first_bit_neurons] = firstbit_neuron_activations_reconstructed
