@@ -87,7 +87,11 @@ def classify_neurons(output_weights, threshold):
     k = 0
 
     for weights_per_neuron in output_weights:
-        big_weights = np.abs(weights_per_neuron) > threshold
+        big_weights = np.abs(weights_per_neuron)
+        biggest_weight = np.max(big_weights)
+        difference = biggest_weight - big_weights
+        ratio_biggest_to_weights = difference/biggest_weight
+        big_weights = ratio_biggest_to_weights < threshold
         for i in range(len(big_weights)):
             if big_weights[i] and i == 0:
                 weights_by_number['number_one']['weights'].append(weights_per_neuron)
@@ -108,7 +112,7 @@ def reconstruct_model_with_domains(weights, weights_by_number):
     def recurrent_layer(inputs, activations):
         inputweights, recurrentweights, recurrentbias = weights[0], weights[1], weights[2]
         return np.matmul(np.tanh(activations), recurrentweights) + np.matmul(inputs, inputweights) + recurrentbias
-weights_by_number = classify_neurons(output_weights[0], 0.35)
+weights_by_number = classify_neurons(output_weights[0], 0.5)
 
 mean_neuron_activations = np.mean(activations, axis=0)
 # activations_first_number = np.zeros(activations.shape)
