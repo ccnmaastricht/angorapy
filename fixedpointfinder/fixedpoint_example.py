@@ -109,18 +109,85 @@ def unique_neurons(weights_by_number):
     pass
 
 def reconstruct_model_with_domains(weights, weights_by_number):
+
+    def split_recurrent_kernel(weights_by_number):
+        first_bit_index = np.asarray(weights_by_number['number_one']['index'])
+        second_bit_index = np.asarray(weights_by_number['number_two']['index'])
+        third_bit_index = np.asarray(weights_by_number['number_two']['index'])
+
+        return [first_bit_index, second_bit_index, third_bit_index]
+
     def recurrent_layer(inputs, activations):
         inputweights, recurrentweights, recurrentbias = weights[0], weights[1], weights[2]
-        return np.matmul(np.tanh(activations), recurrentweights) + np.matmul(inputs, inputweights) + recurrentbias
+        list_of_indices = split_recurrent_kernel(weights_by_number)
+
+        first_bit_inputweights, first_bit_recurrentweights, first_bit_recurrentbias = inputweights[:, list_of_indices[0]], \
+                                                                                      recurrentweights[list_of_indices[0], :], \
+                                                                                      recurrentbias[list_of_indices[0]]
+        first_bit_recurrentweights = first_bit_recurrentweights[:, list_of_indices[0]]
+
+        second_bit_inputweights, second_bit_recurrentweights, second_bit_recurrentbias = inputweights[:, list_of_indices[1]], \
+                                                                                      recurrentweights[list_of_indices[1], :], \
+                                                                                      recurrentbias[list_of_indices[1]]
+        second_bit_recurrentweights = second_bit_recurrentweights[:, list_of_indices[1]]
+
+        third_bit_inputweights, third_bit_recurrentweights, third_bit_recurrentbias = inputweights[:, list_of_indices[2]], \
+                                                                                      recurrentweights[list_of_indices[2], :], \
+                                                                                      recurrentbias[list_of_indices[2]]
+        third_bit_recurrentweights = third_bit_recurrentweights[:, list_of_indices[2]]
+
+        first_bit_activations = activations[:, list_of_indices[0]]
+        second_bit_activations = activations[:, list_of_indices[1]]
+        third_bit_activations = activations[:, list_of_indices[2]]
+        first_bit_output = np.tanh(np.matmul(first_bit_activations, first_bit_recurrentweights) + \
+                                   np.matmul(inputs, first_bit_inputweights) + first_bit_recurrentbias)
+
+        second_bit_output = np.tanh(np.matmul(second_bit_activations, second_bit_recurrentweights) + \
+                                    np.matmul(inputs, second_bit_inputweights) + second_bit_recurrentbias)
+
+        third_bit_output = np.tanh(np.matmul(third_bit_activations, third_bit_recurrentweights) + \
+                                   np.matmul(inputs, third_bit_inputweights) + third_bit_recurrentbias)
+        return [first_bit_output, second_bit_output, third_bit_output]
+
+    def dense_layer(recurrent_activations):
+        first_bit_weights = np.vstack(weights_by_number['number_one']['weights'])
+        second_bit_weights = np.vstack(weights_by_number['number_two']['weights'])
+        third_bit_weights = np.vstack(weights_by_number['number_two']['weights'])
+
+        first_bit_output = np.matmul(recurrent_activations[0], first_bit_weights)
+        second_bit_output = np.matmul(recurrent_activations[1], second_bit_weights)
+        third_bit_output = np.matmul(recurrent_activations[2], third_bit_weights)
+
+        return first_bit_output + second_bit_output + third_bit_output
+
+    return recurrent_layer, dense_layer
+
 weights_by_number = classify_neurons(output_weights[0], 0.5)
 
-mean_neuron_activations = np.mean(activations, axis=0)
-# activations_first_number = np.zeros(activations.shape)
-activations_first_number = np.repeat(np.reshape(mean_neuron_activations, (-1, 24)), activations.shape[0], axis=0)
-first_bit_neurons = np.asarray(weights_by_number['number_one']['index'])
+initial_activations = np.zeros((1, 24))
+fake_activations = np.vstack((initial_activations, activations[:-1, :]))
+
+inputs = np.vstack(stim['inputs'])
+
+recurrent_layer, dense_layer = reconstruct_model_with_domains(weights, weights_by_number)
+
+recurrent_activations = recurrent_layer(inputs, fake_activations)
+generated_outputs = dense_layer(recurrent_activations)
+
+mse = (np.square(outputs - generated_outputs)).mean(axis=1)
+
+avemse = np.mean(mse)
+print(avemse)
+
+
+
+# mean_neuron_activations = np.mean(activations, axis=0)
+activations_first_number = np.zeros(activations.shape)
+# activations_first_number = np.repeat(np.reshape(mean_neuron_activations, (-1, 24)), activations.shape[0], axis=0)
+first_bit_neurons = np.asarray(weights_by_number['number_three']['index'])
 activations_first_number[:, first_bit_neurons] = activations[:, first_bit_neurons]
 
-first_bit_neuron_weights = np.vstack(weights_by_number['number_one']['weights'])
+first_bit_neuron_weights = np.vstack(weights_by_number['number_three']['weights'])
 
 outputs = np.vstack(stim['output'])
 firstbit_neuron_activations_reconstructed = np.matmul(outputs, first_bit_neuron_weights.transpose())
