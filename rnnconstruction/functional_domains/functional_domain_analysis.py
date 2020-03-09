@@ -14,10 +14,11 @@ class FDA:
 
         for weights_per_neuron in output_weights:
             big_weights = np.abs(weights_per_neuron)
-            biggest_weight = np.max(big_weights)
-            difference = biggest_weight - big_weights
-            ratio_biggest_to_weights = difference / biggest_weight
-            big_weights = ratio_biggest_to_weights < threshold
+            big_weights = big_weights > threshold
+            #biggest_weight = np.max(big_weights)
+            #difference = biggest_weight - big_weights
+            #ratio_biggest_to_weights = difference / biggest_weight
+            #big_weights = ratio_biggest_to_weights < threshold
             for i in range(len(big_weights)):
                 if big_weights[i] and i == 0:
                     weights_by_number['number_one']['weights'].append(weights_per_neuron)
@@ -62,6 +63,7 @@ class FDA:
 
         def pooling_layer(output_from_domains, pooling_weights):
             return np.matmul(output_from_domains, pooling_weights)
+
 
         return recurrent_layer, dense_layer, pooling_layer
 
