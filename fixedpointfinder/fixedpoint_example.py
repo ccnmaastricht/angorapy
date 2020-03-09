@@ -1,7 +1,7 @@
 from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from fixedpointfinder.three_bit_flip_flop import Flipflopper
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities, visualize_flipflop
-import numpy as np
+import autograd.numpy as np
 import os
 import itertools as it
 from scipy.stats import pearsonr
@@ -158,28 +158,48 @@ def reconstruct_model_with_domains(weights, weights_by_number):
         second_bit_output = np.matmul(recurrent_activations[1], second_bit_weights)
         third_bit_output = np.matmul(recurrent_activations[2], third_bit_weights)
 
-        return first_bit_output + second_bit_output + third_bit_output
+        return np.hstack((first_bit_output, second_bit_output, third_bit_output))
 
-    return recurrent_layer, dense_layer
+    def pooling_layer(output_from_domains, pooling_weights):
 
-weights_by_number = classify_neurons(output_weights[0], 0.5)
+        return np.matmul(output_from_domains, pooling_weights)
+
+    return recurrent_layer, dense_layer, pooling_layer
+
+
+weights_by_number = classify_neurons(output_weights[0], 1)
 
 initial_activations = np.zeros((1, 24))
 fake_activations = np.vstack((initial_activations, activations[:-1, :]))
 
 inputs = np.vstack(stim['inputs'])
 
-recurrent_layer, dense_layer = reconstruct_model_with_domains(weights, weights_by_number)
+recurrent_layer, dense_layer, pooling_layer = reconstruct_model_with_domains(weights, weights_by_number)
 
 recurrent_activations = recurrent_layer(inputs, fake_activations)
 generated_outputs = dense_layer(recurrent_activations)
 
-mse = (np.square(outputs - generated_outputs)).mean(axis=1)
-
-avemse = np.mean(mse)
-print(avemse)
+pooling_weights = np.random.randn(9, 3) * 1e-03
 
 
+def objective_function(x):
+
+    return np.mean(np.square(- np.matmul(generated_outputs, x) + outputs))
+
+from fixedpointfinder.minimization import adam_weights_optimizer
+pooling_weights = adam_weights_optimizer(objective_function, pooling_weights, 0,
+                                         epsilon=0.01,
+                                         alr_decayr=0.001,
+                                         max_iter=5000,
+                                         print_every=200,
+                                         init_agnc=1.0,
+                                         agnc_decayr=0.0001,
+                                         verbose=True)
+
+from autograd import grad
+b = grad(objective_function)
+a = b(pooling_weights)
+c = objective_function(pooling_weights)
 
 # mean_neuron_activations = np.mean(activations, axis=0)
 activations_first_number = np.zeros(activations.shape)
