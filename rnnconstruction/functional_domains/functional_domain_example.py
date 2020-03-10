@@ -39,7 +39,7 @@ activations = flopper.get_activations(stim)
 # find neurons that wire together and or represent certain features in the input
 activations = np.vstack(activations)
 
-fda = FDA(output_weights[0], 0.4)
+fda = FDA(output_weights[0], 0.4, n_hidden)
 
 initial_activations = np.zeros((1, 24))
 fake_activations = np.vstack((initial_activations, activations[:-1, :]))
@@ -63,19 +63,9 @@ def objective_function(x):
 
     return np.mean(np.square(- np.matmul(recurrent_pooling_layer(x), output_weights[0]) + outputs))
 
-
-mean_neuron_activations = np.mean(activations, axis=0)
-# activations_first_number = np.zeros(activations.shape)
-activations_first_number = np.repeat(np.reshape(mean_neuron_activations, (-1, n_hidden)), activations.shape[0], axis=0)
-first_bit_neurons = np.asarray(fda.weights_by_number['number_two']['index'])
-activations_first_number[:, first_bit_neurons] = activations[:, first_bit_neurons]
-
-first_bit_neuron_weights = np.vstack(fda.weights_by_number['number_two']['weights'])
-
-firstbit_neuron_activations_reconstructed = np.matmul(outputs, first_bit_neuron_weights.transpose())
-activations_first_number[:, first_bit_neurons] = firstbit_neuron_activations_reconstructed
-
-plot_functional_domains(activations, activations[:1000, :])
+bit = 'first_bit'
+activations_per_bit = fda.reconstruct_domains(activations, outputs, bit)
+plot_functional_domains(activations, activations_per_bit)
 
 #pooling_weights = adam_weights_optimizer(objective_function, recurrent_output_weights, 0,
 #                                         epsilon=0.01,

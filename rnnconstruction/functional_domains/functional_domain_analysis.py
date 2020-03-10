@@ -2,14 +2,14 @@ import autograd.numpy as np
 
 class FDA:
 
-    def __init__(self, output_weights, classification_threshold):
+    def __init__(self, output_weights, classification_threshold, n_hidden):
         self.weights_by_number = self._classify_neurons(output_weights, classification_threshold)
-
+        self.n_hidden = n_hidden
 
     def _classify_neurons(self, output_weights, threshold):
-        weights_by_number = {'number_one': {'weights': [], 'index': []},
-                             'number_two': {'weights': [], 'index': []},
-                             'number_three': {'weights': [], 'index': []}}
+        weights_by_number = {'first_bit': {'weights': [], 'index': []},
+                             'second_bit': {'weights': [], 'index': []},
+                             'third_bit': {'weights': [], 'index': []}}
         k = 0
 
         for weights_per_neuron in output_weights:
@@ -21,14 +21,14 @@ class FDA:
             #big_weights = ratio_biggest_to_weights < threshold
             for i in range(len(big_weights)):
                 if big_weights[i] and i == 0:
-                    weights_by_number['number_one']['weights'].append(weights_per_neuron)
-                    weights_by_number['number_one']['index'].append(k)
+                    weights_by_number['first_bit']['weights'].append(weights_per_neuron)
+                    weights_by_number['first_bit']['index'].append(k)
                 elif big_weights[i] and i == 1:
-                    weights_by_number['number_two']['weights'].append(weights_per_neuron)
-                    weights_by_number['number_two']['index'].append(k)
+                    weights_by_number['second_bit']['weights'].append(weights_per_neuron)
+                    weights_by_number['second_bit']['index'].append(k)
                 elif big_weights[i] and i == 2:
-                    weights_by_number['number_three']['weights'].append(weights_per_neuron)
-                    weights_by_number['number_three']['index'].append(k)
+                    weights_by_number['third_bit']['weights'].append(weights_per_neuron)
+                    weights_by_number['third_bit']['index'].append(k)
             k += 1
         return weights_by_number
 
@@ -51,9 +51,9 @@ class FDA:
             return [first_bit_output, second_bit_output, third_bit_output]
 
         def dense_layer(recurrent_activations):
-            first_bit_weights = np.vstack(self.weights_by_number['number_one']['weights'])
-            second_bit_weights = np.vstack(self.weights_by_number['number_two']['weights'])
-            third_bit_weights = np.vstack(self.weights_by_number['number_two']['weights'])
+            first_bit_weights = np.vstack(self.weights_by_number['first_bit']['weights'])
+            second_bit_weights = np.vstack(self.weights_by_number['second_bit']['weights'])
+            third_bit_weights = np.vstack(self.weights_by_number['third_bit']['weights'])
 
             first_bit_output = np.matmul(recurrent_activations[0], first_bit_weights)
             second_bit_output = np.matmul(recurrent_activations[1], second_bit_weights)
@@ -68,9 +68,9 @@ class FDA:
         return recurrent_layer, dense_layer, pooling_layer
 
     def get_recurrent_kernel_splits(self):
-        first_bit_index = np.asarray(self.weights_by_number['number_one']['index'])
-        second_bit_index = np.asarray(self.weights_by_number['number_two']['index'])
-        third_bit_index = np.asarray(self.weights_by_number['number_two']['index'])
+        first_bit_index = np.asarray(self.weights_by_number['first_bit']['index'])
+        second_bit_index = np.asarray(self.weights_by_number['second_bit']['index'])
+        third_bit_index = np.asarray(self.weights_by_number['third_bit']['index'])
 
         return [first_bit_index, second_bit_index, third_bit_index]
 
@@ -109,3 +109,17 @@ class FDA:
         split_activations = [first_bit_activations, second_bit_activations, third_bit_activations]
 
         return split_activations
+
+    def reconstruct_domains(self, activations, outputs, bit):
+        mean_neuron_activations = np.mean(activations, axis=0)
+
+        # activations_first_number = np.zeros(activations.shape)
+        activations_first_number = np.repeat(np.reshape(mean_neuron_activations, (-1, self.n_hidden)), activations.shape[0],
+                                             axis=0)
+        first_bit_neurons = np.asarray(self.weights_by_number[bit]['index'])
+        activations_first_number[:, first_bit_neurons] = activations[:, first_bit_neurons]
+
+        first_bit_neuron_weights = np.vstack(self.weights_by_number[bit]['weights'])
+
+        firstbit_neuron_activations_reconstructed = np.matmul(outputs, first_bit_neuron_weights.transpose())
+        activations_first_number[:, first_bit_neurons] = firstbit_neuron_activations_reconstructed
