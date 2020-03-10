@@ -39,7 +39,7 @@ activations = flopper.get_activations(stim)
 # find neurons that wire together and or represent certain features in the input
 activations = np.vstack(activations)
 
-fda = FDA(output_weights[0], 0.4, n_hidden)
+fda = FDA(output_weights[0], 1, n_hidden)
 
 initial_activations = np.zeros((1, 24))
 fake_activations = np.vstack((initial_activations, activations[:-1, :]))
@@ -67,11 +67,39 @@ bit = 'first_bit'
 activations_per_bit = fda.reconstruct_domains(activations, outputs, bit)
 plot_functional_domains(activations, activations_per_bit)
 
-#pooling_weights = adam_weights_optimizer(objective_function, recurrent_output_weights, 0,
-#                                         epsilon=0.01,
- #                                        alr_decayr=0.001,
- #                                        max_iter=500,
- #                                        print_every=200,
- #                                        init_agnc=1.0,
- #                                        agnc_decayr=0.0001,
-  #                                       verbose=True)
+pooling_weights = adam_weights_optimizer(objective_function, recurrent_output_weights, 0,
+                                         epsilon=0.01,
+                                         alr_decayr=0.001,
+                                         max_iter=5000,
+                                         print_every=200,
+                                         init_agnc=1.0,
+                                         agnc_decayr=0.0001,
+                                         verbose=True)
+
+orthonormalbasis = np.linalg.qr(weights[1])
+evals, evecs = np.linalg.eig(weights[1])
+diagonal_evals = np.diag(evals)
+
+def reconstruct_from_evecs(evals, evecs, threshold, bigger):
+    if bigger:
+        big_evals = np.abs(evals) > threshold
+    else:
+        big_evals = np.abs(evals) < threshold
+    new_evecs = np.zeros((24, 24))
+    new_evecs[:, big_evals] = evecs[:, big_evals]
+
+    diagonal_evals = np.zeros((24, 24))
+    diag_indices = np.diag_indices(24)
+    evals_vector = np.zeros(24)
+    evals_vector[big_evals] = evals[big_evals]
+    diagonal_evals[diag_indices] = evals_vector
+
+    reconstructed_weights = np.dot(new_evecs,  diagonal_evals * new_evecs.T)
+
+    return reconstructed_weights
+
+
+bigger = True
+reconstructed_weights = reconstruct_from_evecs(evals, evecs, 0.1, bigger)
+reconstructed_weights_small = reconstruct_from_evecs(evals, evecs, 0.1, True)
+weights[1] = reconstructed_weights
