@@ -3,9 +3,6 @@ from fixedpointfinder.three_bit_flip_flop import Flipflopper
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities, visualize_flipflop
 import autograd.numpy as np
 import os
-import itertools as it
-from scipy.stats import pearsonr
-import matplotlib.pyplot as plt
 import tensorflow as tf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

@@ -102,8 +102,8 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id = 1583404415  # 1583180664 lunarlandercont
-    # agent_id = 1583256614 # reach task
+    # agent_id = 1583404415  # 1583180664 lunarlandercont
+    agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1e-04,
+                                   q_threshold=1e-06,
                                    epsilon=0.01,
                                    alr_decayr=1e-04,
                                    max_iters=5000)
