@@ -6,7 +6,7 @@ import numpy as np
 from gym import utils, spaces
 from gym.envs.robotics import HandReachEnv, HandBlockEnv
 from gym.envs.robotics.hand import manipulate
-from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS
+from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from gym.envs.robotics.utils import robot_get_obs
 
 from utilities.const import VISION_WH
@@ -262,6 +262,45 @@ class ShadowHandReach(HandReachEnv):
         }
 
 
+class ShadowHandMultiReach(ShadowHandReach):
+    """Reaching task where three fingers have to be joined."""
+
+    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type,
+                         success_multiplier)
+
+    def _sample_goal(self):
+        thumb_name = 'robot0:S_thtip'
+        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
+
+        # choose the fingers to join with the thumb
+        finger_name_a, finger_name_b = self.np_random.choice(a=finger_names, size=2, replace=False)
+
+        # retrieve their indices
+        thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
+        finger_idx_a = FINGERTIP_SITE_NAMES.index(finger_name_a)
+        finger_idx_b = FINGERTIP_SITE_NAMES.index(finger_name_b)
+
+        # pick a meeting point above the hand.
+        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
+        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
+
+        # Slightly move meeting goal towards the respective finger to avoid that they overlap.
+        goal = self.initial_goal.copy().reshape(-1, 3)
+        for idx in [thumb_idx, finger_idx_a, finger_idx_b]:
+            offset_direction = (meeting_pos - goal[idx])
+            offset_direction /= np.linalg.norm(offset_direction)
+            goal[idx] = meeting_pos - 0.007 * offset_direction
+
+        if self.np_random.uniform() < 0.1:
+            # With some probability, ask all fingers to move back to the origin.
+            # This avoids that the thumb constantly stays near the goal position already.
+            goal = self.initial_goal.copy()
+
+        return goal.flatten()
+
+
 class ShadowHandBlockVector(HandBlockEnv):
 
     def _get_obs(self):
@@ -279,7 +318,8 @@ class ShadowHandBlockVector(HandBlockEnv):
 if __name__ == "__main__":
     from environments import *
 
-    env = gym.make("ShadowHand-v0")
+    env = gym.make("MultiReachAbsolute-v0")
+    # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
     # env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()
