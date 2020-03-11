@@ -160,11 +160,14 @@ reconstructed_weights_small = reconstruct_from_evecs(evals, evecs, 0.1, True)
 
 # serialize the recurrent layer to proof that eigenvectors do what they do
 input_to_recurrent_layer = np.matmul(np.vstack(stim['inputs']), weights[0])
-fake_h = np.vstack((np.zeros(24), input_to_recurrent_layer[:-1, :]))
+fake_h = np.vstack((np.zeros(24), activations[:-1, :]))
 def recurrent_layer_serialized(reconstructed_matrices, input_recurrent_layer, weights, fake_h):
     h = fake_h
-    for i in range(1):
-        h =  np.tanh(h @ weights[1] + weights[2] + input_recurrent_layer) # reconstructed_matrices[i]
+    # h = weights[2] + input_recurrent_layer
+    for i in range(24):
+        h = h @ reconstructed_matrices[i] #weights[1]
+
+    h = np.tanh(h + input_recurrent_layer + weights[2])
     return h
 
 

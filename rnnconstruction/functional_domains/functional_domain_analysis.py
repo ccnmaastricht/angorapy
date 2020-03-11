@@ -131,7 +131,7 @@ class FDA:
         evals, evecs = np.linalg.eig(weights[1])
         # diagonal_evals = np.diag(evals)
         reconstructed_matrices = []
-        for i in range(len(weights)):
+        for i in range(len(weights[1])):
 
             diagonal_evals = np.zeros((24, 24))
             diagonal_evals[i, i] = evals[i]
