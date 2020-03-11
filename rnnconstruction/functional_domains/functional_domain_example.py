@@ -164,7 +164,7 @@ fake_h = np.vstack((np.zeros(24), activations[:-1, :]))
 def recurrent_layer_serialized(reconstructed_matrices, input_recurrent_layer, weights, fake_h):
     h = fake_h
     # h = weights[2] + input_recurrent_layer
-    for i in range(24):
+    for i in range(1):
         h = h @ reconstructed_matrices[i] #weights[1]
 
     h = np.tanh(h + input_recurrent_layer + weights[2])
