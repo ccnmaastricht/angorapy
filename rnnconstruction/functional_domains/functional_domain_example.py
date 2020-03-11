@@ -80,6 +80,62 @@ orthonormalbasis = np.linalg.qr(weights[1])
 evals, evecs = np.linalg.eig(weights[1])
 diagonal_evals = np.diag(evals)
 
+A = evals[4].real
+B = evals[4].imag
+
+cosval = A/np.sqrt(np.square(A) + np.square(B))
+sinval = B/np.sqrt(np.square(A) + np.square(B))
+r = np.sqrt(np.square(A) + np.square(B))
+
+import math
+def polar(z):
+    a= z.real
+    b= z.imag
+    r = math.hypot(a,b)
+    theta = math.atan2(b,a)
+    return r,theta # use return instead of print.
+
+
+# theta almost 120°!!!
+degrees = []
+real_evals = []
+for val in evals:
+    if type(val) == np.complex64:
+        r, theta = polar(val)
+        degrees.append(np.degrees(theta))
+        print(np.degrees(theta))
+        if theta == 0:
+            real_evals.append(val)
+
+
+
+
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+            >>> angle_between((1, 0, 0), (0, 1, 0))
+            1.5707963267948966
+            >>> angle_between((1, 0, 0), (1, 0, 0))
+            0.0
+            >>> angle_between((1, 0, 0), (-1, 0, 0))
+            3.141592653589793
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+for i in range(len(fps)):
+    for j in range(len(fps)-1):
+        pointa = fps[j]['x']
+        pointb = fps[i]['x']
+        # print(np.degrees(angle_between(pointa, pointb)))
+        print(np.linalg.norm(pointa))
+
+
 def reconstruct_from_evecs(evals, evecs, threshold, bigger):
     if bigger:
         big_evals = np.abs(evals) > threshold
@@ -102,4 +158,4 @@ def reconstruct_from_evecs(evals, evecs, threshold, bigger):
 bigger = True
 reconstructed_weights = reconstruct_from_evecs(evals, evecs, 0.1, bigger)
 reconstructed_weights_small = reconstruct_from_evecs(evals, evecs, 0.1, True)
-weights[1] = reconstructed_weights
+# weights[1] = reconstructed_weights

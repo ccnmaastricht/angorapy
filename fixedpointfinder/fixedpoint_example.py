@@ -37,9 +37,9 @@ fpf = Adamfixedpointfinder(weights, rnn_type,
                            q_threshold=1e-12,
                            epsilon=0.01,
                            alr_decayr=0.0001,
-                           max_iters=5000)
+                           max_iters=10000)
 # sample states, i.e. a number of ICs
-states = fpf.sample_states(activations, 1000, 0.5)
+states = fpf.sample_states(activations, 1000, 0)
 # vel = fpf.compute_velocities(np.hstack(activations[1:]), np.zeros((32768, 3)))
 # generate corresponding input as zeros for flip flop task
 # please keep in mind that the input does not need to be zero for all tasks
