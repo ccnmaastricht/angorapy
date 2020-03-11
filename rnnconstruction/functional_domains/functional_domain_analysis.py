@@ -125,3 +125,20 @@ class FDA:
         activations_first_number[:, first_bit_neurons] = firstbit_neuron_activations_reconstructed
 
         return activations_first_number
+
+    def serialize_recurrent_layer(self, weights):
+
+        evals, evecs = np.linalg.eig(weights[1])
+        # diagonal_evals = np.diag(evals)
+        reconstructed_matrices = []
+        for i in range(len(weights)):
+
+            diagonal_evals = np.zeros((24, 24))
+            diagonal_evals[i, i] = evals[i]
+
+            reconstructed_weights = evecs @ diagonal_evals @ np.linalg.inv(evecs)
+            reconstructed_matrices.append(reconstructed_weights)
+
+        return reconstructed_matrices
+
+

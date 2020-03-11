@@ -107,7 +107,14 @@ for val in evals:
         if theta == 0:
             real_evals.append(val)
 
+degrees = np.vstack(degrees)
+degrees = degrees[degrees != 0]
 
+combinations = []
+for a, b in it.combinations(degrees, 2):
+        combinations.append(a + b)
+
+combinations = np.vstack(combinations)
 
 
 def unit_vector(vector):
@@ -128,34 +135,48 @@ def angle_between(v1, v2):
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
-for i in range(len(fps)):
-    for j in range(len(fps)-1):
-        pointa = fps[j]['x']
-        pointb = fps[i]['x']
-        # print(np.degrees(angle_between(pointa, pointb)))
+degrees_fixedpoints = []
+import itertools as it
+for a, b in it.combinations(fps, 2):
+        pointa = a['x']
+        pointb = b['x']
+        print(np.degrees(angle_between(pointa, pointb)))
+        degrees_fixedpoints.append(np.degrees(angle_between(pointa, pointb)))
         print(np.linalg.norm(pointa))
+degrees_fixedpoints = np.vstack(degrees_fixedpoints)
 
+list_combinations_and_degrees = []
+for combination in combinations:
+    for degrees_fixedpoint in degrees_fixedpoints:
+        if np.abs(combination-degrees_fixedpoint) < 0.5:
+            list_combinations_and_degrees.append((degrees_fixedpoint, combination))
 
-def reconstruct_from_evecs(evals, evecs, threshold, bigger):
-    if bigger:
-        big_evals = np.abs(evals) > threshold
-    else:
-        big_evals = np.abs(evals) < threshold
-    new_evecs = np.zeros((24, 24))
-    new_evecs[:, big_evals] = evecs[:, big_evals]
-
-    diagonal_evals = np.zeros((24, 24))
-    diag_indices = np.diag_indices(24)
-    evals_vector = np.zeros(24)
-    evals_vector[big_evals] = evals[big_evals]
-    diagonal_evals[diag_indices] = evals_vector
-
-    reconstructed_weights = np.dot(new_evecs,  diagonal_evals * new_evecs.T)
-
-    return reconstructed_weights
 
 
 bigger = True
 reconstructed_weights = reconstruct_from_evecs(evals, evecs, 0.1, bigger)
 reconstructed_weights_small = reconstruct_from_evecs(evals, evecs, 0.1, True)
 # weights[1] = reconstructed_weights
+
+# serialize the recurrent layer to proof that eigenvectors do what they do
+input_to_recurrent_layer = np.matmul(np.vstack(stim['inputs']), weights[0])
+fake_h = np.vstack((np.zeros(24), input_to_recurrent_layer[:-1, :]))
+def recurrent_layer_serialized(reconstructed_matrices, input_recurrent_layer, weights, fake_h):
+    h = fake_h
+    for i in range(1):
+        h =  np.tanh(h @ weights[1] + weights[2] + input_recurrent_layer) # reconstructed_matrices[i]
+    return h
+
+
+def after_serialized_layer(h, output_weights):
+
+    output_network = np.matmul(h, output_weights[0]) + output_weights[1]
+
+    return output_network
+
+h = recurrent_layer_serialized(reconstructed_matrices, input_to_recurrent_layer, weights, fake_h)
+
+network_output = after_serialized_layer(h, output_weights)
+
+mse = np.mean(np.sqrt(np.square(network_output-outputs)))
+print(mse)
