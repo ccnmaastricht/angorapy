@@ -129,17 +129,28 @@ class FDA:
     def serialize_recurrent_layer(self, weights):
 
         evals, evecs = np.linalg.eig(weights[1])
-        diagonal_evals = np.diag(evals)
-        reconstructed_matrices = []
+        diagonal_evals = np.real(np.diag(evals))
+        real_parts = evals.real
+        img_parts = evals.imag
+        evecs_c = np.real(evecs)
+        #reconstructed_matrices = []
         for i in range(len(weights[1])):
 
-            diagonal_evals = np.zeros((24, 24))
-            diagonal_evals[i, i] = evals[i]**(1/24)
+            #diagonal_evals = np.zeros((24, 24))
+            #diagonal_evals[i, i] = evals[i]**(1/24)
 
-            reconstructed_weights = evecs @ diagonal_evals @ np.linalg.pinv(evecs)
-            reconstructed_matrices.append(reconstructed_weights)
+            #reconstructed_weights = evecs @ diagonal_evals @ np.linalg.pinv(evecs)
+            if img_parts[i] > 0:
+                diagonal_evals[i, i+1] = img_parts[i]
+                diagonal_evals[i+1, i] = img_parts[i+1]
+                evecs_c[:, i] = np.real(evecs[:, i])
+                evecs_c[:, i+1] = np.imag(evecs[:, i])
+                i += 2
 
-        return reconstructed_matrices
+
+            #reconstructed_matrices.append(reconstructed_weights)
+
+        return diagonal_evals
 
 
 

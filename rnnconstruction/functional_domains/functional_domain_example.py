@@ -5,6 +5,7 @@ from rnnconstruction.functional_domains.plot_utils import plot_functional_domain
 import tensorflow as tf
 from rnnconstruction.functional_domains.functional_domain_analysis import FDA
 from fixedpointfinder.minimization import adam_weights_optimizer
+import itertools as it
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -67,14 +68,14 @@ bit = 'first_bit'
 activations_per_bit = fda.reconstruct_domains(activations, outputs, bit)
 plot_functional_domains(activations, activations_per_bit)
 
-pooling_weights = adam_weights_optimizer(objective_function, recurrent_output_weights, 0,
-                                         epsilon=0.01,
-                                         alr_decayr=0.001,
-                                         max_iter=5000,
-                                         print_every=200,
-                                         init_agnc=1.0,
-                                         agnc_decayr=0.0001,
-                                         verbose=True)
+#pooling_weights = adam_weights_optimizer(objective_function, recurrent_output_weights, 0,
+#                                         epsilon=0.01,
+ #                                        alr_decayr=0.001,
+ #                                        max_iter=5000,
+ #                                        print_every=200,
+  #                                       init_agnc=1.0,
+  #                                       agnc_decayr=0.0001,
+  #                                       verbose=True)
 
 orthonormalbasis = np.linalg.qr(weights[1])
 evals, evecs = np.linalg.eig(weights[1])
@@ -136,13 +137,13 @@ def angle_between(v1, v2):
 
 degrees_fixedpoints = []
 import itertools as it
-for a, b in it.combinations(fps, 2):
-        pointa = a['x']
-        pointb = b['x']
-        print(np.degrees(angle_between(pointa, pointb)))
-        degrees_fixedpoints.append(np.degrees(angle_between(pointa, pointb)))
-        print(np.linalg.norm(pointa))
-degrees_fixedpoints = np.vstack(degrees_fixedpoints)
+#for a, b in it.combinations(fps, 2):
+#        pointa = a['x']
+ #       pointb = b['x']
+ #       print(np.degrees(angle_between(pointa, pointb)))
+ #       degrees_fixedpoints.append(np.degrees(angle_between(pointa, pointb)))
+  #      print(np.linalg.norm(pointa))
+#degrees_fixedpoints = np.vstack(degrees_fixedpoints)
 
 list_combinations_and_degrees = []
 for combination in combinations:
@@ -153,8 +154,8 @@ for combination in combinations:
 
 
 bigger = True
-reconstructed_weights = reconstruct_from_evecs(evals, evecs, 0.1, bigger)
-reconstructed_weights_small = reconstruct_from_evecs(evals, evecs, 0.1, True)
+#reconstructed_weights = reconstruct_from_evecs(evals, evecs, 0.1, bigger)
+#reconstructed_weights_small = reconstruct_from_evecs(evals, evecs, 0.1, True)
 # weights[1] = reconstructed_weights
 
 # serialize the recurrent layer to proof that eigenvectors do what they do
@@ -176,85 +177,41 @@ def after_serialized_layer(h, output_weights):
 
     return output_network
 
-h = recurrent_layer_serialized(reconstructed_matrices, input_to_recurrent_layer, weights, fake_h)
+#h = recurrent_layer_serialized(reconstructed_matrices, input_to_recurrent_layer, weights, fake_h)
 
-network_output = after_serialized_layer(h, output_weights)
+#network_output = after_serialized_layer(h, output_weights)
 
-mse = np.mean(np.sqrt(np.square(network_output-outputs)))
-print(mse)
+#mse = np.mean(np.sqrt(np.square(network_output-outputs)))
+#print(mse)
 
 scaled_evecs = diagonal_evals @ evecs
 origin = np.zeros(24)
 
-plt.quiver(evecs.T, scaled_evecs.T)
-plt.xlim((-2, 25))
-plt.ylim((-2, 25))
-plt.show()
 
 polar2z = lambda r,θ: r * np.exp( 1j * θ )
 z2polar = lambda z: ( np.abs(z), np.angle(z) )
-polar_activation = z2polar(fake_activations[:2000, :])
-polar_rotation = polar_activation[0] * polar_activation[1] @ weights[1]
 
-plt.quiver(polar_activation[1].T, polar_rotation.T)
-plt.xlim((-2, 40))
-plt.ylim((-2, 25))
-plt.show()
 
 fake_activations = outputs @ output_weights[0].T
-rotated_cartesian = polar2z(polar_activation[0], polar_rotation)
+#rotated_cartesian = polar2z(polar_activation[0], polar_rotation)
 import sklearn.decomposition as skld
 pca = skld.PCA(3)
 pca.fit(activations)
 X_pca = pca.transform(fake_activations[:2000, :])
 
+
+h = fake_h @ diagonal_evals
+reconstructed_h = h @ evecs_c
+
+np.allclose(activations, reconstructed_h)
+
+import sklearn.decomposition as skld
+
+pca = skld.PCA(3)
+pca.fit(reconstructed_h)
+X_pca = pca.transform(reconstructed_h)
+import matplotlib.pyplot as plt
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
-for i in range(len(polar_rotation)):
-    ax.plot(np.linspace(0,X_pca[i, 0]),np.linspace(0,X_pca[i, 1]),np.linspace(0,X_pca[i, 2]))
-
+ax.plot(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2])
 plt.show()
-
-np.degrees(angle_between(polar_activation[1][:, 0], polar_rotation[:, 0]))
-degres_activations = []
-for i in range(2000):
-    degres_activations.append(np.degrees(angle_between(fake_activations[i, :], fake_activations[i+1, :])))
-
-# next up: test if combined angle difference to eigenvector can predict rotation of vector
-def angular_difference_prediction(weights, fake_activations):
-    evals, evecs = np.linalg.eig(weights[1])
-
-    degrees = []
-    real_evals = []
-    for val in evals:
-        r, theta = polar(val)
-        degrees.append((r, np.degrees(theta)))
-        # print(np.degrees(theta))
-        if theta == 0:
-            real_evals.append(val)
-    degrees = np.vstack(degrees)
-
-    degres_activations = []
-    for i in range(200):
-        degres_activations.append(np.degrees(angle_between(fake_activations[i, :], fake_activations[i + 1, :])))
-
-    collected_degrees = []
-    for i in range(len(degres_activations)):
-        combined_degrees = 0
-        for k in range(len(degrees)):
-            if degrees[k, 1] < 0:
-                degree_input_vs_evec = np.degrees(np.angle(angle_between(fake_activations[i, :], evecs[:, k])))#+ \
-                                       #np.angle(evecs[:, k], deg=True)
-                combined_degrees += degree_input_vs_evec + degrees[k, 1]
-        combined_degrees = combined_degrees % 360
-        collected_degrees.append(combined_degrees)
-
-    collected_degrees = np.gradient(np.vstack(collected_degrees), axis=0)
-
-    degres_activations = np.vstack(degres_activations)
-
-    return collected_degrees, degres_activations
-
-collected_degrees, degres_activations = angular_difference_prediction(weights, fake_activations)
-
-correlation = scipy.stats.pearsonr(collected_degrees[:, 0], gradient_activations[:, 0])
