@@ -100,12 +100,11 @@ def polar(z):
 degrees = []
 real_evals = []
 for val in evals:
-    if type(val) == np.complex64:
-        r, theta = polar(val)
-        degrees.append(np.degrees(theta))
-        print(np.degrees(theta))
-        if theta == 0:
-            real_evals.append(val)
+    r, theta = polar(val)
+    degrees.append((r,np.degrees(theta)))
+    print(np.degrees(theta))
+    if theta == 0:
+        real_evals.append(val)
 
 degrees = np.vstack(degrees)
 degrees = degrees[degrees != 0]
@@ -164,7 +163,7 @@ fake_h = np.vstack((np.zeros(24), activations[:-1, :]))
 def recurrent_layer_serialized(reconstructed_matrices, input_recurrent_layer, weights, fake_h):
     h = fake_h
     # h = weights[2] + input_recurrent_layer
-    for i in range(1):
+    for i in range(24):
         h = h @ reconstructed_matrices[i] #weights[1]
 
     h = np.tanh(h + input_recurrent_layer + weights[2])
@@ -183,3 +182,79 @@ network_output = after_serialized_layer(h, output_weights)
 
 mse = np.mean(np.sqrt(np.square(network_output-outputs)))
 print(mse)
+
+scaled_evecs = diagonal_evals @ evecs
+origin = np.zeros(24)
+
+plt.quiver(evecs.T, scaled_evecs.T)
+plt.xlim((-2, 25))
+plt.ylim((-2, 25))
+plt.show()
+
+polar2z = lambda r,θ: r * np.exp( 1j * θ )
+z2polar = lambda z: ( np.abs(z), np.angle(z) )
+polar_activation = z2polar(fake_activations[:2000, :])
+polar_rotation = polar_activation[0] * polar_activation[1] @ weights[1]
+
+plt.quiver(polar_activation[1].T, polar_rotation.T)
+plt.xlim((-2, 40))
+plt.ylim((-2, 25))
+plt.show()
+
+fake_activations = outputs @ output_weights[0].T
+rotated_cartesian = polar2z(polar_activation[0], polar_rotation)
+import sklearn.decomposition as skld
+pca = skld.PCA(3)
+pca.fit(activations)
+X_pca = pca.transform(fake_activations[:2000, :])
+
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+for i in range(len(polar_rotation)):
+    ax.plot(np.linspace(0,X_pca[i, 0]),np.linspace(0,X_pca[i, 1]),np.linspace(0,X_pca[i, 2]))
+
+plt.show()
+
+np.degrees(angle_between(polar_activation[1][:, 0], polar_rotation[:, 0]))
+degres_activations = []
+for i in range(2000):
+    degres_activations.append(np.degrees(angle_between(fake_activations[i, :], fake_activations[i+1, :])))
+
+# next up: test if combined angle difference to eigenvector can predict rotation of vector
+def angular_difference_prediction(weights, fake_activations):
+    evals, evecs = np.linalg.eig(weights[1])
+
+    degrees = []
+    real_evals = []
+    for val in evals:
+        r, theta = polar(val)
+        degrees.append((r, np.degrees(theta)))
+        # print(np.degrees(theta))
+        if theta == 0:
+            real_evals.append(val)
+    degrees = np.vstack(degrees)
+
+    degres_activations = []
+    for i in range(200):
+        degres_activations.append(np.degrees(angle_between(fake_activations[i, :], fake_activations[i + 1, :])))
+
+    collected_degrees = []
+    for i in range(len(degres_activations)):
+        combined_degrees = 0
+        for k in range(len(degrees)):
+            if degrees[k, 1] < 0:
+                degree_input_vs_evec = np.degrees(np.angle(angle_between(fake_activations[i, :], evecs[:, k])))#+ \
+                                       #np.angle(evecs[:, k], deg=True)
+                combined_degrees += degree_input_vs_evec + degrees[k, 1]
+        combined_degrees = combined_degrees % 360
+        collected_degrees.append(combined_degrees)
+
+    collected_degrees = np.gradient(np.vstack(collected_degrees), axis=0)
+
+    degres_activations = np.vstack(degres_activations)
+
+    return collected_degrees, degres_activations
+
+collected_degrees, degres_activations = angular_difference_prediction(weights, fake_activations)
+
+correlation = scipy.stats.pearsonr(collected_degrees[:, 0], gradient_activations[:, 0])

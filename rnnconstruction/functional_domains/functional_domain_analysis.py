@@ -133,12 +133,13 @@ class FDA:
         reconstructed_matrices = []
         for i in range(len(weights[1])):
 
-            # diagonal_evals = np.zeros((24, 24))
-            # diagonal_evals[i, i] = evals[i]
+            diagonal_evals = np.zeros((24, 24))
+            diagonal_evals[i, i] = evals[i]**(1/24)
 
             reconstructed_weights = evecs @ diagonal_evals @ np.linalg.pinv(evecs)
             reconstructed_matrices.append(reconstructed_weights)
 
         return reconstructed_matrices
+
 
 
