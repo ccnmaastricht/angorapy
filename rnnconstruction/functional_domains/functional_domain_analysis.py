@@ -141,10 +141,10 @@ class FDA:
 
             #reconstructed_weights = evecs @ diagonal_evals @ np.linalg.pinv(evecs)
             if img_parts[i] > 0:
-                diagonal_evals[i, i+1] = img_parts[i]
-                diagonal_evals[i+1, i] = img_parts[i+1]
+                diagonal_evals[i, i + 1] = img_parts[i]
+                diagonal_evals[i + 1, i] = img_parts[i + 1]
                 evecs_c[:, i] = np.real(evecs[:, i])
-                evecs_c[:, i+1] = np.imag(evecs[:, i])
+                evecs_c[:, i + 1] = np.imag(evecs[:, i])
                 i += 2
 
 
