@@ -2,11 +2,31 @@
 """ShadowHand Environment Wrappers."""
 import os
 
-import numpy
+import numpy as np
 from gym import utils, spaces
+from gym.envs.robotics import HandReachEnv, HandBlockEnv
 from gym.envs.robotics.hand import manipulate
-from gym.envs.robotics.hand.manipulate_touch_sensors import MANIPULATE_BLOCK_XML, MANIPULATE_EGG_XML
-from mujoco_py import GlfwContext
+from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS
+from gym.envs.robotics.utils import robot_get_obs
+
+from utilities.const import VISION_WH
+
+MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
+                                    "assets/hand",
+                                    'manipulate_block_touch_sensors.xml')
+
+MANIPULATE_EGG_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
+                                  "assets/hand",
+                                  'manipulate_egg_touch_sensors.xml')
+
+
+# DEFAULT_INITIAL_QPOS = {k: v * 0 for k, v in DEFAULT_INITIAL_QPOS.items()}
+
+
+def get_palm_position(sim):
+    """Return the robotic hand's palm's center."""
+    palm_idx = sim.model.body_names.index("robot0:palm")
+    return np.array(sim.model.body_pos[palm_idx])
 
 
 class ShadowHand(manipulate.ManipulateEnv):
@@ -14,7 +34,7 @@ class ShadowHand(manipulate.ManipulateEnv):
 
     def __init__(self, model_path, target_position, target_rotation, target_position_range, reward_type,
                  initial_qpos={}, randomize_initial_position=True, randomize_initial_rotation=True,
-                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=False,
+                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=True,
                  ignore_z_target_rotation=False, touch_visualisation="off", touch_get_obs="sensordata",
                  visual_input: bool = False, max_steps=100):
         """Initializes a new Hand manipulation environment with touch sensors.
@@ -33,16 +53,19 @@ class ShadowHand(manipulate.ManipulateEnv):
                 position (False)
             max_steps (int): maximum number of steps before episode is ended
         """
-        # init rendering [IMPORTANT]
-        GlfwContext(offscreen=True, quiet=True)
+
+        if visual_input:
+            # init rendering [IMPORTANT]
+            from mujoco_py import GlfwContext
+            GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
 
         self.touch_visualisation = touch_visualisation
         self.touch_get_obs = touch_get_obs
+        self.visual_input = visual_input
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
         self.touch_color = [1, 0, 0, 0.5]
         self.notouch_color = [0, 0.5, 0, 0.2]
-        self.visual_input = visual_input
         self.total_steps = 0
         self.max_steps = max_steps
 
@@ -71,20 +94,20 @@ class ShadowHand(manipulate.ManipulateEnv):
             pass
 
         # set hand and background colors
-        self.sim.model.mat_rgba[2] = numpy.array([16, 18, 35, 255]) / 255
-        self.sim.model.mat_rgba[4] = numpy.array([104, 143, 71, 255]) / 255
-        self.sim.model.geom_rgba[48] = numpy.array([0.5, 0.5, 0.5, 0])
+        self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255
+        self.sim.model.mat_rgba[4] = np.array([104, 143, 71, 255]) / 255
+        self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
         # set observation space
         obs = self._get_obs()
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['desired_goal'].shape, dtype='float32'),
-            achieved_goal=spaces.Box(-numpy.inf, numpy.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['desired_goal'].shape, dtype='float32'),
+            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             observation=spaces.Tuple((
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][0].shape, dtype='float32'),  # visual/object
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][1].shape, dtype='float32'),  # proprioception
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][2].shape, dtype='float32'),  # touch sensors
-                spaces.Box(-numpy.inf, numpy.inf, shape=obs["observation"][3].shape, dtype='float32'),  # goal
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][0].shape, dtype='float32'),  # visual/object
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][1].shape, dtype='float32'),  # proprioception
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][2].shape, dtype='float32'),  # touch sensors
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][3].shape, dtype='float32'),  # goal
             ))
         ))
 
@@ -92,9 +115,10 @@ class ShadowHand(manipulate.ManipulateEnv):
         super()._viewer_setup()
 
         # rotate camera to top down view
-        self.viewer.cam.distance = 0.5
-        self.viewer.cam.azimuth = -90.0
-        self.viewer.cam.elevation = -90.0
+        self.viewer.cam.distance = 0.4  # zoom in
+        self.viewer.cam.azimuth = -90.0  # top down view
+        self.viewer.cam.elevation = -90.0  # top down view
+        self.viewer.cam.lookat[1] -= 0.03  # slightly move forward
 
     def _render_callback(self):
         super()._render_callback()
@@ -109,14 +133,14 @@ class ShadowHand(manipulate.ManipulateEnv):
         # "primary" information, either this is the visual frame or the object position and velocity
         achieved_goal = self._get_achieved_goal().ravel()
         if self.visual_input:
-            primary = self.render(mode="rgb_array", height=224, width=224)
+            primary = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
-            primary = numpy.concatenate([achieved_goal, object_vel])
+            primary = np.concatenate([achieved_goal, object_vel])
 
         # get proprioceptive information (positions of joints)
         robot_pos, robot_vel = manipulate.robot_get_obs(self.sim)
-        proprioception = numpy.concatenate([robot_pos, robot_vel])
+        proprioception = np.concatenate([robot_pos, robot_vel])
 
         # touch sensor information
         if self.touch_get_obs == 'sensordata':
@@ -125,35 +149,71 @@ class ShadowHand(manipulate.ManipulateEnv):
             raise NotImplementedError("Only sensor data supported atm, sorry.")
 
         return {
-            "observation": numpy.array((primary.copy(), proprioception.copy(), touch.copy(), self.goal.ravel().copy())),
+            "observation": np.array((primary.copy(), proprioception.copy(), touch.copy(), self.goal.ravel().copy())),
             "achieved_goal": achieved_goal.copy(),
             "desired_goal": self.goal.ravel().copy(),
         }
+
+    def _is_success(self, achieved_goal, desired_goal):
+        """We determine success only by means of rotational goals."""
+        _, d_rot = self._goal_distance(achieved_goal, desired_goal)
+        return (d_rot < self.rotation_threshold).astype(np.float32)
+
+    def _is_dropped(self) -> bool:
+        """Heuristically determine whether the object still is in the hand."""
+
+        # determin object center position
+        obj_center_idx = self.sim.model.site_name2id('object:center')
+        obj_center_pos = self.sim.data.site_xpos[obj_center_idx]
+
+        # determine palm center position
+        palm_center_pos = get_palm_position(self.sim)
+
+        dropped = (
+            obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
+            # we could add smth like checking for contacts between palm and object here, but the above works
+            # pretty well already tbh
+        )
+
+        return dropped
 
     def step(self, action):
         """Make step in environment."""
         self.total_steps += 1
         obs, reward, done, info = super().step(action)
-        return obs, reward, done if self.total_steps < self.max_steps else True, info
+        dropped = self._is_dropped()
+        done = done or dropped or self.total_steps >= self.max_steps
+
+        return obs, reward, done, info
 
     def reset(self):
         """Reset the environment."""
         self.total_steps = 0
         return super().reset()
 
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute the reward."""
+        success = self._is_success(achieved_goal, goal).astype(np.float32)
+        _, d_rot = self._goal_distance(achieved_goal, goal)
+
+        return (- d_rot                     # convergence to goal reward
+                - 1                         # constant punishment to encourage fast solutions
+                + success * 5               # reward for finishing
+                + 20 * self._is_dropped())  # dropping penalty
+
 
 class ShadowHandBlock(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with a Block as an object."""
 
-    def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='not_sparse', visual_input: bool = False, max_steps=100):
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+                 reward_type='dense', visual_input: bool = False, max_steps=100):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         ShadowHand.__init__(self,
                             model_path=MANIPULATE_BLOCK_XML,
                             touch_get_obs=touch_get_obs,
                             target_rotation=target_rotation,
                             target_position=target_position,
-                            target_position_range=numpy.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                            target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                             reward_type=reward_type,
                             visual_input=visual_input,
                             max_steps=max_steps)
@@ -162,31 +222,70 @@ class ShadowHandBlock(ShadowHand, utils.EzPickle):
 class ShadowHandEgg(ShadowHand, utils.EzPickle):
     """ShadowHand Environment with an Egg as an object."""
 
-    def __init__(self, target_position='random', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='not_sparse', visual_input: bool = False, max_steps=100):
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+                 reward_type='dense', visual_input: bool = False, max_steps=100):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         ShadowHand.__init__(self,
                             model_path=MANIPULATE_EGG_XML,
                             touch_get_obs=touch_get_obs,
                             target_rotation=target_rotation,
                             target_position=target_position,
-                            target_position_range=numpy.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                            target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                             reward_type=reward_type,
                             visual_input=visual_input,
                             max_steps=max_steps)
 
 
+# RELATED HAND TASKS
+
+class ShadowHandReach(HandReachEnv):
+    """Simpler Reaching task."""
+
+    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
+        self.success_multiplier = success_multiplier
+
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute reward with additional success bonus."""
+        return super().compute_reward(achieved_goal, goal, info) + info["is_success"] * self.success_multiplier
+
+    def _get_obs(self):
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        achieved_goal = self._get_achieved_goal().ravel()
+        observation = np.concatenate([robot_qpos, robot_qvel, achieved_goal, self.goal.copy()])
+
+        return {
+            'observation': observation.copy(),
+            'achieved_goal': achieved_goal.copy(),
+            'desired_goal': self.goal.copy(),
+        }
+
+
+class ShadowHandBlockVector(HandBlockEnv):
+
+    def _get_obs(self):
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        object_qvel = self.sim.data.get_joint_qvel('object:joint')
+        achieved_goal = self._get_achieved_goal().ravel()  # this contains the object position + rotation
+        observation = np.concatenate([robot_qpos, robot_qvel, object_qvel, achieved_goal, self.goal.ravel().copy()])
+        return {
+            'observation': observation.copy(),
+            'achieved_goal': achieved_goal.copy(),
+            'desired_goal': self.goal.ravel().copy(),
+        }
+
+
 if __name__ == "__main__":
-    print(os.environ["LD_PRELOAD"])
-
     from environments import *
-    import matplotlib.pyplot as plt
 
-    env = gym.make("ShadowHand-v1")
+    env = gym.make("ShadowHand-v0")
+    # env = gym.make("HandManipulateBlock-v0")
+    # env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()
     while True:
-        # env.render()
+        env.render()
         action = env.action_space.sample()
-        s, _, _, _ = env.step(action)
-        plt.imshow(s["observation"][0])
-        plt.show()
+        s, r, d, i = env.step(action)
+        if d:
+            env.reset()

@@ -6,14 +6,16 @@ import gym
 import tensorflow as tf
 from gym.spaces import Box
 from tensorflow.keras.layers import TimeDistributed as TD
+
 from tqdm import tqdm
+
 
 from models.components import _build_encoding_sub_model, _build_continuous_head, _build_discrete_head
 from utilities.util import env_extract_dims
 
 
 def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
-    """Build simple policy and value models having an LSTM before their heads."""
+    """Build simple policy and value models having an rnnexperiments before their heads."""
     continuous_control = isinstance(env.action_space, Box)
     state_dimensionality, n_actions = env_extract_dims(env)
 
@@ -47,6 +49,7 @@ def build_rnn_distinct_models(env: gym.Env, bs: int = 1):
     return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="simple_rnn")
 
 
+
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -57,3 +60,4 @@ if __name__ == "__main__":
 
     for i in tqdm(range(10)):
         out_pi, out_v = pv.predict(tf.random.normal((3, 16, 4)))
+

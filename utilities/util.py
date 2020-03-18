@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Helper functions."""
-import itertools
 import random
 from typing import Tuple, Union, List
 
@@ -10,6 +9,8 @@ import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 from tensorflow.python.client import device_lib
+
+from utilities.error import UninterpretableObservationSpace
 
 
 def get_available_gpus():
@@ -30,13 +31,26 @@ def set_all_seeds(seed):
     random.seed(seed)
 
 
-def env_extract_dims(env: gym.Env) -> Tuple[Union[int, tuple], int]:
-    """Returns state and (discrete) action space dimensionality for given environment."""
+def env_extract_dims(env: gym.Env) -> Tuple[Union[int, Tuple[int]], int]:
+    """Returns state and action space dimensionality for given environment."""
+
+    # observation space
     if isinstance(env.observation_space, Dict):
-        obs_dim = tuple(field.shape for field in env.observation_space["observation"])
+        # dict observation with observation field
+        if isinstance(env.observation_space["observation"], gym.spaces.Box):
+            obs_dim = env.observation_space["observation"].shape[0]
+        elif isinstance(env.observation_space["observation"], gym.spaces.Tuple):
+            # e.g. shadow hand environment with multiple inputs
+            obs_dim = tuple(field.shape for field in env.observation_space["observation"])
+        else:
+            raise UninterpretableObservationSpace(f"Cannot extract the dimensionality from a Dict observation space "
+                                                  f"where the observation is of type "
+                                                  f"{type(env.observation_space['observation']).__name__}")
     else:
+        # standard observation in box form
         obs_dim = env.observation_space.shape[0]
 
+    # action space
     if isinstance(env.action_space, Discrete):
         act_dim = env.action_space.n
     elif isinstance(env.action_space, Box):
@@ -50,7 +64,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Union[int, tuple], int]:
 def normalize(x, is_img=False) -> numpy.ndarray:
     """Normalize a numpy array to have all values in range (0, 1)."""
     x = tf.convert_to_tensor(x).numpy()
-    return x / 255 if not is_img else (x - x.min()) / (x.max() - x.min())
+    return x / 255 if is_img else (x - x.min()) / (x.max() - x.min())
 
 
 def flatten(some_list):
@@ -58,28 +72,26 @@ def flatten(some_list):
     return [some_list] if not isinstance(some_list, list) else [x for X in some_list for x in flatten(X)]
 
 
-def is_recurrent_model(model: tf.keras.Model):
-    """Check if given model is recurrent (i.e. contains a recurrent layer of any sort)"""
-    for layer in extract_layers(model):
-        if isinstance(layer, tf.keras.layers.RNN):
-            return True
-
-    return False
-
-
-def is_array_collection(a: numpy.ndarray):
+def is_array_collection(a: numpy.ndarray) -> bool:
     """Check if an array is an array of objects (e.g. other arrays) or an actual array of direct data."""
     return a.dtype == "O"
 
 
 def parse_state(state: Union[numpy.ndarray, dict]) -> Union[numpy.ndarray, Tuple]:
     """Parse a state (array or array of arrays) received from an environment to have type float32."""
-    return state.astype(numpy.float32) if not isinstance(state, dict) else \
-        tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
+    if not isinstance(state, dict):
+        return state.astype(numpy.float32)
+    else:
+        observation = state["observation"]
+        if isinstance(observation, np.ndarray):
+            return observation
+        else:
+            # multi input state like shadowhand
+            return tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
 
 
 def add_state_dims(state: Union[numpy.ndarray, Tuple], dims: int = 1, axis: int = 0) -> Union[numpy.ndarray, Tuple]:
-    """Expand state (array or lost of arrays) to have a batch dimension."""
+    """Expand state (array or lost of arrays) to have a batch and/or time dimension."""
     if dims < 1:
         return state
 
@@ -99,37 +111,9 @@ def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
                      for i in range(len(list_of_states[0])))
 
 
-def extract_layers(network: tf.keras.Model) -> List[tf.keras.layers.Layer]:
-    """Recursively extract layers from a potentially nested list of Sequentials of unknown depth."""
-    return list(itertools.chain(*[extract_layers(layer)
-                                  if isinstance(layer, tf.keras.Model)
-                                  else [layer] for layer in network.layers]))
-
-
 def insert_unknown_shape_dimensions(shape, none_replacer: int = 1):
     """Replace Nones in a shape tuple with 1 or a given other value."""
     return tuple(map(lambda s: none_replacer if s is None else s, shape))
-
-
-def reset_states_masked(model: tf.keras.Model, mask: List):
-    """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
-
-    The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
-    and zeros otherwise (booleans possible too)."""
-
-    # extract recurrent layers by their superclass RNN
-    recurrent_layers = [layer for layer in extract_layers(model) if isinstance(layer, tf.keras.layers.RNN)]
-
-    for layer in recurrent_layers:
-        current_states = [state.numpy() for state in layer.states]
-        initial_states = 0
-        new_states = []
-        for current_state in current_states:
-            expanded_mask = numpy.tile(numpy.rot90(numpy.expand_dims(mask, axis=0)), (1, current_state.shape[-1]))
-            masked_reset_state = np.where(expanded_mask, initial_states, current_state)
-            new_states.append(masked_reset_state)
-
-        layer.reset_states(new_states)
 
 
 def detect_finished_episodes(action_log_probabilities: tf.Tensor):
@@ -150,5 +134,3 @@ if __name__ == "__main__":
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
-    print(detect_finished_episodes(tf.convert_to_tensor([[1, 1, 1, 1, 0], [1, 0, 1, 1, 1]])))

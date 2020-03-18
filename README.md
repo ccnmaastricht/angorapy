@@ -1,6 +1,8 @@
+<img src="docs/img/logo.png" width=15% align="right" />
+
 # Dexterous Robot Hand
 
-## Usage
+[![handreach.gif](https://i.postimg.cc/ZYgWRqFM/handreach.gif)](https://postimg.cc/vDrY2bKr)
 
 ### Requirements
 
@@ -13,105 +15,131 @@ To install all required python packages run
 pip install -r requirements.txt
 ```
 
-Additionally some libraries and permissions will be required. Run
-
-```bash
-sudo bash install.sh
-```
-
-To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) as well as mujoco-py.
+To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) 
+as well as mujoco-py. Currently, mujoco-py is buggy with MuJoCo 2.0, you will need version 1.5 of both MuJoCo and mujocopy!
 
 To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`. 
 
-### Main Scripts
+To train on a GPU you will need CUDA 10.0 and cuDNN. Please refer to the <a href="https://www.tensorflow.org/">tensorflow documention</a> for installation instruction.
 
-The python files `train.py` and `evaluate.py` provide ready-made scripts for training 
-and evaluating an agent in an environment. With `pretrain.py`, it is possible to pretrain the visual component
-of a network on classification or reconstruction.
+## Other READMEs
+We divide READMEs over different modules of this repository. You can find more info at:
 
-## Visualization
+ - <a href="analysis/README.md">Analysis</a>
+ - <a href="monitor/README.md">Monitoring</a>
 
-The `analysis` module provides the `NetworkAnalyzer` class, which can be used to visualize certain aspects of a trained 
-model. For any existing model, the Analyzer simply functions as a wrapper for the model:
+## Usage
+The python files `train.py` and `evaluate.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.
 
-```python
-analyzer = NetworkAnalyzer(model, mode="show")
+### Training an Agent
+By using the `train.py` script you can train an agent on any environment and set hyperparameters, model and other
+options. Additionally, a monitor will be automatically added to the drilling of the agent, s.t. you can inspect
+the training progress. For more detail consult the <a href="monitor/README.md">monitoring page</a>. 
+
+The scripts commandline parameters are as follows:
+
+```
+usage: train.py [-h] [--architecture {simple,deeper,shadow}]
+                [--model {ffn,rnn,lstm,gru}]
+                [--distribution {categorical,gaussian,beta}] [--shared]
+                [--iterations ITERATIONS] [--config CONFIG] [--cpu]
+                [--sequential] [--load-from LOAD_FROM] [--preload PRELOAD]
+                [--export-file EXPORT_FILE] [--eval] [--radical-evaluation]
+                [--save-every SAVE_EVERY]
+                [--monitor-frequency MONITOR_FREQUENCY]
+                [--gif-every GIF_EVERY] [--debug] [--workers WORKERS]
+                [--horizon HORIZON] [--discount DISCOUNT] [--lam LAM]
+                [--no-state-norming] [--no-reward-norming] [--epochs EPOCHS]
+                [--batch-size BATCH_SIZE] [--lr-pi LR_PI]
+                [--lr-schedule {None,exponential}] [--clip CLIP]
+                [--c-entropy C_ENTROPY] [--c-value C_VALUE] [--tbptt TBPTT]
+                [--grad-norm GRAD_NORM] [--clip-values] [--stop-early]
+                [{any valid gym env}]
+
+Train a PPO Agent on some task.
+
+positional arguments:
+  {any valid gym env}   the target environment
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --architecture {simple,deeper,shadow}
+                        architecture of the policy
+  --model {ffn,rnn,lstm,gru}
+                        model type if not shadowhand
+  --distribution {categorical,gaussian,beta}
+  --shared              make the model share part of the network for policy
+                        and value
+  --iterations ITERATIONS
+                        number of iterations before training ends
+  --config CONFIG       config name (utilities/configs.py) to be loaded
+  --cpu                 use cpu only
+  --sequential          run worker sequentially workers
+  --load-from LOAD_FROM
+                        load from given agent id
+  --preload PRELOAD     load visual component weights from pretraining
+  --export-file EXPORT_FILE
+                        save policy to be loaded in workers into file
+  --eval                evaluate additionally to have at least 5 eps
+  --radical-evaluation  only record stats from seperate evaluation
+  --save-every SAVE_EVERY
+                        save agent every given number of iterations
+  --monitor-frequency MONITOR_FREQUENCY
+                        update the monitor every n iterations.
+  --gif-every GIF_EVERY
+                        make a gif every n iterations.
+  --debug               run in debug mode
+  --workers WORKERS     the number of workers exploring the environment
+  --horizon HORIZON     number of timesteps one worker generates
+  --discount DISCOUNT   discount factor for future rewards
+  --lam LAM             lambda parameter in the GAE algorithm
+  --no-state-norming    do not normalize states
+  --no-reward-norming   do not normalize rewards
+  --epochs EPOCHS       the number of optimization epochs in each cycle
+  --batch-size BATCH_SIZE
+                        minibatch size during optimization
+  --lr-pi LR_PI         learning rate of the policy
+  --lr-schedule {None,exponential}
+                        lr schedule type
+  --clip CLIP           clipping range around 1 for the objective function
+  --c-entropy C_ENTROPY
+                        entropy factor in objective function
+  --c-value C_VALUE     value factor in objective function
+  --tbptt TBPTT         length of subsequences in truncated BPTT
+  --grad-norm GRAD_NORM
+                        norm for gradient clipping, 0 deactivates
+  --clip-values         clip value objective
+  --stop-early          stop early if threshold of env was surpassed
+
 ```
 
-where the `mode` parameter can be either _show_ or _save_, resulting in a popup or file saving of visualizations 
-respectively. Saved visualizations will be located in _docs/analysis/figures_ with descriptive filenames. The analyzer 
-can alternatively also be initialized from a saved model as follows:
+### Pretraining a Component
+The python script `pretrain.py` can be used to train the visual component on one of three bootstrapping tasks: classification, pose estimation and reconstruction. Usage is as follows:
 
-```python
-analyzer = NetworkAnalyzer.from_saved_model("path/to/my/model", mode="show")
-```
+    usage: pretrain.py [-h] [--name NAME] [--load LOAD] [--epochs EPOCHS]
+                       [{classify,reconstruct,hands,c,r,h}]
 
-Most visuzalization methods require naming the layer of interest. The layer is identified by its unique name.
-A list of layer names of the analyzed model can be retrieved using `list_layer_names()`, 
-`list_convolutional_layer_names()` or `list_non_convolutional_layer_names()`.
+    Pretrain a visual component on classification or reconstruction.
 
-Currently, the following visualization methods are supported.
+    positional arguments:
+      {classify,reconstruct,hands,c,r,h}
 
-### Weight Visualization
-**Weight Visualization** simply interprets the weights of every filter in a layer as an image. This requires the layers input channels 
-to be either 1 or 3. For the first convolutional layer of a pretrained VGG16 model, this can be used as follows:
+    optional arguments:
+      -h, --help            show this help message and exit
+      --name NAME           Name the pretraining to uniquely identify it.
+      --load LOAD           load the weights from checkpoint path
+      --epochs EPOCHS       number of pretraining epochs
 
-```python
-model = tf.keras.applications.VGG16()
-analyzer = NetworkAnalyzer(model, mode="show")
-analyzer.visualize_layer_weights("block1_conv1")
-```
+### Evaluating an Agent
+Use the `evaluate.py` script to easily evaluate a trained agent. Agents are identified by their ID stated in the beginning of a training. You can also find agent IDs in the monitor. Use the script as follows:
 
-This produces the following visualization:
+    usage: evaluate.py [-h] [-n N] [id]
 
-![](https://i.postimg.cc/P5fCYQrx/weights-block1-conv1.png)
+    Evaluate an agent.
 
-### Feature Maximization
-**Feature Maximization** creates an input image from random noise and optimizes its pixels to maximize the response of
-(a specific) filter(s) in a layer, using gradient descent. To make the result more interpretable, the process starts at 
-a low input resolution and successively upscales the input. This produces patterns of lower frequency. 
+    positional arguments:
+      id          id of the agent, defaults to newest
 
-For the first convolutional layer of a pretrained VGG16 model, this can be used as follows:
-```python
-analyzer.visualize_max_filter_respondence("block2_conv2", feature_ids=[24, 57, 89, 120, 42, 26, 45, 21, 99])
-```
-![](https://i.postimg.cc/6QgTssV2/feature-maximization-block2-conv2-24-57-89-120-42-26-45-21-99.png)
-
-### Feature Maps
-**Feature Maps** take a given input image and record the activation at a specified layer. These activations can then 
-be visualized in three ways, specified through a mode.
-
-#### Gray Image Mode
-In the default gray image mode (`mode="gray"`) the activation map is simply used like an image. For layers
-with spacial dimensions close to the input, this gives spatially precise info, but deeper into the network,
-these images get smaller and smaller and less interpretable.
-
-```python
-reference = mpimg.imread("hase.jpg")
-analyzer.visualize_activation_map("block1_conv2", reference, mode="heat")
-```
-
-![](https://i.postimg.cc/65X25NkC/feature-maps-block1-conv2-gray.png)
-
-#### Heatmap Mode
-To tackle the issue with large receptive fields in deeper layers, the heatmap mode (`mode="heat"`) converts the
-activation into a heatmap contour plot and scales it to the original image size. The resulting plot is the original
-image in greyscale, overlayed by this heatmap.
-
-```python
-reference = mpimg.imread("hase.jpg")
-analyzer.visualize_activation_map("block1_conv2", reference, mode="heat")
-```
-
-![](https://i.postimg.cc/G3ktf54t/feature-maps-block1-conv2-heat.png)
-
-#### Bar Plot Mode
-Lastly, the bar plot mode (`mode="plot"`) shows the activation of a filter as a bar in a bar plot, averaged over the 
-spatial dimensions.
-
-```python
-reference = mpimg.imread("hase.jpg")
-analyzer.visualize_activation_map("block1_conv2", reference, mode="gray")
-```
-
-![](https://i.postimg.cc/DyPWSMhH/feature-maps-block1-conv2-plot.png)
+    optional arguments:
+      -h, --help  show this help message and exit
+      -n N        number of evaluation episodes
