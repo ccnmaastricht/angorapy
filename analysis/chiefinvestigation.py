@@ -11,7 +11,6 @@ from fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities
 from analysis.rsa.rsa import RSA
 
-
 class Chiefinvestigator:
 
     def __init__(self, agent_id: int, enforce_env_name: str = None):
@@ -95,7 +94,7 @@ class Chiefinvestigator:
 
 # TODO: sequence analysis ideas -> sequence pattern and so forth:
 # one possibility could be sequence alignment, time series analysis (datacamp), rsa
-
+# TODO: consider making chiefinvestigator and investigator child classes of BaseInvestigator
 
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory

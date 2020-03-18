@@ -315,6 +315,8 @@ class FixedPointFinder(object):
               f"unique_tolerance - {self.unique_tol}\n"
               f"-----------------------------------------\n")
 
+# TODO: make function to classify fixedpoints apart from the one inside the plotting
+
 
 class Adamfixedpointfinder(FixedPointFinder):
     adam_default_hps = {'alr_hps': {'decay_rate': 0.0005},
@@ -475,6 +477,7 @@ class Adamfixedpointfinder(FixedPointFinder):
                 raise ValueError('Hyperparameter rnn_type must be one of'
                                  '[vanilla, gru, lstm] but was %s', self.rnn_type)
         # TODO: implement parallel sequential optimization
+
             fps[i, :] = adam_optimizer(fun, x0[i, :],
                                        epsilon=self.epsilon,
                                        alr_decayr=self.alr_decayr,
