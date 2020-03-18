@@ -7,7 +7,7 @@ import os
 from tensorflow.keras.layers import SimpleRNNCell, SimpleRNN
 from tensorflow.python.keras.utils import tf_utils
 
-class Flipflopper:
+class Flipflopper(object):
     ''' Class for training an RNN to implement a 3-Bit Flip-Flop task as
     described in Sussillo, D., & Barak, O. (2012). Opening the Black Box:
     Low-Dimensional Dynamics in High-Dimensional Recurrent Neural Networks.
@@ -87,58 +87,6 @@ class Flipflopper:
 
         return model, weights
 
-    def build_pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
-
-        inputweights = weights[0]
-        recurrentbias = weights[2]
-
-        if not recurrent_trainable:
-            return [inputweights, recurrentbias, recurrentweights]
-        else:
-            return [inputweights, recurrentweights, recurrentbias]
-
-    def pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
-
-        '''Builds model that can be used to train the 3-Bit Flip-Flop task. A pretrained
-        model assumes that the recurrent kernel has been optimized in some way. Thus, it
-        offers functionality to not train the recurrent kernel furthermore.
-
-        Args:
-            None.
-
-        Returns:
-            None.'''
-
-        n_hidden = self.hps['n_hidden']
-        name = self.hps['model_name']
-        n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
-
-        inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
-
-        if self.hps['rnn_type'] == 'vanilla':
-            x = SimplerRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True,
-                           recurrent_trainable=recurrent_trainable)(inputs)
-        elif self.hps['rnn_type'] == 'gru':
-            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
-        elif self.hps['rnn_type'] == 'lstm':
-            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True,
-                                     return_state=True)(inputs)
-        else:
-            raise ValueError('Hyperparameter rnn_type must be one of'
-                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
-
-        x = tf.keras.layers.Dense(3)(x)
-        model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
-
-        # weights = model.get_layer(self.hps['rnn_type']).get_weights()
-        weights = self.build_pretrained_model(weights, recurrentweights, recurrent_trainable)
-        model.get_layer(self.hps['rnn_type']).set_weights(weights)
-
-        if self.verbose:
-            model.summary()
-
-        return model
-
 
     def generate_flipflop_trials(self):
         '''Generates synthetic data (i.e., ground truth trials) for the
@@ -215,6 +163,82 @@ class Flipflopper:
             self._save_model()
         return history
 
+    def _save_model(self):
+        '''Save trained model to JSON file.'''
+        self.model.save(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
+        print("Saved "+self.hps['rnn_type']+" model.")
+
+    def load_model(self):
+        """Load saved model from JSON file.
+        The function will overwrite the current model, if it exists."""
+        self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
+        print("Loaded "+self.hps['rnn_type']+" model.")
+
+    def get_activations(self, stim):
+        sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
+        activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
+
+        return activation
+
+
+class PretrainableFlipflopper(Flipflopper):
+
+    def __init__(self, rnn_type: str = 'vanilla', n_hidden: int = 24):
+
+        super(Flipflopper, self).__init__(rnn_type, n_hidden)
+
+    def pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
+
+        '''Builds model that can be used to train the 3-Bit Flip-Flop task. A pretrained
+        model assumes that the recurrent kernel has been optimized in some way. Thus, it
+        offers functionality to not train the recurrent kernel furthermore.
+
+        Args:
+            None.
+
+        Returns:
+            None.'''
+
+        n_hidden = self.hps['n_hidden']
+        name = self.hps['model_name']
+        n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
+
+        inputs = tf.keras.Input(shape=(n_time, n_bits), batch_size=n_batch, name='input')
+
+        if self.hps['rnn_type'] == 'vanilla':
+            x = SimplerRNN(n_hidden, name=self.hps['rnn_type'], return_sequences=True,
+                           recurrent_trainable=recurrent_trainable)(inputs)
+        elif self.hps['rnn_type'] == 'gru':
+            x = tf.keras.layers.GRU(n_hidden, name=self.hps['rnn_type'], return_sequences=True)(inputs)
+        elif self.hps['rnn_type'] == 'lstm':
+            x, state_h, state_c = tf.keras.layers.LSTM(n_hidden, name=self.hps['rnn_type'], return_sequences=True, stateful=True,
+                                     return_state=True)(inputs)
+        else:
+            raise ValueError('Hyperparameter rnn_type must be one of'
+                             '[vanilla, gru, lstm] but was %s', self.hps['rnn_type'])
+
+        x = tf.keras.layers.Dense(3)(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x, name=name)
+
+        # weights = model.get_layer(self.hps['rnn_type']).get_weights()
+        weights = self.build_pretrained_model(weights, recurrentweights, recurrent_trainable)
+        model.get_layer(self.hps['rnn_type']).set_weights(weights)
+
+        if self.verbose:
+            model.summary()
+
+        return model
+
+    def build_pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
+
+        inputweights = weights[0]
+        recurrentbias = weights[2]
+
+        if not recurrent_trainable:
+            return [inputweights, recurrentbias, recurrentweights]
+        else:
+            return [inputweights, recurrentweights, recurrentbias]
+
     def train_pretrained(self, stim, epochs, weights, recurrentweights, recurrent_trainable):
         '''Function to train a pretrained RNN model.
 
@@ -237,7 +261,8 @@ class Flipflopper:
 
         return history
 
-    def pretrained_predict(self,model , stim):
+    @staticmethod
+    def pretrained_predict(model , stim):
 
         model.compile(optimizer="adam", loss="mse",
                       metrics=['accuracy'])
@@ -245,25 +270,6 @@ class Flipflopper:
                                tf.convert_to_tensor(stim['output'], dtype=tf.float32))
 
         return score
-
-    def _save_model(self):
-        '''Save trained model to JSON file.'''
-        self.model.save(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
-        print("Saved "+self.hps['rnn_type']+" model.")
-
-    def load_model(self):
-        """Load saved model from JSON file.
-        The function will overwrite the current model, if it exists."""
-        self.model = load_model(os.getcwd()+"/saved/"+self.hps['rnn_type']+"model.h5")
-        print("Loaded "+self.hps['rnn_type']+" model.")
-
-    def get_activations(self, stim):
-        sub_model = build_sub_model_to(self.model, [self.hps['rnn_type']])
-        activation = sub_model.predict(tf.convert_to_tensor(stim['inputs'], dtype=tf.float32))
-
-        return activation
-
-
 
 
 class SimplerRNN(SimpleRNN):
