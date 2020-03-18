@@ -32,7 +32,18 @@ def plot_velocities(activations, velocities, n_points: int = 5000):
     mlab.show()
 
 def plot_fixed_points(activations, fps, n_points, scale):
+    """Plot a set of fixedpoints together with activations of a recurrent layer.
 
+    Args:
+        activations: numpy array containing activations of a recurrent layer in
+        which dynamics have been analyzed
+        fps: fixedpointobject containing a set of detected fixed points.
+        n_points: Integer specifying how many datapoints of the activations
+        dataset shall be plotted.
+        scale: float specifying by how much the unstable modes shall be scaled for plotting.
+
+    Returns:
+        Plot of classified fixedpoints together with recurrent activations"""
     def extract_fixed_point_locations(fps):
         """Processing of minimisation results for pca. The function takes one fixedpoint object at a time and
         puts all coordinates in single array."""
@@ -44,8 +55,17 @@ def plot_fixed_points(activations, fps, n_points, scale):
 
 
     def classify_fixedpoints(fps, scale):
+        """Function to classify fixed points. Methodology is based on
+        'Nonlinear Dynamics and Chaos, Strogatz 2015'.
 
-        # somehow this block of code does not return values if put in function
+        Args:
+            fps: Fixedpointobject containing a set of fixedpoints.
+            scale: Float by which the unstable modes shall be scaled for plotting.
+
+        Returns:
+            fps: Fixedpointobject that contains 'fp_stability', i.e. information about
+            the stability of the fixedpoint
+            x_directions: list of matrices containing vectors of unstable modes"""
 
         x_directions = []
         scale = scale
@@ -107,7 +127,7 @@ def plot_fixed_points(activations, fps, n_points, scale):
 
 
 def visualize_flipflop(prediction, stim):
-
+    """Function to visualize the 3-Bit flip flop task."""
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharey=True)
     fig.suptitle('3-Bit Flip-Flop')
     ax1.plot(prediction[0, :, 0], c='r')

@@ -92,7 +92,6 @@ class Chiefinvestigator:
         return activations, inputs, actions
 # TODO: build neural network to predict grasp -> we trained a simple prediction model fp(z) containing one hidden
 # layer with 64 units and ReLU activation, followed by a sigmoid output.
-# TODO: classify reaching tasks against each other. s.a.
 
 # TODO: sequence analysis ideas -> sequence pattern and so forth:
 # one possibility could be sequence alignment, time series analysis (datacamp), rsa

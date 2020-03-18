@@ -99,13 +99,16 @@ class Flipflopper:
 
     def pretrained_model(self, weights, recurrentweights, recurrent_trainable=False):
 
-        '''Builds model that can be used to train the 3-Bit Flip-Flop task.
+        '''Builds model that can be used to train the 3-Bit Flip-Flop task. A pretrained
+        model assumes that the recurrent kernel has been optimized in some way. Thus, it
+        offers functionality to not train the recurrent kernel furthermore.
 
         Args:
             None.
 
         Returns:
             None.'''
+
         n_hidden = self.hps['n_hidden']
         name = self.hps['model_name']
         n_time, n_batch, n_bits = self.data_hps['n_time'], self.data_hps['n_batch'], self.data_hps['n_bits']
@@ -213,7 +216,7 @@ class Flipflopper:
         return history
 
     def train_pretrained(self, stim, epochs, weights, recurrentweights, recurrent_trainable):
-        '''Function to train an RNN model This function will save the trained model afterwards.
+        '''Function to train a pretrained RNN model.
 
         Args:
             stim: dict containing 'inputs' and 'output' as input and target data for training the model.
