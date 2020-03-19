@@ -93,7 +93,7 @@ def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.ke
                 outputs.append([layer.get_output_at(layer_input_id)])
 
     if include_original:
-        outputs = outputs + network.output
+        outputs = outputs + network.outputs
 
     return tf.keras.Model(inputs=[network.input], outputs=outputs)
 
