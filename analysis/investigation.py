@@ -8,7 +8,7 @@ import tensorflow as tf
 from agent.policies import BasePolicyDistribution
 from agent.ppo import PPOAgent
 from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
-    extract_layers
+    extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.wrappers import BaseWrapper, SkipWrapper
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1583781174, from_iteration="b")
+    agent_007 = PPOAgent.from_agent_state(1583860097, from_iteration="b")
     inv = Investigator.from_agent(agent_007)
     print(inv.list_layer_names())
 

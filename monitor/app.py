@@ -4,12 +4,20 @@ import re
 import shutil
 
 import flask
-from flask import request
+from flask import request, Blueprint
 from flask_jsglue import JSGlue
 
+from agent.ppo import PPOAgent
 from utilities.const import PATH_TO_EXPERIMENTS
 
-app = flask.Flask(__name__)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+agents = Blueprint("agents", __name__, static_folder="../storage/saved_models/states")
+
+app = flask.Flask(__name__, )
+app.register_blueprint(agents)
+
 jsglue = JSGlue(app)
 
 
@@ -216,3 +224,17 @@ def delete_experiment():
     return {"success": True}
 
 
+@app.route("/evaluate", methods=("POST", "GET"))
+def evaluate():
+    """Evaluate an agent."""
+    if request.method == "POST":
+        try:
+            agent = PPOAgent.from_agent_state(request.json['id'])
+            evaluation_stats = agent.evaluate(10, save=True)
+
+            return {"results": evaluation_stats._asdict()}
+
+        except Exception as e:
+            return {"success": e.__repr__()}
+
+    return {"success": "success"}
