@@ -70,7 +70,7 @@ Pillow==6.2.1
 pluggy==0.13.0
 promise==2.2.1
 protobuf==3.10.0
-psutil==5.6.5
+psutil==5.6.6
 py==1.8.0
 pyasn1==0.4.7
 pyasn1-modules==0.2.7
