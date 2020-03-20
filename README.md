@@ -2,6 +2,11 @@
 
 # Dexterous Robot Hand
 
+![](https://img.shields.io/github/license/ccnmaastricht/dexterous-robot-hand)
+![](https://img.shields.io/github/issues/ccnmaastricht/dexterous-robot-hand)
+![](https://img.shields.io/github/forks/ccnmaastricht/dexterous-robot-hand)
+![](https://img.shields.io/github/stars/ccnmaastricht/dexterous-robot-hand)
+
 [![handreach.gif](https://i.postimg.cc/ZYgWRqFM/handreach.gif)](https://postimg.cc/vDrY2bKr)
 
 ### Requirements
@@ -15,10 +20,10 @@ To install all required python packages run
 pip install -r requirements.txt
 ```
 
-To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license) 
+To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license)
 as well as mujoco-py. Currently, mujoco-py is buggy with MuJoCo 2.0, you will need version 1.5 of both MuJoCo and mujocopy!
 
-To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`. 
+To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`.
 
 To train on a GPU you will need CUDA 10.0 and cuDNN. Please refer to the <a href="https://www.tensorflow.org/">tensorflow documention</a> for installation instruction.
 
@@ -34,7 +39,7 @@ The python files `train.py` and `evaluate.py` provide ready-made scripts for tra
 ### Training an Agent
 By using the `train.py` script you can train an agent on any environment and set hyperparameters, model and other
 options. Additionally, a monitor will be automatically added to the drilling of the agent, s.t. you can inspect
-the training progress. For more detail consult the <a href="monitor/README.md">monitoring page</a>. 
+the training progress. For more detail consult the <a href="monitor/README.md">monitoring page</a>.
 
 The scripts commandline parameters are as follows:
 
