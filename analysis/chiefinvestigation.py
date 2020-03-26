@@ -8,6 +8,7 @@ from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
+from utilities.model_utils import build_sub_model_from, build_sub_model_to
 
 
 class Chiefinvestigator(Investigator):
@@ -94,27 +95,29 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    # agent_id = 1583404415  # 1583180664 lunarlandercont
-    agent_id = 1583256614 # reach task
+    agent_id = 1583404415  # 1583180664 lunarlandercont
+    # agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
     activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(20,
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(2,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1e-06,
+                                   q_threshold=1,
                                    epsilon=0.01,
                                    alr_decayr=1e-04,
-                                   max_iters=5000)
+                                   max_iters=1000)
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
                                                               1000, 0.2)
     sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
-    plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+    # plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+
+    sub_model_to = build_sub_model_from(chiefinvesti.network, ["policy_recurrent_layer"])

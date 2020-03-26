@@ -107,7 +107,7 @@ def build_sub_model_from(network: tf.keras.Model, froms: Union[List[str], List[t
     for layer in layers:
         inputs.append([layer])
 
-    return tf.keras.Model(inputs=tf.kers.Input(inputs), outputs=network.outputs)
+    return tf.keras.Model(inputs=inputs, outputs=network.outputs)
 
 
 def get_component(model: tf.keras.Model, name: str):
