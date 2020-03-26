@@ -98,16 +98,22 @@ def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.ke
     return tf.keras.Model(inputs=[network.input], outputs=outputs)
 
 
-def build_sub_model_from(network: tf.keras.Model, froms: Union[List[str], List[tf.keras.Model]]):
-    """Build a sub model of a given network that has inputs at layers defined by a given name.
+def build_sub_model_from(network: tf.keras.Model, from_layer_name: str):
+    """EXPERIMENTAL: NOT GUARANTEED TO WORK WITH ALL ARCHITECTURES.
+
+    Build a sub model of a given network that has inputs at layers defined by a given name.
     Outputs will remain the network outputs."""
-    layers = get_layers_by_names(network, froms) if isinstance(froms[0], str) else froms
-    inputs = []
+    all_layer_names = [l.name for l in network.layers]
 
-    for layer in layers:
-        inputs.append([layer])
+    first_layer = get_layers_by_names(network, [from_layer_name])[0]
+    first_layer_index = all_layer_names.index(first_layer.name)
 
-    return tf.keras.Model(inputs=inputs, outputs=network.outputs)
+    new_input = tf.keras.layers.Input(first_layer.input_shape[1:])
+    x = first_layer(new_input)
+    for layer in network.layers[first_layer_index + 1:]:
+        x = layer(x)
+
+    return tf.keras.Model(inputs=new_input, outputs=x)
 
 
 def get_component(model: tf.keras.Model, name: str):
