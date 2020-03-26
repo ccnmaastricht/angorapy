@@ -1,9 +1,10 @@
 import os
 import gym
 import numpy as np
-import sklearn.decomposition as skld
-from mpl_toolkits.mplot3d import Axes3D
-
+import sys
+sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
+from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
+from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
@@ -20,7 +21,7 @@ class Chiefinvestigator(Investigator):
         """
 
         self.agent = PPOAgent.from_agent_state(agent_id, from_iteration='best')
-        super(Investigator, self).__init__(self.agent.policy, self.agent.distribution, self.agent.preprocessor)
+        super().__init__(self.agent.policy, self.agent.distribution, self.agent.preprocessor)
         self.env = self.agent.env
         if enforce_env_name is not None:
             print(f"Enforcing environment {enforce_env_name} over agents original environment. If you want to use"
@@ -106,14 +107,14 @@ if __name__ == "__main__":
                                                                     layer_names[1])
 
     # employ fixedpointfinder
-    # adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-    #                               q_threshold=1e-06,
-    #                               epsilon=0.01,
-    #                               alr_decayr=1e-04,
-    #                               max_iters=5000)
-    # states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
-    #                                                          inputs_over_all_episodes,
-    #                                                          1000, 0.2)
-    # sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
-    # fps = adamfpf.find_fixed_points(states, sampled_inputs)
-    # plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
+                                   q_threshold=1e-06,
+                                   epsilon=0.01,
+                                   alr_decayr=1e-04,
+                                   max_iters=5000)
+    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
+                                                              inputs_over_all_episodes,
+                                                              1000, 0.2)
+    sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
+    fps = adamfpf.find_fixed_points(states, sampled_inputs)
+    plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
