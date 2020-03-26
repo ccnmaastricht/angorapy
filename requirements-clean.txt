@@ -2,3 +2,6 @@ tensorflow==2.0.1
 ray
 tqdm
 numpy
+simplejson
+pydot
+graphviz
