@@ -93,9 +93,21 @@ def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.ke
                 outputs.append([layer.get_output_at(layer_input_id)])
 
     if include_original:
-        outputs = outputs + network.output
+        outputs = outputs + network.outputs
 
     return tf.keras.Model(inputs=[network.input], outputs=outputs)
+
+
+def build_sub_model_from(network: tf.keras.Model, froms: Union[List[str], List[tf.keras.Model]]):
+    """Build a sub model of a given network that has inputs at layers defined by a given name.
+    Outputs will remain the network outputs."""
+    layers = get_layers_by_names(network, froms) if isinstance(froms[0], str) else froms
+    inputs = []
+
+    for layer in layers:
+        inputs.append([layer])
+
+    return tf.keras.Model(inputs=tf.kers.Input(inputs), outputs=network.outputs)
 
 
 def get_component(model: tf.keras.Model, name: str):

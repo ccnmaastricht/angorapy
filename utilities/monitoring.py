@@ -97,6 +97,7 @@ class Monitor:
                       writer='pillow',
                       fps=25)
 
+
             plt.close()
 
     def make_metadata(self):

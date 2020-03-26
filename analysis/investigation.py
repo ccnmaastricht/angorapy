@@ -205,7 +205,9 @@ if __name__ == "__main__":
     inv = Investigator.from_agent(agent_007)
     print(inv.list_layer_names())
 
-    inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
+    #inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
+
+    #inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     for i in range(100):
         inv.render_episode(agent_007.env, to_gif=False)

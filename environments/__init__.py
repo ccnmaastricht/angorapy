@@ -10,7 +10,7 @@ from environments.race import Race
 from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector, ShadowHandMultiReach
 from environments.tunnel import Tunnel
 
-# SHADOW HAND #
+# SHADOW HAND
 
 gym.envs.register(
     id='ShadowHand-v0',
