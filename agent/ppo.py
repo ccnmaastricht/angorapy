@@ -25,6 +25,7 @@ from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer, RemoteGatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import condense_stats, StatBundle
@@ -197,6 +198,9 @@ class PPOAgent:
             w.__class__.__name__: {"mean": [w.simplified_mean()], "stdev": [w.simplified_stdev()]}
             for w in self.preprocessor if isinstance(w, BaseRunningMeanWrapper)
         }
+
+    def __repr__(self):
+        return f"PPOAgent[at {self.iteration}][{self.env_name}]"
 
     def set_gpu(self, activated: bool):
         """Set GPU usage mode."""
@@ -632,13 +636,15 @@ class PPOAgent:
 
         progressbar.close()
 
-    def evaluate(self, n: int, ray_already_initialized: bool = False, workers: List[RemoteGatherer] = None) -> StatBundle:
+    def evaluate(self, n: int, ray_already_initialized: bool = False, workers: List[RemoteGatherer] = None,
+                 save: bool = False) -> StatBundle:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
             ray_already_initialized (bool): if True, do not initialize ray again (default False)
+            save (bool): whether to save the evaluation to the monitor directory
 
         Returns:
             StatBundle with evaluation results
@@ -675,7 +681,22 @@ class PPOAgent:
 
         all_lengths, all_rewards = zip(*[ray.get(oi) for oi in result_ids])
 
-        return StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=0)
+        stats = StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=0)
+
+        if save:
+            os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
+
+            previous_evaluations = {}
+            if os.path.isfile(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/evaluations.json"):
+                with open(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/evaluations.json", "r") as jf:
+                    previous_evaluations = json.load(jf)
+
+            previous_evaluations.update({self.iteration: stats._asdict()})
+
+            with open(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/evaluations.json", "w") as jf:
+                json.dump(previous_evaluations, jf)
+
+        return stats
 
     def report(self, total_iterations):
         """Print a report of the current state of the training."""
@@ -803,6 +824,8 @@ class PPOAgent:
         for p, v in parameters.items():
             if p in ["distribution", "preprocessor"]:
                 continue
+
+            loaded_agent.__dict__[p] = v
 
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
