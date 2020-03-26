@@ -109,15 +109,16 @@ if __name__ == "__main__":
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1,
+                                   q_threshold=1e-06,
                                    epsilon=0.01,
                                    alr_decayr=1e-04,
                                    max_iters=1000)
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
-                                                              1000, 0.2)
+                                                              100, 0.2)
     sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     # plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
 
-    sub_model_to = build_sub_model_from(chiefinvesti.network, ["policy_recurrent_layer"])
+    sub_model_to = build_sub_model_to(chiefinvesti.network, ["policy_recurrent_layer"])
+    sub_model_from = build_sub_model_from(chiefinvesti.network, ["policy_recurrent_layer"])
