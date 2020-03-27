@@ -1,14 +1,16 @@
 import os
 import gym
 import numpy as np
+from time import sleep
 import sys
-sys.path.append("/home/weidler/workspace/dexterous-robot-hand/rnn_dynamical_systems")
+sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 
 from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
+from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.model_utils import build_sub_model_from, build_sub_model_to
 
 
@@ -35,6 +37,7 @@ class Chiefinvestigator(Investigator):
         self.weights = self.get_layer_weights('policy_recurrent_layer')
         self.n_hidden = self.weights[1].shape[0]
         self._get_rnn_type()
+        self.sub_model_from = build_sub_model_from(self.network, "policy_recurrent_layer")
 
     def _get_rnn_type(self):
         if self.weights[1].shape[1] / self.weights[1].shape[0] == 1:
@@ -92,36 +95,52 @@ class Chiefinvestigator(Investigator):
 
         return activations, inputs, actions
 
+    def render_fixed_points(self, activations):
+
+        self.env.reset()
+        for i in range(100):
+            self.env.render()
+            activation = activations[0, i, :].reshape(1, 1, self.n_hidden)
+            probabilities = flatten(self.sub_model_from.predict(activation))
+
+            action, _ = self.distribution.act(*probabilities)
+            observation, reward, done, info = self.env.step(action)
+
+
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id = 1583404415  # 1583180664 lunarlandercont
-    # agent_id = 1583256614 # reach task
+    # agent_id = 1583404415  # 1583180664 lunarlandercont
+    agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
     activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(2,
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(20,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1e-06,
+                                   q_threshold=1e-07,
                                    epsilon=0.01,
                                    alr_decayr=1e-04,
-                                   max_iters=1000)
+                                   max_iters=5000)
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
-                                                              100, 0.2)
+                                                              1000, 0.2)
     sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
-    # plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+    plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+    # render fixedpoints
+    for fp in fps:
+        repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
+        print("RENDERING FIXED POINT")
+        chiefinvesti.render_fixed_points(repeated_fps)
+        sleep(5)
 
 
-
-    sub_model_from = build_sub_model_from(chiefinvesti.network, "policy_recurrent_layer")
 
