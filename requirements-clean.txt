@@ -5,3 +5,8 @@ numpy
 simplejson
 pydot
 graphviz
+psutil
+scipy
+sklearn
+Flask
+Flask-JSGlue
