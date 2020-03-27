@@ -119,7 +119,7 @@ if __name__ == "__main__":
     print(layer_names)
 
     activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(20,
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(30,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
 
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                                    max_iters=5000)
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
-                                                              1000, 0.2)
+                                                              2000, 0.2)
     sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
