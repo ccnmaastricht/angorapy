@@ -3,7 +3,7 @@
 #SBATCH --job-name=ihom_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
-#SBATCH --time=24:00:00
+#SBATCH --time=00:05:00
 #SBATCH --nodes=3
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=1
@@ -55,4 +55,4 @@ do
   sleep 5
 done
 
-python -u trainer.py $redis_password 36 # Pass the total number of allocated CPUs
+python -u test_slurm_deploy.py $redis_password 36 # Pass the total number of allocated CPUs
