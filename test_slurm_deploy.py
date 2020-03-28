@@ -6,22 +6,24 @@ from collections import Counter
 
 import ray
 
-redis_password = sys.argv[1]
-num_cpus = int(sys.argv[2])
-
-print(redis_password)
-print(num_cpus)
-
-ray.init(address=os.environ["ip_head"], redis_password=redis_password)
-
-print("Nodes in the Ray cluster:")
-print(ray.nodes())
-
 
 @ray.remote
 def f():
     time.sleep(1)
     return ray.services.get_node_ip_address()
+
+
+redis_password = sys.argv[1]
+num_cpus = int(sys.argv[2])
+
+print(redis_password)
+print(num_cpus)
+print(os.environ["ip_head"])
+
+ray.init(address=os.environ["ip_head"], redis_password=redis_password)
+
+print("Nodes in the Ray cluster:")
+print(ray.nodes())
 
 
 # The following takes one second (assuming that ray was able to access all of the allocated nodes).
