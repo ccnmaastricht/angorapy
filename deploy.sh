@@ -46,12 +46,17 @@ export ip_head
 
 # start head node
 srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password &
+
+# observed sleep time to be required to be high to have head ready before children
 sleep 20
 
 for ((  i=1; i<=$worker_num; i++ ))
 do
+  # start a worker
   node2=${nodes_array[$i]}
-  srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password & # Starting the workers
+  srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password &
+
+  # again sleep long, just to make sure idk
   sleep 20
 done
 
