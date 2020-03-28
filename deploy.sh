@@ -1,10 +1,20 @@
 #!/bin/bash
 
 #SBATCH --job-name=ihom_experiment
-#SBATCH --cpus-per-task=5
-#SBATCH --mem-per-cpu=1GB
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=admin@tonioweidler.de
+#SBATCH --time=24:00:00
 #SBATCH --nodes=3
-#SBATCH --tasks-per-node 1
+#SBATCH --ntasks-per-core=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=12
+#SBATCH --partition=normal
+#SBATCH --constraint=gpu
+#SBATCH --hint=nomultithread
+
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+# this is an adaption of the ray boilerplate https://ray.readthedocs.io/en/latest/deploying-on-slurm.html
 
 worker_num=2 # Must be one less that the total number of nodes
 
@@ -22,16 +32,20 @@ source venv/bin/activate
 nodes=$(scontrol show hostnames $SLURM_JOB_NODELIST)
 nodes_array=($nodes)
 
+# choose head node
 node1=${nodes_array[0]}
 
-ip_prefix=$(srun --nodes=1 --ntasks=1 -w $node1 hostname --ip-address) # Making address
+# make head adress
+ip_prefix=$(srun --nodes=1 --ntasks=1 -w $node1 hostname --ip-address)
 suffix=':6379'
 ip_head=$ip_prefix$suffix
 redis_password=$(uuidgen)
 
-export ip_head # Exporting for latter access by trainer.py
+# export ip head so pyhton script can read it
+export ip_head
 
-srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password & # Starting the head
+# start head node
+srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password &
 sleep 5
 
 for ((  i=1; i<=$worker_num; i++ ))
@@ -41,4 +55,4 @@ do
   sleep 5
 done
 
-python -u trainer.py $redis_password 15 # Pass the total number of allocated CPUs
+python -u trainer.py $redis_password 36 # Pass the total number of allocated CPUs
