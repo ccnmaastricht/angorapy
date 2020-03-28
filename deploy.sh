@@ -60,4 +60,4 @@ do
   sleep 20
 done
 
-python -u test_slurm_deploy.py $redis_password 36 # Pass the total number of allocated CPUs
+python -u train.py BipedalWalker-v2 --config continuous_beta --redis-ip $ip_head --redis-pw $redis_password

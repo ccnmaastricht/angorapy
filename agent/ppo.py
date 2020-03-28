@@ -9,7 +9,7 @@ import shutil
 import statistics
 import time
 from collections import OrderedDict
-from typing import Union, List
+from typing import Union, List, Tuple
 
 import gym
 import numpy
@@ -283,14 +283,14 @@ class PPOAgent:
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False, save_best=True,
-              parallel=True, radical_evaluation=False) -> "PPOAgent":
+              parallel=True, radical_evaluation=False, redis_auth: Tuple[str, str] = None) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
         Args:
             parallel:
-            save_best:
+            save_best: if True, at every iteration save the model as "best" if it is better than the last best
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
             batch_size (int): batch size for the optimization
@@ -303,6 +303,9 @@ class PPOAgent:
                 additional episodes.
             stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
                 above the environments threshold
+
+            redis_auth: tuple of redis head ip address and password; if None (default), ray is initialized on the
+                current default node
 
         Returns:
             self
@@ -325,7 +328,11 @@ class PPOAgent:
 
         if parallel:
             if not ray_is_initialized:
-                ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+                if redis_auth is None:
+                    ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+                else:
+                    ray.init(address=redis_auth[0], redis_password=redis_auth[1],
+                             local_mode=self.debug, logging_level=logging.ERROR)
 
         workers = self._make_workers(parallel, verbose=True)
 
