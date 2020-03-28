@@ -25,7 +25,6 @@ ray.init(address=os.environ["ip_head"], redis_password=redis_password)
 print("Nodes in the Ray cluster:")
 print(ray.nodes())
 
-
 # The following takes one second (assuming that ray was able to access all of the allocated nodes).
 for i in range(60):
     start = time.time()

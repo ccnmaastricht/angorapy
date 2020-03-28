@@ -46,13 +46,13 @@ export ip_head
 
 # start head node
 srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password &
-sleep 5
+sleep 20
 
 for ((  i=1; i<=$worker_num; i++ ))
 do
   node2=${nodes_array[$i]}
   srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password & # Starting the workers
-  sleep 5
+  sleep 20
 done
 
 python -u test_slurm_deploy.py $redis_password 36 # Pass the total number of allocated CPUs
