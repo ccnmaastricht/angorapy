@@ -324,7 +324,7 @@ class PPOAgent:
             {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
-        available_cpus = multiprocessing.cpu_count()
+        available_cpus = ray.cluster_resources()['CPU']
 
         if parallel:
             if not ray_is_initialized:
@@ -333,6 +333,9 @@ class PPOAgent:
                 else:
                     ray.init(address=redis_auth[0], redis_password=redis_auth[1],
                              local_mode=self.debug, logging_level=logging.ERROR)
+
+        print(f"Training on {len(ray.nodes())} nodes: {ray.nodes()}")
+        print(f"Using {available_cpus} CPUs.")
 
         workers = self._make_workers(parallel, verbose=True)
 
@@ -493,7 +496,7 @@ class PPOAgent:
 
     def _make_workers(self, parallel, verbose=False):
         if parallel:
-            available_cpus = multiprocessing.cpu_count()
+            available_cpus = ray.cluster_resources()['CPU']
 
             # set up the persistent workers
             worker_options: dict = {}
