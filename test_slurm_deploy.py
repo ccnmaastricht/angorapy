@@ -9,6 +9,9 @@ import ray
 redis_password = sys.argv[1]
 num_cpus = int(sys.argv[2])
 
+print(redis_password)
+print(num_cpus)
+
 ray.init(address=os.environ["ip_head"], redis_password=redis_password)
 
 print("Nodes in the Ray cluster:")
