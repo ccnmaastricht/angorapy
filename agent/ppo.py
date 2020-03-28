@@ -584,7 +584,7 @@ class PPOAgent:
             None
         """
         progressbar = tqdm(total=epochs * ((self.horizon * self.n_workers / self.tbptt_length) / batch_size),
-                           leave=False, desc="Optimizing")
+                           leave=False, desc="Optimizing", disable=True)
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation
