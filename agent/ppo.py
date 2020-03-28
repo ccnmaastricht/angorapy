@@ -324,16 +324,15 @@ class PPOAgent:
             {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
-        available_cpus = ray.cluster_resources()['CPU']
-
         if parallel:
             if not ray_is_initialized:
                 if redis_auth is None:
-                    ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+                    ray.init(local_mode=self.debug, num_cpus=multiprocessing.cpu_count(), logging_level=logging.ERROR)
                 else:
                     ray.init(address=redis_auth[0], redis_password=redis_auth[1],
                              local_mode=self.debug, logging_level=logging.ERROR)
 
+        available_cpus = ray.cluster_resources()['CPU']
         print(f"Training on {len(ray.nodes())} nodes: {ray.nodes()}")
         print(f"Using {available_cpus} CPUs.")
 
