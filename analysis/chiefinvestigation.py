@@ -112,7 +112,8 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     # agent_id = 1583404415  # 1583180664 lunarlandercont
-    agent_id = 1583256614 # reach task
+    agent_id = 1585500821 # cartpole-v1
+    # agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
@@ -136,11 +137,11 @@ if __name__ == "__main__":
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
     # render fixedpoints
-    for fp in fps:
-        repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
-        print("RENDERING FIXED POINT")
-        chiefinvesti.render_fixed_points(repeated_fps)
-        sleep(5)
+    #for fp in fps:
+    #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
+    #    print("RENDERING FIXED POINT")
+    #    chiefinvesti.render_fixed_points(repeated_fps)
+     #   sleep(5)
 
 
 
