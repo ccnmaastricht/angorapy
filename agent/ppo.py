@@ -510,7 +510,7 @@ class PPOAgent:
                                                                        self.env_name, i) for i in range(self.n_workers)]
 
             if verbose:
-                print(f"{self.n_workers} workers each use: {worker_options}")
+                print(f"{self.n_workers} workers each using {worker_options}")
         else:
             workers = [Gatherer(self.builder_function_name,
                                 self.distribution.__class__.__name__,

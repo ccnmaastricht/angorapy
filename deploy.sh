@@ -56,8 +56,7 @@ do
   node2=${nodes_array[$i]}
   srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password &
 
-  # again sleep long, just to make sure idk
-  sleep 20
+  sleep 10
 done
 
 python -u train.py BipedalWalker-v2 --config continuous_beta --redis-ip $ip_head --redis-pw $redis_password
