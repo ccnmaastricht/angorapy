@@ -153,7 +153,7 @@ class Investigator:
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
-            activation, probabilities = dual_out[:-self.network.output.shape[0]], dual_out[-self.network.output.shape[0]:]
+            activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
 
             states.append(state)
             activations.append(activation)

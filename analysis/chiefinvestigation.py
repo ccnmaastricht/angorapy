@@ -1,6 +1,6 @@
 import os
 import gym
-import numpy as np
+#import numpy as np
 from time import sleep
 import sys
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
@@ -12,6 +12,8 @@ from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.model_utils import build_sub_model_from, build_sub_model_to
+import autograd.numpy as np
+from autograd import jacobian
 
 
 class Chiefinvestigator(Investigator):
@@ -106,42 +108,79 @@ class Chiefinvestigator(Investigator):
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, info = self.env.step(action)
 
+    def compute_all_jacobians(self, inputs, activations):
+
+        def build_gru(weights, input, n_hidden):
+            def sigmoid(x):
+                return 1 / (1 + np.exp(-x))
+
+            z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
+            W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
+            U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
+            b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
+
+            z_projection_b = input @ W_z + b_z
+            r_projection_b = input @ W_r + b_r
+            g_projection_b = input @ W_h + b_h
+
+            z_fun = lambda x: sigmoid(x @ U_z + z_projection_b)
+            r_fun = lambda x: sigmoid(x @ U_r + r_projection_b)
+            g_fun = lambda x: np.tanh((r_fun(x) * np.matmul(x, U_h) + g_projection_b))
+
+            gru = lambda x: z_fun(x) * x + (1 - z_fun(x)) * g_fun(x)
+            return jacobian(gru)
+
+        jac_fun = build_gru(self.weights, inputs, self.n_hidden)
+
+        # jacobians = jac_fun()
+
+        return jac_fun
+
+
 
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     # agent_id = 1583404415  # 1583180664 lunarlandercont
-    agent_id = 1585500821 # cartpole-v1
-    # agent_id = 1583256614 # reach task
+    # agent_id = 1585500821 # cartpole-v1
+    # agent_id = 1585557832 # MountainCar # 1585561817 continuous
+    agent_id = 1583256614 # reach task
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
-    activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(30,
-                                                                    "policy_recurrent_layer",
-                                                                    layer_names[1])
+    #activations_over_all_episodes, inputs_over_all_episodes, \
+    #actions_over_all_episodes = chiefinvesti.get_data_over_episodes(30,
+    #                                                                "policy_recurrent_layer",
+    #                                                                layer_names[1])
 
     # employ fixedpointfinder
-    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1e-07,
-                                   epsilon=0.01,
-                                   alr_decayr=1e-04,
-                                   max_iters=5000)
-    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
-                                                              inputs_over_all_episodes,
-                                                              2000, 0.2)
-    sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
-    fps = adamfpf.find_fixed_points(states, sampled_inputs)
-    plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+    #adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
+     #                              q_threshold=1e-07,
+     #                              epsilon=0.01,
+     #                              alr_decayr=1e-04,
+     #                              max_iters=5000)
+    #states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
+    #                                                          inputs_over_all_episodes,
+    #                                                          2000, 0.2)
+    #sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
+    #fps = adamfpf.find_fixed_points(states, sampled_inputs)
+    #plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
     # render fixedpoints
     #for fp in fps:
     #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
     #    print("RENDERING FIXED POINT")
     #    chiefinvesti.render_fixed_points(repeated_fps)
      #   sleep(5)
+
+    activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
+                                                                                                          layer_names[1])
+
+    jac_fun = chiefinvesti.compute_all_jacobians(inputs_single_run, activations_single_run)
+    #jacobians = jacobians[:].reshape(5, 32, 32)
+    jacobian = jac_fun(activations_single_run[:1, :])
 
 
 
