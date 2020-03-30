@@ -3,8 +3,8 @@
 #SBATCH --job-name=ihom_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
-#SBATCH --time=00:05:00
-#SBATCH --nodes=3
+#SBATCH --time=00:12:00
+#SBATCH --nodes=12
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
@@ -16,7 +16,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 # this is an adaption of the ray boilerplate https://ray.readthedocs.io/en/latest/deploying-on-slurm.html
 
-worker_num=2 # Must be one less that the total number of nodes
+worker_num=11 # Must be one less that the total number of nodes
 
 # load modules
 module load daint-gpu
