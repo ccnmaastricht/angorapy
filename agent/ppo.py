@@ -502,7 +502,7 @@ class PPOAgent:
             if self.n_workers == 1:
                 # worker_options["num_gpus"] = 1
                 worker_options["num_cpus"] = available_cpus
-            elif self.n_workers > available_cpus:
+            elif self.n_workers < available_cpus:
                 worker_options["num_cpus"] = available_cpus // self.n_workers
 
             workers = [RemoteGatherer.options(**worker_options).remote(self.builder_function_name,
