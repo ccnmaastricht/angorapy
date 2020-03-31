@@ -174,7 +174,9 @@ class PPOAgent:
             os.makedirs(self.agent_directory, exist_ok=True)
 
         if os.path.isdir("storage/experience"):
-            shutil.rmtree("storage/experience/")
+            # TODO loading a currently training agent will potentially delete its storage
+            # shutil.rmtree("storage/experience/")
+            pass
         os.makedirs("storage/experience/", exist_ok=True)
 
         # statistics
