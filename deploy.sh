@@ -3,7 +3,7 @@
 #SBATCH --job-name=ihom_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
-#SBATCH --time=00:12:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=12
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=1
@@ -59,4 +59,4 @@ do
   sleep 10
 done
 
-python -u train.py BipedalWalker-v2 --config continuous_beta --redis-ip $ip_head --redis-pw $redis_password
+python -u train.py BipedalWalker-v2 --config continuous_beta --iterations 2000 --workers 32 --redis-ip $ip_head --redis-pw $redis_password
