@@ -248,8 +248,9 @@ class ShadowHandReach(HandReachEnv):
 
     def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
-        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
         self.success_multiplier = success_multiplier
+        self.current_target_finger = "none"
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute reward with additional success bonus."""
@@ -266,6 +267,39 @@ class ShadowHandReach(HandReachEnv):
             'desired_goal': self.goal.copy(),
         }
 
+    def _sample_goal(self):
+        thumb_name = 'robot0:S_thtip'
+        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
+        finger_name = self.np_random.choice(finger_names)
+        self.current_target_finger = finger_name
+
+        thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
+        finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
+        assert thumb_idx != finger_idx
+
+        # Pick a meeting point above the hand.
+        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
+        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
+
+        # Slightly move meeting goal towards the respective finger to avoid that they overlap.
+        goal = self.initial_goal.copy().reshape(-1, 3)
+        for idx in [thumb_idx, finger_idx]:
+            offset_direction = (meeting_pos - goal[idx])
+            offset_direction /= np.linalg.norm(offset_direction)
+            goal[idx] = meeting_pos - 0.005 * offset_direction
+
+        if self.np_random.uniform() < 0.1:
+            goal = self.initial_goal.copy()
+
+        return goal.flatten()
+
+    def step(self, action):
+        o, r, d, i = super().step(action)
+        i.update({
+            "target_finger": self.current_target_finger
+        })
+
+        return o,r,d,i
 
 class ShadowHandMultiReach(ShadowHandReach):
     """Reaching task where three fingers have to be joined."""
