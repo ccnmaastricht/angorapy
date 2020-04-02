@@ -4,6 +4,9 @@ import gym
 from time import sleep
 import sys
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import sklearn
 
 from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
@@ -108,7 +111,7 @@ class Chiefinvestigator(Investigator):
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, info = self.env.step(action)
 
-    def compute_all_jacobians(self, inputs, activations):
+    def return_gru(self, inputs):
 
         def build_gru(weights, input, n_hidden):
             def sigmoid(x):
@@ -125,16 +128,94 @@ class Chiefinvestigator(Investigator):
 
             z_fun = lambda x: sigmoid(x @ U_z + z_projection_b)
             r_fun = lambda x: sigmoid(x @ U_r + r_projection_b)
-            g_fun = lambda x: np.tanh((r_fun(x) * np.matmul(x, U_h) + g_projection_b))
+            g_fun = lambda x: np.tanh((r_fun(x) * x) @ U_h + g_projection_b)
 
             gru = lambda x: z_fun(x) * x + (1 - z_fun(x)) * g_fun(x)
-            return jacobian(gru)
+            return gru
 
-        jac_fun = build_gru(self.weights, inputs, self.n_hidden)
+        gru = build_gru(self.weights, inputs, self.n_hidden)
+        return gru
+    def return_vanilla(self, inputs):
 
-        # jacobians = jac_fun()
+        def build_vanilla(weights, inputs):
+            weights, inputweights, b = weights[1], weights[0], weights[2]
+            vanilla = lambda x: np.tanh(x @ weights + inputs @ inputweights + b)
+            return vanilla
 
-        return jac_fun
+        vanilla = build_vanilla(self.weights, inputs)
+        return vanilla
+
+    def compute_quiver_data(self, inputs, activations, timesteps, stepsize):
+
+        def real_meshgrid(data_transformed):
+            indices = np.arange(timesteps[0], timesteps[1], stepsize)
+            x, y, z = np.meshgrid(data_transformed[indices, 0],
+                                  data_transformed[indices, 1],
+                                  data_transformed[indices, 2])
+
+            x = x.ravel()
+            y = y.ravel()
+            z = z.ravel()
+            all = np.vstack((x, y, z)).transpose()
+            return all
+
+        pca = sklearn.decomposition.PCA(3)
+        transformed_activations = pca.fit_transform(activations)
+        transformed_input = pca.transform(inputs)
+
+        meshed_activations = real_meshgrid(transformed_activations)
+        meshed_inputs = real_meshgrid(transformed_input)
+
+        reverse_transformed = pca.inverse_transform(meshed_activations)
+        reversed_input = pca.inverse_transform(meshed_inputs)
+
+        gru = self.return_gru(reversed_input)
+        #vanilla = self.return_vanilla(reversed_input)
+        phase_stuff = gru(reverse_transformed)
+        #phase_stuff = vanilla(reverse_transformed)
+
+        transformed_phase_stuff = pca.transform(phase_stuff)
+        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
+        u, v, w = transformed_phase_stuff[:, 0], transformed_phase_stuff[:, 1], transformed_phase_stuff[:, 2]
+
+        return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :]
+
+    def compute_quiver_layer(self, inputs, activations, timesteps, stepsize, layer):
+
+        def real_meshgrid(data_transformed):
+            indices = np.arange(timesteps[0], timesteps[1], stepsize)
+            x, y, z = np.meshgrid(data_transformed[indices, 0],
+                                  data_transformed[indices, 1],
+                                  np.repeat(data_transformed[layer, 2], len(indices)))
+
+            x = x.ravel()
+            y = y.ravel()
+            z = z.ravel()
+            all = np.vstack((x, y, z)).transpose()
+            return all
+
+        pca = sklearn.decomposition.PCA(3)
+        transformed_activations = pca.fit_transform(activations)
+        transformed_input = pca.transform(inputs)
+
+        meshed_activations = real_meshgrid(transformed_activations)
+        meshed_inputs = real_meshgrid(transformed_input)
+
+        reverse_transformed = pca.inverse_transform(meshed_activations)
+        reversed_input = pca.inverse_transform(meshed_inputs)
+
+        gru = self.return_gru(reversed_input)
+        #vanilla = self.return_vanilla(reversed_input)
+        phase_stuff = gru(reverse_transformed)
+        #phase_stuff = vanilla(reverse_transformed)
+
+        transformed_phase_stuff = pca.transform(phase_stuff)
+        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
+        u, v, w = transformed_phase_stuff[:, 0], transformed_phase_stuff[:, 1], transformed_phase_stuff[:, 2]
+
+        return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :]
+
+
 
 
 
@@ -151,10 +232,11 @@ if __name__ == "__main__":
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
+    #n_episodes = 10
     #activations_over_all_episodes, inputs_over_all_episodes, \
-    #actions_over_all_episodes = chiefinvesti.get_data_over_episodes(30,
-    #                                                                "policy_recurrent_layer",
-    #                                                                layer_names[1])
+    #actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
+      #                                                              "policy_recurrent_layer",
+      #                                                              layer_names[1])
 
     # employ fixedpointfinder
     #adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
@@ -178,9 +260,64 @@ if __name__ == "__main__":
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
 
-    jac_fun = chiefinvesti.compute_all_jacobians(inputs_single_run, activations_single_run)
-    #jacobians = jacobians[:].reshape(5, 32, 32)
-    jacobian = jac_fun(activations_single_run[:1, :])
+    import mayavi
+    from mayavi.mlab import quiver3d, plot3d
+
+    timesteps, stepsize = (0, 100), 5
+    activations_single_run = np.vstack((np.zeros(chiefinvesti.n_hidden), activations_single_run[:-1, :]))
+    inputs_over_all_episodes = np.zeros(inputs_single_run.shape)
+    x,y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_over_all_episodes, activations_single_run,
+                                                                    timesteps,
+                                                                    stepsize)
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.quiver(x, y, z, u, v, w, length=0.5)
+    ax.plot(activations[:, 0], activations[:, 1], activations[:, 2], c='r')
+    plt.show()
+    quiver3d(x, y, z, u, v, w)
+    plot3d(activations[:, 0], activations[:, 1], activations[:, 2])
+    mayavi.mlab.show()
+
+    plt.quiver(x, y, u, v, scale=5)
+    plt.plot(activations[:10, 0], activations[:10, 1], c='r')#, activations[:, 2], c='r')
+    plt.show()
 
 
+    def transformation_stuff():
+        all_jacobians = []
+        for i in range(100):
+            gru = build_gru(chiefinvesti.weights, inputs_over_all_episodes[i, :], chiefinvesti.n_hidden)
+            all_jacobians.append(jacobian(gru)(activations_single_run[i, :]))
 
+        evals, _ = np.linalg.eig(all_jacobians)
+
+        evals_real = evals.real
+        evals_imag = evals.imag
+        angles = np.angle(evals, deg=True)
+
+        #combined_evals = np.hstack((evals_real, angles))
+        #import sklearn
+        #pca = sklearn.decomposition.PCA(3)
+
+        #transformed_evals = pca.fit_transform(angles)
+
+        #fig = plt.figure()
+        #ax = fig.add_subplot(projection='3d')
+        #k = 100
+        #n_steps = 20
+        #for i in range(n_episodes):
+        #    ax.scatter(transformed_evals[k * i:(k * i + n_steps), 0],
+        #               transformed_evals[k * i:(k * i + n_steps), 1],
+        #               transformed_evals[k * i:(k * i + n_steps), 2])
+        #plt.show()
+        #angles_abs = np.abs(angles)
+        #histo = np.histogram(angles_abs, bins=100)
+        #plt.hist(angles_abs, bins=100)
+        #plt.ylabel("Counts")
+        #plt.xlabel("Angles")
+        #plt.show()
+
+        plt.hist(evals_real, bins=50)
+        plt.ylabel("Counts")
+        plt.xlabel("Eigenvalue")
+        plt.show()
