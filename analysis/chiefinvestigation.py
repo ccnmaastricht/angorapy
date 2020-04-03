@@ -128,18 +128,19 @@ class Chiefinvestigator(Investigator):
 
             z_fun = lambda x: sigmoid(x @ U_z + z_projection_b)
             r_fun = lambda x: sigmoid(x @ U_r + r_projection_b)
-            g_fun = lambda x: np.tanh((r_fun(x) * x) @ U_h + g_projection_b)
+            g_fun = lambda x: np.tanh(r_fun(x) * (x @ U_h) + g_projection_b)
 
-            gru = lambda x: -x + z_fun(x) * x + (1 - z_fun(x)) * g_fun(x) # (1 - z_fun(x)) * (g_fun(x) - x)
+            gru = lambda x: - x + z_fun(x) * x + (1 - z_fun(x)) * g_fun(x)
             return gru
 
         gru = build_gru(self.weights, inputs, self.n_hidden)
         return gru
+
     def return_vanilla(self, inputs):
 
         def build_vanilla(weights, inputs):
             weights, inputweights, b = weights[1], weights[0], weights[2]
-            vanilla = lambda x: np.tanh(x @ weights + inputs @ inputweights + b)
+            vanilla = lambda x: - x + np.tanh(x @ weights + inputs @ inputweights + b)
             return vanilla
 
         vanilla = build_vanilla(self.weights, inputs)
@@ -152,6 +153,9 @@ class Chiefinvestigator(Investigator):
             x, y, z = np.meshgrid(data_transformed[indices, 0],
                                   data_transformed[indices, 1],
                                   data_transformed[indices, 2])
+            x,y,z = np.meshgrid(np.linspace(-7.5, 7.5, stepsize),
+                                np.linspace(-6, 6, stepsize),
+                                np.linspace(-4, 4, stepsize))
 
             x = x.ravel()
             y = y.ravel()
@@ -161,6 +165,7 @@ class Chiefinvestigator(Investigator):
 
         pca = sklearn.decomposition.PCA(3)
         transformed_activations = pca.fit_transform(activations)
+
         # transformed_input = pca.transform(inputs)
 
         meshed_activations = real_meshgrid(transformed_activations)
@@ -168,10 +173,11 @@ class Chiefinvestigator(Investigator):
 
         reverse_transformed = pca.inverse_transform(meshed_activations)
         #reversed_input = pca.inverse_transform(meshed_inputs)
+        indices = np.arange(timesteps[0], timesteps[1], stepsize)
 
         gru = self.return_gru(inputs[5, :])
-        #vanilla = self.return_vanilla(reversed_input)
-        phase_stuff = gru(reverse_transformed)
+        #vanilla = self.return_vanilla(inputs[5, :])
+        phase_stuff = gru(activations[indices, :])
         #phase_stuff = vanilla(reverse_transformed)
 
         sim_act = reverse_transformed[0,:]
@@ -182,47 +188,14 @@ class Chiefinvestigator(Investigator):
         recored_act = np.vstack(recorded_act)
         transformed_recored = pca.transform(recored_act)
         transformed_phase_stuff = pca.transform(phase_stuff)
-        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
+        #x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
+
+
+        x,y,z = transformed_activations[indices, 0], transformed_activations[indices, 1], transformed_activations[indices, 2]
         u, v, w = transformed_phase_stuff[:, 0], transformed_phase_stuff[:, 1], transformed_phase_stuff[:, 2]
+        # u,v,w = transformed_phase_stuff[indices, 0], transformed_phase_stuff[indices, 1], transformed_phase_stuff[indices, 2]
 
         return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :], transformed_recored
-
-    def compute_quiver_layer(self, inputs, activations, timesteps, stepsize, layer):
-
-        def real_meshgrid(data_transformed):
-            indices = np.arange(timesteps[0], timesteps[1], stepsize)
-            x, y, z = np.meshgrid(data_transformed[indices, 0],
-                                  data_transformed[indices, 1],
-                                  np.repeat(data_transformed[layer, 2], len(indices)))
-
-            x = x.ravel()
-            y = y.ravel()
-            z = z.ravel()
-            all = np.vstack((x, y, z)).transpose()
-            return all
-
-        pca = sklearn.decomposition.PCA(3)
-        transformed_activations = pca.fit_transform(activations)
-        transformed_input = pca.transform(inputs)
-
-        meshed_activations = real_meshgrid(transformed_activations)
-        meshed_inputs = real_meshgrid(transformed_input)
-
-        reverse_transformed = pca.inverse_transform(meshed_activations)
-        reversed_input = pca.inverse_transform(meshed_inputs)
-
-        gru = self.return_gru(reversed_input)
-        #vanilla = self.return_vanilla(reversed_input)
-        phase_stuff = gru(reverse_transformed)
-        #phase_stuff = vanilla(reverse_transformed)
-        transformed_phase_stuff = pca.transform(phase_stuff)
-        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
-        u, v, w = transformed_phase_stuff[:, 0], transformed_phase_stuff[:, 1], transformed_phase_stuff[:, 2]
-
-        return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :], transformed_recored
-
-
-
 
 
 if __name__ == "__main__":
@@ -238,24 +211,30 @@ if __name__ == "__main__":
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
 
-    n_episodes = 10
-    activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
-                                                                    "policy_recurrent_layer",
-                                                                    layer_names[1])
+    #n_episodes = 10
+    #activations_over_all_episodes, inputs_over_all_episodes, \
+    #actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
+    #                                                                "policy_recurrent_layer",
+    #                                                                layer_names[1])
+    activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
+                                                                                                          layer_names[1])
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1e-07,
-                                   epsilon=0.01,
-                                   alr_decayr=1e-04,
-                                   max_iters=5000)
-    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
-                                                              inputs_over_all_episodes,
-                                                              2000, 0.2)
-    sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
+                                   q_threshold=1e-12,
+                                   tol_unique=1e-03,
+                                   epsilon=0.1,
+                                   alr_decayr=5e-03,
+                                   agnc_normclip=2,
+                                   agnc_decayr=1e-03,
+                                   max_iters=2000,
+                                   method='sequential')
+    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_single_run,
+                                                              inputs_single_run,
+                                                              100, 0)
+    # sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
-    plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
+    fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
     # render fixedpoints
     #for fp in fps:
     #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
@@ -263,24 +242,23 @@ if __name__ == "__main__":
     #    chiefinvesti.render_fixed_points(repeated_fps)
      #   sleep(5)
 
-    #activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
-    #                                                                                                      layer_names[1])
+
+    timesteps, stepsize = (0, 100), 10
+    x,y, z, u, v, w, activations, recored_act= chiefinvesti.compute_quiver_data(inputs_single_run, activations_single_run,
+                                                                                    timesteps,
+                                                                                    stepsize)
+    #fig = plt.figure()
+    #ax = fig.add_subplot(projection='3d')
+    ax.quiver(x, y, z, u, v, w, color='g')
+    # ax.streamplot(x, y, z, u, v, w, color='g')
+    #ax.quiver(x,y,z, a,b,c, length=0.2, color='y')
+    #ax.plot(activations[:, 0], activations[:, 1], activations[:, 2], c='r')
+    #ax.plot(recored_act[:10, 0], recored_act[:10, 1], recored_act[:10, 2], c='g')
+
+    plt.show()
 
     #import mayavi
     #from mayavi.mlab import quiver3d, plot3d
-
-    #timesteps, stepsize = (0, 100), 10
-    #activations_single_run = np.vstack((np.zeros(chiefinvesti.n_hidden), activations_single_run[:-1, :]))
-    #inputs_over_all_episodes = np.zeros(inputs_single_run.shape)
-    #x,y, z, u, v, w, activations, recored_act = chiefinvesti.compute_quiver_data(inputs_single_run, activations_single_run,
-    #                                                                                timesteps,
-    #                                                                                stepsize)
-    #fig = plt.figure()
-    #ax = fig.add_subplot(projection='3d')
-    #ax.quiver(x, y, z, u, v, w, length=0.2)
-    #ax.plot(activations[:10, 0], activations[:10, 1], activations[:10, 2], c='r')
-    #ax.plot(recored_act[:10, 0], recored_act[:10, 1], recored_act[:10, 2], c='g')
-    #plt.show()
     #quiver3d(x, y, z, u, v, w)
     #plot3d(activations[:, 0], activations[:, 1], activations[:, 2])
     #mayavi.mlab.show()
