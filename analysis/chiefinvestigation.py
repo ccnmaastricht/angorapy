@@ -16,7 +16,7 @@ from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNo
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.model_utils import build_sub_model_from, build_sub_model_to
 import autograd.numpy as np
-from autograd import jacobian
+import sklearn.decomposition as skld
 
 
 class Chiefinvestigator(Investigator):
@@ -153,49 +153,37 @@ class Chiefinvestigator(Investigator):
             x, y, z = np.meshgrid(data_transformed[indices, 0],
                                   data_transformed[indices, 1],
                                   data_transformed[indices, 2])
-            x,y,z = np.meshgrid(np.linspace(-7.5, 7.5, stepsize),
-                                np.linspace(-6, 6, stepsize),
-                                np.linspace(-4, 4, stepsize))
-
-            x = x.ravel()
-            y = y.ravel()
-            z = z.ravel()
+            x, y, z = np.meshgrid(np.linspace(-2, 2, stepsize),
+                                  np.linspace(-2, 2, stepsize),
+                                  np.linspace(-2, 2, stepsize))
+            x, y, z = x.ravel(), y.ravel(), z.ravel()
             all = np.vstack((x, y, z)).transpose()
             return all
 
         pca = sklearn.decomposition.PCA(3)
+
         transformed_activations = pca.fit_transform(activations)
+        meshed_activations = real_meshgrid(transformed_activations)
+        reverse_transformed = pca.inverse_transform(meshed_activations)
+
 
         # transformed_input = pca.transform(inputs)
+        # meshed_inputs = real_meshgrid(transformed_input)
+        # reversed_input = pca.inverse_transform(meshed_inputs)
 
-        meshed_activations = real_meshgrid(transformed_activations)
-        #meshed_inputs = real_meshgrid(transformed_input)
+        if self.rnn_type == 'vanilla':
+            vanilla = self.return_vanilla(inputs[5, :])
+            phase_space = vanilla(reverse_transformed)
+        elif self.rnn_type == 'gru':
+            gru = self.return_gru(inputs[5, :])
+            phase_space = gru(reverse_transformed)
 
-        reverse_transformed = pca.inverse_transform(meshed_activations)
-        #reversed_input = pca.inverse_transform(meshed_inputs)
-        indices = np.arange(timesteps[0], timesteps[1], stepsize)
+        transformed_phase_space = pca.transform(phase_space)
+        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
+        # x,y,z = transformed_activations[indices, 0], transformed_activations[indices, 1], transformed_activations[indices, 2]
+        u, v, w = transformed_phase_space[:, 0], transformed_phase_space[:, 1], transformed_phase_space[:, 2]
 
-        gru = self.return_gru(inputs[5, :])
-        #vanilla = self.return_vanilla(inputs[5, :])
-        phase_stuff = gru(activations[indices, :])
-        #phase_stuff = vanilla(reverse_transformed)
-
-        sim_act = reverse_transformed[0,:]
-        recorded_act = []
-        for i in range(10):
-            recorded_act.append(sim_act)
-            sim_act = gru(sim_act)
-        recored_act = np.vstack(recorded_act)
-        transformed_recored = pca.transform(recored_act)
-        transformed_phase_stuff = pca.transform(phase_stuff)
-        #x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
-
-
-        x,y,z = transformed_activations[indices, 0], transformed_activations[indices, 1], transformed_activations[indices, 2]
-        u, v, w = transformed_phase_stuff[:, 0], transformed_phase_stuff[:, 1], transformed_phase_stuff[:, 2]
-        # u,v,w = transformed_phase_stuff[indices, 0], transformed_phase_stuff[indices, 1], transformed_phase_stuff[indices, 2]
-
-        return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :], transformed_recored
+        return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :]
 
 
 if __name__ == "__main__":
@@ -209,15 +197,17 @@ if __name__ == "__main__":
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
+    gru_weights = chiefinvesti.weights # weights are a list inputweights, recurrent weights and biases
     print(layer_names)
-
-    #n_episodes = 10
-    #activations_over_all_episodes, inputs_over_all_episodes, \
-    #actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
-    #                                                                "policy_recurrent_layer",
-    #                                                                layer_names[1])
+    # collect data from episodes
+    n_episodes = 4
+    activations_over_all_episodes, inputs_over_all_episodes, \
+    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
+                                                                    "policy_recurrent_layer",
+                                                                    layer_names[1])
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
+    print('Standard deviation:', np.std(inputs_single_run))
 
     # employ fixedpointfinder
     adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
@@ -227,36 +217,42 @@ if __name__ == "__main__":
                                    alr_decayr=5e-03,
                                    agnc_normclip=2,
                                    agnc_decayr=1e-03,
-                                   max_iters=2000,
-                                   method='sequential')
+                                   max_iters=5000)
+    n_samples, noise_level = 100, 0
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_single_run,
                                                               inputs_single_run,
-                                                              20, 0)
-    sampled_inputs = np.repeat(np.mean(inputs_single_run, axis=0).reshape(1, 32), repeats=20, axis=0)
-    # sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
+                                                              n_samples,
+                                                              noise_level)
+
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
+
+    # handle means of inputs
+    mean_inputs = np.repeat(np.mean(inputs_single_run, axis=0).reshape(1, 32), repeats=n_samples, axis=0)
+    fp_mean_input = adamfpf.find_fixed_points(states, mean_inputs)
+
+    pca = skld.PCA(3)
+    transformed_activations = pca.fit_transform(activations_single_run)
+    fp_mean_input_transformed = pca.transform(fp_mean_input[0]['x'].reshape(1, -1))
+
+    # plotting
     fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
-    # render fixedpoints
-    #for fp in fps:
-    #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
-    #    print("RENDERING FIXED POINT")
-    #    chiefinvesti.render_fixed_points(repeated_fps)
-     #   sleep(5)
 
+    timespan, stepsize = (0, 100), 3
+    x, y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_single_run, activations_single_run,
+                                                                     timespan,
+                                                                     stepsize)
+    # mean fp will be red
+    ax.scatter(fp_mean_input_transformed[:, 0], fp_mean_input_transformed[:, 1], fp_mean_input_transformed[:, 2], color='r')
+    ax.quiver(x, y, z, u, v, w, length=0.5, color='g')
+    # ax.streamplot(x, y, z, u, v, w, color='g')
+    plt.show()
 
-    timesteps, stepsize = (0, 100), 10
-    x,y, z, u, v, w, activations, recored_act= chiefinvesti.compute_quiver_data(inputs_single_run, activations_single_run,
-                                                                                    timesteps,
-                                                                                    stepsize)
+    # loadings plot
+    loadings = pca.components_
     #fig = plt.figure()
     #ax = fig.add_subplot(projection='3d')
-    ax.quiver(x, y, z, u, v, w, color='g')
-    # ax.streamplot(x, y, z, u, v, w, color='g')
-    #ax.quiver(x,y,z, a,b,c, length=0.2, color='y')
-    #ax.plot(activations[:, 0], activations[:, 1], activations[:, 2], c='r')
-    #ax.plot(recored_act[:10, 0], recored_act[:10, 1], recored_act[:10, 2], c='g')
-
-    plt.show()
+    #ax.scatter(loadings[0, :], loadings[1, :], loadings[2, :])
+    #plt.show()
 
     #import mayavi
     #from mayavi.mlab import quiver3d, plot3d
@@ -264,8 +260,10 @@ if __name__ == "__main__":
     #plot3d(activations[:, 0], activations[:, 1], activations[:, 2])
     #mayavi.mlab.show()
 
-    #plt.quiver(x, y, u, v, scale=5)
-    #plt.plot(activations[:10, 0], activations[:10, 1], c='r')#, activations[:, 2], c='r')
-    #plt.show()
 
-
+    # render fixedpoints
+    #for fp in fps:
+    #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
+    #    print("RENDERING FIXED POINT")
+    #    chiefinvesti.render_fixed_points(repeated_fps)
+    #    sleep(5)
