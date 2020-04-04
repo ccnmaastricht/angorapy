@@ -231,7 +231,8 @@ if __name__ == "__main__":
                                    method='sequential')
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_single_run,
                                                               inputs_single_run,
-                                                              100, 0)
+                                                              20, 0)
+    sampled_inputs = np.repeat(np.mean(inputs_single_run, axis=0).reshape(1, 32), repeats=20, axis=0)
     # sampled_inputs = np.zeros((states.shape[0], chiefinvesti.n_hidden))
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
