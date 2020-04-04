@@ -7,7 +7,8 @@ from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, Half
 from environments.evasion import Evasion
 from environments.evasionwalls import EvasionWalls
 from environments.race import Race
-from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector, ShadowHandMultiReach
+from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector, ShadowHandMultiReach, \
+    ShadowHandFreeReach, ShadowHandTappingSequence
 from environments.tunnel import Tunnel
 
 # SHADOW HAND
@@ -50,6 +51,20 @@ gym.envs.register(
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
     max_episode_steps=100,
+)
+
+gym.envs.register(
+    id='HandFreeReachAbsolute-v0',
+    entry_point='environments:ShadowHandFreeReach',
+    kwargs={"relative_control": False, "success_multiplier": 0.1},
+    max_episode_steps=100,
+)
+
+gym.envs.register(
+    id='HandTappingAbsolute-v0',
+    entry_point='environments:ShadowHandTappingSequence',
+    kwargs={"relative_control": False, "success_multiplier": 1},
+    max_episode_steps=200,
 )
 
 gym.envs.register(

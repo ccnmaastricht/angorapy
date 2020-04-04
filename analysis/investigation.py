@@ -161,8 +161,8 @@ class Investigator:
 
             action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
-            observation, reward, done, _ = env.step(action)
-            observation, reward, done, _ = self.preprocessor.modulate((parse_state(observation), reward, done, None),
+            observation, reward, done, i = env.step(action)
+            observation, reward, done, i = self.preprocessor.modulate((parse_state(observation), reward, done, i),
                                                                       update=False)
 
             state = observation
@@ -186,7 +186,7 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, info = env.step(action)
             cumulative_reward += reward
-            observation, reward, done, _ = self.preprocessor.modulate((parse_state(observation), reward, done, None),
+            observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                       update=False)
 
             state = observation
@@ -200,6 +200,7 @@ if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 
     # agent_id = 1585500821  # cartpole-v1
     agent_id = 1583256614 # reach task
