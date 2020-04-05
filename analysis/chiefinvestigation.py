@@ -166,10 +166,9 @@ class Chiefinvestigator(Investigator):
         meshed_activations = real_meshgrid(transformed_activations)
         reverse_transformed = pca.inverse_transform(meshed_activations)
 
-
-        # transformed_input = pca.transform(inputs)
-        # meshed_inputs = real_meshgrid(transformed_input)
-        # reversed_input = pca.inverse_transform(meshed_inputs)
+        #transformed_input = pca.transform(inputs)
+        #meshed_inputs = real_meshgrid(transformed_input)
+        #reversed_input = pca.inverse_transform(meshed_inputs)
 
         if self.rnn_type == 'vanilla':
             vanilla = self.return_vanilla(inputs[5, :])
@@ -200,7 +199,7 @@ if __name__ == "__main__":
     gru_weights = chiefinvesti.weights # weights are a list inputweights, recurrent weights and biases
     print(layer_names)
     # collect data from episodes
-    n_episodes = 4
+    n_episodes = 5
     activations_over_all_episodes, inputs_over_all_episodes, \
     actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
                                                                     "policy_recurrent_layer",
@@ -219,33 +218,39 @@ if __name__ == "__main__":
                                    agnc_decayr=1e-03,
                                    max_iters=5000)
     n_samples, noise_level = 100, 0
-    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_single_run,
-                                                              inputs_single_run,
+    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
+                                                              inputs_over_all_episodes,
                                                               n_samples,
                                                               noise_level)
 
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
 
     # handle means of inputs
-    mean_inputs = np.repeat(np.mean(inputs_single_run, axis=0).reshape(1, 32), repeats=n_samples, axis=0)
+    mean_inputs = np.repeat(np.mean(inputs_over_all_episodes, axis=0).reshape(1, 32), repeats=n_samples, axis=0)
     fp_mean_input = adamfpf.find_fixed_points(states, mean_inputs)
 
     pca = skld.PCA(3)
-    transformed_activations = pca.fit_transform(activations_single_run)
+    transformed_activations = pca.fit_transform(activations_over_all_episodes)
     fp_mean_input_transformed = pca.transform(fp_mean_input[0]['x'].reshape(1, -1))
 
+    fp_locations = np.vstack([fp['x'] for fp in fps])
+    mean_locations = np.mean(fp_locations, axis=0)
+    mean_fp_transformed = pca.transform(mean_locations.reshape(1, -1))
     # plotting
     fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
 
     timespan, stepsize = (0, 100), 3
-    x, y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_single_run, activations_single_run,
+    x, y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_over_all_episodes, activations_over_all_episodes,
                                                                      timespan,
                                                                      stepsize)
     # mean fp will be red
     ax.scatter(fp_mean_input_transformed[:, 0], fp_mean_input_transformed[:, 1], fp_mean_input_transformed[:, 2], color='r')
+    ax.scatter(mean_fp_transformed[:, 0], mean_fp_transformed[:, 1], mean_fp_transformed[:, 2],
+               color='m')
     ax.quiver(x, y, z, u, v, w, length=0.5, color='g')
     # ax.streamplot(x, y, z, u, v, w, color='g')
     plt.show()
+    sleep(3)
 
     # loadings plot
     loadings = pca.components_
