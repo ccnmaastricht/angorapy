@@ -6,6 +6,7 @@ import sys
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import animation
 import sklearn
 
 from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
@@ -146,7 +147,7 @@ class Chiefinvestigator(Investigator):
         vanilla = build_vanilla(self.weights, inputs)
         return vanilla
 
-    def compute_quiver_data(self, inputs, activations, timesteps, stepsize):
+    def compute_quiver_data(self, inputs, activations, timesteps, stepsize, i):
 
         def real_meshgrid(data_transformed):
             indices = np.arange(timesteps[0], timesteps[1], stepsize)
@@ -171,10 +172,10 @@ class Chiefinvestigator(Investigator):
         #reversed_input = pca.inverse_transform(meshed_inputs)
 
         if self.rnn_type == 'vanilla':
-            vanilla = self.return_vanilla(inputs[5, :])
+            vanilla = self.return_vanilla(inputs[i, :])
             phase_space = vanilla(reverse_transformed)
         elif self.rnn_type == 'gru':
-            gru = self.return_gru(inputs[5, :])
+            gru = self.return_gru(inputs[i, :])
             phase_space = gru(reverse_transformed)
 
         transformed_phase_space = pca.transform(phase_space)
@@ -199,7 +200,7 @@ if __name__ == "__main__":
     gru_weights = chiefinvesti.weights # weights are a list inputweights, recurrent weights and biases
     print(layer_names)
     # collect data from episodes
-    n_episodes = 5
+    n_episodes = 1
     activations_over_all_episodes, inputs_over_all_episodes, \
     actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
                                                                     "policy_recurrent_layer",
@@ -237,20 +238,23 @@ if __name__ == "__main__":
     mean_locations = np.mean(fp_locations, axis=0)
     mean_fp_transformed = pca.transform(mean_locations.reshape(1, -1))
     # plotting
-    fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
+    for i in range(100):
+        fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
 
-    timespan, stepsize = (0, 100), 3
-    x, y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_over_all_episodes, activations_over_all_episodes,
-                                                                     timespan,
-                                                                     stepsize)
-    # mean fp will be red
-    ax.scatter(fp_mean_input_transformed[:, 0], fp_mean_input_transformed[:, 1], fp_mean_input_transformed[:, 2], color='r')
-    ax.scatter(mean_fp_transformed[:, 0], mean_fp_transformed[:, 1], mean_fp_transformed[:, 2],
-               color='m')
-    ax.quiver(x, y, z, u, v, w, length=0.5, color='g')
-    # ax.streamplot(x, y, z, u, v, w, color='g')
-    plt.show()
-    sleep(3)
+        timespan, stepsize = (0, 100), 3
+        x, y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_over_all_episodes, activations_over_all_episodes,
+                                                                         timespan,
+                                                                         stepsize, i)
+        # mean fp will be red
+        ax.scatter(fp_mean_input_transformed[:, 0], fp_mean_input_transformed[:, 1], fp_mean_input_transformed[:, 2], color='r')
+        #ax.scatter(mean_fp_transformed[:, 0], mean_fp_transformed[:, 1], mean_fp_transformed[:, 2],
+        #           color='m')
+        ax.quiver(x, y, z, u, v, w, length=0.5, color='g')
+        # ax.streamplot(x, y, z, u, v, w, color='g')
+
+
+        plt.show()
+        sleep(0.3)
 
     # loadings plot
     loadings = pca.components_

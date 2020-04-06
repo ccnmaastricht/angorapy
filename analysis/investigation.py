@@ -150,7 +150,7 @@ class Investigator:
 
         done = False
         state = env.reset()
-        env.goal = 0
+        env.goal = 1
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
