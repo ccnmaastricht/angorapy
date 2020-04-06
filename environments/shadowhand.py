@@ -301,6 +301,7 @@ class ShadowHandReach(HandReachEnv):
 
         return o,r,d,i
 
+
 class ShadowHandMultiReach(ShadowHandReach):
     """Reaching task where three fingers have to be joined."""
 
@@ -428,13 +429,19 @@ class ShadowHandTappingSequence(ShadowHandFreeReach):
 
     def compute_reward(self, achieved_goal, goal, info):
         current_goal_finger_id = self.goal_sequence[self.current_sequence_position]
+        last_goal_finger_id = self.goal_sequence[0]
+        if self.current_sequence_position > 0:
+            last_goal_finger_id = self.goal_sequence[self.current_sequence_position - 1]
+
         current_goal_finger_name = FINGERTIP_SITE_NAMES[current_goal_finger_id]
 
         d = get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(current_goal_finger_name))
         reward = -d + info["is_success"] * self.success_multiplier
 
+        # incentivise distance to non target fingers
         for i, fname in enumerate(FINGERTIP_SITE_NAMES):
-            if fname == self.thumb_name or i == current_goal_finger_id:
+            # do not reward distance to self, thumb and last target (to give time to move away last target)
+            if fname == self.thumb_name or i == current_goal_finger_id or i == last_goal_finger_id:
                 continue
 
             reward += 0.2 * get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(fname))
@@ -507,6 +514,7 @@ class ShadowHandBlockVector(HandBlockEnv):
         object_qvel = self.sim.data.get_joint_qvel('object:joint')
         achieved_goal = self._get_achieved_goal().ravel()  # this contains the object position + rotation
         observation = np.concatenate([robot_qpos, robot_qvel, object_qvel, achieved_goal, self.goal.ravel().copy()])
+
         return {
             'observation': observation.copy(),
             'achieved_goal': achieved_goal.copy(),
