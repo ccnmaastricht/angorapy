@@ -175,7 +175,7 @@ class ShadowHand(manipulate.ManipulateEnv):
         palm_center_pos = get_palm_position(self.sim)
 
         dropped = (
-            obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
+                obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
             # we could add smth like checking for contacts between palm and object here, but the above works
             # pretty well already tbh
         )
@@ -201,9 +201,9 @@ class ShadowHand(manipulate.ManipulateEnv):
         success = self._is_success(achieved_goal, goal).astype(np.float32)
         _, d_rot = self._goal_distance(achieved_goal, goal)
 
-        return (- d_rot                     # convergence to goal reward
-                - 1                         # constant punishment to encourage fast solutions
-                + success * 5               # reward for finishing
+        return (- d_rot  # convergence to goal reward
+                - 1  # constant punishment to encourage fast solutions
+                + success * 5  # reward for finishing
                 + 20 * self._is_dropped())  # dropping penalty
 
 
@@ -294,12 +294,11 @@ class ShadowHandReach(HandReachEnv):
         return goal.flatten()
 
     def step(self, action):
+        """Step the environment."""
         o, r, d, i = super().step(action)
-        i.update({
-            "target_finger": self.current_target_finger
-        })
+        i.update({"target_finger": self.current_target_finger})
 
-        return o,r,d,i
+        return o, r, d, i
 
 
 class ShadowHandMultiReach(ShadowHandReach):
