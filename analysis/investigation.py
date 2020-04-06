@@ -203,9 +203,11 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 
+
     # agent_id = 1585500821  # cartpole-v1
     agent_id = 1583256614 # reach task
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
+
     inv = Investigator.from_agent(agent_007)
     print(inv.list_layer_names())
 
