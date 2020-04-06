@@ -194,6 +194,7 @@ if __name__ == "__main__":
     # agent_id = 1585500821 # cartpole-v1
     # agent_id = 1585557832 # MountainCar # 1585561817 continuous
     agent_id = 1583256614 # reach task
+    # agent_id = # free reach
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
