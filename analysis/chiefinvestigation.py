@@ -129,7 +129,7 @@ class Chiefinvestigator(Investigator):
 
             z_fun = lambda x: sigmoid(x @ U_z + z_projection_b)
             r_fun = lambda x: sigmoid(x @ U_r + r_projection_b)
-            g_fun = lambda x: np.tanh(r_fun(x) * (x @ U_h) + g_projection_b)
+            g_fun = lambda x: np.tanh((r_fun(x) * x) @ U_h + g_projection_b)
 
             gru = lambda x: - x + z_fun(x) * x + (1 - z_fun(x)) * g_fun(x)
             return gru
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     gru_weights = chiefinvesti.weights # weights are a list inputweights, recurrent weights and biases
     print(layer_names)
     # collect data from episodes
-    n_episodes = 1
+    n_episodes = 5
     activations_over_all_episodes, inputs_over_all_episodes, \
     actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
                                                                     "policy_recurrent_layer",

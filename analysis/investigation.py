@@ -202,8 +202,6 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-<<<<<<< HEAD
-
 
     # agent_id = 1585500821  # cartpole-v1
     agent_id = 1583256614 # reach task
