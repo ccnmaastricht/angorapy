@@ -61,7 +61,7 @@ def extract_layers(network: tf.keras.Model, unfold_tds: bool = False) -> List[tf
 
 def get_layers_by_names(network: tf.keras.Model, layer_names: List[str]):
     """Get a list of layers identified by their names from a network."""
-    layers = extract_layers(network)
+    layers = extract_layers(network) + network.layers
     all_layer_names = [l.name for l in layers]
 
     assert all(ln in all_layer_names for ln in layer_names), "Cannot find layer name in network extraction."
@@ -105,8 +105,8 @@ def build_sub_model_from(network: tf.keras.Model, from_layer_name: str):
     Outputs will remain the network outputs."""
     all_layer_names = [l.name for l in network.layers]
 
-    first_layer = get_layers_by_names(network, [from_layer_name])[0]
-    first_layer_index = all_layer_names.index(first_layer.name)
+    first_layer_index = all_layer_names.index(from_layer_name)
+    first_layer = network.layers[first_layer_index]
 
     new_input = tf.keras.layers.Input(first_layer.input_shape[1:])
     x = first_layer(new_input)
