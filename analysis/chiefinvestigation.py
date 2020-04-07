@@ -43,7 +43,7 @@ class Chiefinvestigator(Investigator):
         self.weights = self.get_layer_weights('policy_recurrent_layer')
         self.n_hidden = self.weights[1].shape[0]
         self._get_rnn_type()
-        self.sub_model_from = build_sub_model_from(self.network, "policy_recurrent_layer")
+        self.sub_model_from = build_sub_model_from(self.network, "beta_action_head")
 
     def _get_rnn_type(self):
         if self.weights[1].shape[1] / self.weights[1].shape[0] == 1:
