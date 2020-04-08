@@ -6,11 +6,10 @@ import sys
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import animation
 import sklearn
 
-from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
-from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
+from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, AdamCircularFpf
+from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
@@ -44,6 +43,8 @@ class Chiefinvestigator(Investigator):
         self.n_hidden = self.weights[1].shape[0]
         self._get_rnn_type()
         self.sub_model_from = build_sub_model_from(self.network, "beta_action_head")
+        layer_names = self.get_layer_names()
+        self.sub_model_to = build_sub_model_to(self.network, ['policy_recurrent_layer', layer_names[1]], include_original=True)
 
     def _get_rnn_type(self):
         if self.weights[1].shape[1] / self.weights[1].shape[0] == 1:
@@ -193,84 +194,45 @@ if __name__ == "__main__":
     # agent_id = 1583404415  # 1583180664 lunarlandercont
     # agent_id = 1585500821 # cartpole-v1
     # agent_id = 1585557832 # MountainCar # 1585561817 continuous
-    agent_id = 1583256614 # reach task
-    # agent_id = 1585777856# free reach
+    # agent_id = 1583256614 # reach task
+    agent_id = 1585777856 # free reach
     chiefinvesti = Chiefinvestigator(agent_id)
 
     layer_names = chiefinvesti.get_layer_names()
-    gru_weights = chiefinvesti.weights # weights are a list inputweights, recurrent weights and biases
     print(layer_names)
     # collect data from episodes
-    n_episodes = 5
+    n_episodes = 1
     activations_over_all_episodes, inputs_over_all_episodes, \
     actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
-    print('Standard deviation:', np.std(inputs_single_run))
 
     # employ fixedpointfinder
-    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
-                                   q_threshold=1e-12,
-                                   tol_unique=1e-03,
-                                   epsilon=0.1,
-                                   alr_decayr=5e-03,
-                                   agnc_normclip=2,
-                                   agnc_decayr=1e-03,
-                                   max_iters=5000)
-    n_samples, noise_level = 100, 0
+    adamfpf = AdamCircularFpf(chiefinvesti.weights, chiefinvesti.rnn_type,
+                              sub_model_to=chiefinvesti.sub_model_to,
+                              sub_model_from=chiefinvesti.sub_model_from,
+                              env=chiefinvesti.env,
+                              distribution=chiefinvesti.distribution,
+                              preprocessor=chiefinvesti.preprocessor,
+                              network=chiefinvesti.network,
+                              q_threshold=1e-01,
+                              tol_unique=1e-03,
+                              epsilon=0.001,
+                              alr_decayr=5e-03,
+                              agnc_normclip=2,
+                              agnc_decayr=1e-03,
+                              max_iters=800)
+    n_samples, noise_level = 20, 0
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
                                                               n_samples,
                                                               noise_level)
 
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
-
-    # handle means of inputs
-    mean_inputs = np.repeat(np.mean(inputs_over_all_episodes, axis=0).reshape(1, 32), repeats=n_samples, axis=0)
-    fp_mean_input = adamfpf.find_fixed_points(states, mean_inputs)
-
-    pca = skld.PCA(3)
-    transformed_activations = pca.fit_transform(activations_over_all_episodes)
-    fp_mean_input_transformed = pca.transform(fp_mean_input[0]['x'].reshape(1, -1))
-
-    fp_locations = np.vstack([fp['x'] for fp in fps])
-    mean_locations = np.mean(fp_locations, axis=0)
-    mean_fp_transformed = pca.transform(mean_locations.reshape(1, -1))
-    # plotting
-    for i in range(100):
-        fig, ax = plot_fixed_points(activations_single_run, fps, 4000, 1)
-
-        timespan, stepsize = (0, 100), 3
-        x, y, z, u, v, w, activations = chiefinvesti.compute_quiver_data(inputs_over_all_episodes, activations_over_all_episodes,
-                                                                         timespan,
-                                                                         stepsize, i)
-        # mean fp will be red
-        ax.scatter(fp_mean_input_transformed[:, 0], fp_mean_input_transformed[:, 1], fp_mean_input_transformed[:, 2], color='r')
-        #ax.scatter(mean_fp_transformed[:, 0], mean_fp_transformed[:, 1], mean_fp_transformed[:, 2],
-        #           color='m')
-        ax.quiver(x, y, z, u, v, w, length=0.5, color='g')
-        # ax.streamplot(x, y, z, u, v, w, color='g')
-
-
-        plt.show()
-        sleep(0.3)
-
-    # loadings plot
-    loadings = pca.components_
-    #fig = plt.figure()
-    #ax = fig.add_subplot(projection='3d')
-    #ax.scatter(loadings[0, :], loadings[1, :], loadings[2, :])
-    #plt.show()
-
-    #import mayavi
-    #from mayavi.mlab import quiver3d, plot3d
-    #quiver3d(x, y, z, u, v, w)
-    #plot3d(activations[:, 0], activations[:, 1], activations[:, 2])
-    #mayavi.mlab.show()
-
-
+    plot_fixed_points(activations_over_all_episodes, fps, 200, 1)
+    plt.show()
     # render fixedpoints
     #for fp in fps:
     #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
