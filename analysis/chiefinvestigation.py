@@ -223,7 +223,7 @@ if __name__ == "__main__":
                               alr_decayr=5e-03,
                               agnc_normclip=2,
                               agnc_decayr=1e-03,
-                              max_iters=800)
+                              max_iters=200)
     n_samples, noise_level = 20, 0
     states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
                                                               inputs_over_all_episodes,
