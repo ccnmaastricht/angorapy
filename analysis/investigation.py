@@ -161,8 +161,8 @@ class Investigator:
 
             action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
-            observation, reward, done, _ = env.step(action)
-            observation, reward, done, _ = self.preprocessor.modulate((parse_state(observation), reward, done, None),
+            observation, reward, done, i = env.step(action)
+            observation, reward, done, i = self.preprocessor.modulate((parse_state(observation), reward, done, i),
                                                                       update=False)
 
             state = observation
@@ -186,8 +186,8 @@ class Investigator:
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, info = env.step(action)
             cumulative_reward += reward
-            observation, reward, done, _ = self.preprocessor.modulate((parse_state(observation), reward, done, None),
-                                                                      update=False)
+            observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
+                                                                         update=False)
 
             state = observation
 
@@ -201,13 +201,14 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
+
     agent_007 = PPOAgent.from_agent_state(  1585432747  , from_iteration="b")
     inv = Investigator.from_agent(agent_007)
     print(inv.list_layer_names())
 
-    #inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
+    # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
-    #inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
+    # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     for i in range(100):
         inv.render_episode(agent_007.env, to_gif=False)

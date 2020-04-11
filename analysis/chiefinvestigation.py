@@ -2,7 +2,8 @@ import os
 import gym
 import numpy as np
 import sys
-sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
+sys.path.append("/home/weidler/workspace/dexterous-robot-hand/rnn_dynamical_systems")
+
 from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
@@ -120,4 +121,4 @@ if __name__ == "__main__":
     fps = adamfpf.find_fixed_points(states, sampled_inputs)
     # plot_fixed_points(activations_over_all_episodes, fps, 4000, 1)
 
-    sub_model_to = build_sub_model_from(chiefinvesti.network, ["policy_recurrent_layer"])
+    sub_model_to = build_sub_model_from(chiefinvesti.network, "policy_recurrent_layer")

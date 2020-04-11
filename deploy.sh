@@ -59,4 +59,4 @@ do
   sleep 10
 done
 
-python -u train.py BipedalWalker-v2 --config continuous_beta --iterations 2000 --workers 32 --redis-ip $ip_head --redis-pw $redis_password
+python -u train.py BipedalWalker-v2 --config hand_beta_no_ent --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
