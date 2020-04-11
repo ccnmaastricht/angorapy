@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=ihom_experiment
+#SBATCH --job-name=tapping_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
-#SBATCH --time=12:00:00
-#SBATCH --nodes=12
+#SBATCH --time=20:00:00
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
@@ -16,7 +16,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 # this is an adaption of the ray boilerplate https://ray.readthedocs.io/en/latest/deploying-on-slurm.html
 
-worker_num=11 # Must be one less that the total number of nodes
+worker_num=0 # Must be one less than the total number of nodes
 
 # load modules
 module load daint-gpu
@@ -52,11 +52,11 @@ sleep 20
 
 for ((  i=1; i<=$worker_num; i++ ))
 do
-  # start a worker
+  # start another node
   node2=${nodes_array[$i]}
   srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password &
 
   sleep 10
 done
 
-python -u train.py BipedalWalker-v2 --config hand_beta_no_ent --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
+python -u train.py HandTappingAbsolute-v0 --config hand_beta_no_ent --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
