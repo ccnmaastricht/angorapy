@@ -150,6 +150,7 @@ class Investigator:
 
         done = False
         state = env.reset()
+        env.goal = 1
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
@@ -159,7 +160,7 @@ class Investigator:
             activations.append(activation)
             env.render() if render else ""
 
-            action, _ = self.distribution.act(*probabilities)
+            action = self.distribution.act_deterministic(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, i = env.step(action)
             observation, reward, done, i = self.preprocessor.modulate((parse_state(observation), reward, done, i),
@@ -183,7 +184,7 @@ class Investigator:
             probabilities = flatten(
                 self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
-            action, _ = self.distribution.act(*probabilities)
+            action = self.distribution.act_deterministic(*probabilities)
             observation, reward, done, info = env.step(action)
             cumulative_reward += reward
             observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
@@ -201,7 +202,11 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_007 = PPOAgent.from_agent_state(1585900961, from_iteration="b")
+
+    # agent_id = 1585500821  # cartpole-v1
+    agent_id = 1583256614 # reach task
+    agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
+
     inv = Investigator.from_agent(agent_007)
     print(inv.list_layer_names())
 

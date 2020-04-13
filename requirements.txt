@@ -92,7 +92,6 @@ PyYAML==5.1.2
 ra==0.2.0
 ramlfications==0.1.9
 ray==0.8.0
--e git+https://github.com/mattgolub/recurrent-whisperer.git@ca5e482ac9b583ad7552e0a0b6e2ed44eee3b614#egg=recurrent_whisperer
 redis==3.3.11
 requests==2.22.0
 requests-oauthlib==1.3.0
