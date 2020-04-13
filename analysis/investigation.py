@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+from time import sleep
 from typing import List, Union
 
 import gym
@@ -162,8 +163,8 @@ class Investigator:
 
             action = self.distribution.act_deterministic(*probabilities)
             action_trajectory.append(action)
-            observation, reward, done, i = env.step(action)
-            observation, reward, done, i = self.preprocessor.modulate((parse_state(observation), reward, done, i),
+            observation, reward, done, info = env.step(action)
+            observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                       update=False)
 
             state = observation
@@ -171,15 +172,17 @@ class Investigator:
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
-    def render_episode(self, env: gym.Env, to_gif: bool = False) -> None:
+    def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False) -> None:
         """Render an episode in the given environment."""
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
 
-        done = False
+        done, step = False, 0
         state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
         cumulative_reward = 0
         while not done:
+            step += 1
+
             env.render() if not to_gif else env.render(mode="rgb_array")
             probabilities = flatten(
                 self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
@@ -191,6 +194,11 @@ class Investigator:
                                                                          update=False)
 
             state = observation
+
+            if slow_down:
+                sleep(0.1)
+
+        print(f"Finished after {step} steps.")
 
         print(f"Achieved a score of {cumulative_reward}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")

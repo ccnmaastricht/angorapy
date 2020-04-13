@@ -531,7 +531,7 @@ if __name__ == "__main__":
     from environments import *
 
     # env = gym.make("HandTappingAbsolute-v0")
-    env = gym.make("HandFreeReachAbsolute-v0")
+    env = gym.make("HandFreeReachLFAbsolute-v0")
     # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
     # env = gym.make("HandReachDenseRelative-v0")
