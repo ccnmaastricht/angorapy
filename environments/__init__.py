@@ -57,6 +57,14 @@ gym.envs.register(
     max_episode_steps=100,
 )
 
+for i, name in enumerate(["FF", "MF", "RF", "LF"]):
+    gym.envs.register(
+        id=f'HandFreeReach{name}Absolute-v0',
+        entry_point='environments:ShadowHandFreeReach',
+        kwargs={"relative_control": False, "success_multiplier": 0.1, "force_finger": i},
+        max_episode_steps=100,
+    )
+
 gym.envs.register(
     id='HandTappingAbsolute-v0',
     entry_point='environments:ShadowHandTappingSequence',

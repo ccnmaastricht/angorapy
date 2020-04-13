@@ -349,8 +349,11 @@ class ShadowHandFreeReach(ShadowHandReach):
     The goal is represented as a one-hot vector of size 4."""
 
     def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
-                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1):
+                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
+        assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
+
         self.thumb_name = 'robot0:S_thtip'
+        self.forced_finger = force_finger
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, "dense",
                          success_multiplier)
 
@@ -367,13 +370,16 @@ class ShadowHandFreeReach(ShadowHandReach):
         return reward
 
     def _sample_goal(self):
-        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != self.thumb_name]
+        if self.forced_finger is None:
+            finger_names = [name for name in FINGERTIP_SITE_NAMES if name != self.thumb_name]
 
-        # choose the finger to join with the thumb
-        finger_name = self.np_random.choice(a=finger_names, size=1, replace=False)
+            # choose the finger to join with the thumb
+            finger_name = self.np_random.choice(a=finger_names, size=1, replace=False)
 
-        # get finger id
-        f_id = FINGERTIP_SITE_NAMES.index(finger_name)
+            # get finger id
+            f_id = FINGERTIP_SITE_NAMES.index(finger_name)
+        else:
+            f_id = self.forced_finger
 
         # make one hot encoding
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
@@ -524,7 +530,8 @@ class ShadowHandBlockVector(HandBlockEnv):
 if __name__ == "__main__":
     from environments import *
 
-    env = gym.make("HandTappingAbsolute-v0")
+    # env = gym.make("HandTappingAbsolute-v0")
+    env = gym.make("HandFreeReachAbsolute-v0")
     # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
     # env = gym.make("HandReachDenseRelative-v0")
@@ -533,6 +540,6 @@ if __name__ == "__main__":
         env.render()
         action = env.action_space.sample()
         s, r, d, i = env.step(action)
-        print(s)
+        print(env.goal)
         if d:
             env.reset()
