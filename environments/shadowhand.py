@@ -475,17 +475,19 @@ class ShadowHandTappingSequence(ShadowHandFreeReach):
         return (d < self.distance_threshold).astype(np.float32)
 
     def step(self, action):
-        o, r, d, i = super().step(action)
+        observation, reward, done, info = super().step(action)
 
         # set next goal
-        if i["is_success"]:
+        if info["is_success"]:
             self.current_sequence_position += 1
 
         if self.current_sequence_position >= len(self.goal_sequence):
-            self.current_sequence_position -= 1
-            d = True
+            done = True
 
-        return o, r, d, i
+        # sequence position cannot go above length of sequence
+        self.current_sequence_position = min(self.current_sequence_position, len(self.goal_sequence) - 1)
+
+        return observation, reward, done, info
 
     def reset(self):
         ret = super().reset()
@@ -512,6 +514,43 @@ class ShadowHandTappingSequence(ShadowHandFreeReach):
         self.sim.forward()
 
 
+class ShadowHandDelayedTappingSequence(ShadowHandTappingSequence):
+    """Task in which a sequence of reaching movements needs to be performed but on each finger the agent
+    should rest some time.
+
+    It only matters which fingertips need to be joint. The reward is based on the distance between the fingertips,
+    punishing distance of the thumb to target fingers and rewarding the distance to non-target fingers."""
+
+    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, resting_duration=10):
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, success_multiplier)
+        self.resting_duration = resting_duration
+        self.steps_on_target = 0
+
+    def step(self, action):
+        observation, reward, done, info = HandReachEnv.step(self, action)
+
+        print(self.steps_on_target)
+
+        # set next goal
+        if info["is_success"]:
+            # check if still in resting period
+            if self.steps_on_target < self.resting_duration:
+                self.steps_on_target += 1
+            else:
+                # if not in resting period, go to next sequence element and reset
+                self.current_sequence_position += 1
+                self.steps_on_target = 0
+
+        if self.current_sequence_position >= len(self.goal_sequence):
+            done = True
+
+        # sequence position cannot go above length of sequence
+        self.current_sequence_position = min(self.current_sequence_position, len(self.goal_sequence) - 1)
+
+        return observation, reward, done, info
+
+
 class ShadowHandBlockVector(HandBlockEnv):
 
     def _get_obs(self):
@@ -530,8 +569,8 @@ class ShadowHandBlockVector(HandBlockEnv):
 if __name__ == "__main__":
     from environments import *
 
-    # env = gym.make("HandTappingAbsolute-v0")
-    env = gym.make("HandFreeReachLFAbsolute-v0")
+    env = gym.make("HandTappingAbsolute-v1")
+    # env = gym.make("HandFreeReachLFAbsolute-v0")
     # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
     # env = gym.make("HandReachDenseRelative-v0")
@@ -540,6 +579,5 @@ if __name__ == "__main__":
         env.render()
         action = env.action_space.sample()
         s, r, d, i = env.step(action)
-        print(env.goal)
         if d:
             env.reset()

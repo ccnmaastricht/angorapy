@@ -153,13 +153,13 @@ class Investigator:
         state = env.reset()
         env.goal = 1
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
+        env.render() if render else ""
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
             activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
 
             states.append(state)
             activations.append(activation)
-            env.render() if render else ""
 
             action = self.distribution.act_deterministic(*probabilities)
             action_trajectory.append(action)
@@ -169,6 +169,8 @@ class Investigator:
 
             state = observation
             reward_trajectory.append(reward)
+
+            env.render() if render else ""
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
@@ -180,10 +182,10 @@ class Investigator:
         done, step = False, 0
         state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
         cumulative_reward = 0
+        env.render() if not to_gif else env.render(mode="rgb_array")
         while not done:
             step += 1
 
-            env.render() if not to_gif else env.render(mode="rgb_array")
             probabilities = flatten(
                 self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
@@ -198,8 +200,9 @@ class Investigator:
             if slow_down:
                 sleep(0.1)
 
-        print(f"Finished after {step} steps.")
+            env.render() if not to_gif else env.render(mode="rgb_array")
 
+        print(f"Finished after {step} steps.")
         print(f"Achieved a score of {cumulative_reward}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
@@ -209,7 +212,6 @@ if __name__ == "__main__":
     os.chdir("../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
 
     # agent_id = 1585500821  # cartpole-v1
     agent_id = 1583256614 # reach task
