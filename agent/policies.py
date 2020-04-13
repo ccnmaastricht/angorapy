@@ -47,6 +47,11 @@ class BasePolicyDistribution(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def act_deterministic(self, *args, **kwargs):
+
+        pass
+
+    @abc.abstractmethod
     def sample(self, *args, **kwargs):
         """Sample an action from the distribution."""
         pass
@@ -312,6 +317,14 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         probabilities = tf.squeeze(self.log_probability(actions, alphas, betas)).numpy()
 
         return actions, probabilities
+
+    def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
+        """Compute the mode of a beta distribution as action."""
+        actions = (alphas - 1) / (alphas + betas - 2)
+
+        actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
+
+        return actions
 
     def sample(self, alphas: tf.Tensor, betas: tf.Tensor):
         """Sample from the Beta distribution."""

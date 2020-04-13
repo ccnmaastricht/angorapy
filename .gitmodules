@@ -1,3 +1,3 @@
 [submodule "rnn_dynamical_systems"]
-	path = rnn_dynamical_systems
+	path = analysis/rnn_dynamical_systems
 	url = https://github.com/ccnmaastricht/rnn_dynamical_systems.git
