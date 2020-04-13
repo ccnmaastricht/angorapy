@@ -59,4 +59,4 @@ do
   sleep 10
 done
 
-python -u train.py HandTappingAbsolute-v0 --config hand_beta_no_ent --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
+python -u train.py HandTappingAbsolute-v1 --config hand_beta_no_ent --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
