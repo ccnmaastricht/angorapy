@@ -47,11 +47,6 @@ class BasePolicyDistribution(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def act_deterministic(self, *args, **kwargs):
-
-        pass
-
-    @abc.abstractmethod
     def sample(self, *args, **kwargs):
         """Sample an action from the distribution."""
         pass

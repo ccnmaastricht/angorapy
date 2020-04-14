@@ -6,7 +6,6 @@ import sys
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import sklearn
 
 from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, AdamCircularFpf
 from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
@@ -42,7 +41,11 @@ class Chiefinvestigator(Investigator):
         self.weights = self.get_layer_weights('policy_recurrent_layer')
         self.n_hidden = self.weights[1].shape[0]
         self._get_rnn_type()
-        self.sub_model_from = build_sub_model_from(self.network, "beta_action_head")
+        try:
+            self.sub_model_from = build_sub_model_from(self.network, "beta_action_head")
+        except:
+            self.sub_model_from = build_sub_model_from(self.network, 'discrete_action_head')
+
         layer_names = self.get_layer_names()
         self.sub_model_to = build_sub_model_to(self.network, ['policy_recurrent_layer', layer_names[1]], include_original=True)
 
@@ -78,6 +81,7 @@ class Chiefinvestigator(Investigator):
     def get_data_over_episodes(self, n_episodes: int, layer_name: str, previous_layer_name: str):
 
         activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
+        states_all_episodes = []
         for i in range(n_episodes):
             states, activations, rewards, actions = self.parse_data(layer_name, previous_layer_name)
             inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
@@ -86,12 +90,13 @@ class Chiefinvestigator(Investigator):
             inputs_over_all_episodes.append(inputs)
             actions = np.vstack(actions)
             actions_over_all_episodes.append(actions)
+            states_all_episodes.append(np.vstack(states))
 
         activations_over_all_episodes, inputs_over_all_episodes = np.vstack(activations_over_all_episodes), \
                                                                   np.vstack(inputs_over_all_episodes)
         actions_over_all_episodes = np.concatenate(actions_over_all_episodes, axis=0)
 
-        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes
+        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 
@@ -201,41 +206,133 @@ if __name__ == "__main__":
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
     # collect data from episodes
-    n_episodes = 1
+    n_episodes = 5
     activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
+    actions_over_all_episodes, states_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
                                                                     "policy_recurrent_layer",
                                                                     layer_names[1])
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
 
-    # employ fixedpointfinder
-    adamfpf = AdamCircularFpf(chiefinvesti.weights, chiefinvesti.rnn_type,
-                              sub_model_to=chiefinvesti.sub_model_to,
-                              sub_model_from=chiefinvesti.sub_model_from,
-                              env=chiefinvesti.env,
-                              distribution=chiefinvesti.distribution,
-                              preprocessor=chiefinvesti.preprocessor,
-                              network=chiefinvesti.network,
-                              q_threshold=1e-01,
-                              tol_unique=1e-03,
-                              epsilon=0.001,
-                              alr_decayr=5e-03,
-                              agnc_normclip=2,
-                              agnc_decayr=1e-03,
-                              max_iters=200)
-    n_samples, noise_level = 20, 0
-    states, sampled_inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes,
-                                                              inputs_over_all_episodes,
-                                                              n_samples,
-                                                              noise_level)
 
-    fps = adamfpf.find_fixed_points(states, sampled_inputs)
-    plot_fixed_points(activations_over_all_episodes, fps, 200, 1)
+    def build_numpy_submodelto(submodel_weights):
+        first_layer = lambda x: np.tanh(x @ submodel_weights[0] + submodel_weights[1])
+        second_layer = lambda x: np.tanh(x @ submodel_weights[2] + submodel_weights[3])
+        third_layer = lambda x: np.tanh(x @ submodel_weights[4] + submodel_weights[5])
+        fourth_layer = lambda x: np.tanh(x @ submodel_weights[6] + submodel_weights[7])
+
+        return first_layer, second_layer, third_layer, fourth_layer
+
+    def build_numpy_submodelfrom(submodel_weights):
+        softplus = lambda x: np.log(np.exp(x) + 1)
+        alpha_fun = lambda x: softplus(x @ submodel_weights[0] + submodel_weights[1])
+        beta_fun = lambda x: softplus(x @ submodel_weights[2] + submodel_weights[3])
+
+        return alpha_fun, beta_fun
+
+    submodelfrom_weights = chiefinvesti.sub_model_from.get_weights()
+    alpha_fun, beta_fun = build_numpy_submodelfrom(submodelfrom_weights)
+    alphas = alpha_fun(activations_over_all_episodes)
+    betas = beta_fun(activations_over_all_episodes)
+
+
+    def act_deterministic(alphas, betas):
+        actions = (alphas - 1) / (alphas + betas - 2)
+
+        action_max_values = chiefinvesti.env.action_space.high
+        action_min_values = chiefinvesti.env.action_space.low
+        action_mm_diff = action_max_values - action_min_values
+
+        actions = np.multiply(actions, action_mm_diff) + action_min_values
+
+        return actions
+    actions = act_deterministic(alphas, betas)
+
+    def unwrapper(means, variances, states):
+        unwrapped_states = []
+        for state in states:
+            unwrapped_states.append((state * np.sqrt(variances)) + means)
+
+        return np.vstack(unwrapped_states)
+
+    means = chiefinvesti.preprocessor.wrappers[0].mean[0]
+    variances = chiefinvesti.preprocessor.wrappers[0].variance[0]
+    states_all_episodes = np.vstack(states_all_episodes)
+    unwrapped_states = unwrapper(means, variances, states_all_episodes)
+
+
+    pca = skld.PCA(3)
+
+    transformed_states = pca.fit_transform(unwrapped_states[:100, :])
+    transformed_states_wrapped = pca.transform(states_all_episodes[:100, :])
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.plot(transformed_states[:, 0], transformed_states[:, 1], transformed_states[:, 2])
+    plt.title('unwrapped states')
     plt.show()
-    # render fixedpoints
-    #for fp in fps:
-    #    repeated_fps = np.repeat(fp['x'].reshape(1, 1, chiefinvesti.n_hidden), 100, axis=1)
-    #    print("RENDERING FIXED POINT")
-    #    chiefinvesti.render_fixed_points(repeated_fps)
-    #    sleep(5)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.plot(transformed_states_wrapped[:, 0], transformed_states_wrapped[:, 1], transformed_states_wrapped[:, 2])
+    plt.title('wrapped states')
+    plt.show()
+
+    # actual_action = actuation_center + aoi * actuation_range
+    geom_quat = chiefinvesti.env.sim.model.geom_quat
+    # finding orientation and angle of geoms
+    some_quat = geom_quat[9, :]
+    a_some_quat = some_quat[1:] / np.sqrt(np.sum(np.square(some_quat[1:])))
+    print(a_some_quat)
+    theta_some_quat = 2 * np.arctan2(np.sqrt(np.sum(np.square(some_quat[1]))), some_quat[0])
+    print(np.degrees(theta_some_quat))
+
+    # manipulation of geoms according to actions
+    new_angle = actual_action[0] - theta_some_quat
+
+    # update quaternion
+    # new_quat = np.ndarray((np.cos(new_angle/2), 0, np.sin(new_angle/2)*some_quat[2], 0))
+
+    def quaternion_mult(q, r):
+        return [r[0] * q[0] - r[1] * q[1] - r[2] * q[2] - r[3] * q[3],
+                r[0] * q[1] + r[1] * q[0] - r[2] * q[3] + r[3] * q[2],
+                r[0] * q[2] + r[1] * q[3] + r[2] * q[0] - r[3] * q[1],
+                r[0] * q[3] - r[1] * q[2] + r[2] * q[1] + r[3] * q[0]]
+
+
+    def point_rotation_by_quaternion(point, q):
+        r = point
+        q_conj = [q[0], -1 * q[1], -1 * q[2], -1 * q[3]]
+        return quaternion_mult(quaternion_mult(q, r), q_conj)[1:]
+
+
+    rotation_quat = [np.cos(actual_action[3] / 2), np.sin(actual_action[3] / 2), 0, 0]
+    print(point_rotation_by_quaternion(some_quat, rotation_quat))
+    a = point_rotation_by_quaternion(some_quat, rotation_quat)
+
+    print(np.degrees(angle_between(a, a_some_quat)))
+    print(np.degrees(actual_action[3]))
+
+
+
+
+    def unit_vector(vector):
+        """ Returns the unit vector of the vector.  """
+        return vector / np.linalg.norm(vector)
+
+
+    def angle_between(v1, v2):
+        """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+                >>> angle_between((1, 0, 0), (0, 1, 0))
+                1.5707963267948966
+                >>> angle_between((1, 0, 0), (1, 0, 0))
+                0.0
+                >>> angle_between((1, 0, 0), (-1, 0, 0))
+                3.141592653589793
+        """
+        v1_u = unit_vector(v1)
+        v2_u = unit_vector(v2)
+        return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))

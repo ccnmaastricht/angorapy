@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 from typing import List, Union
-
+import numpy as np
 import gym
 import tensorflow as tf
 
@@ -150,17 +150,23 @@ class Investigator:
 
         done = False
         state = env.reset()
-        env.goal = 1
+        env.goal = np.ndarray([0,1,0,0,0])
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
-            activation, probabilities = dual_out[:-len(self.network.output)], dual_out[-len(self.network.output):]
+            try:
+                activation, probabilities = dual_out[:-self.network.output.shape[0]], \
+                                            dual_out[-self.network.output.shape[0]:]
+            except:
+                activation, probabilities = dual_out[:-len(self.network.output)], \
+                                            dual_out[-len(self.network.output):]
 
             states.append(state)
             activations.append(activation)
             env.render() if render else ""
 
             action = self.distribution.act_deterministic(*probabilities)
+            # action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, i = env.step(action)
             observation, reward, done, i = self.preprocessor.modulate((parse_state(observation), reward, done, i),
