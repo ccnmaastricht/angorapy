@@ -5,7 +5,7 @@ import gym
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
 from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector, ShadowHandMultiReach, \
-    ShadowHandFreeReach, ShadowHandTappingSequence
+    ShadowHandFreeReach, ShadowHandTappingSequence, ShadowHandDelayedTappingSequence
 
 
 # SHADOW HAND
@@ -57,10 +57,25 @@ gym.envs.register(
     max_episode_steps=100,
 )
 
+for i, name in enumerate(["FF", "MF", "RF", "LF"]):
+    gym.envs.register(
+        id=f'HandFreeReach{name}Absolute-v0',
+        entry_point='environments:ShadowHandFreeReach',
+        kwargs={"relative_control": False, "success_multiplier": 0.1, "force_finger": i},
+        max_episode_steps=100,
+    )
+
 gym.envs.register(
     id='HandTappingAbsolute-v0',
     entry_point='environments:ShadowHandTappingSequence',
     kwargs={"relative_control": False, "success_multiplier": 1},
+    max_episode_steps=200,
+)
+
+gym.envs.register(
+    id='HandTappingAbsolute-v1',
+    entry_point='environments:ShadowHandDelayedTappingSequence',
+    kwargs={"relative_control": False},
     max_episode_steps=200,
 )
 
