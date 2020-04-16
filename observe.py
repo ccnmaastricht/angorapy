@@ -15,7 +15,7 @@ parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults t
 args = parser.parse_args()
 
 if args.id is None:
-    ids = map(int, os.listdir(BASE_SAVE_PATH))
+    ids = map(int, [d for d in os.listdir(BASE_SAVE_PATH) if os.path.isdir(os.path.join(BASE_SAVE_PATH, d))])
     args.id = max(ids)
 
 start = time.time()
