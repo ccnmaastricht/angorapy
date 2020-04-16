@@ -190,7 +190,7 @@
         <div class="col col-8">
             <h4 align="center" class="sub-title">Model</h4>
 
-            <img src="{{ url_for('static', filename="experiments/" ~ info.current_id ~ '/model.png') }}" alt="Plot of the Model" class="fit-div"/>
+            <img src="{{ url_for('expfile', exp_id=info.current_id, filename='model.png') }}" alt="Plot of the Model" class="fit-div"/>
         </div>
     </div>
 </div>
