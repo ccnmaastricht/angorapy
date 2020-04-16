@@ -12,6 +12,7 @@ from utilities.model_utils import is_recurrent_model, list_layer_names, get_laye
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.wrappers import BaseWrapper, SkipWrapper
+from environments.shadowhand import ShadowHandFreeReachAction
 
 
 class Investigator:
@@ -151,7 +152,6 @@ class Investigator:
 
         done = False
         state = env.reset()
-        env.goal = np.ndarray([0,1,0,0,0])
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         env.render() if render else ""
         while not done:
@@ -220,8 +220,8 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     # agent_id = 1585500821  # cartpole-v1
-    # agent_id = 1583256614 # reach task
-    agent_id = 1586597938 # finger tapping
+    agent_id = 1583256614 # reach task
+    # agent_id = 1586597938 # finger tapping
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)

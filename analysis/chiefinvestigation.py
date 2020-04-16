@@ -201,7 +201,7 @@ if __name__ == "__main__":
     # agent_id = 1585557832 # MountainCar # 1585561817 continuous
     # agent_id = 1583256614 # reach task
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
-    agent_id = 1586597938 # finger tapping
+    agent_id = 1586597938# finger tapping
 
     chiefinvesti = Chiefinvestigator(agent_id)
 
