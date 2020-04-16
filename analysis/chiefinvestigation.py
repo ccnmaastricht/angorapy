@@ -1,21 +1,21 @@
 import os
 import gym
-#import numpy as np
-from time import sleep
 import sys
+import autograd.numpy as np
+import sklearn.decomposition as skld
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, AdamCircularFpf
+from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, Scipyfixedpointfinder, \
+    AdamCircularFpf
 from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
+from analysis.rnn_dynamical_systems.fixedpointfinder.minimization import Minimizer
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.model_utils import build_sub_model_from, build_sub_model_to
-import autograd.numpy as np
-import sklearn.decomposition as skld
 
 
 class Chiefinvestigator(Investigator):
@@ -32,7 +32,7 @@ class Chiefinvestigator(Investigator):
         super().__init__(self.agent.policy, self.agent.distribution, self.agent.preprocessor)
         self.env = self.agent.env
         if enforce_env_name is not None:
-            print(f"Enforcing environment {enforce_env_name} over agents original environment. If you want to use"
+            print(f"Enforcing environment {enforce_env_name} over agents original environment. If you want to use "
                   f"the same environment as the original agent anyways, there is no need to specify it in the"
                   f"constructor!")
             self.env = gym.make(enforce_env_name)
@@ -96,7 +96,7 @@ class Chiefinvestigator(Investigator):
                                                                   np.vstack(inputs_over_all_episodes)
         actions_over_all_episodes = np.concatenate(actions_over_all_episodes, axis=0)
 
-        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes
+        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, np.vstack(states_all_episodes)
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     # agent_id = 1585500821 # cartpole-v1
     # agent_id = 1585557832 # MountainCar # 1585561817 continuous
     # agent_id = 1583256614 # reach task
-    agent_id = 1585777856 # free reach
-    chiefinvesti = Chiefinvestigator(agent_id)
+    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
+    chiefinvesti = Chiefinvestigator(agent_id, env)
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
@@ -213,3 +213,29 @@ if __name__ == "__main__":
                                                                     layer_names[1])
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
+
+    obs_model = states_all_episodes[1:100, :]
+    actions_model = actions_over_all_episodes[:99, :]
+    initial_weights = np.random.randn(68, 20) * 1e-03
+    minmizer = Minimizer(epsilon=1e-02,
+                         alr_decayr=1e-03,
+                         init_agnc=1,
+                         max_iter=30000)
+    objective_fun = lambda x: np.mean(np.sum(np.square(actions_model - obs_model @ x), axis=1))
+    trained_weights = minmizer.adam_optimization(objective_fun, initial_weights)
+
+    circfpf = AdamCircularFpf(chiefinvesti.weights, chiefinvesti.rnn_type,
+                              chiefinvesti.env, chiefinvesti.sub_model_to.get_weights(),
+                              chiefinvesti.sub_model_from.get_weights(), trained_weights,
+                              q_threshold=1e-02,
+                              max_iters=10000,
+                              epsilon=1e-02)
+
+    states, inputs = circfpf.sample_inputs_and_states(activations_single_run, inputs_single_run,
+                                                      20, 0)
+
+    fps = circfpf.find_fixed_points(states)
+
+    plot_fixed_points(activations_single_run, fps, 100, 1)
+    plt.show()
+
