@@ -420,6 +420,32 @@ class ShadowHandFreeReach(ShadowHandReach):
         self.sim.forward()
 
 
+class ShadowHandFreeReachAction(ShadowHandFreeReach):
+
+    def __init__(self, distance_threshold = 0.02, n_substeps = 20, relative_control=True,
+                 initial_qpos = DEFAULT_INITIAL_QPOS, success_multiplier = 0.1, force_finger=None):
+
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos,
+                         success_multiplier, force_finger)
+        self.previous_reward = 0
+
+    def compute_reward(self, achieved_goal, goal, info):
+        d = get_fingertip_distance(self._get_thumb_position(), self._get_target_finger_position())
+        reward = -d + info["is_success"] * self.success_multiplier
+
+        for i, fname in enumerate(FINGERTIP_SITE_NAMES):
+            if fname == self.thumb_name or i == np.where(self.goal == 1)[0].item():
+                continue
+
+            reward += 0.2 * get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(fname))
+
+        reward_ratio_great = (reward / self.previous_reward - 1) > 0.1 * self.previous_reward
+        if reward_ratio_great:
+            reward = reward + 0.2 * (1 - reward / self.previous_reward)
+        self.previous_reward = reward
+        return reward
+
+
 class ShadowHandTappingSequence(ShadowHandFreeReach):
     """Task in which a sequence of reaching movements needs to be performed.
 
