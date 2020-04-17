@@ -3,7 +3,7 @@
 #SBATCH --job-name=tapping_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
-#SBATCH --time=20:00:00
+#SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=1
@@ -59,4 +59,4 @@ do
   sleep 10
 done
 
-python -u train.py HandTappingAbsolute-v1 --config hand_beta_no_ent --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
+python -u train.py HandFreeReachRelative-v0 --config hand_beta_no_ent --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
