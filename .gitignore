@@ -5,9 +5,7 @@ monitor/static/experiments/
 storage/*
 !storage/saved_models
 storage/saved_models/*
-!storage/saved_models/states
-storage/saved_models/states/*
-!/storage/saved_models/states/*.zip
+!/storage/saved_models/*.zip
 
 analysis/monitor/experiments/
 analysis/storage/

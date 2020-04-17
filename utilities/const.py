@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Constants."""
+"""Constants used throughout the repository."""
 import numpy as np
 
 # MISC
@@ -31,16 +31,14 @@ QUALITATIVE_COLOR_PALETTE = [
     "#666666"
 ]
 
-#5F4690,#1D6996,#38A6A5,#0F8554,#73AF48,#EDAD08,#E17C05,#CC503E,#94346E,#6F4070,#994E95,#666666
-
 # MISC
 MIN_STAT_EPS = 5
 
 # STORAGE
-BASE_SAVE_PATH = "storage/saved_models/states/"
+BASE_SAVE_PATH = "storage/saved_models/"
 STORAGE_DIR = "storage/experience/"
 PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
-PATH_TO_EXPERIMENTS = "monitor/static/experiments/"
+PATH_TO_EXPERIMENTS = "storage/experiments/"
 PATH_TO_BENCHMARKS = "docs/benchmarks/"
 
 # NUMERICAL PRECISION
