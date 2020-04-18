@@ -27,7 +27,7 @@ from agent.gather import Gatherer, RemoteGatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
-from utilities.const import MIN_STAT_EPS
+from utilities.const import MIN_STAT_EPS, RESET_EVERY
 from utilities.datatypes import condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
@@ -345,7 +345,7 @@ class PPOAgent:
         for self.iteration in range(self.iteration, n):
 
             # every tenth iteration reconstruct workers to prevent tensorflow memory leakage
-            if self.iteration % 50 == 0:
+            if self.iteration % RESET_EVERY == 0:
                 flat_print("Recreating Workers...")
                 del workers
                 workers = self._make_workers(parallel)
