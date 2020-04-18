@@ -3,10 +3,12 @@ from copy import copy
 from collections import OrderedDict
 import os
 import gym
-import  matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from utilities.util import parse_state
 
 from analysis.chiefinvestigation import Chiefinvestigator
+
+EPSILON = 1e-6
 
 
 class reach_agent:
@@ -16,7 +18,10 @@ class reach_agent:
         self.sigma_g = lambda x: 1 / (1 + np.exp(-x))
         self.sigma_h = lambda x: np.tanh(x)
 
-        self.env = gym.make(env)
+        if not env == gym.Env:
+            self.env = gym.make(env)
+        else:
+            self.env = env
         self.state = self.env.reset()
         self.n_hidden = n_hidden
         self.h0 = h0
@@ -58,7 +63,7 @@ class reach_agent:
 
         observation, reward, done, info = self.env.step(action)
 
-        self.state = (parse_state(observation) - self.means) / np.sqrt(self.variances)
+        self.state = (parse_state(observation) - self.means) / (np.sqrt(self.variances) + EPSILON)
         x = self.state
         for key in self.ff_layer:
             x = self.ff_layer[key](x)
@@ -79,7 +84,7 @@ class reach_agent:
     def reset(self):
         observation = self.env.reset()
 
-        self.state = (parse_state(observation) - self.means) / np.sqrt(self.variances)
+        self.state = (parse_state(observation) - self.means) / (np.sqrt(self.variances) + EPSILON)
         self.h = copy(self.h0)
 
     def set_h0(self, h0):
@@ -90,32 +95,57 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
-    chiefinvesti = Chiefinvestigator(agent_id, env)
+    # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
+    agent_id, env = 1587117437, "HandFreeReachLFAbsolute-v0" # free reach relative control
+    chiefinvesti = Chiefinvestigator(agent_id)
     means = chiefinvesti.preprocessor.wrappers[0].mean[0]
     variances = chiefinvesti.preprocessor.wrappers[0].variance[0]
 
+    layer_names = chiefinvesti.get_layer_names()
+    activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
+                                                                                                          layer_names[1])
     h0 = np.random.random(32) * 2 - 1
     reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0, means, variances,
                           n_hidden=chiefinvesti.n_hidden)
 
+    # reacher.env.sim.nsubsteps = 5
     dt = 1e-2
     t_sim = 150
     t_steps = int(t_sim / dt) + 1
 
-    h_vector = np.zeros((t_steps, 32))
-    q_vector = np.zeros(t_steps)
-    reacher.reset()
-    for t in range(t_steps):
-        h_vector[t, :] = reacher.h
-        q_vector[t] = reacher.compute_q()
-        reacher.update(dt=dt)
+    h0 = [activations_single_run[np.random.randint(100), :], np.random.random(32) * 2 - 1]
+    initial_conditions_h = []
+    for i in range(2):
+        h_vector = np.zeros((t_steps, 32))
+        q_vector = np.zeros(t_steps)
+        reacher.set_h0(h0[i])
+        reacher.reset()
+        for t in range(t_steps):
+            h_vector[t, :] = reacher.h
+            q_vector[t] = reacher.compute_q()
+            reacher.update(dt=dt)
+        initial_conditions_h.append(h_vector)
 
-
-    plt.figure(1)
+    fig = plt.figure(1)
     plt.subplot(121)
     plt.plot(h_vector)
     plt.subplot(122)
     plt.plot(q_vector)
     plt.show()
 
+    import sklearn.decomposition as skld
+    from mpl_toolkits.mplot3d import Axes3D
+
+    pca = skld.PCA(10)
+
+    transformed_activations = pca.fit_transform(activations_single_run)
+
+    transformed_h = pca.transform(initial_conditions_h[0])
+    transformed_h_random = pca.transform(initial_conditions_h[1])
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.plot(transformed_activations[:, 0], transformed_activations[:, 1], transformed_activations[:, 2], c='b')
+    ax.plot(transformed_h[:, 0], transformed_h[:, 1], transformed_h[:, 2], c='r')
+    ax.plot(transformed_h_random[:, 0], transformed_h_random[:, 1], transformed_h_random[:, 2], c='g')
+    plt.show()
