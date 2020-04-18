@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
 import datetime
+import socket
+
 import simplejson as json
 import os
 import time
@@ -105,6 +107,7 @@ class Monitor:
         metadata = dict(
             date=str(datetime.datetime.now()),
             config=self.config_name,
+            host=socket.gethostname(),
             iterations=self.iterations,
             environment=dict(
                 name=self.agent.env_name,

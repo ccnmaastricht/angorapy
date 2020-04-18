@@ -53,6 +53,7 @@ def overview():
                     eid: {
                         "env": meta["environment"]["name"],
                         "date": meta["date"],
+                        "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
                         "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
@@ -97,6 +98,7 @@ def benchmarks():
                     eid: {
                         "env": meta["environment"]["name"],
                         "date": meta["date"],
+                        "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
                         "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
@@ -151,6 +153,7 @@ def show_experiment(exp_id):
     return flask.render_template("experiment.html", info={
         "env": meta["environment"]["name"],
         "config": meta["config"] if "config" in meta else None,
+        "host": meta["host"] if "host" in meta else "unknown",
         "current_id": exp_id,
         "next_id": experiment_paths[current_index + 1] if current_index != len(experiment_paths) - 1 else None,
         "prev_id": experiment_paths[current_index - 1] if current_index != 0 else None,
