@@ -151,7 +151,7 @@ class Investigator:
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        # env.sim.nsubsteps = 5
+        env.sim.nsubsteps = 2
         state = env.reset()
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         env.render() if render else ""

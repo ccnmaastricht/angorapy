@@ -95,9 +95,9 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
-    agent_id, env = 1587117437, "HandFreeReachLFAbsolute-v0" # free reach relative control
-    chiefinvesti = Chiefinvestigator(agent_id)
+    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
+    # agent_id, env = 1587117437, "HandFreeReachLFAbsolute-v0" # free reach relative control
+    chiefinvesti = Chiefinvestigator(agent_id, env)
     means = chiefinvesti.preprocessor.wrappers[0].mean[0]
     variances = chiefinvesti.preprocessor.wrappers[0].variance[0]
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0, means, variances,
                           n_hidden=chiefinvesti.n_hidden)
 
-    # reacher.env.sim.nsubsteps = 5
+    reacher.env.sim.nsubsteps = 5
     dt = 1e-2
     t_sim = 150
     t_steps = int(t_sim / dt) + 1
@@ -148,4 +148,7 @@ if __name__ == "__main__":
     ax.plot(transformed_activations[:, 0], transformed_activations[:, 1], transformed_activations[:, 2], c='b')
     ax.plot(transformed_h[:, 0], transformed_h[:, 1], transformed_h[:, 2], c='r')
     ax.plot(transformed_h_random[:, 0], transformed_h_random[:, 1], transformed_h_random[:, 2], c='g')
+    plt.show()
+
+    plt.plot(activations_single_run)
     plt.show()
