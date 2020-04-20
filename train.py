@@ -110,10 +110,11 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
         monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
                       iterations=settings["iterations"], config_name=settings["config"])
 
+    redis_auth = None if settings["redis_ip"] is None else [settings["redis_ip"], settings["redis_pw"]]
     agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
                 export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
                 stop_early=settings["stop_early"], parallel=not settings["sequential"], ray_is_initialized=not init_ray,
-                radical_evaluation=settings["radical_evaluation"])
+                radical_evaluation=settings["radical_evaluation"], redis_auth=redis_auth)
 
     agent.save_agent_state()
     env.close()
@@ -154,6 +155,8 @@ if __name__ == "__main__":
     parser.add_argument("--monitor-frequency", type=int, default=1, help=f"update the monitor every n iterations.")
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
+    parser.add_argument("--redis-ip", type=str, help=f"redis head ip address", default=None)
+    parser.add_argument("--redis-pw", type=str, help=f"redis password", default=None)
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")

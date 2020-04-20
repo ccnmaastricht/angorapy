@@ -556,8 +556,6 @@ class ShadowHandDelayedTappingSequence(ShadowHandTappingSequence):
     def step(self, action):
         observation, reward, done, info = HandReachEnv.step(self, action)
 
-        print(self.steps_on_target)
-
         # set next goal
         if info["is_success"]:
             # check if still in resting period

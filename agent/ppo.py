@@ -9,7 +9,7 @@ import shutil
 import statistics
 import time
 from collections import OrderedDict
-from typing import Union, List
+from typing import Union, List, Tuple
 
 import gym
 import numpy
@@ -27,7 +27,7 @@ from agent.gather import Gatherer, RemoteGatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
-from utilities.const import MIN_STAT_EPS
+from utilities.const import MIN_STAT_EPS, RESET_EVERY
 from utilities.datatypes import condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
@@ -285,14 +285,14 @@ class PPOAgent:
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
               separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False, save_best=True,
-              parallel=True, radical_evaluation=False) -> "PPOAgent":
+              parallel=True, radical_evaluation=False, redis_auth: Tuple[str, str] = None) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
         Args:
             parallel:
-            save_best:
+            save_best: if True, at every iteration save the model as "best" if it is better than the last best
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
             batch_size (int): batch size for the optimization
@@ -305,6 +305,9 @@ class PPOAgent:
                 additional episodes.
             stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
                 above the environments threshold
+
+            redis_auth: tuple of redis head ip address and password; if None (default), ray is initialized on the
+                current default node
 
         Returns:
             self
@@ -323,11 +326,17 @@ class PPOAgent:
             {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
-        available_cpus = multiprocessing.cpu_count()
-
         if parallel:
             if not ray_is_initialized:
-                ray.init(local_mode=self.debug, num_cpus=available_cpus, logging_level=logging.ERROR)
+                if redis_auth is None:
+                    ray.init(local_mode=self.debug, num_cpus=multiprocessing.cpu_count(), logging_level=logging.ERROR)
+                else:
+                    ray.init(address=redis_auth[0], redis_password=redis_auth[1],
+                             local_mode=self.debug, logging_level=logging.ERROR)
+
+        available_cpus = ray.cluster_resources()['CPU']
+        print(f"Training on {len(ray.nodes())} nodes: {ray.nodes()}")
+        print(f"Using {available_cpus} CPUs.")
 
         workers = self._make_workers(parallel, verbose=True)
 
@@ -336,7 +345,7 @@ class PPOAgent:
         for self.iteration in range(self.iteration, n):
 
             # every tenth iteration reconstruct workers to prevent tensorflow memory leakage
-            if self.iteration % 50 == 0:
+            if self.iteration % RESET_EVERY == 0:
                 flat_print("Recreating Workers...")
                 del workers
                 workers = self._make_workers(parallel)
@@ -488,14 +497,14 @@ class PPOAgent:
 
     def _make_workers(self, parallel, verbose=False):
         if parallel:
-            available_cpus = multiprocessing.cpu_count()
+            available_cpus = ray.cluster_resources()['CPU']
 
             # set up the persistent workers
             worker_options: dict = {}
             if self.n_workers == 1:
                 # worker_options["num_gpus"] = 1
                 worker_options["num_cpus"] = available_cpus
-            elif available_cpus % self.n_workers == 0 and self.n_workers != available_cpus:
+            elif self.n_workers < available_cpus:
                 worker_options["num_cpus"] = available_cpus // self.n_workers
 
             workers = [RemoteGatherer.options(**worker_options).remote(self.builder_function_name,
@@ -503,7 +512,7 @@ class PPOAgent:
                                                                        self.env_name, i) for i in range(self.n_workers)]
 
             if verbose:
-                print(f"{self.n_workers} workers each use: {worker_options}")
+                print(f"{self.n_workers} workers each using {worker_options}")
         else:
             workers = [Gatherer(self.builder_function_name,
                                 self.distribution.__class__.__name__,
@@ -579,7 +588,7 @@ class PPOAgent:
             None
         """
         progressbar = tqdm(total=epochs * ((self.horizon * self.n_workers / self.tbptt_length) / batch_size),
-                           leave=False, desc="Optimizing")
+                           leave=False, desc="Optimizing", disable=True)
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation

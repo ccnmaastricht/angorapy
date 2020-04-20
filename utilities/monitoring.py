@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
 import datetime
+import socket
+
 import simplejson as json
 import os
 import time
@@ -55,8 +57,8 @@ class Monitor:
             if not os.path.isdir(self.story_directory):
                 raise ValueError("Given ID not found in experiments.")
 
-        tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
-                                  show_shapes=True, dpi=300)
+        # tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
+        #                           show_shapes=True, dpi=300)
         self.make_metadata()
         self.write_progress()
 
@@ -105,6 +107,7 @@ class Monitor:
         metadata = dict(
             date=str(datetime.datetime.now()),
             config=self.config_name,
+            host=socket.gethostname(),
             iterations=self.iterations,
             environment=dict(
                 name=self.agent.env_name,
@@ -144,16 +147,16 @@ class Monitor:
         """Write training statistics into json file."""
         progress = dict(
             rewards=dict(
-                mean=[round(v, 2) for v in self.agent.cycle_reward_history],
-                stdev=[round(v, 2) for v in self.agent.cycle_reward_std_history],
+                mean=[round(v, 2) if v is not None else v for v in self.agent.cycle_reward_history],
+                stdev=[round(v, 2) if v is not None else v for v in self.agent.cycle_reward_std_history],
                 last_cycle=self.agent.episode_reward_history[-1] if self.agent.iteration > 1 else []),
             lengths=dict(
-                mean=[round(v, 2) for v in self.agent.cycle_length_history],
-                stdev=[round(v, 2) for v in self.agent.cycle_length_std_history],
+                mean=[round(v, 2) if v is not None else v for v in self.agent.cycle_length_history],
+                stdev=[round(v, 2) if v is not None else v for v in self.agent.cycle_length_std_history],
                 last_cycle=self.agent.episode_length_history[-1] if self.agent.iteration > 1 else []),
-            entropies=[round(v, 4) for v in self.agent.entropy_history],
-            vloss=[round(v, 4) for v in self.agent.value_loss_history],
-            ploss=[round(v, 4) for v in self.agent.policy_loss_history],
+            entropies=[round(v, 4) if v is not None else v for v in self.agent.entropy_history],
+            vloss=[round(v, 4) if v is not None else v for v in self.agent.value_loss_history],
+            ploss=[round(v, 4) if v is not None else v for v in self.agent.policy_loss_history],
             preprocessors=self.agent.preprocessor_stat_history
         )
 

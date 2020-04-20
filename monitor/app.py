@@ -4,7 +4,7 @@ import re
 import shutil
 
 import flask
-from flask import request, Blueprint
+from flask import request, Blueprint, send_from_directory
 from flask_jsglue import JSGlue
 
 from agent.ppo import PPOAgent
@@ -14,9 +14,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 agents = Blueprint("agents", __name__, static_folder="../storage/saved_models/states")
+exps = Blueprint("exps", __name__, static_folder="../storage/experiments")
 
 app = flask.Flask(__name__, )
 app.register_blueprint(agents)
+app.register_blueprint(exps)
 
 jsglue = JSGlue(app)
 
@@ -51,6 +53,7 @@ def overview():
                     eid: {
                         "env": meta["environment"]["name"],
                         "date": meta["date"],
+                        "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
                         "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
@@ -95,6 +98,7 @@ def benchmarks():
                     eid: {
                         "env": meta["environment"]["name"],
                         "date": meta["date"],
+                        "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
                         "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
@@ -139,7 +143,7 @@ def show_experiment(exp_id):
     experiment_paths = sorted([int(p) for p in os.listdir(f"{PATH_TO_EXPERIMENTS}")])
     current_index = experiment_paths.index(exp_id)
 
-    path = f"{PATH_TO_EXPERIMENTS}{exp_id}"
+    path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
     with open(os.path.join(path, "progress.json"), "r") as f:
         progress = json.load(f)
 
@@ -149,6 +153,7 @@ def show_experiment(exp_id):
     return flask.render_template("experiment.html", info={
         "env": meta["environment"]["name"],
         "config": meta["config"] if "config" in meta else None,
+        "host": meta["host"] if "host" in meta else "unknown",
         "current_id": exp_id,
         "next_id": experiment_paths[current_index + 1] if current_index != len(experiment_paths) - 1 else None,
         "prev_id": experiment_paths[current_index - 1] if current_index != 0 else None,
@@ -156,6 +161,12 @@ def show_experiment(exp_id):
         "env_meta": meta["environment"],
         "iterations": meta["iterations"] if "iterations" in meta else None
     })
+
+
+@app.route("/expfile/<int:exp_id>/<path:filename>")
+def expfile(exp_id, filename):
+    path = os.path.abspath(os.path.join(PATH_TO_EXPERIMENTS, str(exp_id)))
+    return send_from_directory(path, filename, as_attachment=True)
 
 
 @app.route("/_clear_all_empty")

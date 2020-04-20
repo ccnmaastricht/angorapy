@@ -1,6 +1,4 @@
 // UTILITIES
-
-
 function smooth(arr, windowSize, getter = (value) => value, setter) {
     const get = getter;
     const result = [];
@@ -79,8 +77,8 @@ let expid = url_elements[url_elements.length - 1];
 console.log(expid);
 
 $.when(
-    $.get(Flask.url_for("static", {"filename": "experiments/" + expid + "/meta.json"})),
-    $.get(Flask.url_for("static", {"filename": "experiments/" + expid + "/progress.json"}))
+    $.get(Flask.url_for("expfile", {"filename": "meta.json", "exp_id": expid})),
+    $.get(Flask.url_for("expfile", {"filename": "progress.json", "exp_id": expid}))
 ).then(function (req_1, req_2) {
     let meta = req_1[0];
     let prog = req_2[0];
