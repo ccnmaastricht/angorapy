@@ -59,4 +59,4 @@ do
   sleep 10
 done
 
-python3 -u train.py HandFreeReachRelative-v0 --config hand_beta --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
+python3 -u train.py HandTappingAbsolute-v1 --config hand_beta_no_ent --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
