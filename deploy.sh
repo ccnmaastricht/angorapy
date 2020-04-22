@@ -26,7 +26,8 @@ module load cudatoolkit/10.0.130_3.22-7.0.1.0_5.2__gdfb4ce5
 module av graphviz
 
 # load virtual environment
-source ${HOME}/dextvenv/bin/activate
+source venv/bin/activate
+# source ${HOME}/dextvenv/bin/activate
 
 # get names of allocated nodes and create array
 nodes=$(scontrol show hostnames $SLURM_JOB_NODELIST)
