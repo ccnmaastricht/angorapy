@@ -36,7 +36,7 @@ MIN_STAT_EPS = 5
 RESET_EVERY = 100
 
 # STORAGE
-BASE_SAVE_PATH = "storage/saved_models/"
+BASE_SAVE_PATH = "storage/saved_models/states/"
 STORAGE_DIR = "storage/experience/"
 PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
 PATH_TO_EXPERIMENTS = "storage/experiments/"

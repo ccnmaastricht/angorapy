@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from utilities.util import parse_state
 
 from analysis.chiefinvestigation import Chiefinvestigator
+import sklearn.decomposition as skld
 
 EPSILON = 1e-6
 
@@ -26,6 +27,7 @@ class reach_agent:
         self.n_hidden = n_hidden
         self.h0 = h0
         self.h = copy(self.h0)
+        self.input_proj = np.zeros(n_hidden)
 
         self.means = means
         self.variances = variances
@@ -68,6 +70,7 @@ class reach_agent:
         for key in self.ff_layer:
             x = self.ff_layer[key](x)
 
+        self.input_proj = copy(x)
         z = self.gru_layer['z'](x, self.h)
         r = self.gru_layer['r'](x, self.h)
         g = self.gru_layer['g'](x, r, self.h)
@@ -89,21 +92,23 @@ class reach_agent:
 
     def set_h0(self, h0):
         self.h0 = h0
-        self.h = copy
+        self.h = copy(h0)
+
 
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
-    # agent_id, env = 1587117437, "HandFreeReachLFAbsolute-v0" # free reach relative control
-    chiefinvesti = Chiefinvestigator(agent_id, env)
+    # agent_id = 1587117437 # free reach relative control
+    chiefinvesti = Chiefinvestigator(agent_id)
     means = chiefinvesti.preprocessor.wrappers[0].mean[0]
     variances = chiefinvesti.preprocessor.wrappers[0].variance[0]
 
     layer_names = chiefinvesti.get_layer_names()
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
+    np.random.seed(420)
     h0 = np.random.random(32) * 2 - 1
     reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0, means, variances,
                           n_hidden=chiefinvesti.n_hidden)
@@ -113,42 +118,77 @@ if __name__ == "__main__":
     t_sim = 150
     t_steps = int(t_sim / dt) + 1
 
-    h0 = [activations_single_run[np.random.randint(100), :], np.random.random(32) * 2 - 1]
-    initial_conditions_h = []
-    for i in range(2):
-        h_vector = np.zeros((t_steps, 32))
-        q_vector = np.zeros(t_steps)
-        reacher.set_h0(h0[i])
-        reacher.reset()
-        for t in range(t_steps):
-            h_vector[t, :] = reacher.h
-            q_vector[t] = reacher.compute_q()
-            reacher.update(dt=dt)
-        initial_conditions_h.append(h_vector)
+    h_vector = np.zeros((t_steps, 32))
+    dh_vector = np.zeros_like(h_vector)
+    input_projections = np.zeros_like(h_vector)
+    q_vector = np.zeros(t_steps)
+    dV = np.zeros(t_steps)
+    reacher.reset()
+    for t in range(t_steps):
+        h_vector[t, :] = reacher.h
+        q_vector[t] = reacher.compute_q()
+        input_projections[t, :] = reacher.input_proj
+        dh_vector[t, :] = reacher.dh
+        dV[t] = np.sum(2 * reacher.h * reacher.dh)
+        reacher.update(dt=dt)
 
-    fig = plt.figure(1)
+    fig= plt.figure(1)
     plt.subplot(121)
     plt.plot(h_vector)
     plt.subplot(122)
     plt.plot(q_vector)
     plt.show()
 
-    import sklearn.decomposition as skld
-    from mpl_toolkits.mplot3d import Axes3D
+    q_threshold = 1e-2
+    q_smaller_threshold = q_vector[q_vector < q_threshold]
+    random_index = np.random.randint(q_smaller_threshold.shape[0], size=1)
+    random_index = np.argmin(q_vector)
 
-    pca = skld.PCA(10)
+    pca = skld.PCA(2)
+    transformed_h_vector = pca.fit_transform(h_vector)
 
-    transformed_activations = pca.fit_transform(activations_single_run)
+    center_point = transformed_h_vector[random_index, :]
 
-    transformed_h = pca.transform(initial_conditions_h[0])
-    transformed_h_random = pca.transform(initial_conditions_h[1])
+    sidesteps, n_points = 3, 25
+    left_points = center_point.T + center_point.T * sidesteps
+    right_points = center_point.T - center_point.T * sidesteps
 
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.plot(transformed_activations[:, 0], transformed_activations[:, 1], transformed_activations[:, 2], c='b')
-    ax.plot(transformed_h[:, 0], transformed_h[:, 1], transformed_h[:, 2], c='r')
-    ax.plot(transformed_h_random[:, 0], transformed_h_random[:, 1], transformed_h_random[:, 2], c='g')
+    x,y = np.meshgrid(np.linspace(right_points[0], left_points[0], n_points),
+                        np.linspace(right_points[1], left_points[1], n_points),
+                        indexing='xy')
+    x,y = x.ravel(), y.ravel()
+
+    stacked_points = np.vstack((x, y)).T
+    inverse_stacked_points = pca.inverse_transform(stacked_points)
+
+
+    h_vector_mesh = np.zeros_like(inverse_stacked_points)
+    dVn = np.zeros(len(inverse_stacked_points))
+    reacher.reset()
+    for i in range(len(inverse_stacked_points)):
+        reacher.reset()
+        reacher.h = inverse_stacked_points[i, :]
+        reacher.update(dt=dt)
+        h_vector_mesh[i, :] = reacher.h
+        dVn[i] = np.sum(2 * (reacher.h - h_vector[random_index, :]) * reacher.dh)
+
+    transformed_h_mesh = pca.transform(h_vector_mesh)
+    dVn_r = dVn.reshape((n_points,n_points)) < 0
+    #plt.imshow(dVn_r, extent=[min(x), max(x), min(y), max(y)])
+
+    plt.scatter(center_point[0], center_point[1], c='r')
+    plt.plot(transformed_h_vector[:, 0], transformed_h_vector[:, 1], c='g')
+   # plt.quiver(stacked_points[:, 0], stacked_points[:, 1],
+     #         transformed_h_mesh[:, 0], transformed_h_mesh[:, 1])
+
+
+
+    plt.imshow(dVn.reshape(n_points, n_points)<0, extent=[min(stacked_points[:, 0]),
+                                                          max(stacked_points[:, 0]),
+                                                          min(stacked_points[:, 1]),
+                                                          max(stacked_points[:, 1])])
     plt.show()
 
-    plt.plot(activations_single_run)
-    plt.show()
+
+
+

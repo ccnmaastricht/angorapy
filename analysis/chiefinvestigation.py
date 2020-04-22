@@ -16,6 +16,7 @@ from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.model_utils import build_sub_model_from, build_sub_model_to
+import sklearn
 
 
 class Chiefinvestigator(Investigator):
