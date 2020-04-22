@@ -241,7 +241,7 @@ def evaluate():
     if request.method == "POST":
         try:
             agent = PPOAgent.from_agent_state(request.json['id'])
-            evaluation_stats = agent.evaluate(10, save=True)
+            evaluation_stats, _ = agent.evaluate(10, save=True)
 
             return {"results": evaluation_stats._asdict()}
 

@@ -23,7 +23,7 @@ start = time.time()
 agent = PPOAgent.from_agent_state(args.id, "b")
 print(f"Agent {args.id} successfully loaded.")
 
-stats = agent.evaluate(args.n)
+stats, _ = agent.evaluate(args.n)
 
 average_reward = round(statistics.mean(stats.episode_rewards), 2)
 average_length = round(statistics.mean(stats.episode_lengths), 2)

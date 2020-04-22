@@ -271,10 +271,11 @@ class ShadowHandReach(HandReachEnv):
         thumb_name = 'robot0:S_thtip'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
         finger_name = self.np_random.choice(finger_names)
-        self.current_target_finger = finger_name
 
         thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
         finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
+        self.current_target_finger = finger_idx
+
         assert thumb_idx != finger_idx
 
         # Pick a meeting point above the hand.
@@ -380,6 +381,8 @@ class ShadowHandFreeReach(ShadowHandReach):
             f_id = FINGERTIP_SITE_NAMES.index(finger_name)
         else:
             f_id = self.forced_finger
+
+        self.current_target_finger = f_id
 
         # make one hot encoding
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
@@ -593,8 +596,8 @@ class ShadowHandBlockVector(HandBlockEnv):
 if __name__ == "__main__":
     from environments import *
 
-    env = gym.make("HandTappingAbsolute-v1")
-    # env = gym.make("HandFreeReachLFAbsolute-v0")
+    # env = gym.make("HandTappingAbsolute-v1")
+    env = gym.make("HandFreeReachLFAbsolute-v0")
     # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
     # env = gym.make("HandReachDenseRelative-v0")
