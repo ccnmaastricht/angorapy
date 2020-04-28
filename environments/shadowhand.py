@@ -9,7 +9,7 @@ from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from gym.envs.robotics.utils import robot_get_obs
 
-from utilities.const import VISION_WH
+from utilities.const import VISION_WH, N_SUBSTEPS
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "assets/hand",
@@ -39,7 +39,7 @@ class ShadowHand(manipulate.ManipulateEnv):
 
     def __init__(self, model_path, target_position, target_rotation, target_position_range, reward_type,
                  initial_qpos={}, randomize_initial_position=True, randomize_initial_rotation=True,
-                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=True,
+                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=N_SUBSTEPS, relative_control=True,
                  ignore_z_target_rotation=False, touch_visualisation="off", touch_get_obs="sensordata",
                  visual_input: bool = False, max_steps=100):
         """Initializes a new Hand manipulation environment with touch sensors.
@@ -246,7 +246,7 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
 class ShadowHandReach(HandReachEnv):
     """Simpler Reaching task."""
 
-    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+    def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
         self.success_multiplier = success_multiplier
         self.current_target_finger = "none"
@@ -304,7 +304,7 @@ class ShadowHandReach(HandReachEnv):
 class ShadowHandMultiReach(ShadowHandReach):
     """Reaching task where three fingers have to be joined."""
 
-    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+    def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type,
                          success_multiplier)
@@ -348,7 +348,7 @@ class ShadowHandFreeReach(ShadowHandReach):
 
     The goal is represented as a one-hot vector of size 4."""
 
-    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+    def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
@@ -426,7 +426,7 @@ class ShadowHandTappingSequence(ShadowHandFreeReach):
     It only matters which fingertips need to be joint. The reward is based on the distance between the fingertips,
     punishing distance of the thumb to target fingers and rewarding the distance to non-target fingers."""
 
-    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+    def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.5):
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, success_multiplier)
         self.goal_sequence = [0, 1, 2, 3, 2, 1, 0]
@@ -521,7 +521,7 @@ class ShadowHandDelayedTappingSequence(ShadowHandTappingSequence):
     It only matters which fingertips need to be joint. The reward is based on the distance between the fingertips,
     punishing distance of the thumb to target fingers and rewarding the distance to non-target fingers."""
 
-    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+    def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, resting_duration=10):
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, success_multiplier)
         self.resting_duration = resting_duration
@@ -567,8 +567,8 @@ class ShadowHandBlockVector(HandBlockEnv):
 if __name__ == "__main__":
     from environments import *
 
-    env = gym.make("HandTappingAbsolute-v1")
-    # env = gym.make("HandFreeReachLFAbsolute-v0")
+    # env = gym.make("HandTappingAbsolute-v1")
+    env = gym.make("HandFreeReachLFAbsolute-v0")
     # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
     # env = gym.make("HandReachDenseRelative-v0")

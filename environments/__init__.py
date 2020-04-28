@@ -8,6 +8,7 @@ from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHand
     ShadowHandFreeReach, ShadowHandTappingSequence, ShadowHandDelayedTappingSequence
 
 # SHADOW HAND
+from utilities.const import SHADOWHAND_MAX_STEPS
 
 gym.envs.register(
     id='ShadowHand-v0',
@@ -27,35 +28,35 @@ gym.envs.register(
     id='HandReachDenseRelative-v0',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": True},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='HandReachDenseRelative-v1',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": True, "success_multiplier": 0.1},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='HandReachDenseAbsolute-v0',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": False},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='HandReachDenseAbsolute-v1',
     entry_point='environments:ShadowHandReach',
     kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='MultiReachAbsolute-v0',
     entry_point='environments:ShadowHandMultiReach',
     kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 # FREE REACHING
@@ -64,14 +65,14 @@ gym.envs.register(
     id='HandFreeReachRelative-v0',
     entry_point='environments:ShadowHandFreeReach',
     kwargs={"relative_control": True, "success_multiplier": 0.1},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='HandFreeReachAbsolute-v0',
     entry_point='environments:ShadowHandFreeReach',
     kwargs={"relative_control": False, "success_multiplier": 0.1},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 for i, name in enumerate(["FF", "MF", "RF", "LF"]):
@@ -79,7 +80,7 @@ for i, name in enumerate(["FF", "MF", "RF", "LF"]):
         id=f'HandFreeReach{name}Absolute-v0',
         entry_point='environments:ShadowHandFreeReach',
         kwargs={"relative_control": False, "success_multiplier": 0.1, "force_finger": i},
-        max_episode_steps=100,
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
 
 # HAND TAPPING
@@ -104,7 +105,7 @@ gym.envs.register(
     id='EasyBlockManipulate-v0',
     entry_point='environments:ShadowHandBlockVector',
     kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "reward_type": "dense"},
-    max_episode_steps=100,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 # MODIFIED ENVIRONMENTS

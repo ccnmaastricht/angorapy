@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--horizon", type=int, default=1024, help=f"number of timesteps one worker generates")
+    parser.add_argument("--horizon", type=int, default=2048, help=f"number of timesteps one worker generates")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")
