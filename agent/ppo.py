@@ -9,7 +9,7 @@ import shutil
 import statistics
 import time
 from collections import OrderedDict
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Any
 
 import gym
 import numpy
@@ -411,7 +411,7 @@ class PPOAgent:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
                     flat_print("Evaluating...")
                     n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
-                    evaluation_stats = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
+                    evaluation_stats, _ = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
 
                     if radical_evaluation:
                         stats_with_evaluation = evaluation_stats
@@ -648,7 +648,7 @@ class PPOAgent:
         progressbar.close()
 
     def evaluate(self, n: int, ray_already_initialized: bool = False, workers: List[RemoteGatherer] = None,
-                 save: bool = False) -> StatBundle:
+                 save: bool = False) -> Tuple[StatBundle, Any]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
@@ -690,7 +690,7 @@ class PPOAgent:
             if w_id > len(workers) - 1:
                 w_id = 0
 
-        all_lengths, all_rewards = zip(*[ray.get(oi) for oi in result_ids])
+        all_lengths, all_rewards, all_classes = zip(*[ray.get(oi) for oi in result_ids])
 
         stats = StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=0)
 
@@ -707,7 +707,7 @@ class PPOAgent:
             with open(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/evaluations.json", "w") as jf:
                 json.dump(previous_evaluations, jf)
 
-        return stats
+        return stats, all_classes
 
     def report(self, total_iterations):
         """Print a report of the current state of the training."""

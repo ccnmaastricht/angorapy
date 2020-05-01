@@ -26,7 +26,8 @@ module load cudatoolkit/10.0.130_3.22-7.0.1.0_5.2__gdfb4ce5
 module av graphviz
 
 # load virtual environment
-source ${HOME}/dextvenv/bin/activate
+source venv/bin/activate
+# source ${HOME}/dextvenv/bin/activate
 
 # get names of allocated nodes and create array
 nodes=$(scontrol show hostnames $SLURM_JOB_NODELIST)
@@ -59,4 +60,4 @@ do
   sleep 10
 done
 
-python3 -u train.py HandFreeReachRelative-v0 --config hand_beta --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
+python3 -u train.py HandTappingAbsolute-v1 --config hand_beta_no_ent --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password

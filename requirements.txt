@@ -10,7 +10,6 @@ scipy
 sklearn
 Flask
 Flask-JSGlue
-mujoco-py==2.0
 argcomplete
 gym
 box2d-py

@@ -90,6 +90,9 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the action space is discrete and the agent thus predicts a pmf over the possible actions."""
 
+    def act_deterministic(self, *args, **kwargs):
+        raise NotImplementedError("Act deterministic not defined for Categorical Distribution.")
+
     @property
     def short_name(self):
         """Policy's short identidier."""
@@ -175,6 +178,9 @@ class BaseContinuousPolicyDistribution(BasePolicyDistribution, abc.ABC):
 
 class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
     """Gaussian Probability Distribution."""
+
+    def act_deterministic(self, *args, **kwargs):
+        raise NotImplementedError("Act deterministic not defined for Gaussian Distribution.")
 
     @property
     def short_name(self):

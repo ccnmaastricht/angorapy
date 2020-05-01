@@ -3,7 +3,7 @@
 import os
 import time
 from inspect import getfullargspec as fargs
-from typing import Tuple
+from typing import Tuple, Any
 
 import numpy as np
 import ray
@@ -189,7 +189,7 @@ class Gatherer:
 
         return stats, preprocessor
 
-    def evaluate(self, preprocessor_serialized: dict) -> Tuple[int, int]:
+    def evaluate(self, preprocessor_serialized: dict) -> Tuple[int, int, Any]:
         """Evaluate one episode of the given environment following the given policy. Remote implementation."""
         preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
 
@@ -213,7 +213,10 @@ class Gatherer:
             state = observation
             steps += 1
 
-        return steps, cumulative_reward
+        eps_class = self.env.unwrapped.current_target_finger if hasattr(self.env.unwrapped,
+                                                                        "current_target_finger") else None
+
+        return steps, cumulative_reward, eps_class
 
 
 @ray.remote
