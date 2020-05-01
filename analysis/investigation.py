@@ -12,7 +12,6 @@ from utilities.model_utils import is_recurrent_model, list_layer_names, get_laye
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from utilities.wrappers import BaseWrapper, SkipWrapper
-from environments.shadowhand import ShadowHandFreeReachAction
 
 
 class Investigator:
