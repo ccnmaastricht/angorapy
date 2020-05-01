@@ -389,7 +389,7 @@ class PPOAgent:
             for i, p in enumerate(self.preprocessor):
                 p.correct_sample_size((self.n_workers - 1) * old_ns[i])  # adjust for overcounting
             if isinstance(self.preprocessor, CombiWrapper):
-                self.preprocessor.n -= (self.n_workers - 1) * old_n
+                self.preprocessor.n = np.copy(self.preprocessor.n) - (self.n_workers - 1) * old_n
 
             # read the dataset from storage
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
