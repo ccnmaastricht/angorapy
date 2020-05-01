@@ -12,7 +12,7 @@ from collections import OrderedDict
 from typing import Union, List, Tuple, Any
 
 import gym
-import numpy
+import numpy as np
 import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -452,7 +452,7 @@ class PPOAgent:
 
             # early stopping
             if self.env.spec.reward_threshold is not None and stop_early:
-                if numpy.all(numpy.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
+                if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
                     print("\rAll catch a breath, we stop the drill early due to the formidable result!")
                     break
 
