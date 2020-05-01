@@ -5,9 +5,6 @@ import autograd.numpy as np
 import gym
 
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
-import matplotlib.pyplot as plt
-from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
-from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
@@ -127,11 +124,8 @@ if __name__ == "__main__":
 
     layer_names = chiefinvesti.get_layer_names()
     print(layer_names)
+
     # collect data from episodes
     n_episodes = 5
-    activations_over_all_episodes, inputs_over_all_episodes, \
-    actions_over_all_episodes, states_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
-                                                                                         "policy_recurrent_layer",
-                                                                                         layer_names[1])
-
-
+    activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes \
+        = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])

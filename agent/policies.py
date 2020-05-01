@@ -81,6 +81,10 @@ class BasePolicyDistribution(abc.ABC):
         """Build the action head of a policy using this distribution."""
         pass
 
+    @abc.abstractmethod
+    def act_deterministic(self, param):
+        pass
+
 
 class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
