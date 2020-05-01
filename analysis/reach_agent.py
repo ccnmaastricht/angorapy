@@ -8,6 +8,7 @@ from utilities.util import parse_state
 
 from analysis.chiefinvestigation import Chiefinvestigator
 import sklearn.decomposition as skld
+from analysis.plot_utils import Visualise
 
 EPSILON = 1e-6
 
@@ -112,81 +113,30 @@ if __name__ == "__main__":
     h0 = np.random.random(32) * 2 - 1
     reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0, means, variances,
                           n_hidden=chiefinvesti.n_hidden)
-
-    reacher.env.sim.nsubsteps = 5
-    dt = 1e-2
-    t_sim = 150
+    # reacher.env.sim.nsubsteps = 2
+    dt, t_sim = 1e-2, 100
     t_steps = int(t_sim / dt) + 1
-
-    h_vector = np.zeros((t_steps, 32))
-    dh_vector = np.zeros_like(h_vector)
-    input_projections = np.zeros_like(h_vector)
-    q_vector = np.zeros(t_steps)
-    dV = np.zeros(t_steps)
-    reacher.reset()
-    for t in range(t_steps):
-        h_vector[t, :] = reacher.h
-        q_vector[t] = reacher.compute_q()
-        input_projections[t, :] = reacher.input_proj
-        dh_vector[t, :] = reacher.dh
-        dV[t] = np.sum(2 * reacher.h * reacher.dh)
-        reacher.update(dt=dt)
-
-    fig= plt.figure(1)
-    plt.subplot(121)
-    plt.plot(h_vector)
-    plt.subplot(122)
-    plt.plot(q_vector)
-    plt.show()
-
-    q_threshold = 1e-2
-    q_smaller_threshold = q_vector[q_vector < q_threshold]
-    random_index = np.random.randint(q_smaller_threshold.shape[0], size=1)
-    random_index = np.argmin(q_vector)
-
-    pca = skld.PCA(2)
-    transformed_h_vector = pca.fit_transform(h_vector)
-
-    center_point = transformed_h_vector[random_index, :]
-
-    sidesteps, n_points = 3, 25
-    left_points = center_point.T + center_point.T * sidesteps
-    right_points = center_point.T - center_point.T * sidesteps
-
-    x,y = np.meshgrid(np.linspace(right_points[0], left_points[0], n_points),
-                        np.linspace(right_points[1], left_points[1], n_points),
-                        indexing='xy')
-    x,y = x.ravel(), y.ravel()
-
-    stacked_points = np.vstack((x, y)).T
-    inverse_stacked_points = pca.inverse_transform(stacked_points)
-
-
-    h_vector_mesh = np.zeros_like(inverse_stacked_points)
-    dVn = np.zeros(len(inverse_stacked_points))
-    reacher.reset()
-    for i in range(len(inverse_stacked_points)):
+    pertubated_h = []
+    for h in range(1):
+        h_vector = np.zeros((t_steps, 32))
+        dh_vector, input_projections = np.zeros_like(h_vector), np.zeros_like(h_vector)
+        q_vector = np.zeros(t_steps)
         reacher.reset()
-        reacher.h = inverse_stacked_points[i, :]
-        reacher.update(dt=dt)
-        h_vector_mesh[i, :] = reacher.h
-        dVn[i] = np.sum(2 * (reacher.h - h_vector[random_index, :]) * reacher.dh)
+        for t in range(t_steps):
+            h_vector[t, :] = reacher.h
+            q_vector[t] = reacher.compute_q()
+            input_projections[t, :] = reacher.input_proj
+            dh_vector[t, :] = reacher.dh
+            reacher.update(dt=dt)
 
-    transformed_h_mesh = pca.transform(h_vector_mesh)
-    dVn_r = dVn.reshape((n_points,n_points)) < 0
-    #plt.imshow(dVn_r, extent=[min(x), max(x), min(y), max(y)])
+        pertubated_h.append(h_vector)
+        h0 += np.random.random(32) * 1e-2
+        reacher.set_h0(h0)
 
-    plt.scatter(center_point[0], center_point[1], c='r')
-    plt.plot(transformed_h_vector[:, 0], transformed_h_vector[:, 1], c='g')
-   # plt.quiver(stacked_points[:, 0], stacked_points[:, 1],
-     #         transformed_h_mesh[:, 0], transformed_h_mesh[:, 1])
-
-
-
-    plt.imshow(dVn.reshape(n_points, n_points)<0, extent=[min(stacked_points[:, 0]),
-                                                          max(stacked_points[:, 0]),
-                                                          min(stacked_points[:, 1]),
-                                                          max(stacked_points[:, 1])])
+    vizard = Visualise(pertubated_h[0], multiple_activation_data=pertubated_h)
+    vizard.plot_activations_and_q(q_vector=q_vector)
+    plt.show()
+    vizard.plot_activations_3d(60000)
     plt.show()
 
 
