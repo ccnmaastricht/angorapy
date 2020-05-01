@@ -103,9 +103,6 @@ if __name__ == "__main__":
     # agent_id = 1587117437 # free reach relative control
     chiefinvesti = Chiefinvestigator(agent_id)
 
-    layer_names = chiefinvesti.get_layer_names()
-    activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
-                                                                                                          layer_names[1])
     np.random.seed(420)
     h0 = np.random.random(32) * 2 - 1
     reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0,
@@ -116,26 +113,20 @@ if __name__ == "__main__":
     # reacher.env.sim.nsubsteps = 2
     dt, t_sim = 1e-2, 100
     t_steps = int(t_sim / dt) + 1
-    pertubated_h = []
 
-    for h in range(1):
-        h_vector = np.zeros((t_steps, 32))
-        dh_vector, input_projections = np.zeros_like(h_vector), np.zeros_like(h_vector)
-        q_vector = np.zeros(t_steps)
-        reacher.reset()
+    h_vector = np.zeros((t_steps, 32))
+    dh_vector, input_projections = np.zeros_like(h_vector), np.zeros_like(h_vector)
+    q_vector = np.zeros(t_steps)
+    reacher.reset()
 
-        for t in range(t_steps):
-            h_vector[t, :] = reacher.h
-            q_vector[t] = reacher.compute_q()
-            input_projections[t, :] = reacher.input_proj
-            dh_vector[t, :] = reacher.dh
-            reacher.update(dt=dt)
+    for t in range(t_steps):
+        h_vector[t, :] = reacher.h
+        q_vector[t] = reacher.compute_q()
+        input_projections[t, :] = reacher.input_proj
+        dh_vector[t, :] = reacher.dh
+        reacher.update(dt=dt)
 
-        pertubated_h.append(h_vector)
-        h0 += np.random.random(32) * 1e-2
-        reacher.set_h0(h0)
-
-    vizard = Visualise(pertubated_h[0], multiple_activation_data=pertubated_h)
+    vizard = Visualise(h_vector)
     vizard.plot_activations_and_q(q_vector=q_vector)
     plt.show()
     vizard.plot_activations_3d(t_steps)
