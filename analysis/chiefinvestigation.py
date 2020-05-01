@@ -1,22 +1,18 @@
 import os
-import gym
 import sys
+
 import autograd.numpy as np
-import sklearn.decomposition as skld
+import gym
+
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
-from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, Scipyfixedpointfinder, \
-    AdamCircularFpf
+from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
-from analysis.rnn_dynamical_systems.fixedpointfinder.minimization import Minimizer
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
-from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
+from utilities.util import flatten
 from utilities.model_utils import build_sub_model_from, build_sub_model_to
-import sklearn
 
 
 class Chiefinvestigator(Investigator):
@@ -119,88 +115,11 @@ class Chiefinvestigator(Investigator):
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, info = self.env.step(action)
 
-    def return_gru(self, inputs):
-
-        def build_gru(weights, input, n_hidden):
-            def sigmoid(x):
-                return 1 / (1 + np.exp(-x))
-
-            z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
-            W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
-            U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
-            b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
-
-            z_projection_b = input @ W_z + b_z
-            r_projection_b = input @ W_r + b_r
-            g_projection_b = input @ W_h + b_h
-
-            z_fun = lambda x: sigmoid(x @ U_z + z_projection_b)
-            r_fun = lambda x: sigmoid(x @ U_r + r_projection_b)
-            g_fun = lambda x: np.tanh((r_fun(x) * x) @ U_h + g_projection_b)
-
-            gru = lambda x: - x + z_fun(x) * x + (1 - z_fun(x)) * g_fun(x)
-            return gru
-
-        gru = build_gru(self.weights, inputs, self.n_hidden)
-        return gru
-
-    def return_vanilla(self, inputs):
-
-        def build_vanilla(weights, inputs):
-            weights, inputweights, b = weights[1], weights[0], weights[2]
-            vanilla = lambda x: - x + np.tanh(x @ weights + inputs @ inputweights + b)
-            return vanilla
-
-        vanilla = build_vanilla(self.weights, inputs)
-        return vanilla
-
-    def compute_quiver_data(self, inputs, activations, timesteps, stepsize, i):
-
-        def real_meshgrid(data_transformed):
-            indices = np.arange(timesteps[0], timesteps[1], stepsize)
-            x, y, z = np.meshgrid(data_transformed[indices, 0],
-                                  data_transformed[indices, 1],
-                                  data_transformed[indices, 2])
-            x, y, z = np.meshgrid(np.linspace(-2, 2, stepsize),
-                                  np.linspace(-2, 2, stepsize),
-                                  np.linspace(-2, 2, stepsize))
-            x, y, z = x.ravel(), y.ravel(), z.ravel()
-            all = np.vstack((x, y, z)).transpose()
-            return all
-
-        pca = sklearn.decomposition.PCA(3)
-
-        transformed_activations = pca.fit_transform(activations)
-        meshed_activations = real_meshgrid(transformed_activations)
-        reverse_transformed = pca.inverse_transform(meshed_activations)
-
-        #transformed_input = pca.transform(inputs)
-        #meshed_inputs = real_meshgrid(transformed_input)
-        #reversed_input = pca.inverse_transform(meshed_inputs)
-
-        if self.rnn_type == 'vanilla':
-            vanilla = self.return_vanilla(inputs[i, :])
-            phase_space = vanilla(reverse_transformed)
-        elif self.rnn_type == 'gru':
-            gru = self.return_gru(inputs[i, :])
-            phase_space = gru(reverse_transformed)
-
-        transformed_phase_space = pca.transform(phase_space)
-        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
-        # x,y,z = transformed_activations[indices, 0], transformed_activations[indices, 1], transformed_activations[indices, 2]
-        u, v, w = transformed_phase_space[:, 0], transformed_phase_space[:, 1], transformed_phase_space[:, 2]
-
-        return x, y, z, u, v, w, transformed_activations[timesteps[0]:timesteps[1], :]
-
 
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    # agent_id = 1583404415  # 1583180664 lunarlandercont
-    # agent_id = 1585500821 # cartpole-v1
-    # agent_id = 1585557832 # MountainCar # 1585561817 continuous
-    # agent_id = 1583256614 # reach task
     agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
     # agent_id = 1586597938# finger tapping
 
@@ -212,19 +131,7 @@ if __name__ == "__main__":
     n_episodes = 5
     activations_over_all_episodes, inputs_over_all_episodes, \
     actions_over_all_episodes, states_all_episodes = chiefinvesti.get_data_over_episodes(n_episodes,
-                                                                    "policy_recurrent_layer",
-                                                                    layer_names[1])
-    activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
-                                                                                                          layer_names[1])
+                                                                                         "policy_recurrent_layer",
+                                                                                         layer_names[1])
 
-    # employ fixedpointfinder
-    adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type)
-
-    states, inputs = adamfpf.sample_inputs_and_states(actions_single_run, inputs_single_run,
-                                                      10, 0)
-
-    fps = adamfpf.find_fixed_points(states, inputs)
-
-    plot_fixed_points(actions_single_run, fps, 100, 1)
-    plt.show()
 

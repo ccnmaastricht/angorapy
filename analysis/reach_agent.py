@@ -4,10 +4,9 @@ from collections import OrderedDict
 import os
 import gym
 import matplotlib.pyplot as plt
-from utilities.util import parse_state
 
+from utilities.util import parse_state
 from analysis.chiefinvestigation import Chiefinvestigator
-import sklearn.decomposition as skld
 from analysis.plot_utils import Visualise
 
 EPSILON = 1e-6
@@ -103,25 +102,28 @@ if __name__ == "__main__":
     agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
     # agent_id = 1587117437 # free reach relative control
     chiefinvesti = Chiefinvestigator(agent_id)
-    means = chiefinvesti.preprocessor.wrappers[0].mean[0]
-    variances = chiefinvesti.preprocessor.wrappers[0].variance[0]
 
     layer_names = chiefinvesti.get_layer_names()
     activations_single_run, inputs_single_run, actions_single_run = chiefinvesti.get_data_over_single_run('policy_recurrent_layer',
                                                                                                           layer_names[1])
     np.random.seed(420)
     h0 = np.random.random(32) * 2 - 1
-    reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0, means, variances,
+    reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0,
+                          chiefinvesti.preprocessor.wrappers[0].mean[0],
+                          chiefinvesti.preprocessor.wrappers[0].variance[0],
                           n_hidden=chiefinvesti.n_hidden)
+
     # reacher.env.sim.nsubsteps = 2
     dt, t_sim = 1e-2, 100
     t_steps = int(t_sim / dt) + 1
     pertubated_h = []
+
     for h in range(1):
         h_vector = np.zeros((t_steps, 32))
         dh_vector, input_projections = np.zeros_like(h_vector), np.zeros_like(h_vector)
         q_vector = np.zeros(t_steps)
         reacher.reset()
+
         for t in range(t_steps):
             h_vector[t, :] = reacher.h
             q_vector[t] = reacher.compute_q()
@@ -136,7 +138,7 @@ if __name__ == "__main__":
     vizard = Visualise(pertubated_h[0], multiple_activation_data=pertubated_h)
     vizard.plot_activations_and_q(q_vector=q_vector)
     plt.show()
-    vizard.plot_activations_3d(60000)
+    vizard.plot_activations_3d(t_steps)
     plt.show()
 
 

@@ -5,6 +5,7 @@ from matplotlib import animation
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+
 def plot_results(self, results, action_data, fixed_point, title: str = "Results", dreiD: bool = False):
     """Plot results of analysis performed by chiefinvestigator
 
