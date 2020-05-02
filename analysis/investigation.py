@@ -171,7 +171,7 @@ class Investigator:
             action_trajectory.append(action)
             observation, reward, done, info = env.step(action)
             observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
-                                                                      update=False)
+                                                                         update=False)
 
             state = observation
             reward_trajectory.append(reward)

@@ -99,13 +99,14 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
+    # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
+    agent_id = 1588151579  # small step reach task
     # agent_id = 1587117437 # free reach relative control
     chiefinvesti = Chiefinvestigator(agent_id)
 
     np.random.seed(420)
     h0 = np.random.random(32) * 2 - 1
-    reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0,
+    reacher = reach_agent(chiefinvesti.network.get_weights(), chiefinvesti.env, h0,
                           chiefinvesti.preprocessor.wrappers[0].mean[0],
                           chiefinvesti.preprocessor.wrappers[0].variance[0],
                           n_hidden=chiefinvesti.n_hidden)

@@ -14,7 +14,7 @@ from utilities.model_utils import build_sub_model_from, build_sub_model_to
 
 class Chiefinvestigator(Investigator):
 
-    def __init__(self, agent_id: int, enforce_env_name: str = None):
+    def __init__(self, agent_id: int, enforce_env_name: str = None, from_iteration=None):
         """Chiefinvestigator can assign investigator to inspect the model and produce high-level analysis.
 
         Args:
@@ -22,7 +22,7 @@ class Chiefinvestigator(Investigator):
             env_name: Name of the gym environment that the agent was trained in. Default is set to CartPole-v1
         """
 
-        self.agent = PPOAgent.from_agent_state(agent_id, from_iteration='best')
+        self.agent = PPOAgent.from_agent_state(agent_id, from_iteration=from_iteration)
         super().__init__(self.agent.policy, self.agent.distribution, self.agent.preprocessor)
         self.env = self.agent.env
         if enforce_env_name is not None:
@@ -109,7 +109,7 @@ class Chiefinvestigator(Investigator):
             activation = activations[0, i, :].reshape(1, 1, self.n_hidden)
             probabilities = flatten(self.sub_model_from.predict(activation))
 
-            action, _ = self.distribution.act(*probabilities)
+            action = self.distribution.act_deterministic(*probabilities)
             observation, reward, done, info = self.env.step(action)
 
 
