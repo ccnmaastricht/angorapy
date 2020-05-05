@@ -63,21 +63,21 @@ class Chiefinvestigator(Investigator):
         Returns:
             activation_data, action_data, state_data, all_rewards
         """
-        states, activations, rewards, actions = self.get_activations_over_episode(
+        states, activations, rewards, actions, done = self.get_activations_over_episode(
             [layer_name, previous_layer_name],
             self.env, False)
 
         # merge activations per layer into matrices where first dimension are timesteps
         activations = list(map(np.array, activations))
 
-        return states, activations, rewards, actions
+        return states, activations, rewards, actions, done
 
     def get_data_over_episodes(self, n_episodes: int, layer_name: str, previous_layer_name: str):
 
         activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
         states_all_episodes = []
         for i in range(n_episodes):
-            states, activations, rewards, actions = self.parse_data(layer_name, previous_layer_name)
+            states, activations, rewards, actions, done = self.parse_data(layer_name, previous_layer_name)
             inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
             activations = np.reshape(activations[1], (activations[1].shape[0], self.n_hidden))
             activations_over_all_episodes.append(activations)
@@ -90,7 +90,7 @@ class Chiefinvestigator(Investigator):
                                                                   np.vstack(inputs_over_all_episodes)
         actions_over_all_episodes = np.concatenate(actions_over_all_episodes, axis=0)
 
-        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, np.vstack(states_all_episodes)
+        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, np.vstack(states_all_episodes), done
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 

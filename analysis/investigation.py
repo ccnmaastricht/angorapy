@@ -143,14 +143,13 @@ class Investigator:
         """Run an episode using the network and get (s, activation, r) tuples for each timestep."""
         layer_names = layer_names if isinstance(layer_names, list) else [layer_names]
 
-        states, activations, reward_trajectory, action_trajectory = [], [], [], []
+        states, activations, reward_trajectory, action_trajectory, done_recorder = [], [], [], [], []
 
         # make new model with multiple outputs
         polymodel = build_sub_model_to(self.network, layer_names, include_original=True)
         is_recurrent = is_recurrent_model(self.network)
 
         done = False
-        # env.sim.nsubsteps = 2
         state = env.reset()
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         env.render() if render else ""
@@ -172,13 +171,14 @@ class Investigator:
             observation, reward, done, info = env.step(action)
             observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                          update=False)
+            done_recorder.append(info['is_success'])
 
             state = observation
             reward_trajectory.append(reward)
 
             env.render() if render else ""
 
-        return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
+        return [states, list(zip(*activations)), reward_trajectory, action_trajectory, done_recorder]
 
     def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False) -> None:
         """Render an episode in the given environment."""
@@ -186,7 +186,6 @@ class Investigator:
         self.network.reset_states()
 
         done, step = False, 0
-        env.sim.nsubsteps = 5
         state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
         cumulative_reward = 0
         env.render() if not to_gif else env.render(mode="rgb_array")
@@ -224,7 +223,8 @@ if __name__ == "__main__":
     # agent_id = 1585500821  # cartpole-v1
     # agent_id = 1583256614 # reach task
     # agent_id = 1586597938 # finger tapping
-    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
+    # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
+    agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)
@@ -234,6 +234,6 @@ if __name__ == "__main__":
 
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
     env = gym.make(env)
-    for i in range(100):
+    for i in range(15):
         # inv.render_episode(agent_007.env, to_gif=False)
         inv.render_episode(env, to_gif=False)
