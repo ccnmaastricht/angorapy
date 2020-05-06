@@ -179,8 +179,10 @@ class BaseContinuousPolicyDistribution(BasePolicyDistribution, abc.ABC):
 class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
     """Gaussian Probability Distribution."""
 
-    def act_deterministic(self, *args, **kwargs):
-        raise NotImplementedError("Act deterministic not defined for Gaussian Distribution.")
+    def act_deterministic(self, means: tf.Tensor, log_stdevs: tf.Tensor) -> Tuple[np.ndarray, np.ndarray]:
+        actions = means
+
+        return tf.reshape(actions, [-1]).numpy()
 
     @property
     def short_name(self):

@@ -10,7 +10,7 @@ from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixe
 os.chdir("../../")  # remove if you want to search for ids in the analysis directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-agent_id, env = 1588151579, 'HandFreeReachMFAbsolute-v0' # small step reach task
+agent_id, env = 1588151579, 'HandFreeReachFFAbsolute-v0' # small step reach task
 
 chiefinvesti = Chiefinvestigator(agent_id, from_iteration='best')
 
@@ -18,7 +18,7 @@ layer_names = chiefinvesti.get_layer_names()
 print(layer_names)
 
 # collect data from episodes
-n_episodes = 1
+n_episodes = 20
 activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done = \
     chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
 
@@ -47,6 +47,10 @@ plt.xlabel('variance')
 plt.ylabel('absolute mean weight')
 plt.show()
 
+import sklearn
+pca = sklearn.decomposition.PCA(10)
+pca.fit_transform(activations_over_all_episodes)
+print(np.cumsum(pca.explained_variance_ratio_))
 
 
 # employ fixedpointfinder

@@ -165,13 +165,18 @@ class Investigator:
             states.append(state)
             activations.append(activation)
 
-            action = self.distribution.act_deterministic(*probabilities)
-            # action, _ = self.distribution.act(*probabilities)
+            try:
+                action = self.distribution.act_deterministic(*probabilities)
+            except NotImplementedError:
+                action, _ = self.distribution.act(*probabilities)
             action_trajectory.append(action)
             observation, reward, done, info = env.step(action)
             observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                          update=False)
-            done_recorder.append(info['is_success'])
+            try:
+                done_recorder.append(info['is_success'])
+            except KeyError:
+                done_recorder.append(info)
 
             state = observation
             reward_trajectory.append(reward)

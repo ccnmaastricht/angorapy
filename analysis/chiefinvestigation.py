@@ -38,7 +38,8 @@ class Chiefinvestigator(Investigator):
         try:
             self.sub_model_from = build_sub_model_from(self.network, "beta_action_head")
         except:
-            self.sub_model_from = build_sub_model_from(self.network, 'discrete_action_head')
+            pass
+            #self.sub_model_from = build_sub_model_from(self.network, 'discrete_action_head')
 
         layer_names = self.get_layer_names()
         self.sub_model_to = build_sub_model_to(self.network, ['policy_recurrent_layer', layer_names[1]], include_original=True)
