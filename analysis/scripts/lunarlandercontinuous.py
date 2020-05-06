@@ -18,15 +18,15 @@ print(layer_names)
 
 # collect data from episodes
 n_episodes = 5
-activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes = \
+activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, info = \
     chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
 
 # employ fixedpointfinder
 adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type)
 
 states, inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes, inputs_over_all_episodes,
-                                                  50, 0)
+                                                  100, 0)
 fps = adamfpf.find_fixed_points(states, inputs)
 
-plot_fixed_points(activations_over_all_episodes, fps, 1000, 1)
+plot_fixed_points(activations_over_all_episodes, fps, 3000, 1)
 plt.show()

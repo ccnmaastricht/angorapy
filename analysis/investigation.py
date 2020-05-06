@@ -201,7 +201,10 @@ class Investigator:
             probabilities = flatten(
                 self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
 
-            action = self.distribution.act_deterministic(*probabilities)
+            try:
+                action = self.distribution.act_deterministic(*probabilities)
+            except NotImplementedError:
+                action, _ = self.distribution.act(*probabilities)
             observation, reward, done, info = env.step(action)
             cumulative_reward += reward
             observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
@@ -226,10 +229,11 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     # agent_id = 1585500821  # cartpole-v1
+    agent_id = 1585557832 # mountaincar
     # agent_id = 1583256614 # reach task
     # agent_id = 1586597938 # finger tapping
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
-    agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
+    # agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)
@@ -238,7 +242,6 @@ if __name__ == "__main__":
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
-    env = gym.make(env)
     for i in range(15):
         # inv.render_episode(agent_007.env, to_gif=False)
-        inv.render_episode(env, to_gif=False)
+        inv.render_episode(agent_007.env, to_gif=False)
