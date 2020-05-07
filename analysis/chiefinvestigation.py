@@ -76,7 +76,7 @@ class Chiefinvestigator(Investigator):
     def get_data_over_episodes(self, n_episodes: int, layer_name: str, previous_layer_name: str):
 
         activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
-        states_all_episodes = []
+        states_all_episodes, info_all = [], []
         for i in range(n_episodes):
             states, activations, rewards, actions, done = self.parse_data(layer_name, previous_layer_name)
             inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
@@ -86,12 +86,13 @@ class Chiefinvestigator(Investigator):
             actions = np.vstack(actions)
             actions_over_all_episodes.append(actions)
             states_all_episodes.append(np.vstack(states))
+            info_all.append(done)
 
         activations_over_all_episodes, inputs_over_all_episodes = np.vstack(activations_over_all_episodes), \
                                                                   np.vstack(inputs_over_all_episodes)
         actions_over_all_episodes = np.concatenate(actions_over_all_episodes, axis=0)
 
-        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, np.vstack(states_all_episodes), done
+        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, np.vstack(states_all_episodes), info_all
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 
