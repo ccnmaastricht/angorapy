@@ -11,8 +11,7 @@ from time import sleep
 os.chdir("../../")  # remove if you want to search for ids in the analysis directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-agent_id, env = 1588151579, 'HandFreeReachLFAbsolute-v0' # small step reach task
-
+agent_id, env = 1588944848, 'HandFreeReachMFAbsolute-v0' # single goal reach task
 chiefinvesti = Chiefinvestigator(agent_id, env, from_iteration='best')
 
 layer_names = chiefinvesti.get_layer_names()
@@ -33,17 +32,16 @@ plt.show()
 adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
                                q_threshold=1e-14,
                                tol_unique=2e-03,
-                               epsilon=5e-03)
+                               epsilon=5e-03,
+                               max_iters=7000)
 
 states, inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes, inputs_over_all_episodes,
                                                   100, 0)
 fps = adamfpf.find_fixed_points(states, inputs)
 
-plot_fixed_points(activations_over_all_episodes, fps, 200, 1)
+plot_fixed_points(activations_over_all_episodes, fps, 20, 1)
 plt.show()
 
 for fp in fps:
     chiefinvesti.render_fixed_points(np.repeat(np.reshape(fp['x'], (1, 1, 32)), axis=1, repeats=100))
     sleep(3)
-
-

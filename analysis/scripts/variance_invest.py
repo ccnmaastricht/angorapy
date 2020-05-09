@@ -10,7 +10,7 @@ from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixe
 os.chdir("../../")  # remove if you want to search for ids in the analysis directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-agent_id, env = 1588151579, 'HandFreeReachFFAbsolute-v0' # small step reach task
+agent_id, env = 1588151579, 'HandFreeReachMFAbsolute-v0' # small step reach task
 
 chiefinvesti = Chiefinvestigator(agent_id, env, from_iteration='best')
 
@@ -18,7 +18,7 @@ layer_names = chiefinvesti.get_layer_names()
 print(layer_names)
 
 # collect data from episodes
-n_episodes = 5
+n_episodes = 20
 activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done = \
     chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
 
@@ -37,7 +37,7 @@ from time import sleep
 #fig = plt.figure()
 
 all_weights = chiefinvesti.network.get_weights()
-variance_recurrent_units = np.var(activations_over_all_episodes[achieved_times:episode_times, :], axis=0)
+variance_recurrent_units = np.var(activations_over_all_episodes[:, :], axis=0)
 alpha_weights = all_weights[11]
 mean_per_recurrent_unit = np.abs(np.mean(alpha_weights, axis=1))
 
@@ -47,6 +47,9 @@ plt.scatter(variance_recurrent_units, np.abs(np.mean(alpha_weights, axis=1)))
 plt.plot(variance_recurrent_units, reg.predict(variance_recurrent_units.reshape(1, -1).T), c='k')
 plt.xlabel('variance')
 plt.ylabel('absolute mean weight')
+plt.title('20 episodes')
+#plt.title('before achieved')
+#plt.title('after achieved')
 plt.show()
 
 for i in range(20):
