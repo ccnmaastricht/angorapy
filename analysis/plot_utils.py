@@ -29,8 +29,12 @@ class Visualise:
         fig = plt.figure(1)
         plt.subplot(121)
         plt.plot(self.activations)
+        plt.ylabel('Activation')
+        plt.xlabel('Time')
         plt.subplot(122)
         plt.plot(q_vector)
+        plt.ylabel('q value')
+        plt.xlabel('Time')
 
         return fig
 

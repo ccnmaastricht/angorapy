@@ -14,7 +14,7 @@ from utilities.model_utils import build_sub_model_from, build_sub_model_to
 
 class Chiefinvestigator(Investigator):
 
-    def __init__(self, agent_id: int, enforce_env_name: str = None, from_iteration=None):
+    def __init__(self, agent_id: int, enforce_env_name: str = None, from_iteration='best'):
         """Chiefinvestigator can assign investigator to inspect the model and produce high-level analysis.
 
         Args:
