@@ -11,7 +11,6 @@ from analysis.plot_utils import Visualise
 
 EPSILON = 1e-6
 
-
 class reach_agent:
 
     def __init__(self, weights_biases, env, h0, means, variances, n_hidden = 32):
@@ -111,7 +110,7 @@ if __name__ == "__main__":
                           chiefinvesti.preprocessor.wrappers[0].variance[0],
                           n_hidden=chiefinvesti.n_hidden)
 
-    dt, t_sim = 1e-2, 300
+    dt, t_sim = 1e-2, 100
     t_steps = int(t_sim / dt) + 1
 
     h_vector = np.zeros((t_steps, 32))
@@ -120,6 +119,7 @@ if __name__ == "__main__":
     reacher.reset()
 
     for t in range(t_steps):
+        reacher.env.render()
         h_vector[t, :] = reacher.h
         q_vector[t] = reacher.compute_q()
         input_projections[t, :] = reacher.input_proj

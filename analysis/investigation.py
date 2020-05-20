@@ -233,8 +233,8 @@ if __name__ == "__main__":
     # agent_id = 1583256614 # reach task
     # agent_id = 1586597938 # finger tapping
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
-    # agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
-    agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
+    agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
+    # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)
