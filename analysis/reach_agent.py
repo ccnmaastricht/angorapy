@@ -109,7 +109,6 @@ if __name__ == "__main__":
                           chiefinvesti.preprocessor.wrappers[0].mean[0],
                           chiefinvesti.preprocessor.wrappers[0].variance[0],
                           n_hidden=chiefinvesti.n_hidden)
-
     dt, t_sim = 1e-2, 100
     t_steps = int(t_sim / dt) + 1
 
