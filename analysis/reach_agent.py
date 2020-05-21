@@ -159,7 +159,9 @@ if __name__ == "__main__":
     vizard.plot_activations_3d(t_steps)
     plt.show()
 
+
     plot_velocities(h_vector, q_vector, 10000)
+
 
 
 
