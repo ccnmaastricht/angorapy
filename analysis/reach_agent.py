@@ -4,12 +4,15 @@ from collections import OrderedDict
 import os
 import gym
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 from utilities.util import parse_state
 from analysis.chiefinvestigation import Chiefinvestigator
 from analysis.plot_utils import Visualise
+from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_velocities
 
 EPSILON = 1e-6
+
 
 class reach_agent:
 
@@ -30,6 +33,10 @@ class reach_agent:
 
         self.means = means
         self.variances = variances
+
+        self.action_max_values = self.env.action_space.high
+        self.action_min_values = self.env.action_space.low
+        self.action_mm_diff = self.action_max_values - self.action_min_values
 
         self.__upstream__(weights_biases)
         self.__downstream__(weights_biases)
@@ -61,6 +68,7 @@ class reach_agent:
         beta = self.beta_fun(self.h)
 
         action = (alpha - 1) / (alpha + beta - 2)
+        action = self._scale_sample_to_action_range(np.reshape(action, [-1])).numpy()
 
         observation, reward, done, info = self.env.step(action)
 
@@ -83,6 +91,24 @@ class reach_agent:
         self.__dh__()
         return self.dh @ self.dh.transpose()
 
+    def compute_h_from_obs(self):
+        observation = self.env.reset()
+
+        self.state = (parse_state(observation) - self.means) / (np.sqrt(self.variances) + EPSILON)
+        x = self.state
+        for key in self.ff_layer:
+            x = self.ff_layer[key](x)
+
+        self.input_proj = copy(x)
+        z = self.gru_layer['z'](x, self.h)
+        r = self.gru_layer['r'](x, self.h)
+        g = self.gru_layer['g'](x, r, self.h)
+        self.h = (1 - z) * g #+ z * self.h
+
+    @tf.function
+    def _scale_sample_to_action_range(self, sample) -> tf.Tensor:
+        return tf.add(tf.multiply(sample, self.action_mm_diff), self.action_min_values)
+
     def reset(self):
         observation = self.env.reset()
 
@@ -99,12 +125,14 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
-    agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0' # small step reach task
+    agent_id, env = 1588151579, 'HandFreeReachMFAbsolute-v0' # small step reach task
+    # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
     # agent_id = 1587117437 # free reach relative control
     chiefinvesti = Chiefinvestigator(agent_id)
 
-    # np.random.seed(420)
-    h0 = np.random.random(32) * 2 - 1
+    np.random.seed(123)
+    # h0 = np.random.random(32) * 2 - 1
+    h0 = np.zeros(32)
     reacher = reach_agent(chiefinvesti.network.get_weights(), env, h0,
                           chiefinvesti.preprocessor.wrappers[0].mean[0],
                           chiefinvesti.preprocessor.wrappers[0].variance[0],
@@ -116,9 +144,9 @@ if __name__ == "__main__":
     dh_vector, input_projections = np.zeros_like(h_vector), np.zeros_like(h_vector)
     q_vector = np.zeros(t_steps)
     reacher.reset()
-
+    reacher.compute_h_from_obs()
     for t in range(t_steps):
-        reacher.env.render()
+        # reacher.env.render()
         h_vector[t, :] = reacher.h
         q_vector[t] = reacher.compute_q()
         input_projections[t, :] = reacher.input_proj
@@ -130,6 +158,9 @@ if __name__ == "__main__":
     plt.show()
     vizard.plot_activations_3d(t_steps)
     plt.show()
+
+    plot_velocities(h_vector, q_vector, 10000)
+
 
 
 
