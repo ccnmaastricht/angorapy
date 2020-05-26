@@ -3,6 +3,7 @@ import sys
 
 import autograd.numpy as np
 import gym
+import sklearn
 
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 from agent.ppo import PPOAgent
@@ -113,6 +114,75 @@ class Chiefinvestigator(Investigator):
 
             action = self.distribution.act_deterministic(*probabilities)
             observation, reward, done, info = self.env.step(action)
+
+    def return_vanilla(self, inputs):
+
+        def build_vanilla(weights, inputs):
+            weights, inputweights, b = weights[1], weights[0], weights[2]
+            vanilla = lambda x: - x + np.tanh(x @ weights + inputs @ inputweights + b)
+            return vanilla
+
+        vanilla = build_vanilla(self.weights, inputs)
+        return vanilla
+
+    def return_gru(self, inputs):
+
+        def build_gru(weights, input, n_hidden):
+            def sigmoid(x):
+                return 1 / (1 + np.exp(-x))
+
+            z, r, h = np.arange(0, n_hidden), np.arange(n_hidden, 2 * n_hidden), np.arange(2 * n_hidden, 3 * n_hidden)
+            W_z, W_r, W_h = weights[0][:, z], weights[0][:, r], weights[0][:, h]
+            U_z, U_r, U_h = weights[1][:, z], weights[1][:, r], weights[1][:, h]
+            b_z, b_r, b_h = weights[2][0, z], weights[2][0, r], weights[2][0, h]
+
+            z_projection_b = input @ W_z + b_z
+            r_projection_b = input @ W_r + b_r
+            g_projection_b = input @ W_h + b_h
+
+            z_fun = lambda x: sigmoid(x @ U_z + z_projection_b)
+            r_fun = lambda x: sigmoid(x @ U_r + r_projection_b)
+            g_fun = lambda x: np.tanh(r_fun(x) * (x @ U_h) + g_projection_b)
+
+            gru = lambda x: - x + z_fun(x) * x + (1 - z_fun(x)) * g_fun(x)
+            return gru
+
+        gru = build_gru(self.weights, inputs, self.n_hidden)
+        return gru
+
+    def compute_quiver_data(self, inputs, activations, stepsize, i):
+
+        def real_meshgrid():
+            x, y, z = np.meshgrid(np.linspace(-6, 6, stepsize),
+                                  np.linspace(-6, 6, stepsize),
+                                  np.linspace(-6, 6, stepsize))
+            x, y, z = x.ravel(), y.ravel(), z.ravel()
+            all = np.vstack((x, y, z)).transpose()
+            return all
+
+        pca = sklearn.decomposition.PCA(3)
+
+        transformed_activations = pca.fit_transform(activations)
+        meshed_activations = real_meshgrid()
+        reverse_transformed = pca.inverse_transform(meshed_activations)
+
+        #transformed_input = pca.transform(inputs)
+        #meshed_inputs = real_meshgrid(transformed_input)
+        #reversed_input = pca.inverse_transform(meshed_inputs)
+
+        if self.rnn_type == 'vanilla':
+            vanilla = self.return_vanilla(inputs[i, :])
+            phase_space = vanilla(reverse_transformed)
+        elif self.rnn_type == 'gru':
+            gru = self.return_gru(np.zeros(self.n_hidden))
+            phase_space = gru(reverse_transformed)
+
+        transformed_phase_space = pca.transform(phase_space)
+        x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
+        # x,y,z = transformed_activations[indices, 0], transformed_activations[indices, 1], transformed_activations[indices, 2]
+        u, v, w = transformed_phase_space[:, 0], transformed_phase_space[:, 1], transformed_phase_space[:, 2]
+
+        return x, y, z, u, v, w
 
 
 if __name__ == "__main__":
