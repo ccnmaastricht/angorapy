@@ -232,8 +232,9 @@ if __name__ == "__main__":
     # agent_id = 1585557832 # mountaincar
     # agent_id = 1583256614 # reach task
     # agent_id = 1586597938 # finger tapping
+    agent_id = 1583404415  # 1583180664 lunarlandercont
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
-    agent_id, env = 1588151579, 'HandFreeReachFFAbsolute-v0'  # small step reach task
+    # agent_id, env = 1588151579, 'HandFreeReachFFAbsolute-v0'  # small step reach task
     # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
@@ -244,5 +245,5 @@ if __name__ == "__main__":
 
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
     for i in range(15):
-        # inv.render_episode(agent_007.env, to_gif=False)
-        inv.render_episode(gym.make(env), to_gif=False)
+        inv.render_episode(agent_007.env, to_gif=False)
+        # inv.render_episode(gym.make(env), to_gif=False)
