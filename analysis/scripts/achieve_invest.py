@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from analysis.chiefinvestigation import Chiefinvestigator
-from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
-from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 
 os.chdir("../../")  # remove if you want to search for ids in the analysis directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -40,16 +38,16 @@ for i, name in enumerate(["FF", "MF", "RF", "LF"]):
                 all_mean_durations[i, k] = len(np.argwhere(d))
         except IndexError:
             first_success.append(int(200))
-    print(first_success)
+
     std = np.std(np.vstack(first_success))
     std_duration = np.std(np.vstack(duration))
-    print(std)
     stds.append(std)
     stds_duration.append(std_duration)
     means.append(np.mean(np.vstack(first_success)))
     mean_durations.append(np.mean(np.vstack(duration)))
     names.append(name)
 
+# plot means and standard deviations of first successfully reaching the target
 x = np.arange(len(names))
 width = 0.5
 
@@ -57,13 +55,11 @@ fig, ax = plt.subplots()
 plt.bar(x, np.asarray(np.asarray(stds_duration)/np.asarray(mean_durations)*100), width)#, yerr=np.asarray(stds_duration), capsize= 4)
 
 ax.set_ylabel('Standard deviation normalized in percent')
-
 ax.set_xticks(x)
 ax.set_xticklabels(names)
-
 plt.show()
 
-
+# plot durations that the agent stayed in target position
 plt.boxplot((all_mean_durations/np.repeat(np.asarray(mean_durations).reshape(-1,1), n_episodes, axis=1)).T*100, labels=names)
 plt.ylabel('% normalized duration in goal position')
 plt.show()

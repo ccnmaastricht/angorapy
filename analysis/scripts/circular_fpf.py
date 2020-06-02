@@ -1,19 +1,21 @@
 import os
 import gym
 import sys
+
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import autograd.numpy as np
 import matplotlib.pyplot as plt
 
-from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, Scipyfixedpointfinder, \
+from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder, \
+    Scipyfixedpointfinder, \
     AdamCircularFpf
 from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from analysis.rnn_dynamical_systems.fixedpointfinder.minimization import Minimizer
 from analysis.chiefinvestigation import Chiefinvestigator
 import scipy as sc
 
-def regress(Y, X, l=0.):
 
+def regress(Y, X, l=0.):
     '''
 Parameters
 ----------
@@ -36,7 +38,6 @@ beta : floating point array (predictors-by-outcomes)
     else:
         n_observations = X.size
         n_predictors = 1
-
 
     if n_observations < n_predictors:
         U, D, V = np.linalg.svd(X, full_matrices=False)
@@ -62,11 +63,11 @@ beta : floating point array (predictors-by-outcomes)
 
     return beta
 
+
 if __name__ == "__main__":
     os.chdir("../../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
-
+    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
 
     chiefinvesti = Chiefinvestigator(agent_id, env)
 
@@ -98,7 +99,6 @@ if __name__ == "__main__":
                               q_threshold=1e-02,
                               max_iters=7000,
                               epsilon=1e-03)
-
 
     states, inputs = circfpf.sample_inputs_and_states(activations_single_run, inputs_single_run,
                                                       10, 0)
