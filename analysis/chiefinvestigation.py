@@ -46,6 +46,7 @@ class Chiefinvestigator(Investigator):
         self.sub_model_to = build_sub_model_to(self.network, ['policy_recurrent_layer', layer_names[1]], include_original=True)
 
     def _get_rnn_type(self):
+        '''Detect the rnn architecture in an agent'''
         if self.weights[1].shape[1] / self.weights[1].shape[0] == 1:
             self.rnn_type = 'vanilla'
         elif self.weights[1].shape[1] / self.weights[1].shape[0] == 3:
@@ -97,7 +98,7 @@ class Chiefinvestigator(Investigator):
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 
-        states, activations, rewards, actions = self.parse_data(layer_name, previous_layer_name)
+        states, activations, rewards, actions, done = self.parse_data(layer_name, previous_layer_name)
         inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
         activations = np.reshape(activations[1], (activations[1].shape[0], self.n_hidden))
         actions = np.vstack(actions)
@@ -105,7 +106,7 @@ class Chiefinvestigator(Investigator):
         return activations, inputs, actions
 
     def render_fixed_points(self, activations):
-
+        '''Function to repeatedly apply and render the state approached by an action.'''
         self.env.reset()
         for i in range(100):
             self.env.render()
@@ -162,13 +163,8 @@ class Chiefinvestigator(Investigator):
 
         pca = sklearn.decomposition.PCA(3)
 
-        transformed_activations = pca.fit_transform(activations)
         meshed_activations = real_meshgrid()
         reverse_transformed = pca.inverse_transform(meshed_activations)
-
-        #transformed_input = pca.transform(inputs)
-        #meshed_inputs = real_meshgrid(transformed_input)
-        #reversed_input = pca.inverse_transform(meshed_inputs)
 
         if self.rnn_type == 'vanilla':
             vanilla = self.return_vanilla(inputs[i, :])
@@ -179,7 +175,6 @@ class Chiefinvestigator(Investigator):
 
         transformed_phase_space = pca.transform(phase_space)
         x, y, z = meshed_activations[:, 0], meshed_activations[:, 1], meshed_activations[:, 2]
-        # x,y,z = transformed_activations[indices, 0], transformed_activations[indices, 1], transformed_activations[indices, 2]
         u, v, w = transformed_phase_space[:, 0], transformed_phase_space[:, 1], transformed_phase_space[:, 2]
 
         return x, y, z, u, v, w
@@ -199,5 +194,5 @@ if __name__ == "__main__":
 
     # collect data from episodes
     n_episodes = 5
-    activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes \
+    activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done \
         = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])

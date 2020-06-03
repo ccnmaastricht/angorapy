@@ -7,7 +7,7 @@ from analysis.chiefinvestigation import Chiefinvestigator
 from analysis.rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from analysis.rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points, plot_velocities
 from time import sleep
-
+# example script to analyse the smallstepreach agent
 os.chdir("../../")  # remove if you want to search for ids in the analysis directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
