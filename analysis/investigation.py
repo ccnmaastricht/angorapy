@@ -258,14 +258,11 @@ if __name__ == "__main__":
     im = plt.imshow(images[0])
     plt.axis('off')
 
-
-
     # animation function.  This is called sequentially
     def animate(i):
         im.set_array(images[i])
         return [im]
 
 
-    anim = FuncAnimation(fig, animate, frames=200, interval=100, blit=True)
-    anim.save('test_video.mp4', dpi=300)
-    plt.show()
+    anim = FuncAnimation(fig, animate, frames=20, interval=500, blit=True)
+    anim.save('test_video.mp4', dpi=400)

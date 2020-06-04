@@ -9,7 +9,7 @@ from analysis.chiefinvestigation import Chiefinvestigator
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class AnimateActivitySingleRun(ThreeDScene):
+class AnimateActivityCartPole(ThreeDScene):
 
     def setup(self):
         agent_id = 1590500032  # cartpole-v1
@@ -25,20 +25,76 @@ class AnimateActivitySingleRun(ThreeDScene):
     def construct(self):
 
         RUN_TIME = 0.7
+        TRANSFORM_RUN_TIME = 0.2
 
         pca = skld.PCA(3)
         activations_transformed = pca.fit_transform(self.activations_over_episode)
-        activations_transformed = activations_transformed * 0.5
+        activations_transformed = activations_transformed * 0.45
         shape = Polygon(*activations_transformed, color=BLUE, width=0.1)
         dot = Dot(activations_transformed[0, :], color=RED, size=1.2)
 
+        action_text = TextMobject("push left", color=RED).to_edge(RIGHT)
         self.play(ShowCreation(shape),
                   ShowCreation(dot),
+                  ShowCreation(action_text),
                   run_time=RUN_TIME)
 
-        for i in range(200):
+        for i in range(20):
+            if self.actions_over_episode[i] == 0:
+                new_dot = Dot(activations_transformed[i, :], color=RED, size=1.2)
+                new_action_tet = TextMobject("push left", color=RED).to_edge(RIGHT)
+            else:
+                new_dot = Dot(activations_transformed[i, :], color=GREEN, size=1.2)
+                new_action_tet = TextMobject("push right", color=GREEN).to_edge(RIGHT)
+            self.play(Transform(dot, new_dot),
+                      Transform(action_text, new_action_tet),
+                      run_time=TRANSFORM_RUN_TIME)
+            self.wait(0.3)
 
-            new_dot = Dot(activations_transformed[i, :], color=RED, size=1.2)
-            self.play(Transform(dot, new_dot))
-            self.wait(0.1)
-# TODO: add input and predictions to animation as numbers
+
+class AnimateActivityMountainCar(ThreeDScene):
+
+    def setup(self):
+        agent_id = 1585557832  # MountainCar # 1585561817 continuous
+        chiefinvesti = Chiefinvestigator(agent_id)
+
+        layer_names = chiefinvesti.get_layer_names()
+        print(layer_names)
+
+        self.activations_over_episode, self.inputs_over_episode, \
+        self.actions_over_episode = chiefinvesti.get_data_over_single_run("policy_recurrent_layer",
+                                                                          layer_names[1])
+
+    def construct(self):
+
+        RUN_TIME = 0.7
+        TRANSFORM_RUN_TIME = 0.5
+
+        pca = skld.PCA(3)
+        activations_transformed = pca.fit_transform(self.activations_over_episode)
+        activations_transformed = activations_transformed * 0.45
+        shape = Polygon(*activations_transformed, color=BLUE, width=0.1)
+        dot = Dot(activations_transformed[0, :], color=RED, size=1.2)
+
+        action_text = TextMobject("push left", color=RED).to_edge(RIGHT)
+        self.play(ShowCreation(shape),
+                  ShowCreation(dot),
+                  ShowCreation(action_text),
+                  run_time=RUN_TIME)
+
+        for i in range(len(self.actions_over_episode)):
+            if self.actions_over_episode[i] == 0:
+                new_dot = Dot(activations_transformed[i, :], color=RED, size=1.2)
+                new_action_tet = TextMobject("push left", color=RED).to_edge(RIGHT)
+            elif self.actions_over_episode[i] == 1:
+                new_dot = Dot(activations_transformed[i, :], color=BLUE, size=1.2)
+                new_action_tet = TextMobject("no push", color=BLUE).to_edge(RIGHT)
+            else:
+                new_dot = Dot(activations_transformed[i, :], color=GREEN, size=1.2)
+                new_action_tet = TextMobject("push right", color=GREEN).to_edge(RIGHT)
+            self.play(Transform(dot, new_dot),
+                      Transform(action_text, new_action_tet),
+                      run_time=TRANSFORM_RUN_TIME)
+            self.wait(0.3)
+
+
