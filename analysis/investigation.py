@@ -141,7 +141,7 @@ class Investigator:
 
         return sub_model.predict(input_tensor)
 
-    def get_activations_over_episode(self, layer_names: Union[List[str], str], env: gym.Env, render: bool = False):
+    def get_activations_over_episode(self, layer_names: Union[List[str], str], env: gym.Env, render: bool = True):
         """Run an episode using the network and get (s, activation, r) tuples for each timestep."""
         layer_names = layer_names if isinstance(layer_names, list) else [layer_names]
 
@@ -183,8 +183,6 @@ class Investigator:
             state = observation
             reward_trajectory.append(reward)
 
-            env.render() if render else ""
-
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory, done_recorder]
 
     def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False) -> None:
@@ -196,7 +194,7 @@ class Investigator:
         state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
         cumulative_reward = 0
         env.render() if not to_gif else env.render(mode="rgb_array")
-        images = []
+        # images = []
         while not done:
             step += 1
 
@@ -217,14 +215,15 @@ class Investigator:
             if slow_down:
                 sleep(0.1)
 
-            img = env.render(mode="rgb_array")
-            images.append(img)
+            # img = env.render(mode="rgb_array")
+            # images.append(img)
+            env.render()
 
         print(f"Finished after {step} steps.")
         print(f"Achieved a score of {cumulative_reward}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
-        return images
+
 
 if __name__ == "__main__":
     print("INVESTIGATING")
@@ -232,14 +231,16 @@ if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    agent_id = 1585500821  # cartpole-v1
+    # agent_id = 1585500821  # cartpole-v1
     # agent_id = 1585557832 # mountaincar
     # agent_id = 1583256614 # reach task
     # agent_id = 1586597938 # finger tapping
     # agent_id = 1583404415  # 1583180664 lunarlandercont
+    # agent_id = 1588341681  # halfcheetah
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
-    # agent_id, env = 1588151579, 'HandFreeReachFFAbsolute-v0'  # small step reach task
+    #agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
     # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
+    agent_id, env = 1591604443, 'HandFreeReachLFAbsolute-v0'  # single goal lf
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)
@@ -248,21 +249,9 @@ if __name__ == "__main__":
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
-    for i in range(1):
-        images = inv.render_episode(agent_007.env, to_gif=True)
-        sleep(2)
-        # inv.render_episode(gym.make(env), to_gif=True)
-
-    fig = plt.figure()
-
-    im = plt.imshow(images[0])
-    plt.axis('off')
-
-    # animation function.  This is called sequentially
-    def animate(i):
-        im.set_array(images[i])
-        return [im]
+    for i in range(2):
+        # inv.render_episode(agent_007.env, to_gif=False)
+        sleep(1)
+        inv.render_episode(gym.make(env), to_gif=False)
 
 
-    anim = FuncAnimation(fig, animate, frames=20, interval=500, blit=True)
-    anim.save('test_video.mp4', dpi=400)
