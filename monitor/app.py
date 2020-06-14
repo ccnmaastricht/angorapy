@@ -140,7 +140,7 @@ def bookmark():
 @app.route("/experiment/<int:exp_id>", methods=("POST", "GET"))
 def show_experiment(exp_id):
     """Show experiment of given ID."""
-    experiment_paths = sorted([int(p) for p in os.listdir(f"{PATH_TO_EXPERIMENTS}")])
+    experiment_paths = sorted([int(p) for p in os.listdir(f"{PATH_TO_EXPERIMENTS}") if re.match("^[0-9]*$", p)])
     current_index = experiment_paths.index(exp_id)
 
     path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"

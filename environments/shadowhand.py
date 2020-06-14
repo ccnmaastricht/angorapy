@@ -30,6 +30,7 @@ def get_palm_position(sim):
 
 
 def get_fingertip_distance(ft_a, ft_b):
+    """Return the distance between two vectors representing finger tip positions."""
     assert ft_a.shape == ft_b.shape
     return np.linalg.norm(ft_a - ft_b, axis=-1)
 
@@ -423,10 +424,68 @@ class ShadowHandFreeReach(ShadowHandReach):
         self.sim.forward()
 
 
+class ShadowHandFreeReachVisual(ShadowHandFreeReach):
+
+    def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
+        super().__init__(distance_threshold=distance_threshold, n_substeps=n_substeps,
+                         relative_control=relative_control, initial_qpos=initial_qpos,
+                         success_multiplier=success_multiplier, force_finger=force_finger)
+
+        # init rendering [IMPORTANT]
+        from mujoco_py import GlfwContext
+        GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
+
+        self.total_steps = 0
+
+        # set hand and background colors
+        self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255
+        self.sim.model.mat_rgba[4] = np.array([104, 143, 71, 255]) / 255
+        self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
+
+        # get touch sensor site names and their ids
+        self._touch_sensor_id_site_id = []
+        self._touch_sensor_id = []
+        for k, v in self.sim.model._sensor_name2id.items():
+            if 'robot0:TS_' in k:
+                self._touch_sensor_id_site_id.append(
+                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
+                self._touch_sensor_id.append(v)
+
+        # set observation space
+        obs = self._get_obs()
+        self.observation_space = spaces.Dict(dict(
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['desired_goal'].shape, dtype='float32'),
+            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            observation=spaces.Tuple((
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][0].shape, dtype='float32'),  # visual
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][1].shape, dtype='float32'),  # proprioception
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][2].shape, dtype='float32'),  # touch sensors
+                spaces.Box(-np.inf, np.inf, shape=obs["observation"][3].shape, dtype='float32'),  # goal
+            ))
+        ))
+
+    def _get_obs(self):
+        # "primary" information, either this is the visual frame or the object position and velocity
+        achieved_goal = self._get_achieved_goal().ravel()
+        visual = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
+
+        # get proprioceptive information (positions of joints) and touch sensors
+        robot_pos, robot_vel = manipulate.robot_get_obs(self.sim)
+        proprioception = np.concatenate([robot_pos, robot_vel])
+        touch = self.sim.data.sensordata[self._touch_sensor_id]
+
+        return {
+            "observation": np.array((visual.copy(), proprioception.copy(), touch.copy(), self.goal.ravel().copy())),
+            "achieved_goal": achieved_goal.copy(),
+            "desired_goal": self.goal.ravel().copy(),
+        }
+
+
 class ShadowHandFreeReachAction(ShadowHandFreeReach):
 
-    def __init__(self, distance_threshold = 0.02, n_substeps = 20, relative_control=True,
-                 initial_qpos = DEFAULT_INITIAL_QPOS, success_multiplier = 0.1, force_finger=None):
+    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
 
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos,
                          success_multiplier, force_finger)
