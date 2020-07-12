@@ -35,6 +35,9 @@ def get_fingertip_distance(ft_a, ft_b):
     return np.linalg.norm(ft_a - ft_b, axis=-1)
 
 
+def get_joint_forces()
+
+
 class ShadowHand(manipulate.ManipulateEnv):
     """Adjusted version of ManipulateTouchSensorsEnv Environment in the gym package to fit the projects needs."""
 
@@ -68,8 +71,6 @@ class ShadowHand(manipulate.ManipulateEnv):
         self.touch_visualisation = touch_visualisation
         self.touch_get_obs = touch_get_obs
         self.visual_input = visual_input
-        self._touch_sensor_id_site_id = []
-        self._touch_sensor_id = []
         self.touch_color = [1, 0, 0, 0.5]
         self.notouch_color = [0, 0.5, 0, 0.2]
         self.total_steps = 0
@@ -85,6 +86,8 @@ class ShadowHand(manipulate.ManipulateEnv):
             ignore_z_target_rotation=ignore_z_target_rotation,
         )
 
+        self._touch_sensor_id_site_id = []
+        self._touch_sensor_id = []
         # get touch sensor site names and their ids
         for k, v in self.sim.model._sensor_name2id.items():
             if 'robot0:TS_' in k:
@@ -105,8 +108,11 @@ class ShadowHand(manipulate.ManipulateEnv):
         self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
         # set observation space
+        self.observation_space = self._determine_observation_space()
+
+    def _determine_observation_space(self):
         obs = self._get_obs()
-        self.observation_space = spaces.Dict(dict(
+        return spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['desired_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             observation=spaces.Tuple((
@@ -251,16 +257,31 @@ class ShadowHandReach(HandReachEnv):
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
         self.success_multiplier = success_multiplier
         self.current_target_finger = "none"
+
+        self._touch_sensor_id_site_id = []
+        self._touch_sensor_id = []
+
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
+
+        for k, v in self.sim.model._sensor_name2id.items():
+            if 'robot0:TS_' in k:
+                self._touch_sensor_id_site_id.append(
+                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
+                self._touch_sensor_id.append(v)
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute reward with additional success bonus."""
         return super().compute_reward(achieved_goal, goal, info) + info["is_success"] * self.success_multiplier
 
     def _get_obs(self):
+        # proprioception
         robot_qpos, robot_qvel = robot_get_obs(self.sim)
+
+        # touch sensor information
+        touch = self.sim.data.sensordata[self._touch_sensor_id]
+
         achieved_goal = self._get_achieved_goal().ravel()
-        observation = np.concatenate([robot_qpos, robot_qvel, achieved_goal, self.goal.copy()])
+        observation = np.concatenate([robot_qpos, robot_qvel, touch, achieved_goal, self.goal.copy()])
 
         return {
             'observation': observation.copy(),
@@ -428,15 +449,15 @@ class ShadowHandFreeReachVisual(ShadowHandFreeReach):
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
-        super().__init__(distance_threshold=distance_threshold, n_substeps=n_substeps,
-                         relative_control=relative_control, initial_qpos=initial_qpos,
-                         success_multiplier=success_multiplier, force_finger=force_finger)
-
         # init rendering [IMPORTANT]
         from mujoco_py import GlfwContext
         GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
 
         self.total_steps = 0
+
+        super().__init__(distance_threshold=distance_threshold, n_substeps=n_substeps,
+                         relative_control=relative_control, initial_qpos=initial_qpos,
+                         success_multiplier=success_multiplier, force_finger=force_finger)
 
         # set hand and background colors
         self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255
@@ -452,7 +473,7 @@ class ShadowHandFreeReachVisual(ShadowHandFreeReach):
                     (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
                 self._touch_sensor_id.append(v)
 
-        # set observation space
+    def _determine_observation_space(self):
         obs = self._get_obs()
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['desired_goal'].shape, dtype='float32'),
