@@ -35,9 +35,6 @@ def get_fingertip_distance(ft_a, ft_b):
     return np.linalg.norm(ft_a - ft_b, axis=-1)
 
 
-def get_joint_forces()
-
-
 class ShadowHand(manipulate.ManipulateEnv):
     """Adjusted version of ManipulateTouchSensorsEnv Environment in the gym package to fit the projects needs."""
 
@@ -253,6 +250,8 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
 class ShadowHandReach(HandReachEnv):
     """Simpler Reaching task."""
 
+    FORCE_MULTIPLIER = 0.1
+
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
         self.success_multiplier = success_multiplier
@@ -271,7 +270,13 @@ class ShadowHandReach(HandReachEnv):
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute reward with additional success bonus."""
-        return super().compute_reward(achieved_goal, goal, info) + info["is_success"] * self.success_multiplier
+        return (super().compute_reward(achieved_goal, goal, info)
+                + info["is_success"] * self.success_multiplier
+                - self._get_force() * ShadowHandReach.FORCE_MULTIPLIER
+                )
+
+    def _get_force(self):
+        return self.sim.data.actuator_forces.sum()
 
     def _get_obs(self):
         # proprioception
@@ -382,7 +387,10 @@ class ShadowHandFreeReach(ShadowHandReach):
 
     def compute_reward(self, achieved_goal, goal, info):
         d = get_fingertip_distance(self._get_thumb_position(), self._get_target_finger_position())
-        reward = -d + info["is_success"] * self.success_multiplier
+        reward = (-d
+                  + info["is_success"] * self.success_multiplier
+                  - self._get_force() * ShadowHandReach.FORCE_MULTIPLIER
+                  )
 
         for i, fname in enumerate(FINGERTIP_SITE_NAMES):
             if fname == self.thumb_name or i == np.where(self.goal == 1)[0].item():
@@ -677,10 +685,10 @@ if __name__ == "__main__":
     from environments import *
 
     # env = gym.make("HandTappingAbsolute-v1")
-    env = gym.make("HandFreeReachLFAbsolute-v0")
+    # env = gym.make("HandFreeReachLFAbsolute-v0")
     # env = gym.make("ShadowHand-v0")
     # env = gym.make("HandManipulateBlock-v0")
-    # env = gym.make("HandReachDenseRelative-v0")
+    env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()
     while True:
         env.render()
