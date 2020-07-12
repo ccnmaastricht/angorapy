@@ -272,11 +272,11 @@ class ShadowHandReach(HandReachEnv):
         """Compute reward with additional success bonus."""
         return (super().compute_reward(achieved_goal, goal, info)
                 + info["is_success"] * self.success_multiplier
-                - self._get_force() * ShadowHandReach.FORCE_MULTIPLIER
+                - self._get_force_punishment() * ShadowHandReach.FORCE_MULTIPLIER
                 )
 
-    def _get_force(self):
-        return self.sim.data.actuator_forces.sum()
+    def _get_force_punishment(self):
+        return (self.sim.data.actuator_force ** 2).sum()
 
     def _get_obs(self):
         # proprioception
@@ -386,10 +386,9 @@ class ShadowHandFreeReach(ShadowHandReach):
                          success_multiplier)
 
     def compute_reward(self, achieved_goal, goal, info):
-        d = get_fingertip_distance(self._get_thumb_position(), self._get_target_finger_position())
-        reward = (-d
+        reward = (- get_fingertip_distance(self._get_thumb_position(), self._get_target_finger_position())
                   + info["is_success"] * self.success_multiplier
-                  - self._get_force() * ShadowHandReach.FORCE_MULTIPLIER
+                  - self._get_force_punishment() * ShadowHandReach.FORCE_MULTIPLIER
                   )
 
         for i, fname in enumerate(FINGERTIP_SITE_NAMES):
