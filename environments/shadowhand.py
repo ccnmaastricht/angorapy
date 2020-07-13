@@ -250,7 +250,7 @@ class ShadowHandEgg(ShadowHand, utils.EzPickle):
 class ShadowHandReach(HandReachEnv):
     """Simpler Reaching task."""
 
-    FORCE_MULTIPLIER = 0.1
+    FORCE_MULTIPLIER = 0.05
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
@@ -273,10 +273,12 @@ class ShadowHandReach(HandReachEnv):
         return (super().compute_reward(achieved_goal, goal, info)
                 + info["is_success"] * self.success_multiplier
                 - self._get_force_punishment() * ShadowHandReach.FORCE_MULTIPLIER
-                )
+        )
 
     def _get_force_punishment(self):
-        return (self.sim.data.actuator_force ** 2).sum()
+        # sum of squares, ignoring wrist (first two)
+        sum_of_squared_forces = (self.sim.data.actuator_force[2:] ** 2).sum()
+        return sum_of_squared_forces
 
     def _get_obs(self):
         # proprioception
