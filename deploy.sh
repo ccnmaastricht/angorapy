@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=tapping_experiment
+#SBATCH --job-name=dexterity_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
 #SBATCH --time=24:00:00
