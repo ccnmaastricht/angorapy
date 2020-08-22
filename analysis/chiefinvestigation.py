@@ -5,7 +5,7 @@ import autograd.numpy as np
 import gym
 import sklearn
 
-sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
+sys.path.append("/dexterous-robot-hand/analysis/rnn_dynamical_systems")
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
@@ -76,25 +76,28 @@ class Chiefinvestigator(Investigator):
         return states, activations, rewards, actions, done
 
     def get_data_over_episodes(self, n_episodes: int, layer_name: str, previous_layer_name: str):
+        """Get recorded data from given number of episodes
 
-        activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes = [], [], []
-        states_all_episodes, info_all = [], []
+        Args:
+            n_episodes: Number of episodes to be recorded
+            layer_name: Name of recurrent layer
+            previous_layer_name: Name of layer feeding into recurrent layer
+
+        Returns: activations, inputs, actions, observations, info"""
+        all_activations, all_inputs, all_actions, all_observations, all_done = [], [], [], [], []
         for i in range(n_episodes):
-            states, activations, rewards, actions, done = self.parse_data(layer_name, previous_layer_name)
-            inputs = np.reshape(activations[2], (activations[2].shape[0], self.n_hidden))
-            activations = np.reshape(activations[1], (activations[1].shape[0], self.n_hidden))
-            activations_over_all_episodes.append(activations)
-            inputs_over_all_episodes.append(inputs)
-            actions = np.vstack(actions)
-            actions_over_all_episodes.append(actions)
-            states_all_episodes.append(np.vstack(states))
-            info_all.append(done)
+            states, activations, rewards, actions, done = \
+                self.parse_data(layer_name, previous_layer_name)
 
-        activations_over_all_episodes, inputs_over_all_episodes = np.vstack(activations_over_all_episodes), \
-                                                                  np.vstack(inputs_over_all_episodes)
-        actions_over_all_episodes = np.concatenate(actions_over_all_episodes, axis=0)
+            all_activations.append(np.reshape(activations[1], (activations[1].shape[0], self.n_hidden)))
+            all_inputs.append(np.reshape(activations[2], (activations[2].shape[0], self.n_hidden)))
+            all_actions.append(np.vstack(actions))
+            all_observations.append(np.vstack(states))
+            all_done.append(done)
 
-        return activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, np.vstack(states_all_episodes), info_all
+        return np.vstack(all_activations), np.vstack(all_inputs), \
+               np.concatenate(all_actions, axis=0), np.vstack(all_observations), \
+               all_done
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 
@@ -114,7 +117,7 @@ class Chiefinvestigator(Investigator):
             probabilities = flatten(self.sub_model_from.predict(activation))
 
             action = self.distribution.act_deterministic(*probabilities)
-            observation, reward, done, info = self.env.step(action)
+            _, _, _, _ = self.env.step(action)
 
     def return_vanilla(self, inputs):
 
