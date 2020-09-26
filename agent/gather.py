@@ -14,8 +14,9 @@ import models
 from agent import policies
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
+from agent.policies import GaussianPolicyDistribution
 from environments import *
-from models import build_rnn_models, GaussianPolicyDistribution
+from models import build_rnn_models, build_ffn_models
 from utilities.const import STORAGE_DIR, DETERMINISTIC
 from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer
 from utilities.model_utils import is_recurrent_model
@@ -25,8 +26,8 @@ from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNo
 
 class Gatherer:
     """Remote Gathering class."""
-    joint: tf.keras.Model
-    policy: tf.keras.Model
+    # joint: tf.keras.Model
+    # policy: tf.keras.Model
 
     def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int):
         model_builder = getattr(models, model_builder_name)
@@ -50,9 +51,9 @@ class Gatherer:
 
     def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict):
         """Collect a batch shard of experience for a given number of timesteps."""
-
         # import here to avoid pickling errors
         import tensorflow as tfl
+        tfl.get_logger().setLevel('WARNING')
 
         # build new environment for each collector to make multiprocessing possible
         if DETERMINISTIC:
@@ -219,7 +220,7 @@ class Gatherer:
         return steps, cumulative_reward, eps_class
 
 
-@ray.remote
+@ray.remote(num_gpus=0)
 class RemoteGatherer(Gatherer):
     pass
 
@@ -230,24 +231,24 @@ if __name__ == "__main__":
     RUN_DEBUG = False
 
     os.chdir("../")
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # need to deactivate GPU in Debugger mode!
-    tf.config.experimental_run_functions_eagerly(RUN_DEBUG)
+    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # need to deactivate GPU in Debugger mode!
+    # tf.config.experimental_run_functions_eagerly(RUN_DEBUG)
 
     env_n = "HalfCheetah-v2"
     environment = gym.make(env_n)
     distro = GaussianPolicyDistribution(environment)
-    builder = build_rnn_models
+    builder = build_ffn_models
     sd, ad = env_extract_dims(environment)
     wrapper = CombiWrapper((StateNormalizationWrapper(sd), RewardNormalizationWrapper()))
 
     ray.init()
     t = time.time()
-    actors = [Gatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(1)]
+    actors = [RemoteGatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(7)]
 
     for _ in range(100):
         it = time.time()
-        outs_ffn = ray.get([actor.collect.remote(2048, 0.99, 0.95, 16, wrapper.serialize(), False) for actor in actors])
+        outs_ffn = ray.get([actor.collect.remote(1024, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors])
         print(f"Gathering Time: {time.time() - it}")
 
     print(f"Program Runtime: {time.time() - t}")

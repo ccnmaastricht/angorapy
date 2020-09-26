@@ -20,8 +20,16 @@ To install all required python packages run
 pip install -r requirements.txt
 ```
 
+#### MuJoCo and MuJoCo-Py
 To train on any mujoco-based environment, you will need to install the MuJoCo software (requiring a license)
 as well as mujoco-py. Currently, mujoco-py is buggy with MuJoCo 2.0, you will need version 1.5 of both MuJoCo and mujocopy!
+
+To install mujoco-py on Ubuntu, run
+
+```bash
+sudo apt install libosmesa6-dev libgl1-mesa-glx libglfw3 patchelf
+pip install -U 'mujoco-py<2.1,>=2.0'
+```
 
 To save gifs during training, imagemagicks policy needs to be changed to allow more memory usage. Achieve this by e.g. commenting out all ressource lines in `/etc/ImageMagick-6/policy.xml`.
 

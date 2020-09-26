@@ -4,7 +4,7 @@ import numpy
 import numpy as np
 
 import tensorflow as tf
-from tensorflow_core.python.keras.layers import TimeDistributed
+from tensorflow.python.keras.layers import TimeDistributed
 
 from utilities.util import flatten
 from inspect import getfullargspec as fargs

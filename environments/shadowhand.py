@@ -85,6 +85,7 @@ class ShadowHand(manipulate.ManipulateEnv):
 
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
+
         # get touch sensor site names and their ids
         for k, v in self.sim.model._sensor_name2id.items():
             if 'robot0:TS_' in k:

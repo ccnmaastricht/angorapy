@@ -5,7 +5,7 @@ import time
 
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD
-from tensorflow_core.python.keras.utils import plot_model
+# from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 
 from agent.policies import BasePolicyDistribution, BetaPolicyDistribution
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     env = gym.make("ShadowHand-v0")
     _, _, joint = build_shadow_brain_v2(env, BetaPolicyDistribution(), bs=batch_size)
-    plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
+    # plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
 

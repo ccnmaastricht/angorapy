@@ -1,19 +1,26 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+import tensorflow as tf
+
 import argparse
 import logging
 
 import argcomplete
+import gym
 from gym.spaces import Box
 
 import configs
 from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
-from models import *
 from models import get_model_builder
 from models.shadow import build_blind_shadow_brain_v1
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
+
+
+tf.get_logger().setLevel('WARNING')
 
 
 class InconsistentArgumentError(Exception):
@@ -100,7 +107,7 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
         print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
-    if tf.test.is_gpu_available():
+    if len(tf.config.list_physical_devices('GPU')) > 0:
         agent.set_gpu(not settings["cpu"])
     else:
         agent.set_gpu(False)
@@ -108,7 +115,7 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
     monitor = None
     if use_monitor:
         monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
-                      iterations=settings["iterations"], config_name=settings["config"])
+                          iterations=settings["iterations"], config_name=settings["config"])
 
     redis_auth = None if settings["redis_ip"] is None else [settings["redis_ip"], settings["redis_pw"]]
     agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
@@ -123,8 +130,7 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
 
 if __name__ == "__main__":
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
+    tf.get_logger().setLevel('WARNING')
     all_envs = [e.id for e in list(gym.envs.registry.all())]
 
     # parse commandline arguments

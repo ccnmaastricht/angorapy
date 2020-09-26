@@ -1,4 +1,5 @@
-tensorflow==2.0.1
+tensorflow==2.3
+mujoco-py<2.1,>=2.0
 ray
 tqdm
 numpy
@@ -12,5 +13,5 @@ Flask
 Flask-JSGlue
 argcomplete
 gym
-box2d-py
+Box2D
 matplotlib

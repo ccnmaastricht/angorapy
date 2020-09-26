@@ -329,7 +329,7 @@ class PPOAgent:
         if parallel:
             if not ray_is_initialized:
                 if redis_auth is None:
-                    ray.init(local_mode=self.debug, num_cpus=multiprocessing.cpu_count(), logging_level=logging.ERROR)
+                    ray.init()  # local_mode=self.debug, num_cpus=multiprocessing.cpu_count())
                 else:
                     ray.init(address=redis_auth[0], redis_password=redis_auth[1],
                              local_mode=self.debug, logging_level=logging.ERROR)
@@ -344,11 +344,12 @@ class PPOAgent:
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
 
-            # every tenth iteration reconstruct workers to prevent tensorflow memory leakage
-            if self.iteration % RESET_EVERY == 0:
-                flat_print("Recreating Workers...")
-                del workers
-                workers = self._make_workers(parallel)
+            # every tenth iteration reconstruct workers to prevent tensorflow memory leakage  TODO potentiall reintroduce
+            # if self.iteration % RESET_EVERY == 0:
+            #     flat_print("Recreating Workers...")
+            #     [ray.kill(worker) for worker in workers]
+            #     del workers
+            #     workers = self._make_workers(parallel)
 
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -368,9 +369,10 @@ class PPOAgent:
                 [actor.update_weights.remote(self.joint.get_weights()) for actor in workers]
 
                 # create processes and execute them
-                split_stats, split_preprocessors = zip(*ray.get(
-                    [actor.collect.remote(self.horizon, self.discount, self.lam, self.tbptt_length,
-                                          self.preprocessor.serialize()) for actor in workers]))
+                ray_output = ray.get([
+                    actor.collect.remote(self.horizon, self.discount, self.lam, self.tbptt_length,
+                                         self.preprocessor.serialize()) for actor in workers])
+                split_stats, split_preprocessors = zip(*ray_output)
             else:
                 # distribute the current policy to the workers
                 [actor.update_weights(self.joint.get_weights()) for actor in workers]
@@ -495,24 +497,25 @@ class PPOAgent:
 
         return self
 
-    def _make_workers(self, parallel, verbose=False):
+    def _make_workers(self, parallel, verbose=False) -> List[RemoteGatherer]:
         if parallel:
             available_cpus = ray.cluster_resources()['CPU']
 
             # set up the persistent workers
             worker_options: dict = {}
-            if self.n_workers == 1:
-                # worker_options["num_gpus"] = 1
-                worker_options["num_cpus"] = available_cpus
-            elif self.n_workers < available_cpus:
-                worker_options["num_cpus"] = available_cpus // self.n_workers
+            # TODO reactivate
+            # if self.n_workers == 1:
+            #     # worker_options["num_gpus"] = 1
+            #     worker_options["num_cpus"] = available_cpus
+            # elif self.n_workers < available_cpus:
+            #     worker_options["num_cpus"] = available_cpus // self.n_workers
 
-            workers = [RemoteGatherer.options(**worker_options).remote(self.builder_function_name,
-                                                                       self.distribution.__class__.__name__,
-                                                                       self.env_name, i) for i in range(self.n_workers)]
+            workers = [RemoteGatherer.remote(self.builder_function_name,
+                                             self.distribution.__class__.__name__,
+                                             self.env_name, i) for i in range(self.n_workers)]
 
             if verbose:
-                print(f"{self.n_workers} workers each using {worker_options}")
+                print(f"{len(workers)} workers initialized.")
         else:
             workers = [Gatherer(self.builder_function_name,
                                 self.distribution.__class__.__name__,
@@ -744,18 +747,19 @@ class PPOAgent:
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
 
         # print the report
-        flat_print(f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
-                   f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
-                   f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
-                   f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
-                   f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
-                   f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
-                   f"lr: {nc}{current_lr:.2e}{ec}; "
-                   f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
-                   f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
-                   f"{underflow}"
-                   f"fps: {fps_string} {time_distribution_string}; "
-                   f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
+        flat_print(
+            f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
+            f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
+            f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
+            f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
+            f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
+            f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
+            f"lr: {nc}{current_lr:.2e}{ec}; "
+            f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
+            f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+            f"{underflow}"
+            f"fps: {fps_string} {time_distribution_string}; "
+            f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
@@ -797,7 +801,8 @@ class PPOAgent:
         agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}"
         print(agent_path)
         if not os.path.isdir(agent_path):
-            raise FileNotFoundError("The given agent ID does not match any existing save history from your current path.")
+            raise FileNotFoundError(
+                "The given agent ID does not match any existing save history from your current path.")
 
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID's save history is empty.")
