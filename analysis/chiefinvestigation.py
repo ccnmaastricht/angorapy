@@ -20,7 +20,7 @@ class Chiefinvestigator(Investigator):
 
         Args:
             agent_id: ID of agent that will be analyzed.
-            env_name: Name of the gym environment that the agent was trained in. Default is set to CartPole-v1
+            enforce_env_name: Name of the gym environment that the agent was trained in. Default is set to CartPole-v1
         """
 
         self.agent = PPOAgent.from_agent_state(agent_id, from_iteration=from_iteration)
