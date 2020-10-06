@@ -5,7 +5,7 @@ import autograd.numpy as np
 import gym
 import sklearn
 
-sys.path.append("/dexterous-robot-hand/analysis/rnn_dynamical_systems")
+# sys.path.append("/dexterous-robot-hand/analysis/rnn_dynamical_systems")
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
