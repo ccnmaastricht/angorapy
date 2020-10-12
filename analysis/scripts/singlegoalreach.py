@@ -38,12 +38,12 @@ adamfpf = Adamfixedpointfinder(chiefinvesti.weights, chiefinvesti.rnn_type,
                                max_iters=7000)
 
 states, inputs = adamfpf.sample_inputs_and_states(activations_over_all_episodes, inputs_over_all_episodes,
-                                                  100, 0)
+                                                  40, 0)
 fps = adamfpf.find_fixed_points(states, inputs)
 
 plot_fixed_points(activations_over_all_episodes, fps, 1000, 1)
 plt.show()
 
-#for fp in fps:
-#    chiefinvesti.render_fixed_points(np.repeat(np.reshape(fp['x'], (1, 1, 32)), axis=1, repeats=100))
-   # sleep(1)
+for fp in fps:
+    chiefinvesti.render_fixed_points(np.repeat(np.reshape(fp['x'], (1, 1, 32)), axis=1, repeats=100))
+    sleep(1)
