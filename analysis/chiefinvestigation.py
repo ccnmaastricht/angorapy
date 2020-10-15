@@ -2,6 +2,7 @@ import os
 import sys
 
 import autograd.numpy as np
+import pysindy as ps
 import gym
 import sklearn
 
@@ -182,12 +183,15 @@ class Chiefinvestigator(Investigator):
 
         return x, y, z, u, v, w
 
+    def detect_dynamics(self):
+        pass
+
 
 if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0" # free reach
+    agent_id = 1585500821  # cartpole-v1
     # agent_id = 1586597938# finger tapping
 
     chiefinvesti = Chiefinvestigator(agent_id)
@@ -196,6 +200,27 @@ if __name__ == "__main__":
     print(layer_names)
 
     # collect data from episodes
-    n_episodes = 5
+    n_episodes = 1
     activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done \
         = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
+
+    poly_order = 3
+    threshold = 0.1
+    seed = 100
+    np.random.seed(seed)
+    dt = 1
+
+    model = ps.SINDy(
+        optimizer=ps.STLSQ(threshold=threshold),
+        feature_library=ps.PolynomialLibrary(degree=poly_order),
+    )
+    model.fit(
+        activations_over_all_episodes,
+        t=dt,
+        quiet=True,
+    )
+    t_sim = np.arange(0, 20, dt)
+    x_sim = model.simulate(activations_over_all_episodes[0, :], t=t_sim)
+
+    error = np.mean(np.sum(np.square(activations_over_all_episodes[:20, :] - x_sim), axis=1))
+    print(error)
