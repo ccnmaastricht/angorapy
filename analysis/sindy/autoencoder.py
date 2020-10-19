@@ -7,12 +7,12 @@ class Encoder(tf.keras.layers.Layer):
         super(Encoder, self).__init__()
         self.hidden_layer = tf.keras.layers.Dense(
             units=intermediate_dim,
-            activation=tf.nn.relu,
+            activation=tf.nn.sigmoid,
             kernel_initializer='he_uniform'
         )
         self.output_layer = tf.keras.layers.Dense(
             units=intermediate_dim,
-            activation=tf.nn.sigmoid
+            activation=tf.nn.relu
         )
 
     def call(self, input_features):
@@ -25,12 +25,12 @@ class Decoder(tf.keras.layers.Layer):
         super(Decoder, self).__init__()
         self.hidden_layer = tf.keras.layers.Dense(
             units=intermediate_dim,
-            activation=tf.nn.relu,
+            activation=tf.nn.sigmoid,
             kernel_initializer='he_uniform'
         )
         self.output_layer = tf.keras.layers.Dense(
             units=original_dim,
-            activation=tf.nn.sigmoid
+            activation=tf.nn.relu
         )
 
     def call(self, code):
@@ -44,20 +44,23 @@ class Autoencoder(tf.keras.Model):
         self.encoder = Encoder(intermediate_dim=intermediate_dim)
         self.decoder = Decoder(intermediate_dim=intermediate_dim, original_dim=original_dim)
 
-    def call(self, input_features):
-        code = self.encoder(input_features)
-        reconstructed = self.decoder(code)
-        return reconstructed
+    def call(self, x, dx):
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        dz = tf.multiply(tf.gradients(x), self.encoder(dx))
+        return x_hat, z
 
 
-def loss(model, original):
-    reconstruction_error = tf.reduce_mean(tf.square(tf.subtract(model(original), original)))
+def loss(model, x):
+    x_hat, z = model(original)
+    reconstruction_error = tf.reduce_mean(tf.square(tf.subtract(x_hat, x)))
+
     return reconstruction_error
 
 
-def train(loss, model, opt, original):
+def train(loss, model, opt, x):
   with tf.GradientTape() as tape:
-    gradients = tape.gradient(loss(model, original), model.trainable_variables)
+    gradients = tape.gradient(loss(model, x), model.trainable_variables)
     gradient_variables = zip(gradients, model.trainable_variables)
     opt.apply_gradients(gradient_variables)
 

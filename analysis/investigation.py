@@ -224,7 +224,6 @@ class Investigator:
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
 
-
 if __name__ == "__main__":
     print("INVESTIGATING")
     os.chdir("../")
