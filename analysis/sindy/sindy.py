@@ -4,7 +4,8 @@ from matplotlib.cm import rainbow
 import numpy as np
 from scipy.integrate import odeint
 from scipy.io import loadmat
-
+from analysis.sindy.components import build_autoencoder
+import tensorflow as tf
 import pysindy as ps
 
 
@@ -22,15 +23,43 @@ poly_order = 5
 threshold = 0.05
 seed = 100
 np.random.seed(seed)  # Seed for reproducibility
-
+dt = 0.001
 noise_level = 1e-3
 
-models = []
+t_sim = np.arange(0, 20, dt)
+t_train = np.arange(0, 100, dt)
+x0_train = [-8, 8, 27]
+x_train = odeint(lorenz, x0_train, t_train)
+x_dot_train_measured = np.array(
+    [lorenz(x_train[i], 0) for i in range(t_train.size)]
+)
 
-x_sim = []
+sindy_autoencoder = build_autoencoder(input_dim=3, hidden_dim=3, z_dim=3, n_hidden=1,
+                                      poly_order=2, batch_size=20)
 
-dt_levels = [1e-4, 1e-3, 1e-2, 0.1, 1]
-for dt in dt_levels:
+opt = tf.keras.optimizers.Adam(learning_rate=1e-2)
+
+def train(opt, sindy_autoencoder, x, dx):
+    with tf.GradientTape() as tape:
+        x_hat, z, dz, dx_decode, sindy_predict = sindy_autoencoder([x, dx])
+        loss = tf.reduce_mean((x-x_hat)**2) \
+        + tf.reduce_mean((dz - sindy_predict)**2) \
+        + tf.reduce_mean((dx - dx_decode)**2)
+        gradients = tape.gradient(loss, sindy_autoencoder.trainable_variables)
+        gradient_variables = zip(gradients, sindy_autoencoder.trainable_variables)
+        opt.apply_gradients(gradient_variables)
+        print(loss.numpy())
+
+if __name__ == "__main__":
+    # Fit the models and simulate
+
+    poly_order = 5
+    threshold = 0.05
+    seed = 100
+    np.random.seed(seed)  # Seed for reproducibility
+    dt = 0.001
+    noise_level = 1e-3
+
     t_sim = np.arange(0, 20, dt)
     t_train = np.arange(0, 100, dt)
     x0_train = [-8, 8, 27]
@@ -38,17 +67,13 @@ for dt in dt_levels:
     x_dot_train_measured = np.array(
         [lorenz(x_train[i], 0) for i in range(t_train.size)]
     )
-    model = ps.SINDy(
-        optimizer=ps.STLSQ(threshold=threshold),
-        feature_library=ps.PolynomialLibrary(degree=poly_order),
-    )
-    model.fit(
-        x_train,
-        t=dt,
-        x_dot=x_dot_train_measured
-        + np.random.normal(scale=noise_level, size=x_train.shape),
-        quiet=True,
-    )
-    models.append(model)
-    x_sim.append(model.simulate(x_train[0], t_sim))
-    model.print()
+
+    batch_size = 100
+    sindy_autoencoder = build_autoencoder(input_dim=3, hidden_dim=3, z_dim=3, n_hidden=1,
+                                          poly_order=2, batch_size=batch_size)
+
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-2)
+    for i in range(len(x_train)-batch_size):
+        x = x_train[i:i+batch_size, :]
+        dx = x_dot_train_measured[i:i+batch_size, :]
+        train(opt, sindy_autoencoder, x, dx)

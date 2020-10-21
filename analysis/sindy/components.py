@@ -24,11 +24,16 @@ def build_autoencoder(input_dim: int, hidden_dim: int, z_dim: int, n_hidden: int
 
     Theta = concatenate([tf.ones(tf.shape(z)), z])
     if poly_order > 1:
+        poly_order_two = []
+        for i in range(z_dim):
+            for j in range(i, z_dim):
+                poly_order_two.append(tf.multiply(tf.slice(z, [0, i], [batch_size, 1]),
+                                                  tf.slice(z, [0, j], [batch_size, 1])))
         Theta = concatenate([tf.ones(tf.shape(z)), z,
-                             ])
+                             tf.squeeze(tf.stack(poly_order_two, axis=1))])
 
     w_init = tf.random_normal_initializer()
-    sindy_coefficients = tf.Variable(initial_value=w_init((6, z_dim)), trainable=True, name="SINDy_coefficients")
+    sindy_coefficients = tf.Variable(initial_value=w_init((Theta.shape[1], z_dim)), trainable=True, name="SINDy_coefficients")
 
     sindy_predict = tf.matmul(Theta, sindy_coefficients, name="SINDy")
     x, dx_decode = z, sindy_predict
@@ -46,18 +51,18 @@ def build_autoencoder(input_dim: int, hidden_dim: int, z_dim: int, n_hidden: int
     weights = shared_x_decode.get_weights()[0]
     dx_decode = tf.matmul(dx_decode, weights, name="dx_decode")
 
-    return tf.keras.Model(inputs=[inputs, dx], outputs=[x_hat, z, dz, dx_decode], name="Autoencoder")
+    return tf.keras.Model(inputs=[inputs, dx], outputs=[x_hat, z, dz, dx_decode, sindy_predict], name="Autoencoder")
 
 
 if __name__ == "__main__":
     autoencoder = build_autoencoder(input_dim=10, hidden_dim=5,
-                                    z_dim=3, n_hidden=1, poly_order=1, batch_size=4)
+                                    z_dim=3, n_hidden=1, poly_order=2, batch_size=4)
     autoencoder.summary()
 
     x = tf.random.uniform((4, 10))
     dx = tf.random.uniform((4, 10))
 
-    x_hat, z, dz, dx_decode = autoencoder([x, dx])
+    x_hat, z, dz, dx_decode, sindy_predict = autoencoder([x, dx])
     tf.keras.utils.plot_model(autoencoder, to_file="model.png",
                               show_shapes=True, dpi=300)
 

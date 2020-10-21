@@ -47,7 +47,7 @@ class Autoencoder(tf.keras.Model):
     def call(self, x, dx):
         z = self.encoder(x)
         x_hat = self.decoder(z)
-        dz = tf.multiply(tf.gradients(x), self.encoder(dx))
+
         return x_hat, z
 
 
