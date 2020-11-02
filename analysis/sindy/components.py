@@ -4,7 +4,7 @@ from tensorflow.keras.layers import concatenate, Dense, ReLU
 
 
 def build_autoencoder(input_dim: int, hidden_dim: int, z_dim: int, n_hidden: int,
-                      poly_order:int = None, batch_size: int = None):
+                      poly_order: int = None, batch_size: int = None):
     # encoder
     inputs = tf.keras.layers.Input(batch_shape=(batch_size, input_dim), name="x")
     dx = tf.keras.layers.Input(batch_shape=(batch_size, input_dim), name="dx")
@@ -13,16 +13,14 @@ def build_autoencoder(input_dim: int, hidden_dim: int, z_dim: int, n_hidden: int
     for i in range(n_hidden):
         shared_x = Dense(hidden_dim, name="shared_encoder"+str(i+1))
         x = shared_x(x)
-        weights = shared_x.get_weights()[0]
-        dz = tf.multiply(tf.cast(x > 0, tf.float32), tf.matmul(dz, weights))
+        dz = tf.multiply(tf.cast(x > 0, tf.float32), tf.matmul(dz, shared_x.weights[0]))
         x = ReLU()(x)
 
     shared_x = Dense(z_dim, name="z")
     z = shared_x(x) # last layer that produces latent space does not have an activation
-    weights = shared_x.get_weights()[0]
-    dz = tf.matmul(dz, weights, name="dz")
-
-    Theta = concatenate([tf.ones(tf.shape(z)), z])
+    dz = tf.matmul(dz, shared_x.weights[0], name="dz")
+    if poly_order == 1:
+        Theta = concatenate([tf.ones(tf.shape(z)), z])
     if poly_order > 1:
         poly_order_two = []
         for i in range(z_dim):
@@ -32,10 +30,7 @@ def build_autoencoder(input_dim: int, hidden_dim: int, z_dim: int, n_hidden: int
         Theta = concatenate([tf.ones(tf.shape(z)), z,
                              tf.squeeze(tf.stack(poly_order_two, axis=1))])
 
-    w_init = tf.random_normal_initializer()
-    sindy_coefficients = tf.Variable(initial_value=w_init((Theta.shape[1], z_dim)), trainable=True, name="SINDy_coefficients")
-
-    sindy_predict = tf.matmul(Theta, sindy_coefficients, name="SINDy")
+    sindy_predict = Dense(z_dim, use_bias=False, name="SINDy")(Theta)
     x, dx_decode = z, sindy_predict
 
     # decoder
