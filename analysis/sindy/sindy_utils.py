@@ -6,7 +6,7 @@ from scipy.integrate import odeint
 def library_size(n, poly_order, use_sine=False, include_constant=True):
     l = 0
     for k in range(poly_order+1):
-        l += int(binom(n+k-1,k))
+        l += int(binom(n+k-1, k))
     if use_sine:
         l += n
     if not include_constant:
@@ -15,9 +15,9 @@ def library_size(n, poly_order, use_sine=False, include_constant=True):
 
 
 def sindy_library(X, poly_order, include_sine=False):
-    m, n = X.shape
+    n = X.shape[0]
     l = library_size(n, poly_order, include_sine, True)
-    library = np.ones((m, l))
+    library = np.ones((1, l))
     index = 1
 
     for i in range(n):
