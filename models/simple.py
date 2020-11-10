@@ -56,14 +56,22 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
                   "gru": tf.keras.layers.GRU}[
         model_type]
 
-    inputs = tf.keras.Input(batch_shape=(bs, None, state_dimensionality,))
-    masked = tf.keras.layers.Masking()(inputs)
+    sequence_length = None
 
-    # policy network
+    inputs = tf.keras.Input(batch_shape=(bs, sequence_length, state_dimensionality,))
+    # masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length, state_dimensionality,))(inputs)
+    masked = inputs
+
+    # policy network; stateful, so batch size needs to be known
     x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="policy_encoder"),
            name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
-    x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
+
+    x, *_ = rnn_choice(layer_sizes[-1],
+                       stateful=True,
+                       return_sequences=True,
+                       return_state=True,
+                       batch_size=bs,
                        name="policy_recurrent_layer")(x)
 
     out_policy = distribution.build_action_head(n_actions, x.shape[1:], bs)(x)
@@ -115,16 +123,16 @@ if __name__ == '__main__':
     cont_env = gym.make("LunarLanderContinuous-v2")
     disc_env = gym.make("LunarLander-v2")
 
-    _, _, ffn_distinct = build_ffn_models(cont_env, GaussianPolicyDistribution(), False)
-    _, _, ffn_shared = build_ffn_models(cont_env, BetaPolicyDistribution(), True)
-    _, _, ffn_distinct_discrete = build_ffn_models(disc_env, CategoricalPolicyDistribution(), True)
-    _, _, rnn_distinct = build_rnn_models(cont_env, BetaPolicyDistribution(), False, 1, "lstm")
-    _, _, rnn_shared = build_rnn_models(cont_env, GaussianPolicyDistribution(), True, 1, "gru")
-    _, _, rnn_shared_discrete = build_rnn_models(disc_env, CategoricalPolicyDistribution(), True)
+    # _, _, ffn_distinct = build_ffn_models(cont_env, GaussianPolicyDistribution(cont_env), False)
+    # _, _, ffn_shared = build_ffn_models(cont_env, BetaPolicyDistribution(cont_env), True)
+    # _, _, ffn_distinct_discrete = build_ffn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
+    _, _, rnn_distinct = build_rnn_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, "lstm")
+    # _, _, rnn_shared = build_rnn_models(cont_env, GaussianPolicyDistribution(cont_env), True, 1, "gru")
+    # _, _, rnn_shared_discrete = build_rnn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
 
-    plot_model(ffn_distinct, "ffn_distinct.png", expand_nested=True)
-    plot_model(ffn_distinct_discrete, "ffn_distinct_discrete.png", expand_nested=True)
-    plot_model(ffn_shared, "ffn_shared.png", expand_nested=True)
-    plot_model(rnn_distinct, "rnn_distinct.png", expand_nested=True)
-    plot_model(rnn_shared, "rnn_shared.png", expand_nested=True)
-    plot_model(rnn_shared_discrete, "rnn_shared_discrete.png", expand_nested=True)
+    # plot_model(ffn_distinct, "ffn_distinct.png", expand_nested=True)
+    # plot_model(ffn_distinct_discrete, "ffn_distinct_discrete.png", expand_nested=True)
+    # plot_model(ffn_shared, "ffn_shared.png", expand_nested=True)
+    # plot_model(rnn_distinct, "rnn_distinct.png", expand_nested=True)
+    # plot_model(rnn_shared, "rnn_shared.png", expand_nested=True)
+    # plot_model(rnn_shared_discrete, "rnn_shared_discrete.png", expand_nested=True)

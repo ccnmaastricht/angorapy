@@ -3,8 +3,8 @@
 #SBATCH --job-name=dexterity_experiment
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=admin@tonioweidler.de
-#SBATCH --time=24:00:00
-#SBATCH --nodes=1
+#SBATCH --time=01:00:00
+#SBATCH --nodes=16
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
@@ -21,8 +21,7 @@ worker_num=0 # Must be one less than the total number of nodes
 # load modules
 module load daint-gpu
 module load cray-python
-module load cray-nvidia-compute
-module load cudatoolkit/10.0.130_3.22-7.0.1.0_5.2__gdfb4ce5
+module load cudatoolkit/10.2.89_3.28-7.0.2.1_2.17__g52c0314
 module av graphviz
 
 # load virtual environment
@@ -59,4 +58,4 @@ do
   sleep 10
 done
 
-python3 -u train.py HandTappingAbsolute-v1 --config hand_beta_no_ent --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
+python3 -uO train.py HandTappingAbsolute-v1 --config hand_beta_no_ent --model gru --iterations 10000 --redis-ip $ip_head --redis-pw $redis_password
