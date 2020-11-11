@@ -246,10 +246,9 @@ if __name__ == "__main__":
     t = time.time()
     actors = [RemoteGatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(7)]
 
-    for _ in range(100):
-        it = time.time()
-        outs_ffn = ray.get([actor.collect.remote(1024, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors])
-        print(f"Gathering Time: {time.time() - it}")
+    it = time.time()
+    outs_ffn = ray.get([actor.collect.remote(2048, 0.99, 0.95, 8, wrapper.serialize()) for actor in actors])
+    print(f"Gathering Time: {time.time() - it}")
 
     print(f"Program Runtime: {time.time() - t}")
 
