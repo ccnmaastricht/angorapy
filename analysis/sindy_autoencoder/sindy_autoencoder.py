@@ -9,7 +9,33 @@ from analysis.sindy_autoencoder.utils import build_sindy_autoencoder, autoencode
 
 
 class SindyAutoencoder(object):
+    """Class for implementation of SindyAutoencoder or
+    Data-driven discovery of coordinates and governing equations
 
+    paper: https://doi.org/10.1073/pnas.1906995116
+    code: https://github.com/kpchamp/SindyAutoencoders
+
+    This is an implementation in JAX instead of Tensorflow in the original publication.
+
+    Args:
+        layer_sizes (list): list of int specifying the layer sizes for the autoencoder. Last layer should be latend_dim,i.e. size of z
+        poly_order (int): polynomial order in Theta
+        seed (int): seed for PRNGkey
+        sequential_thresholding (bool): whether to do sequential thresholding using coefficient_mask
+        coefficient_threshold (float): theshold below which in absolute value sindy_coefficients will be 0
+        threshold_frequency (int): number of epochs to apply thresholding after
+        recon_loss_weight (float): weight multiplier for reconstruction loss
+        sindy_z_loss_weight (float): weight multiplier for sindy_z loss
+        sindy_x_loss_weight (float): weight multiplier for sindy_x loss
+        sindy_regularization_loss_weight (float): weight multiplier for sindy regularization loss
+        max_epochs (int): maximum number of epochs to be run
+        refinement_epochs (int): number of refinement epochs (no regularization loss)
+        batch_size (int): batch_size for one iteration in one epoch
+        learning_rate (float): step size parameter for updating parameters
+        print_updates (bool): switch on/off printing of updates during training
+
+
+    """
     def __init__(self,
                  layer_sizes: list,
                  poly_order: int,
@@ -22,6 +48,7 @@ class SindyAutoencoder(object):
                  sindy_x_loss_weight: float = 1e-4,
                  sindy_regularization_loss_weight: float = 1e-5,
                  max_epochs: int = 5000,
+                 refinement_epochs: int = 1000,
                  batch_size: int = 8000,
                  learning_rate: float = 1e-3,
                  print_updates: bool = True):
@@ -31,24 +58,27 @@ class SindyAutoencoder(object):
         self.library_size = library_size(layer_sizes[-1], poly_order)
 
         self.key = random.PRNGKey(seed)
-        self.autoencoder, self.coefficient_mask = build_sindy_autoencoder(layer_sizes, self.key)
-        self.vmap_autoencoder = vmap(autoencoder_pass, in_axes=({'encoder': None,
-                                                                 'decoder': None,
-                                                                 'sindy_coefficients': None},
-                                                                None, 0, 0))
+        self.autoencoder, self.coefficient_mask = build_sindy_autoencoder(layer_sizes,
+                                                                          self.library_size,
+                                                                          self.key)
+        # TODO: add selector for activation functions
+        self.vmap_autoencoder_pass = vmap(autoencoder_pass, in_axes=({'encoder': None,
+                                                                      'decoder': None,
+                                                                      'sindy_coefficients': None},
+                                                                     None, 0, 0))
 
         self.recon_loss_weight = recon_loss_weight
         self.sindy_z_loss_weight = sindy_z_loss_weight
         self.sindy_x_loss_weight = sindy_x_loss_weight
         self.sindy_regularization_loss_weight = sindy_regularization_loss_weight
 
-        loss, refinement_loss = self.build_loss_fun()
-        self.loss = jit(loss, device=jax.devices()[0])
+        self.loss_fun = jit(self.loss, device=jax.devices()[0])
 
         #optimizer
         self.learning_rate = learning_rate
         self.opt_init, self.opt_update, self.get_params = optimizers.adam(learning_rate)
         self.max_epochs = max_epochs
+        self.refinement_epochs = refinement_epochs
         self.batch_size = batch_size
 
         # thresholding for coefficient mask
@@ -59,78 +89,93 @@ class SindyAutoencoder(object):
         self.print_updates = print_updates
 
         self.train_loss = []
+        self.refinement_loss = []
 
-    def build_loss_fun(self):
+        self.reconstruction_losses = []
+        self.sindy_x_losses = []
+        self.sindy_z_losses = []
+        self.sindy_regularization_losses = []
 
-        vmap_autoencoder = self.vmap_autoencoder
+    def loss(self, sindy_autoencoder, coefficient_mask, x, dx_input):
+        x, dx, dz, x_decode, dx_decode, sindy_predict = self.vmap_autoencoder_pass(sindy_autoencoder,
+                                                                                   coefficient_mask,
+                                                                                   x,
+                                                                                   dx_input)
 
-        recon_loss_weight = self.recon_loss_weight
-        sindy_z_loss_weight = self.sindy_z_loss_weight
-        sindy_x_loss_weight = self.sindy_x_loss_weight
-        sindy_regularization_loss_weight = self.sindy_regularization_loss_weight
+        reconstruction_loss = jnp.mean((x - x_decode) ** 2)
+        sindy_z = jnp.mean((dz - sindy_predict) ** 2)
+        sindy_x = jnp.mean((dx - dx_decode) ** 2)
+        sindy_regularization = jnp.mean(jnp.abs(sindy_autoencoder['sindy_coefficients']))
 
-        def loss(sindy_autoencoder, coefficient_mask, input, dx_input):
-            x, dx, z, dz, x_decode, dx_decode, Theta, sindy_predict = vmap_autoencoder(sindy_autoencoder, coefficient_mask, input,
-                                                                             dx_input)
+        self.reconstruction_losses.append(reconstruction_loss)
+        self.sindy_z_losses.append(sindy_z)
+        self.sindy_x_losses.append(sindy_x)
+        self.sindy_regularization_losses.append(sindy_regularization)
 
-            reconstruction_loss = jnp.mean((x - x_decode) ** 2)
-            sindy_z = jnp.mean((dz - sindy_predict) ** 2)
-            sindy_x = jnp.mean((dx - dx_decode) ** 2)
-            sindy_regularization = jnp.mean(jnp.abs(sindy_autoencoder['sindy_coefficients']))
-
-            total_loss = recon_loss_weight * reconstruction_loss + \
-                         sindy_z_loss_weight * sindy_z + \
-                         sindy_x_loss_weight * sindy_x + \
-                         sindy_regularization_loss_weight * sindy_regularization
-            return total_loss
-
-        def refinement_loss(sindy_autoencoder, coefficient_mask, input, dx_input):
-            x, dx, z, dz, x_decode, dx_decode, Theta, sindy_predict = vmap_autoencoder(sindy_autoencoder, coefficient_mask, input,
-                                                                             dx_input)
-
-            reconstruction_loss = jnp.mean((x - x_decode) ** 2)
-            sindy_z = jnp.mean((dz - sindy_predict) ** 2)
-            sindy_x = jnp.mean((dx - dx_decode) ** 2)
-
-            refinement_loss_total = recon_loss_weight * reconstruction_loss + \
-                                    sindy_z_loss_weight * sindy_z + \
-                                    sindy_x_loss_weight * sindy_x
-            return refinement_loss_total
-
-        return loss, refinement_loss
+        total_loss = self.recon_loss_weight * reconstruction_loss + \
+                     self.sindy_z_loss_weight * sindy_z + \
+                     self.sindy_x_loss_weight * sindy_x + \
+                     self.sindy_regularization_loss_weight * sindy_regularization
+        return total_loss
 
     def update(self, params, coefficient_mask, input, dx_input, opt_state):
-        value, grads = value_and_grad(self.loss)(params, coefficient_mask, input, dx_input)
+        value, grads = value_and_grad(self.loss_fun)(params, coefficient_mask, input, dx_input)
         opt_state = self.opt_update(0, grads, opt_state)
         return self.get_params(opt_state), opt_state, value
 
     def train(self, training_data: dict):
+        n_updates = 0
 
         opt_state = self.opt_init(self.autoencoder)
         params = self.get_params(opt_state)
 
         num_batches = int(jnp.ceil(len(training_data['x']) / self.batch_size))
+        batch_size = self.batch_size
 
         def batch_indices(iter):
             idx = iter % num_batches
-            return slice(idx * batch_size, (idx + 1) * self.batch_size)
-
+            return slice(idx * batch_size, (idx + 1) * batch_size)
+        print("TRAINING...")
         for epoch in range(self.max_epochs):
             start = time.time()
             for i in range(num_batches):
-                idx = batch_indices(i)
+                id = batch_indices(i)
 
                 params, opt_state, value = self.update(params, self.coefficient_mask,
-                                                       training_data['x'][idx, :],
-                                                       training_data['dx'][idx, :],
+                                                       training_data['x'][id, :],
+                                                       training_data['dx'][id, :],
                                                        opt_state)
                 self.train_loss.append(value)
+                n_updates += 1
+
             if epoch % self.thresholding_frequency == 0 and epoch > 1 and self.sequential_thresholding:
                 self.coefficient_mask = jnp.abs(params['sindy_coefficients']) > 0.1
                 print("Updated coefficient mask")
 
             stop = time.time()
-            print("Epoch", str(epoch), "Loss:", str(value), "This took:", str(jnp.round(stop - start, 4)), "s")
+            dt = stop - start
+            if self.print_updates:
+                self.print_update(epoch, n_updates, dt)
+
+        print("REFINEMENT...")
+        self.sindy_regularization_loss_weight = 0.0  # no regularization anymore
+
+        for ref_epoch in range(self.refinement_epochs):
+            start = time.time()
+            for i in range(num_batches):
+                id = batch_indices(i)
+
+                params, opt_state, value = self.update(params, self.coefficient_mask,
+                                                       training_data['x'][id, :],
+                                                       training_data['dx'][id, :],
+                                                       opt_state)
+                self.refinement_loss.append(value)
+                n_updates += 1
+
+            stop = time.time()
+            dt = stop - start
+            if self.print_updates:
+                self.print_update(ref_epoch, n_updates, dt)
 
     def validate(self):
         pass
@@ -138,18 +183,28 @@ class SindyAutoencoder(object):
     def simulate(self):
         pass
 
+    def print_update(self, epoch, n_updates, dt):
+        print(f"Epoch {1 + epoch}",
+              f"| Loss {round(self.train_loss[-1], 7)}",
+              f"| ReconLoss {round(self.reconstruction_losses[-1], 4)}",
+              f"| Updates {n_updates}",
+              f"| This took: {round(dt, 4)}s")
+
+
+# TODO: add model orders higher than 1
+# TODO: add different initializations for weights and sindy coefficients
 
 if __name__ == "__main__":
-    layer_sizes = [128, 64, 32, 3]
+    layers = [128, 64, 32, 3]
     seed = 1
-    SA = SindyAutoencoder(layer_sizes, poly_order=3, seed=seed, max_epochs=10)
+    SA = SindyAutoencoder(layers, poly_order=3, seed=seed, max_epochs=20,
+                          refinement_epochs=10)
 
     noise_strength = 1e-6
     training_data = get_lorenz_data(1024, noise_strength=noise_strength)
     # validation_data = get_lorenz_data(20, noise_strength=noise_strength)
 
-    batch_size = 8000
-
     SA.train(training_data=training_data)
+
 
 

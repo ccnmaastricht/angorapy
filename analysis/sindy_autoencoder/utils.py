@@ -31,13 +31,13 @@ def build_decoder(layer_sizes, key, scale=1e-2):
     return decoding_params
 
 
-def build_sindy_autoencoder(layer_sizes, key):
+def build_sindy_autoencoder(layer_sizes, library_size, key):
 
     encoding_params = build_encoder(layer_sizes, key)
     decoding_params = build_decoder(layer_sizes, key)
 
-    sindy_coefficients = jnp.ones((20, layer_sizes[-1]))
-    coefficient_mask = jnp.ones((20, layer_sizes[-1]))
+    sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
+    coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
     params = {'encoder': encoding_params,
               'decoder': decoding_params,
               'sindy_coefficients': sindy_coefficients}
@@ -95,15 +95,12 @@ def autoencoder_pass(params, coefficient_mask, x, dx):
     sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
     dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
 
-    return [x, dx, z, dz, x_decode, dx_decode, Theta, sindy_predict]
+    return [x, dx, dz, x_decode, dx_decode, sindy_predict]
 
 
 def sindy_library_jax(z, latent_dim, poly_order):
 
-    #library = [jnp.ones(z.shape[0])]
-    library = []
-
-    library.append(1)
+    library = [1]
 
     for i in range(latent_dim):
         library.append(z[i])
