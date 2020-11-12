@@ -2,7 +2,7 @@ import os
 import sys
 
 import autograd.numpy as np
-import pysindy as ps
+
 import gym
 import sklearn
 
@@ -204,23 +204,3 @@ if __name__ == "__main__":
     activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done \
         = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
 
-    poly_order = 3
-    threshold = 0.1
-    seed = 100
-    np.random.seed(seed)
-    dt = 1
-
-    model = ps.SINDy(
-        optimizer=ps.STLSQ(threshold=threshold),
-        feature_library=ps.PolynomialLibrary(degree=poly_order),
-    )
-    model.fit(
-        activations_over_all_episodes,
-        t=dt,
-        quiet=True,
-    )
-    t_sim = np.arange(0, 20, dt)
-    x_sim = model.simulate(activations_over_all_episodes[0, :], t=t_sim)
-
-    error = np.mean(np.sum(np.square(activations_over_all_episodes[:20, :] - x_sim), axis=1))
-    print(error)

@@ -91,11 +91,6 @@ class SindyAutoencoder(object):
         self.train_loss = []
         self.refinement_loss = []
 
-        self.reconstruction_losses = []
-        self.sindy_x_losses = []
-        self.sindy_z_losses = []
-        self.sindy_regularization_losses = []
-
     def loss(self, sindy_autoencoder, coefficient_mask, x, dx_input):
         x, dx, dz, x_decode, dx_decode, sindy_predict = self.vmap_autoencoder_pass(sindy_autoencoder,
                                                                                    coefficient_mask,
@@ -107,19 +102,14 @@ class SindyAutoencoder(object):
         sindy_x = jnp.mean((dx - dx_decode) ** 2)
         sindy_regularization = jnp.mean(jnp.abs(sindy_autoencoder['sindy_coefficients']))
 
-        self.reconstruction_losses.append(reconstruction_loss)
-        self.sindy_z_losses.append(sindy_z)
-        self.sindy_x_losses.append(sindy_x)
-        self.sindy_regularization_losses.append(sindy_regularization)
-
         total_loss = self.recon_loss_weight * reconstruction_loss + \
                      self.sindy_z_loss_weight * sindy_z + \
                      self.sindy_x_loss_weight * sindy_x + \
                      self.sindy_regularization_loss_weight * sindy_regularization
         return total_loss
 
-    def update(self, params, coefficient_mask, input, dx_input, opt_state):
-        value, grads = value_and_grad(self.loss_fun)(params, coefficient_mask, input, dx_input)
+    def update(self, params, coefficient_mask, X, dx, opt_state):
+        value, grads = value_and_grad(self.loss_fun)(params, coefficient_mask, X, dx)
         opt_state = self.opt_update(0, grads, opt_state)
         return self.get_params(opt_state), opt_state, value
 
@@ -177,6 +167,9 @@ class SindyAutoencoder(object):
             if self.print_updates:
                 self.print_update(ref_epoch, n_updates, dt)
 
+        print(f"FINISHING...\n"
+              f"Sparsity: {jnp.sum(self.coefficient_mask)} active terms")
+
     def validate(self):
         pass
 
@@ -185,8 +178,7 @@ class SindyAutoencoder(object):
 
     def print_update(self, epoch, n_updates, dt):
         print(f"Epoch {1 + epoch}",
-              f"| Loss {round(self.train_loss[-1], 7)}",
-              f"| ReconLoss {round(self.reconstruction_losses[-1], 4)}",
+              f"| Loss {self.train_loss[-1]}",
               f"| Updates {n_updates}",
               f"| This took: {round(dt, 4)}s")
 

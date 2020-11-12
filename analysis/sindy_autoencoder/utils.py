@@ -91,7 +91,7 @@ def autoencoder_pass(params, coefficient_mask, x, dx):
     dz = z_derivative(params['encoder'], x, dx)
     x_decode = decoding_pass(params['decoder'], z)
 
-    Theta = sindy_library_jax(z, 3, 3)
+    Theta = sindy_library_jax(z, len(params['encoder'][-1][0]), 2)
     sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
     dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
 
