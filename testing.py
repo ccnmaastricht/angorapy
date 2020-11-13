@@ -34,7 +34,7 @@ if __name__ == "__main__":
     actors = [Gatherer(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(n_actors_on_this_node)]
 
     it = time.time()
-    outs_ffn = [actor.collect(2048, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors]
+    outs_ffn = [actor.collect(512, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors]
     gathering_msg = f"Gathering Time: {time.time() - it}"
 
     msgs = comm.gather(gathering_msg, root=0)

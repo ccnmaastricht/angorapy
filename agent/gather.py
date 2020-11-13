@@ -236,9 +236,10 @@ if __name__ == "__main__":
     sd, ad = env_extract_dims(environment)
     wrapper = CombiWrapper((StateNormalizationWrapper(sd), RewardNormalizationWrapper()))
 
-    n_actors = 16
+    n_actors = 8
     base, extra = divmod(n_actors, size)
     n_actors_on_this_node = base + (rank < extra)
+    print(n_actors_on_this_node)
 
     t = time.time()
     actors = [Gatherer(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(n_actors_on_this_node)]
@@ -247,7 +248,7 @@ if __name__ == "__main__":
     outs_ffn = [actor.collect(512, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors]
     gathering_msg = f"Gathering Time: {time.time() - it}"
 
-    msgs = comm.Gather(gathering_msg, root=0)
+    msgs = comm.gather(gathering_msg, root=0)
 
     if rank == 0:
         for msg in msgs:

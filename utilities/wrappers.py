@@ -7,6 +7,7 @@ from typing import Tuple, Iterable, Union, List
 
 import gym
 import numpy as np
+from mpi4py import MPI
 
 from utilities.const import EPSILON, NP_FLOAT_PREC
 from utilities.util import parse_state
@@ -343,6 +344,30 @@ class CombiWrapper(BaseWrapper, object):
         """Recover CombiWrapper, not supported."""
         raise NotImplementedError("There is no such thing as recovery for CombiWrappers. Create a new wrapper from"
                                   "recovered wrappers instead.")
+
+
+def mpi_merge_wrappers(wrapper: BaseWrapper, old_wrapper_state: BaseWrapper) -> BaseWrapper:
+    """Merge the wrappers of all MPI workers (and root) into a single wrapper.
+
+    Args:
+        wrapper:            buffer object of the wrapper in each worker
+        old_wrapper_state:  previous wrapper state before gathering
+    """
+    old_ns = [w.n for w in old_wrapper_state]
+    old_n = old_wrapper_state.n
+
+    collection = MPI.COMM_WORLD.gather(wrapper, root=0)
+
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        merged_wrapper = BaseWrapper.from_collection(collection)
+
+        for i, p in enumerate(merged_wrapper):
+            p.correct_sample_size((len(collection) - 1) * old_ns[i])  # adjust for overcounting
+
+        if isinstance(merged_wrapper, CombiWrapper):
+            merged_wrapper.n = np.copy(merged_wrapper.n) - (len(collection) - 1) * old_n
+
+        return merged_wrapper
 
 
 if __name__ == '__main__':

@@ -8,6 +8,7 @@ import numpy
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
+from mpi4py import MPI
 from tensorflow.python.client import device_lib
 
 from utilities.error import UninterpretableObservationSpace
@@ -21,7 +22,8 @@ def get_available_gpus():
 
 def flat_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
-    print(f"\r{string}", end="")
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        print(f"\r{string}", end="")
 
 
 def set_all_seeds(seed):

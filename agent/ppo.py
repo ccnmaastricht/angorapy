@@ -13,9 +13,9 @@ from typing import Union, List, Tuple, Any
 
 import gym
 import numpy as np
-import ray
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
+from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
@@ -23,16 +23,16 @@ import models
 from agent import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
-from agent.gather import Gatherer, RemoteGatherer
+from agent.gather import Gatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
-from utilities.const import MIN_STAT_EPS, RESET_EVERY
+from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
-from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, BaseRunningMeanWrapper
+from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
 
 class PPOAgent:
@@ -92,7 +92,9 @@ class PPOAgent:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
         self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
         self.preprocessor.warmup(self.env)
-        print(f"Using {self.preprocessor} for preprocessing.")
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
         self.horizon = horizon
@@ -312,6 +314,13 @@ class PPOAgent:
         Returns:
             self
         """
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        size = comm.Get_size()
+
+        if rank == 0:
+            print(f"Using {size} Processes.")
+
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
         if self.is_recurrent and batch_size > self.n_workers:
             logging.warning(
@@ -326,30 +335,16 @@ class PPOAgent:
             {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
-        if parallel:
-            if not ray_is_initialized:
-                if redis_auth is None:
-                    ray.init()  # local_mode=self.debug, num_cpus=multiprocessing.cpu_count())
-                else:
-                    ray.init(address=redis_auth[0], redis_password=redis_auth[1],
-                             local_mode=self.debug, logging_level=logging.ERROR)
-
-        available_cpus = ray.cluster_resources()['CPU']
-        print(f"Training on {len(ray.nodes())} nodes: {ray.nodes()}")
-        print(f"Using {available_cpus} CPUs.")
-
-        workers = self._make_workers(parallel, verbose=True)
+        actor = self._make_actor()
 
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
 
-            # every tenth iteration reconstruct workers to prevent tensorflow memory leakage  TODO potentiall reintroduce
-            # if self.iteration % RESET_EVERY == 0:
-            #     flat_print("Recreating Workers...")
-            #     [ray.kill(worker) for worker in workers]
-            #     del workers
-            #     workers = self._make_workers(parallel)
+            # distribute parameters from rank 0 to all other ranks  # TODO sanity check
+            values = comm.bcast(self.joint.get_weights(), root=0)
+            self.joint.set_weights(values)
+            actor.update_weights(self.joint.get_weights())
 
             time_dict = OrderedDict()
             subprocess_start = time.time()
@@ -357,55 +352,27 @@ class PPOAgent:
             # run simulations in parallel
             flat_print(f"Gathering cycle {self.iteration}...")
 
-            # export the current state of the policy and value network under unique (-enough) key
-            if export:
-                raise NotImplementedError("Currently Exporting is not supported for weight sharing.")
-                name_key = round(time.time())
-                self.joint.save(f"{self.model_export_dir}/{name_key}/model")
-                model_representation = f"{self.model_export_dir}/{name_key}/"
+            # gather
+            collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, self.preprocessor.serialize())
+            worker_stats, worker_preprocessor = collection
 
-            if parallel:
-                # distribute the current policy to the workers
-                [actor.update_weights.remote(self.joint.get_weights()) for actor in workers]
+            stats = condense_stats(worker_stats)
+            self.preprocessor = mpi_merge_wrappers(worker_preprocessor, self.preprocessor)
+            self.preprocessor = comm.bcast(self.preprocessor, root=0)
 
-                # create processes and execute them
-                ray_output = ray.get([
-                    actor.collect.remote(self.horizon, self.discount, self.lam, self.tbptt_length,
-                                         self.preprocessor.serialize()) for actor in workers])
-                split_stats, split_preprocessors = zip(*ray_output)
-            else:
-                # distribute the current policy to the workers
-                [actor.update_weights(self.joint.get_weights()) for actor in workers]
+            # record preprocessor data in history
+            if rank == 0:
+                for w in self.preprocessor:
+                    if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, BaseRunningMeanWrapper):
+                        continue
 
-                # create processes and execute them
-                split_stats, split_preprocessors = zip(
-                    *[actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length,
-                                    self.preprocessor.serialize()) for actor in workers])
+                    self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
+                    self.preprocessor_stat_history[w.name]["stdev"].append(w.simplified_stdev())
 
-            stats = condense_stats(split_stats)
-
-            # accumulate preprocessors TODO super unelegant, this should be inside the wrapper
-            old_ns = [w.n for w in self.preprocessor]
-            old_n = self.preprocessor.n
-            self.preprocessor = BaseWrapper.from_collection(split_preprocessors)
-            for i, p in enumerate(self.preprocessor):
-                p.correct_sample_size((self.n_workers - 1) * old_ns[i])  # adjust for overcounting
-            if isinstance(self.preprocessor, CombiWrapper):
-                self.preprocessor.n = np.copy(self.preprocessor.n) - (self.n_workers - 1) * old_n
-
-            # read the dataset from storage
-            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                is_shadow_hand=isinstance(self.state_dim, tuple))
+                self.underflow_history.append(stats.tbptt_underflow)
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
-
-            # clean up the saved models
-            if export:
-                shutil.rmtree(f"{self.model_export_dir}/{name_key}")
-
-            # process some stats from actors
-            self.underflow_history.append(stats.tbptt_underflow)
 
             # make seperate evaluation if necessary and wanted
             stats_with_evaluation = stats
@@ -413,118 +380,94 @@ class PPOAgent:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
                     flat_print("Evaluating...")
                     n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
-                    evaluation_stats, _ = self.evaluate(n_evaluations, ray_already_initialized=True, workers=workers)
+                    evaluation_stats, _ = self.evaluate(n_evaluations, actor=workers)
 
                     if radical_evaluation:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = condense_stats([stats, evaluation_stats])
-
-            elif stats.numb_completed_episodes == 0:
+            elif rank == 0 and stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
             # record stats in the agent
-            self.episode_length_history.append(stats_with_evaluation.episode_lengths)
-            self.episode_reward_history.append(stats_with_evaluation.episode_rewards)
-            self.cycle_length_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
-                                             else statistics.mean(stats_with_evaluation.episode_lengths))
-            self.cycle_reward_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
-                                             else statistics.mean(stats_with_evaluation.episode_rewards))
-            self.cycle_length_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
-                                                 else statistics.stdev(stats_with_evaluation.episode_lengths))
-            self.cycle_reward_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
-                                                 else statistics.stdev(stats_with_evaluation.episode_rewards))
-            self.cycle_stat_n_history.append(stats_with_evaluation.numb_completed_episodes)
+            if rank == 0:
+                self.episode_length_history.append(stats_with_evaluation.episode_lengths)
+                self.episode_reward_history.append(stats_with_evaluation.episode_rewards)
+                self.cycle_length_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
+                                                 else statistics.mean(stats_with_evaluation.episode_lengths))
+                self.cycle_reward_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
+                                                 else statistics.mean(stats_with_evaluation.episode_rewards))
+                self.cycle_length_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
+                                                     else statistics.stdev(stats_with_evaluation.episode_lengths))
+                self.cycle_reward_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
+                                                     else statistics.stdev(stats_with_evaluation.episode_rewards))
+                self.cycle_stat_n_history.append(stats_with_evaluation.numb_completed_episodes)
 
-            # record preprocessor stats
-            for w in self.preprocessor:
-                if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, BaseRunningMeanWrapper):
-                    continue
+                time_dict["evaluating"] = time.time() - subprocess_start
+                subprocess_start = time.time()
 
-                self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
-                self.preprocessor_stat_history[w.name]["stdev"].append(w.simplified_stdev())
+                # save if best
+                if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
+                    self.save_agent_state(name="best")
 
-            time_dict["evaluating"] = time.time() - subprocess_start
-            subprocess_start = time.time()
+                # early stopping
+                if self.env.spec.reward_threshold is not None and stop_early:
+                    if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
+                        print("\rAll catch a breath, we stop the drill early due to the formidable result!")
+                        break
 
-            # save if best
-            if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
-                self.save_agent_state(name="best")
+                if cycle_start is not None:
+                    self.cycle_timings.append(round(time.time() - cycle_start, 2))
+                self.report(total_iterations=n)
+                cycle_start = time.time()
 
-            # early stopping
-            if self.env.spec.reward_threshold is not None and stop_early:
-                if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
-                    print("\rAll catch a breath, we stop the drill early due to the formidable result!")
-                    break
+                # OPTIMIZE
+                flat_print("Optimizing...")
 
-            if cycle_start is not None:
-                self.cycle_timings.append(round(time.time() - cycle_start, 2))
-            self.report(total_iterations=n)
-            cycle_start = time.time()
+                # read the dataset from storage
+                dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                                                    is_shadow_hand=isinstance(self.state_dim, tuple))
 
-            # OPTIMIZE
-            flat_print("Optimizing...")
-            self.optimize_model(dataset, epochs, batch_size)
+                self.optimize_model(dataset, epochs, batch_size)
 
-            time_dict["optimizing"] = time.time() - subprocess_start
+                time_dict["optimizing"] = time.time() - subprocess_start
 
-            flat_print("Finalizing...")
-            self.total_frames_seen += stats.numb_processed_frames
-            self.total_episodes_seen += stats.numb_completed_episodes
+                flat_print("Finalizing...")
+                self.total_frames_seen += stats.numb_processed_frames
+                self.total_episodes_seen += stats.numb_completed_episodes
 
-            # update monitor logs
-            if monitor is not None:
-                if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                    print("Creating Episode GIFs for current state of policy...")
-                    monitor.create_episode_gif(n=1)
+                # update monitor logs
+                if monitor is not None:
+                    if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                        print("Creating Episode GIFs for current state of policy...")
+                        monitor.create_episode_gif(n=1)
 
-                if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                    monitor.update()
+                    if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                        monitor.update()
 
-            # save the current state of the agent
-            if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
-                self.save_agent_state()
+                # save the current state of the agent
+                if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                    self.save_agent_state()
 
-            # calculate processing speed in fps
-            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, available_cpus)) / (
-                time_dict["gathering"])
-            self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
-            self.time_dicts.append(time_dict)
+                # calculate processing speed in fps
+                self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+                self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, size)) / (
+                    time_dict["gathering"])
+                self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
+                self.time_dicts.append(time_dict)
 
-        print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
+        if rank == 0:
+            print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
 
         return self
 
-    def _make_workers(self, parallel, verbose=False) -> List[RemoteGatherer]:
-        if parallel:
-            available_cpus = ray.cluster_resources()['CPU']
+    def _make_actor(self) -> Gatherer:
+        actor = Gatherer(self.builder_function_name,
+                         self.distribution.__class__.__name__,
+                         self.env_name, MPI.COMM_WORLD.Get_rank())
 
-            # set up the persistent workers
-            worker_options: dict = {}
-            # TODO reactivate
-            # if self.n_workers == 1:
-            #     # worker_options["num_gpus"] = 1
-            #     worker_options["num_cpus"] = available_cpus
-            # elif self.n_workers < available_cpus:
-            #     worker_options["num_cpus"] = available_cpus // self.n_workers
-
-            workers = [RemoteGatherer.remote(self.builder_function_name,
-                                             self.distribution.__class__.__name__,
-                                             self.env_name, i) for i in range(self.n_workers)]
-
-            if verbose:
-                print(f"{len(workers)} workers initialized.")
-        else:
-            workers = [Gatherer(self.builder_function_name,
-                                self.distribution.__class__.__name__,
-                                self.env_name, i) for i in range(self.n_workers)]
-
-            if verbose:
-                print(f"{self.n_workers} sequential workers initialized.")
-
-        return workers
+        return actor
 
     @tf.function
     def _learn_on_batch(self, batch):
@@ -650,52 +593,28 @@ class PPOAgent:
 
         progressbar.close()
 
-    def evaluate(self, n: int, ray_already_initialized: bool = False, workers: List[RemoteGatherer] = None,
-                 save: bool = False) -> Tuple[StatBundle, Any]:
+    def evaluate(self, n: int, actor: Gatherer = None, save: bool = False) -> Tuple[StatBundle, Any]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
-            ray_already_initialized (bool): if True, do not initialize ray again (default False)
             save (bool): whether to save the evaluation to the monitor directory
 
         Returns:
             StatBundle with evaluation results
         """
-
-        if not ray_already_initialized:
-            ray.init(local_mode=self.debug, logging_level=logging.ERROR)
-
         # set up the persistent workers
-        if workers is None:
-            available_cpus = multiprocessing.cpu_count()
-            worker_options: dict = {}
-            if n == 1:
-                # worker_options["num_gpus"] = 1
-                worker_options["num_cpus"] = available_cpus
-            elif available_cpus % n == 0 and n != available_cpus:
-                worker_options["num_cpus"] = available_cpus // n
+        actor = actor if actor is not None else self._make_actor()
 
-            workers = self._make_workers(True)
+        values = MPI.COMM_WORLD.bcast(self.joint.get_weights(), root=0)
+        self.joint.set_weights(values)
 
-        for w in workers:
-            w.update_weights.remote(self.joint.get_weights())
+        evaluation_result = actor.evaluate(self.preprocessor.serialize())
+        gathered_evaluation_result = MPI.COMM_WORLD.Gather(evaluation_result, root=0)
 
-        result_ids = []
-        w_id, processes_started = 0, 0
-        while processes_started < n:
-            result_ids.append(workers[w_id].evaluate.remote(self.preprocessor.serialize()))
-            processes_started += 1
-
-            # start with the first worker again
-            w_id += 1
-            if w_id > len(workers) - 1:
-                w_id = 0
-
-        all_lengths, all_rewards, all_classes = zip(*[ray.get(oi) for oi in result_ids])
-
-        stats = StatBundle(n, sum(all_lengths), all_rewards, all_lengths, tbptt_underflow=0)
+        lengths, rewards, classes = zip(*(actor.evaluate(self.preprocessor.serialize())))
+        stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
 
         if save:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
@@ -710,10 +629,13 @@ class PPOAgent:
             with open(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/evaluations.json", "w") as jf:
                 json.dump(previous_evaluations, jf)
 
-        return stats, all_classes
+        return stats, classes
 
     def report(self, total_iterations):
         """Print a report of the current state of the training."""
+        if MPI.COMM_WORLD.Get_rank() != 0:
+            return
+
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
         if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None:
