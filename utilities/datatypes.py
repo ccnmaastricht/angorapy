@@ -209,19 +209,25 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
                                             is_continuous=is_continuous, is_multi_feature=is_multi_feature)
 
 
-def condense_stats(stat_bundle: StatBundle) -> Union[StatBundle, None]:
+def condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None]:
     """Infer a single StatBundle from a list of StatBundles."""
-    stat_bundles = MPI.COMM_WORLD.gather(stat_bundle, root=0)
+    return StatBundle(
+        numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
+        numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
+        episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
+        episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles])),
+        tbptt_underflow=round(statistics.mean(map(lambda x: x.tbptt_underflow, stat_bundles)), 2) if (
+                stat_bundles[0].tbptt_underflow is not None) else None
+    )
+
+
+def mpi_condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None]:
+    """Pull together the StatBundle lists from the buffer on all workers and infer a single StatBundle."""
+    stat_bundles = MPI.COMM_WORLD.gather(stat_bundles, root=0)
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        return StatBundle(
-            numb_completed_episodes=sum([s.numb_completed_episodes for s in stat_bundles]),
-            numb_processed_frames=sum([s.numb_processed_frames for s in stat_bundles]),
-            episode_rewards=list(itertools.chain(*[s.episode_rewards for s in stat_bundles])),
-            episode_lengths=list(itertools.chain(*[s.episode_lengths for s in stat_bundles])),
-            tbptt_underflow=round(statistics.mean(map(lambda x: x.tbptt_underflow, stat_bundles)), 2) if (
-                    stat_bundles[0].tbptt_underflow is not None) else None
-        )
+        stat_bundles = list(itertools.chain(*stat_bundles))
+        return condense_stats(stat_bundles)
     else:
         return None
 

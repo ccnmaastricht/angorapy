@@ -28,7 +28,7 @@ from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution
 from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.const import MIN_STAT_EPS
-from utilities.datatypes import condense_stats, StatBundle
+from utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
@@ -337,27 +337,35 @@ class PPOAgent:
 
         actor = self._make_actor()
 
+        # determine the number of independent repeated gatherings required on this worker
+        base, extra = divmod(self.n_workers, size)
+        gatherings_on_this_worker = base + (rank < extra)
+
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
 
-            # distribute parameters from rank 0 to all other ranks  # TODO sanity check
+            time_dict = OrderedDict()
+            subprocess_start = time.time()
+
+            # distribute parameters from rank 0 to all other ranks
             values = comm.bcast(self.joint.get_weights(), root=0)
             self.joint.set_weights(values)
             actor.update_weights(self.joint.get_weights())
-
-            time_dict = OrderedDict()
-            subprocess_start = time.time()
 
             # run simulations in parallel
             flat_print(f"Gathering cycle {self.iteration}...")
 
             # gather
-            collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, self.preprocessor.serialize())
-            worker_stats, worker_preprocessor = collection
+            worker_stats, worker_preprocessors = [], []
+            for i in range(gatherings_on_this_worker):
+                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, self.preprocessor.serialize())
+                worker_stats.append(collection[0])
+                worker_preprocessors.append(collection[1])
 
-            stats = condense_stats(worker_stats)
-            self.preprocessor = mpi_merge_wrappers(worker_preprocessor, self.preprocessor)
+            # merge gatherings from all workers
+            stats = mpi_condense_stats(worker_stats)
+            self.preprocessor = mpi_merge_wrappers(worker_preprocessors, self.preprocessor)
             self.preprocessor = comm.bcast(self.preprocessor, root=0)
 
             # record preprocessor data in history
@@ -385,7 +393,7 @@ class PPOAgent:
                     if radical_evaluation:
                         stats_with_evaluation = evaluation_stats
                     else:
-                        stats_with_evaluation = condense_stats([stats, evaluation_stats])
+                        stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
             elif rank == 0 and stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
