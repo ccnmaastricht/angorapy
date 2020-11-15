@@ -129,8 +129,7 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
     redis_auth = None if settings["redis_ip"] is None else [settings["redis_ip"], settings["redis_pw"]]
     agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
                 export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
-                stop_early=settings["stop_early"], parallel=not settings["sequential"], ray_is_initialized=not init_ray,
-                radical_evaluation=settings["radical_evaluation"], redis_auth=redis_auth)
+                stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
 
     agent.save_agent_state()
     env.close()

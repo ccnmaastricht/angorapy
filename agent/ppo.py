@@ -2,14 +2,12 @@
 """Implementation of Proximal Policy Optimization Algorithm."""
 import json
 import logging
-import multiprocessing
 import os
 import re
-import shutil
 import statistics
 import time
 from collections import OrderedDict
-from typing import Union, List, Tuple, Any
+from typing import Union, Tuple, Any
 
 import gym
 import numpy as np
@@ -28,11 +26,11 @@ from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution
 from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
 from utilities.const import MIN_STAT_EPS
-from utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
+from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
-from utilities.wrappers import BaseWrapper, CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
+from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
 
 class PPOAgent:
@@ -286,15 +284,12 @@ class PPOAgent:
         return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
-              separate_eval: bool = False, stop_early: bool = True, ray_is_initialized: bool = False, save_best=True,
-              parallel=True, radical_evaluation=False, redis_auth: Tuple[str, str] = None) -> "PPOAgent":
+              separate_eval: bool = False, stop_early: bool = True, radical_evaluation=False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
 
         Args:
-            parallel:
-            save_best: if True, at every iteration save the model as "best" if it is better than the last best
             n (int): the number of experience-optimization cycles that shall be run
             epochs (int): the number of epochs for which the model is optimized on the same experience data
             batch_size (int): batch size for the optimization
@@ -308,8 +303,6 @@ class PPOAgent:
             stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
                 above the environments threshold
 
-            redis_auth: tuple of redis head ip address and password; if None (default), ray is initialized on the
-                current default node
 
         Returns:
             self
@@ -344,7 +337,6 @@ class PPOAgent:
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
-
             time_dict = OrderedDict()
             subprocess_start = time.time()
 
@@ -359,7 +351,8 @@ class PPOAgent:
             # gather
             worker_stats, worker_preprocessors = [], []
             for i in range(gatherings_on_this_worker):
-                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, self.preprocessor.serialize())
+                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length,
+                                           self.preprocessor.serialize())
                 worker_stats.append(collection[0])
                 worker_preprocessors.append(collection[1])
 
@@ -368,27 +361,17 @@ class PPOAgent:
             self.preprocessor = mpi_merge_wrappers(worker_preprocessors, self.preprocessor)
             self.preprocessor = comm.bcast(self.preprocessor, root=0)
 
-            # record preprocessor data in history
-            if rank == 0:
-                for w in self.preprocessor:
-                    if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, BaseRunningMeanWrapper):
-                        continue
-
-                    self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
-                    self.preprocessor_stat_history[w.name]["stdev"].append(w.simplified_stdev())
-
-                self.underflow_history.append(stats.tbptt_underflow)
-
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
             # make seperate evaluation if necessary and wanted
+            stats = comm.bcast(stats, root=0)
             stats_with_evaluation = stats
             if separate_eval:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
                     flat_print("Evaluating...")
                     n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
-                    evaluation_stats, _ = self.evaluate(n_evaluations, actor=workers)
+                    evaluation_stats, _ = self.evaluate(n_evaluations, actor=actor)
 
                     if radical_evaluation:
                         stats_with_evaluation = evaluation_stats
@@ -398,77 +381,96 @@ class PPOAgent:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            # record stats in the agent
-            if rank == 0:
-                self.episode_length_history.append(stats_with_evaluation.episode_lengths)
-                self.episode_reward_history.append(stats_with_evaluation.episode_rewards)
-                self.cycle_length_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
-                                                 else statistics.mean(stats_with_evaluation.episode_lengths))
-                self.cycle_reward_history.append(None if stats_with_evaluation.numb_completed_episodes == 0
-                                                 else statistics.mean(stats_with_evaluation.episode_rewards))
-                self.cycle_length_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
-                                                     else statistics.stdev(stats_with_evaluation.episode_lengths))
-                self.cycle_reward_std_history.append(None if stats_with_evaluation.numb_completed_episodes <= 1
-                                                     else statistics.stdev(stats_with_evaluation.episode_rewards))
-                self.cycle_stat_n_history.append(stats_with_evaluation.numb_completed_episodes)
+            if rank != 0:
+                # only the root process calculates the rest
+                continue
 
-                time_dict["evaluating"] = time.time() - subprocess_start
-                subprocess_start = time.time()
+            # record stats and preprocessor in the agent
+            self.record_preprocessor(self.preprocessor)
+            self.record_stats(stats_with_evaluation)
 
-                # save if best
-                if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
-                    self.save_agent_state(name="best")
+            time_dict["evaluating"] = time.time() - subprocess_start
+            subprocess_start = time.time()
 
-                # early stopping
-                if self.env.spec.reward_threshold is not None and stop_early:
-                    if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
-                        print("\rAll catch a breath, we stop the drill early due to the formidable result!")
-                        break
+            # save if best
+            if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
+                self.save_agent_state(name="best")
 
-                if cycle_start is not None:
-                    self.cycle_timings.append(round(time.time() - cycle_start, 2))
-                self.report(total_iterations=n)
-                cycle_start = time.time()
+            # early stopping
+            if self.env.spec.reward_threshold is not None and stop_early:
+                if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
+                    print("\rAll catch a breath, we stop the drill early due to the formidable result!")
+                    break
 
-                # OPTIMIZE
-                flat_print("Optimizing...")
+            if cycle_start is not None:
+                self.cycle_timings.append(round(time.time() - cycle_start, 2))
+            self.report(total_iterations=n)
+            cycle_start = time.time()
 
-                # read the dataset from storage
-                dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                    is_shadow_hand=isinstance(self.state_dim, tuple))
+            # OPTIMIZE
+            flat_print("Optimizing...")
 
-                self.optimize_model(dataset, epochs, batch_size)
+            # read the dataset from storage
+            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                                                is_shadow_hand=isinstance(self.state_dim, tuple))
 
-                time_dict["optimizing"] = time.time() - subprocess_start
+            self.optimize_model(dataset, epochs, batch_size)
 
-                flat_print("Finalizing...")
-                self.total_frames_seen += stats.numb_processed_frames
-                self.total_episodes_seen += stats.numb_completed_episodes
+            time_dict["optimizing"] = time.time() - subprocess_start
 
-                # update monitor logs
-                if monitor is not None:
-                    if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                        print("Creating Episode GIFs for current state of policy...")
-                        monitor.create_episode_gif(n=1)
+            flat_print("Finalizing...")
+            self.total_frames_seen += stats.numb_processed_frames
+            self.total_episodes_seen += stats.numb_completed_episodes
 
-                    if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                        monitor.update()
+            # update monitor logs
+            if monitor is not None:
+                if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                    print("Creating Episode GIFs for current state of policy...")
+                    monitor.create_episode_gif(n=1)
 
-                # save the current state of the agent
-                if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
-                    self.save_agent_state()
+                if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                    monitor.update()
 
-                # calculate processing speed in fps
-                self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-                self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, size)) / (
-                    time_dict["gathering"])
-                self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
-                self.time_dicts.append(time_dict)
+            # save the current state of the agent
+            if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                self.save_agent_state()
+
+            # calculate processing speed in fps
+            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+            self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, size)) / (
+                time_dict["gathering"])
+            self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
+            self.time_dicts.append(time_dict)
 
         if rank == 0:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
 
         return self
+
+    def record_stats(self, stats):
+        """Record a given StatsBundle in the history of the agent."""
+        mean_eps_length = statistics.mean(stats.episode_lengths)
+        stdev_eps_length = statistics.stdev(stats.episode_lengths)
+        mean_eps_rewards = statistics.stdev(stats.episode_rewards)
+        stdev_eps_rewards = statistics.stdev(stats.episode_rewards)
+
+        self.episode_length_history.append(stats.episode_lengths)
+        self.episode_reward_history.append(stats.episode_rewards)
+        self.cycle_length_history.append(None if stats.numb_completed_episodes == 0 else mean_eps_length)
+        self.cycle_reward_history.append(None if stats.numb_completed_episodes == 0 else mean_eps_rewards)
+        self.cycle_length_std_history.append(None if stats.numb_completed_episodes <= 1 else stdev_eps_length)
+        self.cycle_reward_std_history.append(None if stats.numb_completed_episodes <= 1 else stdev_eps_rewards)
+        self.cycle_stat_n_history.append(stats.numb_completed_episodes)
+        self.underflow_history.append(stats.tbptt_underflow)
+
+    def record_preprocessor(self, preprocessor):
+        """Record the stats of a given preprocessor in the history of the agent."""
+        for w in preprocessor:
+            if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, BaseRunningMeanWrapper):
+                continue
+
+            self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
+            self.preprocessor_stat_history[w.name]["stdev"].append(w.simplified_stdev())
 
     def _make_actor(self) -> Gatherer:
         actor = Gatherer(self.builder_function_name,
@@ -612,19 +614,23 @@ class PPOAgent:
         Returns:
             StatBundle with evaluation results
         """
-        # set up the persistent workers
         actor = actor if actor is not None else self._make_actor()
 
         values = MPI.COMM_WORLD.bcast(self.joint.get_weights(), root=0)
         self.joint.set_weights(values)
 
         evaluation_result = actor.evaluate(self.preprocessor.serialize())
-        gathered_evaluation_result = MPI.COMM_WORLD.Gather(evaluation_result, root=0)
+        gathered_evaluation_result = MPI.COMM_WORLD.gather(evaluation_result, root=0)
 
-        lengths, rewards, classes = zip(*(actor.evaluate(self.preprocessor.serialize())))
-        stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
+        stats, classes = None, None
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            lengths, rewards, classes = zip(*gathered_evaluation_result)
+            stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
 
-        if save:
+        stats = MPI.COMM_WORLD.bcast(stats, root=0)
+        classes = MPI.COMM_WORLD.bcast(classes, root=0)
+
+        if save and MPI.COMM_WORLD.Get_rank() == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
 
             previous_evaluations = {}
