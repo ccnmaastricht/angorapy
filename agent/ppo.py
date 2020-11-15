@@ -32,6 +32,10 @@ from utilities.model_utils import is_recurrent_model, get_layer_names, get_compo
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
+mpi_comm = MPI.COMM_WORLD
+mpi_rank = mpi_comm.Get_rank()
+mpi_size = mpi_comm.Get_size()
+
 
 class PPOAgent:
     """Agent using the Proximal Policy Optimization Algorithm for learning.
@@ -91,7 +95,7 @@ class PPOAgent:
         self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
         self.preprocessor.warmup(self.env)
 
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if mpi_rank == 0:
             print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
@@ -307,12 +311,8 @@ class PPOAgent:
         Returns:
             self
         """
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-
-        if rank == 0:
-            print(f"Using {size} Processes.")
+        if mpi_rank == 0:
+            print(f"\n\nDrill started using {mpi_size} Processes.")
 
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
         if self.is_recurrent and batch_size > self.n_workers:
@@ -331,8 +331,8 @@ class PPOAgent:
         actor = self._make_actor()
 
         # determine the number of independent repeated gatherings required on this worker
-        base, extra = divmod(self.n_workers, size)
-        gatherings_on_this_worker = base + (rank < extra)
+        base, extra = divmod(self.n_workers, mpi_size)
+        gatherings_on_this_worker = base + (mpi_rank < extra)
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -341,14 +341,12 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # distribute parameters from rank 0 to all other ranks
-            values = comm.bcast(self.joint.get_weights(), root=0)
+            values = mpi_comm.bcast(self.joint.get_weights(), root=0)
             self.joint.set_weights(values)
             actor.update_weights(self.joint.get_weights())
 
             # run simulations in parallel
             flat_print(f"Gathering cycle {self.iteration}...")
-
-            # gather
             worker_stats, worker_preprocessors = [], []
             for i in range(gatherings_on_this_worker):
                 collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length,
@@ -359,13 +357,13 @@ class PPOAgent:
             # merge gatherings from all workers
             stats = mpi_condense_stats(worker_stats)
             self.preprocessor = mpi_merge_wrappers(worker_preprocessors, self.preprocessor)
-            self.preprocessor = comm.bcast(self.preprocessor, root=0)
+            self.preprocessor = mpi_comm.bcast(self.preprocessor, root=0)
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
             # make seperate evaluation if necessary and wanted
-            stats = comm.bcast(stats, root=0)
+            stats = mpi_comm.bcast(stats, root=0)
             stats_with_evaluation = stats
             if separate_eval:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
@@ -377,11 +375,11 @@ class PPOAgent:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
-            elif rank == 0 and stats.numb_completed_episodes == 0:
+            elif mpi_rank == 0 and stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            if rank != 0:
+            if mpi_rank != 0:
                 # only the root process calculates the rest
                 continue
 
@@ -437,12 +435,12 @@ class PPOAgent:
 
             # calculate processing speed in fps
             self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, size)) / (
+            self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, mpi_size)) / (
                 time_dict["gathering"])
             self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
             self.time_dicts.append(time_dict)
 
-        if rank == 0:
+        if mpi_rank == 0:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
 
         return self
@@ -475,7 +473,7 @@ class PPOAgent:
     def _make_actor(self) -> Gatherer:
         actor = Gatherer(self.builder_function_name,
                          self.distribution.__class__.__name__,
-                         self.env_name, MPI.COMM_WORLD.Get_rank())
+                         self.env_name, mpi_rank)
 
         return actor
 
@@ -616,21 +614,21 @@ class PPOAgent:
         """
         actor = actor if actor is not None else self._make_actor()
 
-        values = MPI.COMM_WORLD.bcast(self.joint.get_weights(), root=0)
+        values = mpi_comm.bcast(self.joint.get_weights(), root=0)
         self.joint.set_weights(values)
 
         evaluation_result = actor.evaluate(self.preprocessor.serialize())
-        gathered_evaluation_result = MPI.COMM_WORLD.gather(evaluation_result, root=0)
+        gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
         stats, classes = None, None
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if mpi_rank == 0:
             lengths, rewards, classes = zip(*gathered_evaluation_result)
             stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
 
-        stats = MPI.COMM_WORLD.bcast(stats, root=0)
-        classes = MPI.COMM_WORLD.bcast(classes, root=0)
+        stats = mpi_comm.bcast(stats, root=0)
+        classes = mpi_comm.bcast(classes, root=0)
 
-        if save and MPI.COMM_WORLD.Get_rank() == 0:
+        if save and mpi_rank == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
 
             previous_evaluations = {}
@@ -647,7 +645,7 @@ class PPOAgent:
 
     def report(self, total_iterations):
         """Print a report of the current state of the training."""
-        if MPI.COMM_WORLD.Get_rank() != 0:
+        if mpi_rank != 0:
             return
 
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
