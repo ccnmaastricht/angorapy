@@ -41,7 +41,11 @@ mpi_size = mpi_comm.Get_size()
 if mpi_rank == 0:
     try:
         distribution_strategy = tfd.experimental.MultiWorkerMirroredStrategy(
-            cluster_resolver=tfd.cluster_resolver.SlurmClusterResolver(),
+            cluster_resolver=tfd.cluster_resolver.SlurmClusterResolver(
+                gpus_per_node=1,
+                gpus_per_task=1,
+                tasks_per_node=1
+            ),
             communication=tfd.experimental.CollectiveCommunication.NCCL
         )
     except RuntimeError:
