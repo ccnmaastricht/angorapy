@@ -32,9 +32,22 @@ from utilities.model_utils import is_recurrent_model, get_layer_names, get_compo
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
+from tensorflow import distribute as tfd
+
 mpi_comm = MPI.COMM_WORLD
 mpi_rank = mpi_comm.Get_rank()
 mpi_size = mpi_comm.Get_size()
+
+if mpi_rank == 0:
+    try:
+        distribution_strategy = tfd.experimental.MultiWorkerMirroredStrategy(
+            cluster_resolver=tfd.cluster_resolver.SlurmClusterResolver(),
+            communication=tfd.experimental.CollectiveCommunication.NCCL
+        )
+    except RuntimeError:
+        distribution_strategy = tfd.OneDeviceStrategy(device="GPU:0")
+else:
+    distribution_strategy = tfd.get_strategy()
 
 
 class PPOAgent:
@@ -125,39 +138,40 @@ class PPOAgent:
             raise ValueError("Unknown Schedule type. Choose one of (None, exponential)")
 
         # models and optimizers
-        self.distribution = distribution
-        if self.distribution is None:
-            self.distribution = CategoricalPolicyDistribution(
-                self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
-        assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
-        self.model_builder = model_builder
-        self.builder_function_name = model_builder.__name__
-        self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
-                                                            **({"bs": 1} if requires_batch_size(model_builder) else {}))
+        with distribution_strategy.scope():
+            self.distribution = distribution
+            if self.distribution is None:
+                self.distribution = CategoricalPolicyDistribution(
+                    self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
+            assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
+            self.model_builder = model_builder
+            self.builder_function_name = model_builder.__name__
+            self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
+                                                                **({"bs": 1} if requires_batch_size(model_builder) else {}))
 
-        if pretrained_components is not None:
-            print("Loading pretrained components:")
-            for pretraining_name in pretrained_components:
-                component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
-                if os.path.isfile(component_path):
-                    component = tf.keras.models.load_model(component_path, compile=False)
-                else:
-                    print(f"\tNo such pretraining found at {component_path}. Skipping.")
-                    continue
+            if pretrained_components is not None:
+                print("Loading pretrained components:")
+                for pretraining_name in pretrained_components:
+                    component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
+                    if os.path.isfile(component_path):
+                        component = tf.keras.models.load_model(component_path, compile=False)
+                    else:
+                        print(f"\tNo such pretraining found at {component_path}. Skipping.")
+                        continue
 
-                if component.name in get_layer_names(self.joint):
-                    try:
-                        get_component(self.joint, component.name).set_weights(component.get_weights())
-                        print(f"\tSuccessfully loaded component '{component.name}'")
-                    except ValueError as e:
-                        print(f"Could not load weights into component: {e}")
-                else:
-                    print(f"\tNo outer component named '{component.name}' in model. Skipping.")
+                    if component.name in get_layer_names(self.joint):
+                        try:
+                            get_component(self.joint, component.name).set_weights(component.get_weights())
+                            print(f"\tSuccessfully loaded component '{component.name}'")
+                        except ValueError as e:
+                            print(f"Could not load weights into component: {e}")
+                    else:
+                        print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
-        self.is_recurrent = is_recurrent_model(self.policy)
-        if not self.is_recurrent:
-            self.tbptt_length = 1
+            self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
+            self.is_recurrent = is_recurrent_model(self.policy)
+            if not self.is_recurrent:
+                self.tbptt_length = 1
 
         # passing one sample, which for some reason prevents cuDNN init error
         if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
@@ -311,8 +325,13 @@ class PPOAgent:
         Returns:
             self
         """
+        # determine the number of independent repeated gatherings required on this worker
+        base, extra = divmod(self.n_workers, mpi_size)
+        gatherings_on_this_worker = base + (mpi_rank < extra)
+
         if mpi_rank == 0:
-            print(f"\n\nDrill started using {mpi_size} Processes.")
+            print(f"\n\nDrill started using {mpi_size} Processes. "
+                  f"Worker distribution: {[base + (r < extra) for r in range(mpi_size)]}")
 
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
         if self.is_recurrent and batch_size > self.n_workers:
@@ -323,16 +342,13 @@ class PPOAgent:
             batch_size = self.n_workers
 
         # rebuild model with desired batch size
-        weights = self.joint.get_weights()
-        self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
-            {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
-        self.joint.set_weights(weights)
+        with distribution_strategy.scope():
+            weights = self.joint.get_weights()
+            self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
+                {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
+            self.joint.set_weights(weights)
 
         actor = self._make_actor()
-
-        # determine the number of independent repeated gatherings required on this worker
-        base, extra = divmod(self.n_workers, mpi_size)
-        gatherings_on_this_worker = base + (mpi_rank < extra)
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -412,7 +428,7 @@ class PPOAgent:
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
 
-            self.optimize_model(dataset, epochs, batch_size)
+            self.optimize(dataset, epochs, batch_size)
 
             time_dict["optimizing"] = time.time() - subprocess_start
 
@@ -523,7 +539,7 @@ class PPOAgent:
 
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
 
-    def optimize_model(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
+    def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
         
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
@@ -552,12 +568,21 @@ class PPOAgent:
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
 
+            # distribute the dataset
+            if distribution_strategy is not None:
+                batched_dataset = distribution_strategy.experimental_distribute_dataset(batched_dataset)
+
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        ent, pi_loss, v_loss, info = self._learn_on_batch(b)
+                        if distribution_strategy is not None:
+                            ent, pi_loss, v_loss, info = distribution_strategy.run(self._learn_on_batch, args=(b,))
+
+                        else:
+                            ent, pi_loss, v_loss, info = self._learn_on_batch(b)
+
                         progressbar.update(1)
                     else:
                         # truncated back propagation through time
@@ -566,7 +591,12 @@ class PPOAgent:
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
-                            ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
+                            if distribution_strategy is not None:
+                                ent, pi_loss, v_loss, info = distribution_strategy.run(self._learn_on_batch,
+                                                                                       args=(partial_batch,))
+                            else:
+                                ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
+
                             progressbar.update(1)
 
                             # make partial RNN state resets

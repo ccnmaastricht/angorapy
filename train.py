@@ -1,7 +1,7 @@
 import os
 import traceback
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
 import argparse
@@ -22,8 +22,6 @@ from utilities.util import env_extract_dims
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
 
 from mpi4py import MPI
-
-tf.get_logger().setLevel('WARNING')
 
 
 class InconsistentArgumentError(Exception):
@@ -128,7 +126,6 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
         monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
                           iterations=settings["iterations"], config_name=settings["config"])
 
-    redis_auth = None if settings["redis_ip"] is None else [settings["redis_ip"], settings["redis_pw"]]
     agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
                 export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
                 stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
@@ -140,7 +137,8 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
 
 if __name__ == "__main__":
-    tf.get_logger().setLevel('WARNING')
+
+    tf.get_logger().setLevel('INFO')
     all_envs = [e.id for e in list(gym.envs.registry.all())]
 
     # parse commandline arguments
