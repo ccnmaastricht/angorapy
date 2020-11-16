@@ -19,5 +19,8 @@ module load daint-gpu
 module load cray-python
 module load cudatoolkit/10.2.89_3.28-7.0.2.1_2.17__g52c0314
 
+# load virtual environment
+source ${HOME}/dexterityvenv/bin/activate
+
 # run it
 srun --hint=nomultithread python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
