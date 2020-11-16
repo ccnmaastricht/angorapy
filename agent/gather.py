@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
 import os
+
 import time
 from inspect import getfullargspec as fargs
 from typing import Tuple, Any
 
 import numpy as np
-import ray
 import tensorflow as tf
 from gym.spaces import Box
 
@@ -22,6 +22,8 @@ from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer
 from utilities.model_utils import is_recurrent_model
 from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims
 from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
+
+from mpi4py import MPI
 
 
 class Gatherer:
@@ -220,20 +222,12 @@ class Gatherer:
         return steps, cumulative_reward, eps_class
 
 
-@ray.remote(num_gpus=0)
-class RemoteGatherer(Gatherer):
-    pass
-
-
 if __name__ == "__main__":
     """Performance Measuring."""
 
-    RUN_DEBUG = False
-
-    os.chdir("../")
-    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # need to deactivate GPU in Debugger mode!
-    # tf.config.experimental_run_functions_eagerly(RUN_DEBUG)
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
     env_n = "HalfCheetah-v2"
     environment = gym.make(env_n)
@@ -242,13 +236,23 @@ if __name__ == "__main__":
     sd, ad = env_extract_dims(environment)
     wrapper = CombiWrapper((StateNormalizationWrapper(sd), RewardNormalizationWrapper()))
 
-    ray.init()
+    n_actors = 8
+    base, extra = divmod(n_actors, size)
+    n_actors_on_this_node = base + (rank < extra)
+    print(n_actors_on_this_node)
+
     t = time.time()
-    actors = [RemoteGatherer.remote(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(7)]
+    actors = [Gatherer(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(n_actors_on_this_node)]
 
     it = time.time()
-    outs_ffn = ray.get([actor.collect.remote(2048, 0.99, 0.95, 8, wrapper.serialize()) for actor in actors])
-    print(f"Gathering Time: {time.time() - it}")
+    outs_ffn = [actor.collect(512, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors]
+    gathering_msg = f"Gathering Time: {time.time() - it}"
+
+    msgs = comm.gather(gathering_msg, root=0)
+
+    if rank == 0:
+        for msg in msgs:
+            print(msg)
 
     print(f"Program Runtime: {time.time() - t}")
 

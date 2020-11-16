@@ -1,12 +1,14 @@
 """Wrapping utilities preprocessing an environment output."""
 import abc
 import inspect
+import itertools
 import sys
 from copy import copy
 from typing import Tuple, Iterable, Union, List
 
 import gym
 import numpy as np
+from mpi4py import MPI
 
 from utilities.const import EPSILON, NP_FLOAT_PREC
 from utilities.util import parse_state
@@ -343,6 +345,41 @@ class CombiWrapper(BaseWrapper, object):
         """Recover CombiWrapper, not supported."""
         raise NotImplementedError("There is no such thing as recovery for CombiWrappers. Create a new wrapper from"
                                   "recovered wrappers instead.")
+
+
+def merge_wrappers(wrappers: List[BaseWrapper], old_wrapper_state: BaseWrapper) -> BaseWrapper:
+    """Merge a list of wrappers into a single wrapper.
+
+    Args:
+        wrappers:           list of wrappers
+        old_wrapper_state:  previous wrapper state before gathering
+    """
+    old_ns = [w.n for w in old_wrapper_state]
+    old_n = old_wrapper_state.n
+
+    merged_wrapper = BaseWrapper.from_collection(wrappers)
+
+    for i, p in enumerate(merged_wrapper):
+        p.correct_sample_size((len(wrappers) - 1) * old_ns[i])  # adjust for overcounting
+
+    if isinstance(merged_wrapper, CombiWrapper):
+        merged_wrapper.n = np.copy(merged_wrapper.n) - (len(wrappers) - 1) * old_n
+
+    return merged_wrapper
+
+
+def mpi_merge_wrappers(wrappers: List[BaseWrapper], old_wrapper_state: BaseWrapper) -> BaseWrapper:
+    """Merge the wrappers of all MPI workers (and root) into a single wrapper.
+
+    Args:
+        wrappers:           buffer object of the wrappers in each worker
+        old_wrapper_state:  previous wrapper state before gathering
+    """
+    collection = MPI.COMM_WORLD.gather(wrappers, root=0)
+
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        collection = list(itertools.chain(*collection))
+        return merge_wrappers(collection, old_wrapper_state)
 
 
 if __name__ == '__main__':

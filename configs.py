@@ -60,8 +60,7 @@ discrete_shared = derive_config(discrete, {"shared": True})
 discrete_rnn = derive_config(discrete, {"model": "rnn"})
 discrete_gru = derive_config(discrete, {"model": "gru"})
 discrete_lstm = derive_config(discrete, {"model": "lstm"})
-discrete_no_norms = derive_config(discrete, {"no_state_norming": True,
-                                             "no_reward_norming": True})
+discrete_no_norms = derive_config(discrete, {"no_state_norming": True, "no_reward_norming": True})
 discrete_no_norms_short = derive_config(discrete_no_norms, {"horizon": 512})
 
 # CONTINUOUS DEFAULT

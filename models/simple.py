@@ -59,6 +59,7 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     sequence_length = None
 
     inputs = tf.keras.Input(batch_shape=(bs, sequence_length, state_dimensionality,))
+    # TODO reactivate
     # masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length, state_dimensionality,))(inputs)
     masked = inputs
 
