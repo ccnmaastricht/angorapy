@@ -469,7 +469,7 @@ class PPOAgent:
         """Record a given StatsBundle in the history of the agent."""
         mean_eps_length = statistics.mean(stats.episode_lengths)
         stdev_eps_length = statistics.stdev(stats.episode_lengths)
-        mean_eps_rewards = statistics.stdev(stats.episode_rewards)
+        mean_eps_rewards = statistics.mean(stats.episode_rewards)
         stdev_eps_rewards = statistics.stdev(stats.episode_rewards)
 
         self.episode_length_history.append(stats.episode_lengths)
