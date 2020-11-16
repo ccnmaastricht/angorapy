@@ -1,4 +1,6 @@
 import os
+import traceback
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 
@@ -169,8 +171,6 @@ if __name__ == "__main__":
     parser.add_argument("--monitor-frequency", type=int, default=1, help=f"update the monitor every n iterations.")
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
-    parser.add_argument("--redis-ip", type=str, help=f"redis head ip address", default=None)
-    parser.add_argument("--redis-pw", type=str, help=f"redis password", default=None)
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
@@ -217,6 +217,10 @@ if __name__ == "__main__":
         if is_root:
             logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
-    run_experiment(args.env, vars(args), use_monitor=True)
+    try:
+        run_experiment(args.env, vars(args), use_monitor=True)
+    except Exception as e:
+        traceback.print_exc()
+        MPI.Finalize()
 
     MPI.Finalize()
