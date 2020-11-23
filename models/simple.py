@@ -60,8 +60,8 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
     inputs = tf.keras.Input(batch_shape=(bs, sequence_length, state_dimensionality,))
     # TODO reactivate
-    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length, state_dimensionality,))(inputs)
-    # masked = inputs
+    # masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length, state_dimensionality,))(inputs)
+    masked = inputs
 
     # policy network; stateful, so batch size needs to be known
     x = TD(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="policy_encoder"),

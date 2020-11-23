@@ -10,6 +10,8 @@ from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NA
 from gym.envs.robotics.utils import robot_get_obs
 
 from utilities.const import VISION_WH, N_SUBSTEPS
+from utilities.const import SHADOWHAND_MAX_STEPS
+
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "assets/hand",
@@ -420,6 +422,7 @@ class ShadowHandFreeReach(ShadowHandReach):
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
         goal[f_id] = 1
 
+        # print(goal)
         return goal
 
     def _get_thumb_position(self):
