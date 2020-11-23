@@ -33,25 +33,21 @@ from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_i
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
 from tensorflow import distribute as tfd
+import horovod.tensorflow as hvd
 
 mpi_comm = MPI.COMM_WORLD
 mpi_rank = mpi_comm.Get_rank()
 mpi_size = mpi_comm.Get_size()
 
-if mpi_rank == 0:
-    try:
-        distribution_strategy = tfd.experimental.MultiWorkerMirroredStrategy(
-            cluster_resolver=tfd.cluster_resolver.SlurmClusterResolver(
-                gpus_per_node=1,
-                gpus_per_task=1,
-                tasks_per_node=1
-            ),
-            communication=tfd.experimental.CollectiveCommunication.NCCL
-        )
-    except RuntimeError:
-        distribution_strategy = tfd.OneDeviceStrategy(device="GPU:0")
-else:
-    distribution_strategy = tfd.get_strategy()
+subcomm = MPI.COMM_WORLD.Split()
+
+hvd.init()
+
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+if gpus and hvd.local_rank() < len(gpus):
+    tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
 
 
 class PPOAgent:
@@ -131,10 +127,10 @@ class PPOAgent:
         # learning rate schedule
         self.lr_schedule_type = lr_schedule
         if lr_schedule is None:
-            self.lr_schedule = learning_rate
+            self.lr_schedule = learning_rate * hvd.size()
         elif lr_schedule.lower() == "exponential":
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=self.learning_rate,
+                initial_learning_rate=self.learning_rate * hvd.size(),
                 decay_steps=workers * horizon,  # decay after every cycle
                 decay_rate=0.98
             )
@@ -142,40 +138,39 @@ class PPOAgent:
             raise ValueError("Unknown Schedule type. Choose one of (None, exponential)")
 
         # models and optimizers
-        with distribution_strategy.scope():
-            self.distribution = distribution
-            if self.distribution is None:
-                self.distribution = CategoricalPolicyDistribution(
-                    self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
-            assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
-            self.model_builder = model_builder
-            self.builder_function_name = model_builder.__name__
-            self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
-                                                                **({"bs": 1} if requires_batch_size(model_builder) else {}))
+        self.distribution = distribution
+        if self.distribution is None:
+            self.distribution = CategoricalPolicyDistribution(
+                self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
+        assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
+        self.model_builder = model_builder
+        self.builder_function_name = model_builder.__name__
+        self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
+                                                            **({"bs": 1} if requires_batch_size(model_builder) else {}))
 
-            if pretrained_components is not None:
-                print("Loading pretrained components:")
-                for pretraining_name in pretrained_components:
-                    component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
-                    if os.path.isfile(component_path):
-                        component = tf.keras.models.load_model(component_path, compile=False)
-                    else:
-                        print(f"\tNo such pretraining found at {component_path}. Skipping.")
-                        continue
+        if pretrained_components is not None:
+            print("Loading pretrained components:")
+            for pretraining_name in pretrained_components:
+                component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
+                if os.path.isfile(component_path):
+                    component = tf.keras.models.load_model(component_path, compile=False)
+                else:
+                    print(f"\tNo such pretraining found at {component_path}. Skipping.")
+                    continue
 
-                    if component.name in get_layer_names(self.joint):
-                        try:
-                            get_component(self.joint, component.name).set_weights(component.get_weights())
-                            print(f"\tSuccessfully loaded component '{component.name}'")
-                        except ValueError as e:
-                            print(f"Could not load weights into component: {e}")
-                    else:
-                        print(f"\tNo outer component named '{component.name}' in model. Skipping.")
+                if component.name in get_layer_names(self.joint):
+                    try:
+                        get_component(self.joint, component.name).set_weights(component.get_weights())
+                        print(f"\tSuccessfully loaded component '{component.name}'")
+                    except ValueError as e:
+                        print(f"Could not load weights into component: {e}")
+                else:
+                    print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-            self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
-            self.is_recurrent = is_recurrent_model(self.policy)
-            if not self.is_recurrent:
-                self.tbptt_length = 1
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.is_recurrent = is_recurrent_model(self.policy)
+        if not self.is_recurrent:
+            self.tbptt_length = 1
 
         # passing one sample, which for some reason prevents cuDNN init error
         if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
@@ -346,11 +341,10 @@ class PPOAgent:
             batch_size = self.n_workers
 
         # rebuild model with desired batch size
-        with distribution_strategy.scope():
-            weights = self.joint.get_weights()
-            self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
-                {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
-            self.joint.set_weights(weights)
+        weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
+            {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
+        self.joint.set_weights(weights)
 
         actor = self._make_actor()
 
@@ -572,21 +566,13 @@ class PPOAgent:
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
 
-            # distribute the dataset
-            if distribution_strategy is not None:
-                batched_dataset = distribution_strategy.experimental_distribute_dataset(batched_dataset)
-
+            first_batch = True
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        if distribution_strategy is not None:
-                            ent, pi_loss, v_loss, info = distribution_strategy.run(self._learn_on_batch, args=(b,))
-
-                        else:
-                            ent, pi_loss, v_loss, info = self._learn_on_batch(b)
-
+                        ent, pi_loss, v_loss, info = self._learn_on_batch(b)
                         progressbar.update(1)
                     else:
                         # truncated back propagation through time
@@ -595,17 +581,18 @@ class PPOAgent:
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
-                            if distribution_strategy is not None:
-                                ent, pi_loss, v_loss, info = distribution_strategy.run(self._learn_on_batch,
-                                                                                       args=(partial_batch,))
-                            else:
-                                ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
+                            ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
 
                             progressbar.update(1)
 
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["action_prob"])
                             reset_states_masked(self.joint, reset_mask)
+
+                if first_batch:
+                    hvd.broadcast_variables(self.joint.variables, root_rank=0)
+                    hvd.broadcast_variables(self.optimizer.variables(), root_rank=0)
+                first_batch = False
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -641,6 +628,7 @@ class PPOAgent:
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
+            actor (Gatherer): actor object to be used for evaluation
             save (bool): whether to save the evaluation to the monitor directory
 
         Returns:

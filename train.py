@@ -218,7 +218,7 @@ if __name__ == "__main__":
     try:
         run_experiment(args.env, vars(args), use_monitor=True)
     except Exception as e:
-        traceback.print_exc()
-        MPI.Finalize()
+        if rank == 0:
+            traceback.print_exc()
 
     MPI.Finalize()
