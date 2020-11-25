@@ -190,6 +190,7 @@ class Gatherer:
         writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{self.id}.tfrecord")
         writer.write(dataset)
 
+        print(f"{MPI.COMM_WORLD.rank} finished")
         return stats, preprocessor
 
     def evaluate(self, preprocessor_serialized: dict) -> Tuple[int, int, Any]:

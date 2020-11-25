@@ -42,10 +42,17 @@ is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
 gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
 hvd.init(comm=gpu_subcomm)
 
+# prevent full blockage of VRAM
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
-if gpus and hvd.local_rank() < len(gpus):
-    tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+
+if is_gpu_process:
+    if gpus:
+        tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
+else:
+    tf.config.experimental.set_visible_devices([], "GPU")
+
+print(f"Devices: {tf.config.experimental.get_visible_devices()}")
 
 
 class PPOAgent:
