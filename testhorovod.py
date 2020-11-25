@@ -1,12 +1,14 @@
-import tensorflow as tf
+from mpi4py import MPI
 import horovod.tensorflow as hvd
 
-hvd.init()
+# Split COMM_WORLD into subcommunicators
+subcomm = MPI.COMM_WORLD.Split(color=0 if MPI.COMM_WORLD.rank < 2 else 1,
+                               key=MPI.COMM_WORLD.rank)
 
-gpus = tf.config.experimental.list_physical_devices('GPU')
-print(gpus)
-for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
+# Initialize Horovod
+hvd.init(comm=subcomm)
 
-if gpus and hvd.local_rank() < len(gpus):
-    tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+if MPI.COMM_WORLD.rank < 2:
+    print(f'COMM_WORLD rank: {MPI.COMM_WORLD.rank}|{MPI.COMM_WORLD.size}, '
+          f'Horovod rank: {hvd.rank()}|{hvd.size()}, '
+          f'Subcomm rank: {subcomm.rank}|{subcomm.size}')

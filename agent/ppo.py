@@ -10,6 +10,7 @@ from collections import OrderedDict
 from typing import Union, Tuple, Any
 
 import gym
+import horovod.tensorflow as hvd
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -29,21 +30,18 @@ from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
-from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
+from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
-from tensorflow import distribute as tfd
-import horovod.tensorflow as hvd
-
+# get COMM and find gpus
 mpi_comm = MPI.COMM_WORLD
-mpi_rank = mpi_comm.Get_rank()
-mpi_size = mpi_comm.Get_size()
-
-subcomm = MPI.COMM_WORLD.Split()
-
-hvd.init()
-
 gpus = tf.config.experimental.list_physical_devices('GPU')
+is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
+
+# create subcomm with GPUs
+gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
+hvd.init(comm=gpu_subcomm)
+
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 if gpus and hvd.local_rank() < len(gpus):
@@ -108,7 +106,7 @@ class PPOAgent:
         self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
         self.preprocessor.warmup(self.env)
 
-        if mpi_rank == 0:
+        if MPI.COMM_WORLD.Get_rank() == 0:
             print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
@@ -127,7 +125,8 @@ class PPOAgent:
         # learning rate schedule
         self.lr_schedule_type = lr_schedule
         if lr_schedule is None:
-            self.lr_schedule = learning_rate * hvd.size()
+            # adjust learning rate based on number of parallel GPUs
+            self.lr_schedule = self.learning_rate * hvd.size()
         elif lr_schedule.lower() == "exponential":
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                 initial_learning_rate=self.learning_rate * hvd.size(),
@@ -325,12 +324,13 @@ class PPOAgent:
             self
         """
         # determine the number of independent repeated gatherings required on this worker
-        base, extra = divmod(self.n_workers, mpi_size)
-        gatherings_on_this_worker = base + (mpi_rank < extra)
+        base, extra = divmod(self.n_workers, MPI.COMM_WORLD.Get_size())
+        gatherings_on_this_worker = base + (MPI.COMM_WORLD.Get_rank() < extra)
 
-        if mpi_rank == 0:
-            print(f"\n\nDrill started using {mpi_size} Processes. "
-                  f"Worker distribution: {[base + (r < extra) for r in range(mpi_size)]}")
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print(
+                f"\n\nDrill started using {MPI.COMM_WORLD.Get_size()} processes of which {hvd.size()} are GPU optimizers."
+                f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.Get_size())]}")
 
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
         if self.is_recurrent and batch_size > self.n_workers:
@@ -351,6 +351,8 @@ class PPOAgent:
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
+            mpi_flat_print(f"Gathering cycle {self.iteration}...")
+
             time_dict = OrderedDict()
             subprocess_start = time.time()
 
@@ -360,7 +362,6 @@ class PPOAgent:
             actor.update_weights(self.joint.get_weights())
 
             # run simulations in parallel
-            flat_print(f"Gathering cycle {self.iteration}...")
             worker_stats, worker_preprocessors = [], []
             for i in range(gatherings_on_this_worker):
                 collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length,
@@ -381,7 +382,7 @@ class PPOAgent:
             stats_with_evaluation = stats
             if separate_eval:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
-                    flat_print("Evaluating...")
+                    mpi_flat_print("Evaluating...")
                     n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
                     evaluation_stats, _ = self.evaluate(n_evaluations, actor=actor)
 
@@ -389,82 +390,83 @@ class PPOAgent:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
-            elif mpi_rank == 0 and stats.numb_completed_episodes == 0:
+            elif MPI.COMM_WORLD.Get_rank() == 0 and stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            if mpi_rank != 0:
-                # only the root process calculates the rest
+            if not is_gpu_process:
+                # only the GPU processes optimize and calculate the rest
                 continue
 
-            # record stats and preprocessor in the agent
-            self.record_preprocessor(self.preprocessor)
-            self.record_stats(stats_with_evaluation)
+            if mpi_comm.rank == 0:
+                # record stats and preprocessor in the agent
+                self.record_preprocessor(self.preprocessor)
+                self.record_stats(stats_with_evaluation)
 
-            time_dict["evaluating"] = time.time() - subprocess_start
-            subprocess_start = time.time()
+                time_dict["evaluating"] = time.time() - subprocess_start
+                subprocess_start = time.time()
 
-            # save if best
-            if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
-                self.save_agent_state(name="best")
+                # save if best
+                if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
+                    self.save_agent_state(name="best")
 
-            # early stopping
+            # early stopping  TODO check how this goes with MPI
             if self.env.spec.reward_threshold is not None and stop_early:
                 if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
                     print("\rAll catch a breath, we stop the drill early due to the formidable result!")
                     break
 
-            if cycle_start is not None:
-                self.cycle_timings.append(round(time.time() - cycle_start, 2))
-            self.report(total_iterations=n)
-            cycle_start = time.time()
+            if mpi_comm.rank == 0:
+                if cycle_start is not None:
+                    self.cycle_timings.append(round(time.time() - cycle_start, 2))
+                self.report(total_iterations=n)
+                cycle_start = time.time()
 
-            # OPTIMIZE
-            flat_print("Optimizing...")
-
-            # read the dataset from storage
+            # PARALLELIZED OPTIMIZATION
+            mpi_flat_print("Optimizing...")
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
-
             self.optimize(dataset, epochs, batch_size)
 
-            time_dict["optimizing"] = time.time() - subprocess_start
+            if MPI.COMM_WORLD.rank == 0:
+                time_dict["optimizing"] = time.time() - subprocess_start
 
-            flat_print("Finalizing...")
-            self.total_frames_seen += stats.numb_processed_frames
-            self.total_episodes_seen += stats.numb_completed_episodes
+                mpi_flat_print("Finalizing...")
+                self.total_frames_seen += stats.numb_processed_frames
+                self.total_episodes_seen += stats.numb_completed_episodes
 
-            # update monitor logs
-            if monitor is not None:
-                if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                    print("Creating Episode GIFs for current state of policy...")
-                    monitor.create_episode_gif(n=1)
+                # update monitor logs
+                if monitor is not None:
+                    if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                        print("Creating Episode GIFs for current state of policy...")
+                        monitor.create_episode_gif(n=1)
 
-                if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                    monitor.update()
+                    if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                        monitor.update()
 
-            # save the current state of the agent
-            if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
-                self.save_agent_state()
+                # save the current state of the agent
+                if save_every != 0 and self.iteration != 0 and (
+                        self.iteration + 1) % save_every == 0:
+                    self.save_agent_state()
 
-            # calculate processing speed in fps
-            self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-            self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, mpi_size)) / (
-                time_dict["gathering"])
-            self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
-            self.time_dicts.append(time_dict)
+                # calculate processing speed in fps
+                self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+                self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.Get_size())) / (
+                    time_dict["gathering"])
+                self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
+                self.time_dicts.append(time_dict)
 
-        if mpi_rank == 0:
+        if mpi_comm.Get_rank() == 0:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
 
         return self
 
     def record_stats(self, stats):
         """Record a given StatsBundle in the history of the agent."""
-        mean_eps_length = statistics.mean(stats.episode_lengths)
-        stdev_eps_length = statistics.stdev(stats.episode_lengths)
-        mean_eps_rewards = statistics.mean(stats.episode_rewards)
-        stdev_eps_rewards = statistics.stdev(stats.episode_rewards)
+        mean_eps_length = statistics.mean(stats.episode_lengths) if len(stats.episode_lengths) > 1 else stats.episode_lengths
+        stdev_eps_length = statistics.stdev(stats.episode_lengths) if len(stats.episode_lengths) > 1 else 0
+        mean_eps_rewards = statistics.mean(stats.episode_rewards) if len(stats.episode_rewards) > 1 else stats.episode_rewards
+        stdev_eps_rewards = statistics.stdev(stats.episode_rewards) if len(stats.episode_rewards) > 1 else 0
 
         self.episode_length_history.append(stats.episode_lengths)
         self.episode_reward_history.append(stats.episode_rewards)
@@ -487,7 +489,7 @@ class PPOAgent:
     def _make_actor(self) -> Gatherer:
         actor = Gatherer(self.builder_function_name,
                          self.distribution.__class__.__name__,
-                         self.env_name, mpi_rank)
+                         self.env_name, MPI.COMM_WORLD.Get_rank())
 
         return actor
 
@@ -515,6 +517,9 @@ class PPOAgent:
                                          clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
             total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+
+        # wrap for distribution
+        tape = hvd.DistributedGradientTape(tape)
 
         # calculate the gradient of the joint model based on total loss
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
@@ -562,6 +567,8 @@ class PPOAgent:
             # for each epoch, dataset first should be shuffled to break correlation
             if not self.is_recurrent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+
+            dataset = dataset.take(dataset.cardinality() // hvd.size())
 
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
@@ -643,14 +650,14 @@ class PPOAgent:
         gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
         stats, classes = None, None
-        if mpi_rank == 0:
+        if MPI.COMM_WORLD.Get_rank() == 0:
             lengths, rewards, classes = zip(*gathered_evaluation_result)
             stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
 
         stats = mpi_comm.bcast(stats, root=0)
         classes = mpi_comm.bcast(classes, root=0)
 
-        if save and mpi_rank == 0:
+        if save and MPI.COMM_WORLD.Get_rank() == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
 
             previous_evaluations = {}
@@ -667,7 +674,7 @@ class PPOAgent:
 
     def report(self, total_iterations):
         """Print a report of the current state of the training."""
-        if mpi_rank != 0:
+        if MPI.COMM_WORLD.Get_rank() != 0:
             return
 
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
@@ -703,7 +710,7 @@ class PPOAgent:
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
 
         # print the report
-        flat_print(
+        mpi_flat_print(
             f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
             f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
             f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
