@@ -10,7 +10,6 @@ from collections import OrderedDict
 from typing import Union, Tuple, Any
 
 import gym
-import horovod.tensorflow as hvd
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
@@ -33,26 +32,30 @@ from utilities.model_utils import is_recurrent_model, get_layer_names, get_compo
 from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
+HOROVOD = True
+
 # get COMM and find gpus
 mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.experimental.list_physical_devices('GPU')
 is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
 
-# create subcomm with GPUs
-gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
-hvd.init(comm=gpu_subcomm)
-
-# prevent full blockage of VRAM
-for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
-
-if is_gpu_process:
-    if gpus:
-        tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
-else:
+if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
 
-print(f"Devices: {tf.config.experimental.get_visible_devices()}")
+if HOROVOD:
+    import horovod.tensorflow as hvd
+
+    # create subcomm with GPUs
+    gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
+    hvd.init(comm=gpu_subcomm)
+
+    # prevent full blockage of VRAM
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
+    if is_gpu_process:
+        if gpus:
+            tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
 
 
 class PPOAgent:
@@ -113,7 +116,7 @@ class PPOAgent:
         self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
         self.preprocessor.warmup(self.env)
 
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if MPI.COMM_WORLD.rank == 0:
             print(f"Using {self.preprocessor} for preprocessing.")
 
         # hyperparameters
@@ -133,10 +136,10 @@ class PPOAgent:
         self.lr_schedule_type = lr_schedule
         if lr_schedule is None:
             # adjust learning rate based on number of parallel GPUs
-            self.lr_schedule = self.learning_rate * hvd.size()
+            self.lr_schedule = self.learning_rate * (hvd.size() if HOROVOD else 1)
         elif lr_schedule.lower() == "exponential":
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=self.learning_rate * hvd.size(),
+                initial_learning_rate=self.learning_rate * (hvd.size() if HOROVOD else 1),
                 decay_steps=workers * horizon,  # decay after every cycle
                 decay_rate=0.98
             )
@@ -331,13 +334,14 @@ class PPOAgent:
             self
         """
         # determine the number of independent repeated gatherings required on this worker
-        base, extra = divmod(self.n_workers, MPI.COMM_WORLD.Get_size())
-        gatherings_on_this_worker = base + (MPI.COMM_WORLD.Get_rank() < extra)
+        base, extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
+        gatherings_on_this_worker = base + (MPI.COMM_WORLD.rank < extra)
 
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if MPI.COMM_WORLD.rank == 0:
             print(
-                f"\n\nDrill started using {MPI.COMM_WORLD.Get_size()} processes of which {hvd.size()} are GPU optimizers."
-                f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.Get_size())]}")
+                f"\n\nDrill started using {MPI.COMM_WORLD.size} processes"
+                f" of which {hvd.size() if HOROVOD else 1} are GPU optimizers."
+                f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.size)]}")
 
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
         if self.is_recurrent and batch_size > self.n_workers:
@@ -370,9 +374,9 @@ class PPOAgent:
 
             # run simulations in parallel
             worker_stats, worker_preprocessors = [], []
+            serialized_wrapper = self.preprocessor.serialize()
             for i in range(gatherings_on_this_worker):
-                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length,
-                                           self.preprocessor.serialize())
+                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, serialized_wrapper)
                 worker_stats.append(collection[0])
                 worker_preprocessors.append(collection[1])
 
@@ -397,7 +401,7 @@ class PPOAgent:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
-            elif MPI.COMM_WORLD.Get_rank() == 0 and stats.numb_completed_episodes == 0:
+            elif MPI.COMM_WORLD.rank == 0 and stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
@@ -458,21 +462,23 @@ class PPOAgent:
 
                 # calculate processing speed in fps
                 self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-                self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.Get_size())) / (
+                self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
                     time_dict["gathering"])
                 self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
                 self.time_dicts.append(time_dict)
 
-        if mpi_comm.Get_rank() == 0:
+        if mpi_comm.rank == 0:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
 
         return self
 
     def record_stats(self, stats):
         """Record a given StatsBundle in the history of the agent."""
-        mean_eps_length = statistics.mean(stats.episode_lengths) if len(stats.episode_lengths) > 1 else stats.episode_lengths
+        mean_eps_length = statistics.mean(stats.episode_lengths) if len(
+            stats.episode_lengths) > 1 else stats.episode_lengths
         stdev_eps_length = statistics.stdev(stats.episode_lengths) if len(stats.episode_lengths) > 1 else 0
-        mean_eps_rewards = statistics.mean(stats.episode_rewards) if len(stats.episode_rewards) > 1 else stats.episode_rewards
+        mean_eps_rewards = statistics.mean(stats.episode_rewards) if len(
+            stats.episode_rewards) > 1 else stats.episode_rewards
         stdev_eps_rewards = statistics.stdev(stats.episode_rewards) if len(stats.episode_rewards) > 1 else 0
 
         self.episode_length_history.append(stats.episode_lengths)
@@ -496,7 +502,7 @@ class PPOAgent:
     def _make_actor(self) -> Gatherer:
         actor = Gatherer(self.builder_function_name,
                          self.distribution.__class__.__name__,
-                         self.env_name, MPI.COMM_WORLD.Get_rank())
+                         self.env_name, MPI.COMM_WORLD.rank)
 
         return actor
 
@@ -526,7 +532,8 @@ class PPOAgent:
             total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
         # wrap for distribution
-        tape = hvd.DistributedGradientTape(tape)
+        if HOROVOD:
+            tape = hvd.DistributedGradientTape(tape)
 
         # calculate the gradient of the joint model based on total loss
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
@@ -575,7 +582,8 @@ class PPOAgent:
             if not self.is_recurrent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            dataset = dataset.take(dataset.cardinality() // hvd.size())
+            if HOROVOD:
+                dataset = dataset.take(dataset.cardinality() // hvd.size())
 
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
@@ -603,7 +611,7 @@ class PPOAgent:
                             reset_mask = detect_finished_episodes(partial_batch["action_prob"])
                             reset_states_masked(self.joint, reset_mask)
 
-                if first_batch:
+                if first_batch and HOROVOD:
                     hvd.broadcast_variables(self.joint.variables, root_rank=0)
                     hvd.broadcast_variables(self.optimizer.variables(), root_rank=0)
                 first_batch = False
@@ -611,15 +619,6 @@ class PPOAgent:
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
-
-                # for grad in info["gradients"]:
-                #     found = False
-                #     if tf.reduce_any(tf.math.is_nan(grad)):
-                #         found = True
-                #
-                #     if found:
-                #         print(info)
-                #         exit()
 
                 # reset RNN states after each outer batch
                 self.joint.reset_states()
@@ -657,14 +656,14 @@ class PPOAgent:
         gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
         stats, classes = None, None
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if MPI.COMM_WORLD.rank == 0:
             lengths, rewards, classes = zip(*gathered_evaluation_result)
             stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
 
         stats = mpi_comm.bcast(stats, root=0)
         classes = mpi_comm.bcast(classes, root=0)
 
-        if save and MPI.COMM_WORLD.Get_rank() == 0:
+        if save and MPI.COMM_WORLD.rank == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
 
             previous_evaluations = {}
@@ -681,12 +680,15 @@ class PPOAgent:
 
     def report(self, total_iterations):
         """Print a report of the current state of the training."""
-        if MPI.COMM_WORLD.Get_rank() != 0:
+        if MPI.COMM_WORLD.rank != 0:
             return
+
+        print(self.cycle_reward_history)
 
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
-        if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None:
+        if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None and \
+                self.cycle_reward_history[0] is not None and self.cycle_reward_history[-1] is not None:
             half_way_there_threshold = (self.cycle_reward_history[0]
                                         + 0.5 * (self.env.spec.reward_threshold - self.cycle_reward_history[0]))
             if self.env.spec.reward_threshold < self.cycle_reward_history[-1]:
