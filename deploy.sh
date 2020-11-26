@@ -14,13 +14,17 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export CRAY_CUDA_MPS=1
 
 # load modules
-module load openmpi/3.0.0
 module load daint-gpu
 module load cray-python
+module load Horovod
 module load cudatoolkit/10.2.89_3.28-7.0.2.1_2.17__g52c0314
+
+export NCCL_DEBUG=INFO
+export NCCL_IB_HCA=ipogif0
+export NCCL_IB_CUDA_SUPPORT=1
 
 # load virtual environment
 source ${HOME}/dexterityvenv/bin/activate
 
 # run it
-srun --hint=nomultithread python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
+srun python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
