@@ -8,6 +8,7 @@
 #SBATCH --ntasks-per-core=1
 #SBATCH --cpus-per-task=2
 #SBATCH --constraint=gpu
+#SBATCH --hint=nomultithread
 #SBATCH --time=08:00:00
 
 # load modules
