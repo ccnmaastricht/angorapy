@@ -475,10 +475,10 @@ class PPOAgent:
     def record_stats(self, stats):
         """Record a given StatsBundle in the history of the agent."""
         mean_eps_length = statistics.mean(stats.episode_lengths) if len(
-            stats.episode_lengths) > 1 else stats.episode_lengths
-        stdev_eps_length = statistics.stdev(stats.episode_lengths) if len(stats.episode_lengths) > 1 else 0
+            stats.episode_lengths) > 1 else stats.episode_lengths[0]
         mean_eps_rewards = statistics.mean(stats.episode_rewards) if len(
-            stats.episode_rewards) > 1 else stats.episode_rewards
+            stats.episode_rewards) > 1 else stats.episode_rewards[0]
+        stdev_eps_length = statistics.stdev(stats.episode_lengths) if len(stats.episode_lengths) > 1 else 0
         stdev_eps_rewards = statistics.stdev(stats.episode_rewards) if len(stats.episode_rewards) > 1 else 0
 
         self.episode_length_history.append(stats.episode_lengths)
