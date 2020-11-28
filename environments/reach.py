@@ -276,6 +276,8 @@ class ShadowHandFreeReachVisual(ShadowHandFreeReach):
 
 
 class FreeReachSequential(ShadowHandFreeReach):
+    """Freely join fingers in a sequence, where each element of the sequence will be given in the goal part of the
+    state and updated after the current subgoal is reached."""
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.5):

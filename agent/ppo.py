@@ -42,7 +42,7 @@ is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
 if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
 
-if HOROVOD:
+if HOROVOD and is_gpu_process:
     import horovod.tensorflow as hvd
 
     # create subcomm with GPUs
