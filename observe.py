@@ -14,6 +14,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=None)
+parser.add_argument("--env", type=str, nargs="?", help="force testing environment", default="")
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="b")
 parser.add_argument("--force-case-circulation", action="store_true", help="circle through goal definitions")
 args = parser.parse_args()
@@ -30,12 +31,18 @@ agent = PPOAgent.from_agent_state(args.id, args.state)
 print(f"Agent {args.id} successfully loaded.")
 
 investigator = Investigator.from_agent(agent)
+env = agent.env
+print(env.unwrapped.spec.id)
+print(env.observation_space)
+if args.env != "":
+    env = gym.make(args.env)
+print(env.observation_space)
 
-print(f"Evaluating on {agent.env_name}")
+print(f"Evaluating on {env.unwrapped.spec.id}")
 
-if not args.force_case_circulation or (agent.env_name != "HandFreeReachAbsolute-v0"):
+if not args.force_case_circulation or (env.unwrapped.spec.id != "HandFreeReachAbsolute-v0"):
     for i in range(100):
-        investigator.render_episode(agent.env, slow_down=False)
+        investigator.render_episode(env, slow_down=False)
 else:
     env = gym.make("HandFreeReachFFAbsolute-v0")
     for i in range(100):
