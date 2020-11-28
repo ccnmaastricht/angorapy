@@ -4,7 +4,7 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=24
-#SBATCH --ntasks-per-node=12
+#SBATCH --ntasks-per-node=24
 #SBATCH --ntasks-per-core=2
 #SBATCH --cpus-per-task=1
 #SBATCH --constraint=gpu
@@ -27,4 +27,4 @@ export NCCL_IB_CUDA_SUPPORT=1
 source ${HOME}/dexterityvenv/bin/activate
 
 # run it
-srun python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
+horovodrun python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
