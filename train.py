@@ -21,6 +21,9 @@ from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
 
+import mpi4py
+mpi4py.rc.initialize = False
+mpi4py.rc.finalize = False
 from mpi4py import MPI
 
 

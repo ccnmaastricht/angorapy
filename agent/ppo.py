@@ -13,6 +13,9 @@ import gym
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
+import mpi4py
+mpi4py.rc.initialize = False
+mpi4py.rc.finalize = False
 from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
@@ -42,11 +45,12 @@ is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
 if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
 
-if HOROVOD and is_gpu_process:
+if HOROVOD:
     import horovod.tensorflow as hvd
 
     # create subcomm with GPUs
     gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
+
     hvd.init(comm=gpu_subcomm)
 
     # prevent full blockage of VRAM
@@ -682,8 +686,6 @@ class PPOAgent:
         """Print a report of the current state of the training."""
         if MPI.COMM_WORLD.rank != 0:
             return
-
-        print(self.cycle_reward_history)
 
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
