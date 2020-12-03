@@ -14,8 +14,6 @@ import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
 import mpi4py
-mpi4py.rc.initialize = False
-mpi4py.rc.finalize = False
 from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
@@ -36,6 +34,7 @@ from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, mer
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
 HOROVOD = True
+INIT_HOROVOD = True
 
 # get COMM and find gpus
 mpi_comm = MPI.COMM_WORLD
@@ -45,7 +44,7 @@ is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
 if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
 
-if HOROVOD:
+if INIT_HOROVOD:
     import horovod.tensorflow as hvd
 
     # create subcomm with GPUs

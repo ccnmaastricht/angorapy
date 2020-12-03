@@ -27,4 +27,4 @@ export NCCL_IB_CUDA_SUPPORT=1
 source ${HOME}/dexterityvenv/bin/activate
 
 # run it
-horovodrun python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
+srun python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
