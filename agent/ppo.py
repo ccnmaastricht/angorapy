@@ -33,8 +33,8 @@ from utilities.model_utils import is_recurrent_model, get_layer_names, get_compo
 from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
-HOROVOD = True
-INIT_HOROVOD = True
+HOROVOD = False
+INIT_HOROVOD = False
 
 # get COMM and find gpus
 mpi_comm = MPI.COMM_WORLD
@@ -49,16 +49,15 @@ if INIT_HOROVOD:
 
     # create subcomm with GPUs
     gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
-
     hvd.init(comm=gpu_subcomm)
 
     # prevent full blockage of VRAM
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
-
-    if is_gpu_process:
-        if gpus:
-            tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
+    # for gpu in gpus:
+    #     tf.config.experimental.set_memory_growth(gpu, True)
+    #
+    # if is_gpu_process:
+    #     if gpus:
+    #         tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
 
 
 class PPOAgent:
