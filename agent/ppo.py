@@ -29,29 +29,13 @@ from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
+from utilities.statistics import ignore_none
 from utilities.util import flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
-
-from tensorflow import distribute as tfd
 
 mpi_comm = MPI.COMM_WORLD
 mpi_rank = mpi_comm.Get_rank()
 mpi_size = mpi_comm.Get_size()
-
-if mpi_rank == 0:
-    try:
-        distribution_strategy = tfd.experimental.MultiWorkerMirroredStrategy(
-            cluster_resolver=tfd.cluster_resolver.SlurmClusterResolver(
-                gpus_per_node=1,
-                gpus_per_task=1,
-                tasks_per_node=1
-            ),
-            communication=tfd.experimental.CollectiveCommunication.NCCL
-        )
-    except RuntimeError:
-        distribution_strategy = tfd.OneDeviceStrategy(device="GPU:0")
-else:
-    distribution_strategy = tfd.get_strategy()
 
 
 class PPOAgent:
@@ -142,40 +126,39 @@ class PPOAgent:
             raise ValueError("Unknown Schedule type. Choose one of (None, exponential)")
 
         # models and optimizers
-        with distribution_strategy.scope():
-            self.distribution = distribution
-            if self.distribution is None:
-                self.distribution = CategoricalPolicyDistribution(
-                    self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
-            assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
-            self.model_builder = model_builder
-            self.builder_function_name = model_builder.__name__
-            self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
-                                                                **({"bs": 1} if requires_batch_size(model_builder) else {}))
+        self.distribution = distribution
+        if self.distribution is None:
+            self.distribution = CategoricalPolicyDistribution(
+                self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
+        assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
+        self.model_builder = model_builder
+        self.builder_function_name = model_builder.__name__
+        self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
+                                                            **({"bs": 1} if requires_batch_size(model_builder) else {}))
 
-            if pretrained_components is not None:
-                print("Loading pretrained components:")
-                for pretraining_name in pretrained_components:
-                    component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
-                    if os.path.isfile(component_path):
-                        component = tf.keras.models.load_model(component_path, compile=False)
-                    else:
-                        print(f"\tNo such pretraining found at {component_path}. Skipping.")
-                        continue
+        if pretrained_components is not None:
+            print("Loading pretrained components:")
+            for pretraining_name in pretrained_components:
+                component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
+                if os.path.isfile(component_path):
+                    component = tf.keras.models.load_model(component_path, compile=False)
+                else:
+                    print(f"\tNo such pretraining found at {component_path}. Skipping.")
+                    continue
 
-                    if component.name in get_layer_names(self.joint):
-                        try:
-                            get_component(self.joint, component.name).set_weights(component.get_weights())
-                            print(f"\tSuccessfully loaded component '{component.name}'")
-                        except ValueError as e:
-                            print(f"Could not load weights into component: {e}")
-                    else:
-                        print(f"\tNo outer component named '{component.name}' in model. Skipping.")
+                if component.name in get_layer_names(self.joint):
+                    try:
+                        get_component(self.joint, component.name).set_weights(component.get_weights())
+                        print(f"\tSuccessfully loaded component '{component.name}'")
+                    except ValueError as e:
+                        print(f"Could not load weights into component: {e}")
+                else:
+                    print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-            self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
-            self.is_recurrent = is_recurrent_model(self.policy)
-            if not self.is_recurrent:
-                self.tbptt_length = 1
+        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.is_recurrent = is_recurrent_model(self.policy)
+        if not self.is_recurrent:
+            self.tbptt_length = 1
 
         # passing one sample, which for some reason prevents cuDNN init error
         if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
@@ -338,7 +321,7 @@ class PPOAgent:
                   f"Worker distribution: {[base + (r < extra) for r in range(mpi_size)]}")
 
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-        if self.is_recurrent and batch_size > self.n_workers:
+        if mpi_rank == 0 and self.is_recurrent and batch_size > self.n_workers:
             logging.warning(
                 f"Batchsize is larger than possible with the available number of independent sequences for "
                 f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
@@ -346,11 +329,10 @@ class PPOAgent:
             batch_size = self.n_workers
 
         # rebuild model with desired batch size
-        with distribution_strategy.scope():
-            weights = self.joint.get_weights()
-            self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
-                {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
-            self.joint.set_weights(weights)
+        weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
+            {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
+        self.joint.set_weights(weights)
 
         actor = self._make_actor()
 
@@ -411,7 +393,7 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # save if best
-            if self.cycle_reward_history[-1] == max(self.cycle_reward_history):
+            if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max, self.cycle_reward_history):
                 self.save_agent_state(name="best")
 
             # early stopping
@@ -467,10 +449,17 @@ class PPOAgent:
 
     def record_stats(self, stats):
         """Record a given StatsBundle in the history of the agent."""
-        mean_eps_length = statistics.mean(stats.episode_lengths)
-        stdev_eps_length = statistics.stdev(stats.episode_lengths)
-        mean_eps_rewards = statistics.mean(stats.episode_rewards)
-        stdev_eps_rewards = statistics.stdev(stats.episode_rewards)
+        try:
+            mean_eps_length = statistics.mean(stats.episode_lengths) if len(
+                stats.episode_lengths) > 1 else stats.episode_lengths[0]
+            mean_eps_rewards = statistics.mean(stats.episode_rewards) if len(
+                stats.episode_rewards) > 1 else stats.episode_rewards[0]
+        except IndexError:
+            mean_eps_rewards = None
+            mean_eps_length = None
+
+        stdev_eps_length = statistics.stdev(stats.episode_lengths) if len(stats.episode_lengths) > 1 else 0
+        stdev_eps_rewards = statistics.stdev(stats.episode_rewards) if len(stats.episode_rewards) > 1 else 0
 
         self.episode_length_history.append(stats.episode_lengths)
         self.episode_reward_history.append(stats.episode_rewards)
@@ -572,20 +561,12 @@ class PPOAgent:
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
 
-            # distribute the dataset
-            if distribution_strategy is not None:
-                batched_dataset = distribution_strategy.experimental_distribute_dataset(batched_dataset)
-
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        if distribution_strategy is not None:
-                            ent, pi_loss, v_loss, info = distribution_strategy.run(self._learn_on_batch, args=(b,))
-
-                        else:
-                            ent, pi_loss, v_loss, info = self._learn_on_batch(b)
+                        ent, pi_loss, v_loss, info = self._learn_on_batch(b)
 
                         progressbar.update(1)
                     else:
@@ -595,11 +576,7 @@ class PPOAgent:
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
-                            if distribution_strategy is not None:
-                                ent, pi_loss, v_loss, info = distribution_strategy.run(self._learn_on_batch,
-                                                                                       args=(partial_batch,))
-                            else:
-                                ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
+                            ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
 
                             progressbar.update(1)
 
@@ -684,7 +661,8 @@ class PPOAgent:
 
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]
         reward_col = ac
-        if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None:
+        if hasattr(self.env.spec, "reward_threshold") and self.env.spec.reward_threshold is not None and \
+                self.cycle_reward_history[0] is not None and self.cycle_reward_history[-1] is not None:
             half_way_there_threshold = (self.cycle_reward_history[0]
                                         + 0.5 * (self.env.spec.reward_threshold - self.cycle_reward_history[0]))
             if self.env.spec.reward_threshold < self.cycle_reward_history[-1]:
