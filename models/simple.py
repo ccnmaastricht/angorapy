@@ -49,8 +49,6 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
                      model_type: str = "rnn", layer_sizes: Tuple = (64,)):
     """Build simple policy and value models having a recurrent layer before their heads."""
-    print(bs)
-
     state_dimensionality, n_actions = env_extract_dims(env)
     rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
                   "lstm": tf.keras.layers.LSTM,
@@ -60,36 +58,30 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     sequence_length = None
 
     inputs = tf.keras.Input(shape=(sequence_length, state_dimensionality,), batch_size=bs)
-    print(inputs.shape)
     masked = tf.keras.layers.Masking()(inputs)
-    print(masked.shape)
 
     # policy network; stateful, so batch size needs to be known
-    x = TimeDistributed(
-        _build_encoding_sub_model(
-            (state_dimensionality,),
-            bs,
-            layer_sizes=layer_sizes,
-            name="policy_encoder"),
+    x = TimeDistributed(_build_encoding_sub_model(
+        (state_dimensionality,), bs,
+        layer_sizes=layer_sizes,
+        name="policy_encoder"),
         name="TD_policy")(masked)
-    print(x.shape)
-    x.set_shape([bs] + x.shape[1:])
-    print(x.shape)
 
+    x.set_shape([bs] + x.shape[1:])
     x, *_ = rnn_choice(layer_sizes[-1],
                        stateful=True,
                        return_sequences=True,
                        return_state=True,
                        batch_size=bs,
                        name="policy_recurrent_layer")(x)
-    print(x.shape)
 
     out_policy = distribution.build_action_head(n_actions, x.shape[1:], bs)(x)
 
     # value network
     if not shared:
-        x = TimeDistributed(_build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="value_encoder"),
-                            name="TD_value")(masked)
+        x = TimeDistributed(
+            _build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="value_encoder"),
+            name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
         x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
                            name="value_recurrent_layer")(x)
