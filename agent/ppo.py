@@ -504,7 +504,9 @@ class PPOAgent:
     def _make_actor(self) -> Gatherer:
         actor = Gatherer(self.builder_function_name,
                          self.distribution.__class__.__name__,
-                         self.env_name, MPI.COMM_WORLD.rank)
+                         self.env_name,
+                         MPI.COMM_WORLD.rank,
+                         self.agent_id)
 
         return actor
 
@@ -833,3 +835,7 @@ class PPOAgent:
         its = [int(i.group(0)) for i in [re.match("([0-9]+)", fn) for fn in os.listdir(agent_path)] if i is not None]
 
         return sorted(its)
+
+    def finalize(self):
+        """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
+        pass

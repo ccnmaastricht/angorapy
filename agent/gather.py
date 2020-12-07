@@ -31,10 +31,11 @@ class Gatherer:
     # joint: tf.keras.Model
     # policy: tf.keras.Model
 
-    def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int):
+    def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int, exp_id: int):
         model_builder = getattr(models, model_builder_name)
 
-        self.id = worker_id
+        self.worker_id = worker_id
+        self.exp_id = exp_id
 
         # setup persistent tools
         self.env = gym.make(env_name)
@@ -187,7 +188,7 @@ class Gatherer:
         dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=self.is_shadow_brain)
         dataset = dataset.map(tf_serialize_example)
 
-        writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/data_{self.id}.tfrecord")
+        writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{self.worker_id}.tfrecord")
         writer.write(dataset)
 
         return stats, preprocessor

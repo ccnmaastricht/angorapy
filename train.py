@@ -127,11 +127,18 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
         monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
                           iterations=settings["iterations"], config_name=settings["config"])
 
-    agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
-                export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
-                stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+    try:
+        agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
+                    export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
+                    stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+    except Exception:
+        agent.finalize()
+
+        if rank == 0:
+            traceback.print_exc()
 
     agent.save_agent_state()
+    agent.finalize()
     env.close()
 
     return agent

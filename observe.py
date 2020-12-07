@@ -32,15 +32,15 @@ print(f"Agent {args.id} successfully loaded.")
 
 investigator = Investigator.from_agent(agent)
 env = agent.env
-print(env.unwrapped.spec.id)
+print(env.unwrapped.spec.worker_id)
 print(env.observation_space)
 if args.env != "":
     env = gym.make(args.env)
 print(env.observation_space)
 
-print(f"Evaluating on {env.unwrapped.spec.id}")
+print(f"Evaluating on {env.unwrapped.spec.worker_id}")
 
-if not args.force_case_circulation or (env.unwrapped.spec.id != "HandFreeReachAbsolute-v0"):
+if not args.force_case_circulation or (env.unwrapped.spec.worker_id != "HandFreeReachAbsolute-v0"):
     for i in range(100):
         investigator.render_episode(env, slow_down=False)
 else:

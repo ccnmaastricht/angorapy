@@ -12,7 +12,7 @@ from utilities.const import PATH_TO_BENCHMARKS
 from utilities.statistics import increment_mean_var
 
 if __name__ == '__main__':
-    all_envs = [e.id for e in list(gym.envs.registry.all())]
+    all_envs = [e.worker_id for e in list(gym.envs.registry.all())]
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     parser = argparse.ArgumentParser(description="Perform a comparative benchmarking experiment. Given one task, a "
