@@ -40,8 +40,10 @@ class Chiefinvestigator(Investigator):
         try:
             self.sub_model_from = build_sub_model_from(self.network, "beta_action_head")
         except:
-            pass
-            #self.sub_model_from = build_sub_model_from(self.network, 'discrete_action_head')
+            try:
+                self.sub_model_from = build_sub_model_from(self.network, 'discrete_action_head')
+            except:
+                self.sub_model_from = build_sub_model_from(self.network, 'gaussian_action_head')
 
         layer_names = self.get_layer_names()
         self.sub_model_to = build_sub_model_to(self.network, ['policy_recurrent_layer', layer_names[1]], include_original=True)
@@ -182,9 +184,6 @@ class Chiefinvestigator(Investigator):
         u, v, w = transformed_phase_space[:, 0], transformed_phase_space[:, 1], transformed_phase_space[:, 2]
 
         return x, y, z, u, v, w
-
-    def detect_dynamics(self):
-        pass
 
 
 if __name__ == "__main__":

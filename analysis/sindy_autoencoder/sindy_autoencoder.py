@@ -1,11 +1,15 @@
-from jax import vmap, random, jit, value_and_grad
+from jax import vmap, random, jit, value_and_grad, jacobian
 import jax.numpy as jnp
 import jax
 from jax.experimental import optimizers
 import time
+import gym
+import pickle
+import os
 
 from analysis.sindy_autoencoder.lorenz_example import get_lorenz_data
-from analysis.sindy_autoencoder.utils import build_sindy_autoencoder, autoencoder_pass, library_size
+from analysis.sindy_autoencoder.utils import build_sindy_autoencoder, autoencoder_pass, \
+    library_size, simulation_pass, encoding_pass, sindy_library_jax
 
 
 class SindyAutoencoder(object):
@@ -43,6 +47,7 @@ class SindyAutoencoder(object):
                  sequential_thresholding: bool = True,
                  coefficient_threshold: float = 0.1,
                  threshold_frequency: int = 500,
+                 use_sine: bool = False,
                  recon_loss_weight: float = 1.0,
                  sindy_z_loss_weight: float = 0.0,
                  sindy_x_loss_weight: float = 1e-4,
@@ -55,7 +60,7 @@ class SindyAutoencoder(object):
 
         self.layer_sizes = layer_sizes
         self.poly_order = poly_order
-        self.library_size = library_size(layer_sizes[-1], poly_order)
+        self.library_size = library_size(layer_sizes[-1], poly_order, use_sine=use_sine)
 
         self.key = random.PRNGKey(seed)
         self.autoencoder, self.coefficient_mask = build_sindy_autoencoder(layer_sizes,
@@ -66,6 +71,7 @@ class SindyAutoencoder(object):
                                                                       'decoder': None,
                                                                       'sindy_coefficients': None},
                                                                      None, 0, 0))
+        self.simulation_pass = simulation_pass
 
         self.recon_loss_weight = recon_loss_weight
         self.sindy_z_loss_weight = sindy_z_loss_weight
@@ -91,11 +97,11 @@ class SindyAutoencoder(object):
         self.train_loss = []
         self.refinement_loss = []
 
-    def loss(self, sindy_autoencoder, coefficient_mask, x, dx_input):
+    def loss(self, sindy_autoencoder, coefficient_mask, x, dx):
         x, dx, dz, x_decode, dx_decode, sindy_predict = self.vmap_autoencoder_pass(sindy_autoencoder,
                                                                                    coefficient_mask,
                                                                                    x,
-                                                                                   dx_input)
+                                                                                   dx)
 
         reconstruction_loss = jnp.mean((x - x_decode) ** 2)
         sindy_z = jnp.mean((dz - sindy_predict) ** 2)
@@ -170,15 +176,91 @@ class SindyAutoencoder(object):
         print(f"FINISHING...\n"
               f"Sparsity: {jnp.sum(self.coefficient_mask)} active terms")
 
+        self.autoencoder = params
+
     def validate(self):
         pass
 
-    def simulate(self):
+    def simulate_dynamics(self, x, dx):
+        x, dx, z_next, sindy_predict, x_next, dx_next = self.simulation_pass(self.autoencoder,
+                                                                             self.coefficient_mask,
+                                                                             x,
+                                                                             dx)
+
+        return z_next, sindy_predict, x_next
+
+    def simulate_episode(self, env: gym.Env):
         pass
+
+    def evaluate_jacobian(self, x):
+        z = encoding_pass(self.autoencoder['encoder'], x)
+        print(z)
+
+        def dynamics_fun(x):
+            return jnp.matmul(sindy_library_jax(x, self.layer_sizes[-1], self.poly_order), \
+                        self.coefficient_mask * self.autoencoder['sindy_coefficients'])
+
+        jacobian_fun = jacobian(dynamics_fun)
+
+        jacobian_evaluation = jacobian_fun(z)
+
+        return jacobian_evaluation
+
+    def save_state(self, filename, save_dir: str = ''):
+        state = {'autoencoder': self.autoencoder,
+                 'coefficient_mask': self.coefficient_mask,
+                 'hps': {'layers': self.layer_sizes,
+                         'poly_order': self.poly_order,
+                         'library:size': self.library_size,
+                         'lr': self.learning_rate,
+                         'epochs': self.max_epochs,
+                         'batch_size': self.batch_size,
+                         'sequential_threshold': self.sequential_thresholding,
+                         'thresholding_frequency': self.thresholding_frequency,
+                         'threshold_coefficient': self.coefficient_threshold},
+                 'history': {'train_loss': self.train_loss,
+                             'refinement_loss': self.refinement_loss}}
+
+        try:
+            directory = os.getcwd() + '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+
+            with open(file=directory, mode='wb') as f:
+                pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
+
+        except FileNotFoundError:
+            directory = '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+
+            with open(file=directory, mode='wb') as f:
+                pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
+
+    def load_state(self, filename, save_dir: str = ''):
+        try:
+            directory = os.getcwd() + '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+            with open(directory, 'rb') as f:
+                state = pickle.load(f)
+
+        except FileNotFoundError:
+            directory = '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+            with open(directory, 'rb') as f:
+                state = pickle.load(f)
+
+        self.autoencoder = state['autoencoder']
+        self.coefficient_mask = state['coefficient_mask']
+        self.layer_sizes = state['hps']['layers']
+        self.poly_order = state['hps']['poly_order']
+        self.library_size = state['hps']['library:size']
+        self.learning_rate = state['hps']['lr']
+        self.max_epochs = state['hps']['epochs']
+        self.batch_size = state['hps']['batch_size']
+        self.sequential_thresholding = state['hps']['sequential_threshold']
+        self.thresholding_frequency = state['hps']['thresholding_frequency']
+        self.coefficient_threshold = state['hps']['threshold_coefficient']
+        self.train_loss = state['history']['train_loss']
+        self.refinement_loss = state['history']['refinement_loss']
 
     def print_update(self, epoch, n_updates, dt):
         print(f"Epoch {1 + epoch}",
-              f"| Loss {self.train_loss[-1]}",
+              f"| Loss {round(self.train_loss[-1], 7)}",
               f"| Updates {n_updates}",
               f"| This took: {round(dt, 4)}s")
 
@@ -186,17 +268,24 @@ class SindyAutoencoder(object):
 # TODO: add model orders higher than 1
 # TODO: add different initializations for weights and sindy coefficients
 
+class SindyControlAutoencoder(SindyAutoencoder):
+
+    def __init__(self):
+        pass
+
+
 if __name__ == "__main__":
     layers = [128, 64, 32, 3]
     seed = 1
-    SA = SindyAutoencoder(layers, poly_order=3, seed=seed, max_epochs=20,
-                          refinement_epochs=10)
+    SA = SindyAutoencoder(layers, poly_order=2, seed=seed, max_epochs=3000,
+                          refinement_epochs=200)
 
     noise_strength = 1e-6
     training_data = get_lorenz_data(1024, noise_strength=noise_strength)
     # validation_data = get_lorenz_data(20, noise_strength=noise_strength)
 
     SA.train(training_data=training_data)
+    SA.save_state(filename='LorenzSystem')
 
 
 
