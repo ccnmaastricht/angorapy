@@ -21,7 +21,6 @@ from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
 
-import mpi4py
 from mpi4py import MPI
 
 
@@ -32,13 +31,8 @@ class InconsistentArgumentError(Exception):
 
 def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use_monitor=False) -> PPOAgent:
     """Run an experiment with the given settings ."""
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    is_root = rank == 0
-
-    if not is_root:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    mpi_rank = MPI.COMM_WORLD.rank
+    is_root = mpi_rank == 0
 
     # sanity checks and warnings for given parameters
     if settings["preload"] is not None and settings["load_from"] is not None:
@@ -134,7 +128,7 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
     except Exception:
         agent.finalize()
 
-        if rank == 0:
+        if mpi_rank == 0:
             traceback.print_exc()
 
     agent.save_agent_state()
@@ -145,7 +139,6 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
 
 if __name__ == "__main__":
-
     tf.get_logger().setLevel('INFO')
     all_envs = [e.id for e in list(gym.envs.registry.all())]
 
@@ -228,5 +221,3 @@ if __name__ == "__main__":
     except Exception as e:
         if rank == 0:
             traceback.print_exc()
-
-    MPI.Finalize()

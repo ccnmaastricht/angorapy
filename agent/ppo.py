@@ -13,7 +13,6 @@ import gym
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete, Box, Dict
-import mpi4py
 from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
@@ -52,12 +51,12 @@ if INIT_HOROVOD:
     hvd.init(comm=gpu_subcomm)
 
     # prevent full blockage of VRAM
-    # for gpu in gpus:
-    #     tf.config.experimental.set_memory_growth(gpu, True)
-    #
-    # if is_gpu_process:
-    #     if gpus:
-    #         tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
+    if is_gpu_process:
+        if gpus:
+            tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
 
 
 class PPOAgent:
@@ -407,7 +406,7 @@ class PPOAgent:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            if not is_gpu_process:
+            if not is_gpu_process :
                 # only the GPU processes optimize and calculate the rest
                 continue
 
@@ -441,7 +440,7 @@ class PPOAgent:
                                                 is_shadow_hand=isinstance(self.state_dim, tuple))
             self.optimize(dataset, epochs, batch_size)
 
-            if MPI.COMM_WORLD.rank == 0:
+            if mpi_comm.rank == 0:
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 mpi_flat_print("Finalizing...")
@@ -470,7 +469,7 @@ class PPOAgent:
                 self.time_dicts.append(time_dict)
 
         if mpi_comm.rank == 0:
-            print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}.")
+            print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}s.")
 
         return self
 
@@ -587,7 +586,8 @@ class PPOAgent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
             if HOROVOD:
-                dataset = dataset.take(dataset.cardinality() // hvd.size())
+                # dataset = dataset.take(dataset.cardinality() // hvd.size())  # todo wont work before 2.3
+                dataset = dataset
 
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
@@ -721,26 +721,27 @@ class PPOAgent:
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
 
         # print the report
-        mpi_flat_print(
-            f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
-            f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
-            f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
-            f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
-            f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
-            f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
-            f"lr: {nc}{current_lr:.2e}{ec}; "
-            f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
-            f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
-            f"{underflow}"
-            f"fps: {fps_string} {time_distribution_string}; "
-            f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
+        if mpi_comm.rank == 0:
+            mpi_flat_print(
+                f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
+                f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
+                f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
+                f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
+                f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
+                f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
+                f"lr: {nc}{current_lr:.2e}{ec}; "
+                f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
+                f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+                f"{underflow}"
+                f"fps: {fps_string} {time_distribution_string}; "
+                f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
         if name is None:
             name = str(self.iteration)
 
-        self.joint.save_weights(self.agent_directory + f"/{name}/weights")
+        self.joint.save_weights(os.path.join(self.agent_directory, f"{name}/weights"))
         with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
 
