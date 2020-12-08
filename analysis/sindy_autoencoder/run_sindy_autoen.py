@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from analysis.chiefinvestigation import Chiefinvestigator
 from analysis.sindy_autoencoder.sindy_autoencoder import SindyAutoencoder
@@ -23,24 +24,35 @@ activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episod
 print(f"SIMULATED {n_episodes} episodes")
 
 dx = np.gradient(activations_over_all_episodes, axis=0)
+
 training_data = {'x': activations_over_all_episodes,
                  'dx': dx}
 
-layers = [64, 32, 16, 4]
+layers = [64, 32, 8, 4]
 seed = 1
-SA = SindyAutoencoder(layers, poly_order=2, seed=seed, max_epochs=2500,
-                      refinement_epochs=300)
+SA = SindyAutoencoder(layers, poly_order=2, seed=seed, max_epochs=5000,
+                      refinement_epochs=1000)
 
 SA.train(training_data=training_data)
 SA.save_state(filename='InvPendulum')
 #SA.load_state(filename='CartPoleSindy')
 
 #a = chiefinvesti.sub_model_to.predict(np.reshape(np.array([1, 0, 0, 0]), (1, 1, 4)))
-# evaluation = SA.evaluate_jacobian(a[1].reshape(64, ))
-# print(evaluation)
 
-plt.imshow(SA.coefficient_mask * SA.autoencoder['sindy_coefficients'])
+fig, ax = plt.subplots()
+plt.spy(SA.coefficient_mask * SA.autoencoder['sindy_coefficients'],
+        marker='o', markersize=10)
+labels = ['z1', 'z2', 'z3', 'z4']
+#plt.axis('off')
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['bottom'].set_visible(False)
+plt.xticks([0, 1, 2, 3], labels)
 plt.show()
 
-#z_next, sindy_predict, x_next = SA.simulate_dynamics(a[1].reshape(64, ), np.zeros((64, )))
-
+all_train_losses = {k: [dic[k] for dic in SA.all_train_losses] for k in SA.all_train_losses[0]}
+for key in all_train_losses:
+    if key != 'total' and key != 'recon':
+        plt.plot(np.asarray(jnp.vstack(all_train_losses[key])), label=key)
+plt.legend()
+plt.show()

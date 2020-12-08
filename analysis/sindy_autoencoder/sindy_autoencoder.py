@@ -78,7 +78,8 @@ class SindyAutoencoder(object):
         self.sindy_x_loss_weight = sindy_x_loss_weight
         self.sindy_regularization_loss_weight = sindy_regularization_loss_weight
 
-        self.loss_fun = jit(self.loss, device=jax.devices()[0])
+        self.loss_jit = jit(self.loss, device=jax.devices()[0])
+        self.jit_update = jit(self.update, device=jax.devices()[0])
 
         #optimizer
         self.learning_rate = learning_rate
@@ -95,6 +96,7 @@ class SindyAutoencoder(object):
         self.print_updates = print_updates
 
         self.train_loss = []
+        self.all_train_losses = []
         self.refinement_loss = []
 
     def loss(self, sindy_autoencoder, coefficient_mask, x, dx):
@@ -108,14 +110,23 @@ class SindyAutoencoder(object):
         sindy_x = jnp.mean((dx - dx_decode) ** 2)
         sindy_regularization = jnp.mean(jnp.abs(sindy_autoencoder['sindy_coefficients']))
 
-        total_loss = self.recon_loss_weight * reconstruction_loss + \
-                     self.sindy_z_loss_weight * sindy_z + \
-                     self.sindy_x_loss_weight * sindy_x + \
-                     self.sindy_regularization_loss_weight * sindy_regularization
-        return total_loss
+        reconstruction_loss = self.recon_loss_weight * reconstruction_loss
+        sindy_z_loss = self.sindy_z_loss_weight * sindy_z
+        sindy_x_loss = self.sindy_x_loss_weight * sindy_x
+        sindy_regularization_loss = self.sindy_regularization_loss_weight * sindy_regularization
+
+        total_loss = reconstruction_loss + sindy_z_loss + sindy_x_loss + sindy_regularization_loss
+        return {'total': total_loss,
+                'recon': reconstruction_loss,
+                'sindy_z': sindy_z_loss,
+                'sindy_x': sindy_x_loss,
+                'sindy_l2': sindy_regularization_loss}
+
+    def training_loss(self, sindy_autoencoder, coefficient_mask, x, dx):
+        return self.loss(sindy_autoencoder, coefficient_mask, x, dx)['total']
 
     def update(self, params, coefficient_mask, X, dx, opt_state):
-        value, grads = value_and_grad(self.loss_fun)(params, coefficient_mask, X, dx)
+        value, grads = value_and_grad(self.training_loss)(params, coefficient_mask, X, dx)
         opt_state = self.opt_update(0, grads, opt_state)
         return self.get_params(opt_state), opt_state, value
 
@@ -137,16 +148,23 @@ class SindyAutoencoder(object):
             for i in range(num_batches):
                 id = batch_indices(i)
 
-                params, opt_state, value = self.update(params, self.coefficient_mask,
+                params, opt_state, value = self.jit_update(params, self.coefficient_mask,
                                                        training_data['x'][id, :],
                                                        training_data['dx'][id, :],
                                                        opt_state)
-                self.train_loss.append(value)
+
                 n_updates += 1
 
             if epoch % self.thresholding_frequency == 0 and epoch > 1 and self.sequential_thresholding:
                 self.coefficient_mask = jnp.abs(params['sindy_coefficients']) > 0.1
                 print("Updated coefficient mask")
+
+            # record
+            losses = self.loss_jit(params, self.coefficient_mask,
+                                   training_data['x'][id, :],
+                                   training_data['dx'][id, :])
+            self.train_loss.append(losses['total'])
+            self.all_train_losses.append(losses)
 
             stop = time.time()
             dt = stop - start
@@ -161,13 +179,19 @@ class SindyAutoencoder(object):
             for i in range(num_batches):
                 id = batch_indices(i)
 
-                params, opt_state, value = self.update(params, self.coefficient_mask,
+                params, opt_state, value = self.jit_update(params, self.coefficient_mask,
                                                        training_data['x'][id, :],
                                                        training_data['dx'][id, :],
                                                        opt_state)
-                self.refinement_loss.append(value)
+
                 n_updates += 1
 
+            # record
+            losses = self.loss_jit(params, self.coefficient_mask,
+                                   training_data['x'][id, :],
+                                   training_data['dx'][id, :])
+            self.refinement_loss.append(losses['total'])
+            self.all_train_losses.append(losses)
             stop = time.time()
             dt = stop - start
             if self.print_updates:
@@ -191,20 +215,6 @@ class SindyAutoencoder(object):
 
     def simulate_episode(self, env: gym.Env):
         pass
-
-    def evaluate_jacobian(self, x):
-        z = encoding_pass(self.autoencoder['encoder'], x)
-        print(z)
-
-        def dynamics_fun(x):
-            return jnp.matmul(sindy_library_jax(x, self.layer_sizes[-1], self.poly_order), \
-                        self.coefficient_mask * self.autoencoder['sindy_coefficients'])
-
-        jacobian_fun = jacobian(dynamics_fun)
-
-        jacobian_evaluation = jacobian_fun(z)
-
-        return jacobian_evaluation
 
     def save_state(self, filename, save_dir: str = ''):
         state = {'autoencoder': self.autoencoder,

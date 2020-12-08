@@ -44,6 +44,25 @@ def build_sindy_autoencoder(layer_sizes, library_size, key):
     return params, coefficient_mask
 
 
+def build_sindy_control_autoencoder(layer_sizes, library_size, key):
+
+    encoding_params = build_encoder(layer_sizes, key)
+    decoding_params = build_decoder(layer_sizes, key)
+
+    control_encoding_params = build_encoder(layer_sizes, key)
+    control_decoding_params = build_decoder(layer_sizes, key)
+
+    sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
+    coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
+    params = {'encoder': encoding_params,
+              'decoder': decoding_params,
+              'control_encoder': control_encoding_params,
+              'control_decoder': control_decoding_params,
+              'sindy_coefficients': sindy_coefficients}
+
+    return params, coefficient_mask
+
+
 def z_derivative(params, x, dx):
     dz = dx
 
@@ -98,6 +117,24 @@ def autoencoder_pass(params, coefficient_mask, x, dx):
     return [x, dx, dz, x_decode, dx_decode, sindy_predict]
 
 
+def control_autoencoder_pass(params, coefficient_mask, x, dx, u, du):
+
+    z = encoding_pass(params['encoder'], x)
+    dz = z_derivative(params['encoder'], x, dx)
+    x_decode = decoding_pass(params['decoder'], z)
+
+    y = encoding_pass(params['control_encoder'], u)
+    dy = z_derivative(params['control_encoder'], u, du)
+    u_decode = decoding_pass(params['control_decoder', y])
+
+    z = jnp.concatenate((z, y))
+    Theta = sindy_library_jax(z, len(params['encoder'][-1][0]), 2)
+    sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
+    dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
+
+    return [x, dx, dz, u, du, x_decode, dx_decode, sindy_predict, u_decode]
+
+
 def simulation_pass(params, coefficient_mask, x, dx):
 
     z = encoding_pass(params['encoder'], x)
@@ -138,15 +175,20 @@ def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
     return jnp.stack(library, axis=0)
 
 
-def library_size(n, poly_order, use_sine=False, include_constant=True):
+def library_size(n, poly_order, use_sine=False, include_constant=True, include_control=False):
     l = 0
     for k in range(poly_order+1):
         l += int(binom(n+k-1, k))
     if use_sine:
         l += n
+    if include_control:
+        for k in range(poly_order + 1):
+            l += int(binom(n + k - 1, k))
     if not include_constant:
         l -= 1
     return l
+
+
 
 '''
 def regress(Y, X, l=0.):
