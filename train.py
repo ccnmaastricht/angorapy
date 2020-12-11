@@ -29,7 +29,7 @@ class InconsistentArgumentError(Exception):
     pass
 
 
-def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use_monitor=False) -> PPOAgent:
+def run_experiment(environment, settings: dict, verbose=True, use_monitor=False) -> PPOAgent:
     """Run an experiment with the given settings ."""
     mpi_rank = MPI.COMM_WORLD.rank
     is_root = mpi_rank == 0
@@ -122,17 +122,20 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
                           iterations=settings["iterations"], config_name=settings["config"])
 
     try:
-        agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
-                    export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
+        agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
+                    monitor=monitor, save_every=settings["save_every"], separate_eval=settings["eval"],
                     stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+    except KeyboardInterrupt:
+        print("test")
+        pass
     except Exception:
-        agent.finalize()
-
         if mpi_rank == 0:
             traceback.print_exc()
+    finally:
+        if mpi_rank == 0:
+            agent.finalize()
 
     agent.save_agent_state()
-    agent.finalize()
     env.close()
 
     return agent

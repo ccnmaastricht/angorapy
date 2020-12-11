@@ -7,6 +7,7 @@ import re
 import statistics
 import time
 from collections import OrderedDict
+from glob import glob
 from typing import Union, Tuple, Any
 
 import gym
@@ -24,7 +25,7 @@ from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities import const
-from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH
+from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
 from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
@@ -37,11 +38,14 @@ INIT_HOROVOD = False
 
 # get COMM and find gpus
 mpi_comm = MPI.COMM_WORLD
-gpus = tf.config.experimental.list_physical_devices('GPU')
+gpus = tf.config.list_physical_devices('GPU')
 is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
+
 
 if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
+else:
+    tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
 
 if INIT_HOROVOD:
     import horovod.tensorflow as hvd
@@ -194,7 +198,7 @@ class PPOAgent:
         self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
-        self.agent_id = round(time.time())
+        self.agent_id = mpi_comm.bcast(round(time.time()), root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
@@ -310,7 +314,7 @@ class PPOAgent:
         """
         return tf.reduce_mean(self.distribution.entropy(policy_output))
 
-    def drill(self, n: int, epochs: int, batch_size: int, monitor=None, export: bool = False, save_every: int = 0,
+    def drill(self, n: int, epochs: int, batch_size: int, monitor=None, save_every: int = 0,
               separate_eval: bool = False, stop_early: bool = True, radical_evaluation=False) -> "PPOAgent":
         """Start a training loop of the agent.
         
@@ -322,8 +326,6 @@ class PPOAgent:
             batch_size (int): batch size for the optimization
             monitor: story telling object that creates visualizations of the training process on the fly (Default
                 value = None)
-            export (bool): boolean indicator for whether communication with workers is achieved through file saving
-                or direct weight passing (Default value = False)
             save_every (int): for any int x > 0 save the policy every x iterations, if x = 0 (default) do not save
             separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
@@ -336,21 +338,26 @@ class PPOAgent:
         """
         # determine the number of independent repeated gatherings required on this worker
         base, extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
-        gatherings_on_this_worker = base + (MPI.COMM_WORLD.rank < extra)
+        worker_split = [base + (r < extra) for r in range(MPI.COMM_WORLD.size)]
+        worker_collection_ids = list(range(self.n_workers))[sum(worker_split[:mpi_comm.rank]):sum(worker_split[:mpi_comm.rank + 1])]
+        list_of_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
 
         if MPI.COMM_WORLD.rank == 0:
             print(
-                f"\n\nDrill started using {MPI.COMM_WORLD.size} processes"
-                f" of which {hvd.size() if HOROVOD else 1} are GPU optimizers."
-                f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.size)]}")
+                f"\n\nDrill started using {MPI.COMM_WORLD.size} processes of which {len(gpus)} are GPU optimizers."
+                f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
+                f"IDs over Workers: {list_of_collection_id_lists}")
 
-        assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+            assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+
         if self.is_recurrent and batch_size > self.n_workers:
-            logging.warning(
-                f"Batchsize is larger than possible with the available number of independent sequences for "
-                f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
-                f"transitions per batch.")
             batch_size = self.n_workers
+
+            if mpi_comm.rank == 0:
+                logging.warning(
+                    f"Batchsize is larger than possible with the available number of independent sequences for "
+                    f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
+                    f"transitions per batch.")
 
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
@@ -376,8 +383,9 @@ class PPOAgent:
             # run simulations in parallel
             worker_stats, worker_preprocessors = [], []
             serialized_wrapper = self.preprocessor.serialize()
-            for i in range(gatherings_on_this_worker):
-                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, serialized_wrapper)
+            for i in worker_collection_ids:
+                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, serialized_wrapper,
+                                           collector_id=i)
                 worker_stats.append(collection[0])
                 worker_preprocessors.append(collection[1])
 
@@ -839,4 +847,7 @@ class PPOAgent:
 
     def finalize(self):
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
-        pass
+        print(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord")
+        for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
+            print(file)
+            os.remove(file)

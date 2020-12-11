@@ -52,7 +52,8 @@ class Gatherer:
         """Update the weights of this worker."""
         self.joint.set_weights(weights)
 
-    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict):
+    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict,
+                collector_id: int):
         """Collect a batch shard of experience for a given number of timesteps."""
         # import here to avoid pickling errors
         import tensorflow as tfl
@@ -188,7 +189,7 @@ class Gatherer:
         dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=self.is_shadow_brain)
         dataset = dataset.map(tf_serialize_example)
 
-        writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{self.worker_id}.tfrecord")
+        writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord")
         writer.write(dataset)
 
         return stats, preprocessor

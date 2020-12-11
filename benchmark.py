@@ -79,7 +79,7 @@ if __name__ == '__main__':
         for i in range(args.repetitions):
             print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with config {conf_name}.")
             reward_history = np.array(run_experiment(
-                args.env, config, init_ray=should_init, verbose=False).cycle_reward_history)
+                args.env, config, verbose=False).cycle_reward_history)
             should_init = False
 
             current_n = benchmark_dict["results"][conf_name]["n"]

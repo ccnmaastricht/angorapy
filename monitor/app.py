@@ -55,7 +55,7 @@ def overview():
                         "date": meta["date"],
                         "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
-                        "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
+                        "max_reward": ignore_nones(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
                             progress["rewards"]["mean"]) > reward_threshold),
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,
