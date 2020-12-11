@@ -20,7 +20,7 @@ def get_available_gpus():
     return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 
-def flat_print(string: str):
+def mpi_flat_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
     if MPI.COMM_WORLD.Get_rank() == 0:
         print(f"\r{string}", end="")

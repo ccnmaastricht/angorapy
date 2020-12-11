@@ -9,6 +9,7 @@ from flask_jsglue import JSGlue
 
 from agent.ppo import PPOAgent
 from utilities.const import PATH_TO_EXPERIMENTS
+from utilities.statistics import ignore_none
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -55,7 +56,7 @@ def overview():
                         "date": meta["date"],
                         "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
-                        "max_reward": max(progress["rewards"]["mean"]) if iterations > 0 else "N/A",
+                        "max_reward": ignore_none(max, progress["rewards"]["mean"]) if iterations > 0 else "N/A",
                         "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
                             progress["rewards"]["mean"]) > reward_threshold),
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,

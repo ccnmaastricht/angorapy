@@ -12,7 +12,7 @@ from utilities.const import PATH_TO_BENCHMARKS
 from utilities.statistics import increment_mean_var
 
 if __name__ == '__main__':
-    all_envs = [e.id for e in list(gym.envs.registry.all())]
+    all_envs = [e.worker_id for e in list(gym.envs.registry.all())]
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     parser = argparse.ArgumentParser(description="Perform a comparative benchmarking experiment. Given one task, a "
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         for i in range(args.repetitions):
             print(f"\nRepetition {i + 1}/{args.repetitions} in environment {args.env} with config {conf_name}.")
             reward_history = np.array(run_experiment(
-                args.env, config, init_ray=should_init, verbose=False).cycle_reward_history)
+                args.env, config, verbose=False).cycle_reward_history)
             should_init = False
 
             current_n = benchmark_dict["results"][conf_name]["n"]

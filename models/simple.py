@@ -57,8 +57,13 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
     sequence_length = None
 
+<<<<<<< HEAD
     inputs = tf.keras.Input(shape=(sequence_length, state_dimensionality,), batch_size=bs)
     masked = tf.keras.layers.Masking()(inputs)
+=======
+    inputs = tf.keras.Input(batch_shape=(bs, sequence_length, state_dimensionality,))
+    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length, state_dimensionality,))(inputs)
+>>>>>>> horovod-implementation
 
     # policy network; stateful, so batch size needs to be known
     x = TimeDistributed(_build_encoding_sub_model(

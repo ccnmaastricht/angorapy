@@ -29,15 +29,10 @@ class InconsistentArgumentError(Exception):
     pass
 
 
-def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use_monitor=False) -> PPOAgent:
+def run_experiment(environment, settings: dict, verbose=True, use_monitor=False) -> PPOAgent:
     """Run an experiment with the given settings ."""
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    is_root = rank == 0
-
-    if not is_root:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    mpi_rank = MPI.COMM_WORLD.rank
+    is_root = mpi_rank == 0
 
     # sanity checks and warnings for given parameters
     if settings["preload"] is not None and settings["load_from"] is not None:
@@ -126,9 +121,19 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
         monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
                           iterations=settings["iterations"], config_name=settings["config"])
 
-    agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"], monitor=monitor,
-                export=settings["export_file"], save_every=settings["save_every"], separate_eval=settings["eval"],
-                stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+    try:
+        agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
+                    monitor=monitor, save_every=settings["save_every"], separate_eval=settings["eval"],
+                    stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+    except KeyboardInterrupt:
+        print("test")
+        pass
+    except Exception:
+        if mpi_rank == 0:
+            traceback.print_exc()
+    finally:
+        if mpi_rank == 0:
+            agent.finalize()
 
     agent.save_agent_state()
     env.close()
@@ -137,7 +142,6 @@ def run_experiment(environment, settings: dict, verbose=True, init_ray=True, use
 
 
 if __name__ == "__main__":
-
     tf.get_logger().setLevel('INFO')
     all_envs = [e.id for e in list(gym.envs.registry.all())]
 
@@ -218,7 +222,5 @@ if __name__ == "__main__":
     try:
         run_experiment(args.env, vars(args), use_monitor=True)
     except Exception as e:
-        traceback.print_exc()
-        MPI.Finalize()
-
-    MPI.Finalize()
+        if rank == 0:
+            traceback.print_exc()
