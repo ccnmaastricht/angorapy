@@ -20,4 +20,8 @@ def increment_mean_var(old_mean: arr, old_var: arr, new_mean: arr, new_var: arr,
 
 def ignore_none(func, sequence):
     """Apply function to a sequence ignoring all its Nones."""
-    return func([e for e in sequence if e is not None])
+    no_nones = [e for e in sequence if e is not None]
+    if no_nones:
+        return func(no_nones)
+
+    return None

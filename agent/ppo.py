@@ -31,7 +31,6 @@ from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.statistics import ignore_none
-
 from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
@@ -43,11 +42,12 @@ mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
 is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
 
-
 if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 else:
-    tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
+    pass
+#     tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
 
 if INIT_HOROVOD:
     import horovod.tensorflow as hvd
@@ -341,7 +341,8 @@ class PPOAgent:
         # determine the number of independent repeated gatherings required on this worker
         base, extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
         worker_split = [base + (r < extra) for r in range(MPI.COMM_WORLD.size)]
-        worker_collection_ids = list(range(self.n_workers))[sum(worker_split[:mpi_comm.rank]):sum(worker_split[:mpi_comm.rank + 1])]
+        worker_collection_ids = list(range(self.n_workers))[
+                                sum(worker_split[:mpi_comm.rank]):sum(worker_split[:mpi_comm.rank + 1])]
         list_of_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
 
         if MPI.COMM_WORLD.rank == 0:
@@ -421,7 +422,7 @@ class PPOAgent:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            if not is_gpu_process :
+            if not is_gpu_process:
                 # only the GPU processes optimize and calculate the rest
                 continue
 
@@ -434,7 +435,8 @@ class PPOAgent:
                 subprocess_start = time.time()
 
                 # save if best
-                if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max, self.cycle_reward_history):
+                if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
+                                                                                                              self.cycle_reward_history):
                     self.save_agent_state(name="best")
 
             # early stopping  TODO check how this goes with MPI
@@ -452,7 +454,8 @@ class PPOAgent:
             # PARALLELIZED OPTIMIZATION
             mpi_flat_print("Optimizing...")
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                is_shadow_hand=isinstance(self.state_dim, tuple))
+                                                is_shadow_hand=isinstance(self.state_dim, tuple),
+                                                id_prefix=self.agent_id)
             self.optimize(dataset, epochs, batch_size)
 
             if mpi_comm.rank == 0:
@@ -472,8 +475,7 @@ class PPOAgent:
                         monitor.update()
 
                 # save the current state of the agent
-                if save_every != 0 and self.iteration != 0 and (
-                        self.iteration + 1) % save_every == 0:
+                if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                     self.save_agent_state()
 
                 # calculate processing speed in fps
@@ -740,6 +742,11 @@ class PPOAgent:
         # tbptt underflow
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
 
+        # timings
+        time_left = "unknown time"
+        if len(self.cycle_timings) > 0:
+            time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
+
         # print the report
         if mpi_comm.rank == 0:
             mpi_flat_print(
@@ -754,7 +761,7 @@ class PPOAgent:
                 f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                 f"{underflow}"
                 f"fps: {fps_string} {time_distribution_string}; "
-                f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s\n")
+                f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
@@ -781,7 +788,8 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None, path_modifier="") -> "PPOAgent":
+    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None, force_env_name=None,
+                         path_modifier="") -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
@@ -794,7 +802,6 @@ class PPOAgent:
         """
         # TODO also load the state of the optimizers
         agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}"
-        print(agent_path)
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(
                 "The given agent ID does not match any existing save history from your current path.")
@@ -819,7 +826,7 @@ class PPOAgent:
         with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
             parameters = json.load(f)
 
-        env = gym.make(parameters["env_name"])
+        env = gym.make(parameters["env_name"] if force_env_name is None else force_env_name)
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
         preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])
@@ -861,5 +868,4 @@ class PPOAgent:
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
         print(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord")
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
-            print(file)
             os.remove(file)

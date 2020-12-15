@@ -46,7 +46,7 @@ class Gatherer:
         # some attributes for adaptive behaviour
         self.is_recurrent = is_recurrent_model(self.joint)
         self.is_continuous = isinstance(self.env.action_space, Box)
-        self.is_shadow_brain = "ShadowHand" in env_name
+        self.is_shadow_brain = "BaseShadowHand" in env_name
 
     def update_weights(self, weights):
         """Update the weights of this worker."""

@@ -5,14 +5,14 @@ from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from gym.envs.robotics.utils import robot_get_obs
 
-from environments.shadowhand import get_fingertip_distance
+from core import reward
+from core.reward import FORCE_MULTIPLIER, sequential_free_reach
+from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHand
 from utilities.const import N_SUBSTEPS, VISION_WH
 
 
-class ShadowHandReach(HandReachEnv):
-    """Simpler Reaching task."""
-
-    FORCE_MULTIPLIER = 0.05
+class Reach(HandReachEnv, BaseShadowHand):
+    """Simple Reaching task."""
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
@@ -21,6 +21,10 @@ class ShadowHandReach(HandReachEnv):
 
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
+
+        self.random_initial_state = initial_qpos == "random"
+        if self.random_initial_state:
+            initial_qpos = generate_random_sim_qpos(DEFAULT_INITIAL_QPOS)
 
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
 
@@ -34,13 +38,27 @@ class ShadowHandReach(HandReachEnv):
         """Compute reward with additional success bonus."""
         return (super().compute_reward(achieved_goal, goal, info)
                 + info["is_success"] * self.success_multiplier
-                - self._get_force_punishment() * ShadowHandReach.FORCE_MULTIPLIER
-        )
+                - self._get_force_punishment() * FORCE_MULTIPLIER)
 
     def _get_force_punishment(self):
         # sum of squares, ignoring wrist (first two)
         sum_of_squared_forces = (self.sim.data.actuator_force[2:] ** 2).sum()
         return sum_of_squared_forces
+
+    def _reset_sim(self):
+        """Resets a simulation and indicates whether or not it was successful."""
+        self.sim.set_state(self.initial_state)  # reset everything
+
+        # if wanted, generate and set random initial state
+        if self.random_initial_state:
+            initial_qpos = generate_random_sim_qpos(DEFAULT_INITIAL_QPOS)
+
+            for name, value in initial_qpos.items():
+                self.sim.data.set_joint_qpos(name, value)
+                self.sim.data.set_joint_qvel(name, 0)
+
+        self.sim.forward()
+        return True
 
     def _get_obs(self):
         # proprioception
@@ -93,7 +111,7 @@ class ShadowHandReach(HandReachEnv):
         return o, r, d, i
 
 
-class ShadowHandMultiReach(ShadowHandReach):
+class MultiReach(Reach):
     """Reaching task where three fingers have to be joined."""
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
@@ -132,7 +150,7 @@ class ShadowHandMultiReach(ShadowHandReach):
         return goal.flatten()
 
 
-class ShadowHandFreeReach(ShadowHandReach):
+class FreeReach(Reach):
     """Reaching task where the actual position of the joint fingers is irrelevant.
 
     It only matters which fingertips need to be joint. The reward is based on the distance between the fingertips,
@@ -146,22 +164,10 @@ class ShadowHandFreeReach(ShadowHandReach):
 
         self.thumb_name = 'robot0:S_thtip'
         self.forced_finger = force_finger
-        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, "dense",
-                         success_multiplier)
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, "dense", success_multiplier)
 
     def compute_reward(self, achieved_goal, goal, info):
-        reward = (- get_fingertip_distance(self._get_thumb_position(), self._get_target_finger_position())
-                  + info["is_success"] * self.success_multiplier
-                  - self._get_force_punishment() * ShadowHandReach.FORCE_MULTIPLIER
-                  )
-
-        for i, fname in enumerate(FINGERTIP_SITE_NAMES):
-            if fname == self.thumb_name or i == np.where(self.goal == 1)[0].item():
-                continue
-
-            reward += 0.2 * get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(fname))
-
-        return reward
+        return reward.free_reach(self, info)
 
     def _sample_goal(self):
         if self.forced_finger is None:
@@ -181,7 +187,6 @@ class ShadowHandFreeReach(ShadowHandReach):
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
         goal[f_id] = 1
 
-        # print(goal)
         return goal
 
     def _get_thumb_position(self):
@@ -217,7 +222,7 @@ class ShadowHandFreeReach(ShadowHandReach):
         self.sim.forward()
 
 
-class ShadowHandFreeReachVisual(ShadowHandFreeReach):
+class FreeReachVisual(FreeReach):
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
@@ -275,13 +280,13 @@ class ShadowHandFreeReachVisual(ShadowHandFreeReach):
         }
 
 
-class FreeReachSequential(ShadowHandFreeReach):
+class FreeReachSequential(FreeReach):
     """Freely join fingers in a sequence, where each element of the sequence will be given in the goal part of the
     state and updated after the current subgoal is reached."""
 
     def __init__(self, distance_threshold=0.02, n_substeps=N_SUBSTEPS, relative_control=True,
-                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.5):
-        self.goal_sequence = [0, 1, 2, 3, 2, 1, 0]
+                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=10):
+        self.goal_sequence = [0, 1, 2, 3]
         self.current_sequence_position = 0
         super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, success_multiplier)
 
@@ -295,27 +300,7 @@ class FreeReachSequential(ShadowHandFreeReach):
         return goal
 
     def compute_reward(self, achieved_goal, goal, info):
-        current_goal_finger_id = self.goal_sequence[self.current_sequence_position]
-        last_goal_finger_id = self.goal_sequence[0]
-        if self.current_sequence_position > 0:
-            last_goal_finger_id = self.goal_sequence[self.current_sequence_position - 1]
-
-        current_goal_finger_name = FINGERTIP_SITE_NAMES[current_goal_finger_id]
-
-        d = get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(current_goal_finger_name))
-        reward = -d + info["is_success"] * self.success_multiplier
-
-        # incentivise distance to non target fingers
-        for i, fname in enumerate(FINGERTIP_SITE_NAMES):
-            # do not reward distance to self, thumb and last target (to give time to move away last target)
-            if fname == self.thumb_name or i == current_goal_finger_id or i == last_goal_finger_id:
-                continue
-
-            reward += 0.2 * get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(fname))
-
-        reward -= 0.1  # constant punishment
-
-        return reward
+        return sequential_free_reach(self, info)
 
     def _get_thumb_position(self):
         return self.sim.data.get_site_xpos(self.thumb_name).flatten()
@@ -332,22 +317,6 @@ class FreeReachSequential(ShadowHandFreeReach):
 
         d = get_fingertip_distance(self._get_thumb_position(), self._get_finger_position(current_goal_finger_name))
         return (d < self.distance_threshold).astype(np.float32)
-
-    def step(self, action):
-        observation, reward, done, info = super().step(action)
-
-        # set next goal
-        if info["is_success"]:
-            self.current_sequence_position += 1
-
-        if self.current_sequence_position >= len(self.goal_sequence):
-            done = True
-
-        # sequence position cannot go above length of sequence
-        self.current_sequence_position = min(self.current_sequence_position, len(self.goal_sequence) - 1)
-        self.goal = self._sample_goal()
-
-        return observation, reward, done, info
 
     def reset(self):
         ret = super().reset()
@@ -373,8 +342,25 @@ class FreeReachSequential(ShadowHandFreeReach):
 
         self.sim.forward()
 
+    def step(self, action):
+        observation, reward, done, info = super().step(action)
 
-class ShadowHandFreeReachAction(ShadowHandFreeReach):
+        # set next goal
+        if info["is_success"]:
+            print(f"Reached Goal {self.current_sequence_position}!")
+            self.current_sequence_position += 1
+
+        if self.current_sequence_position >= len(self.goal_sequence):
+            done = True
+
+        # sequence position cannot go above length of sequence
+        self.current_sequence_position = min(self.current_sequence_position, len(self.goal_sequence) - 1)
+        self.goal = self._sample_goal()
+
+        return observation, reward, done, info
+
+
+class ShadowHandFreeReachAction(FreeReach):
 
     def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
                  initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=0.1, force_finger=None):
@@ -400,7 +386,7 @@ class ShadowHandFreeReachAction(ShadowHandFreeReach):
         return reward
 
 
-class ShadowHandTappingSequence(ShadowHandFreeReach):
+class ShadowHandTappingSequence(FreeReach):
     """Task in which a sequence of reaching movements needs to be performed.
 
     It only matters which fingertips need to be joint. The reward is based on the distance between the fingertips,

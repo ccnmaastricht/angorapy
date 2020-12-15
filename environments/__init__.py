@@ -4,58 +4,58 @@ import gym
 
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
-from environments.shadowhand import ShadowHandBlock, ShadowHandBlockVector
-from environments.reach import ShadowHandReach, ShadowHandMultiReach, ShadowHandFreeReach, ShadowHandFreeReachVisual, \
+from environments.manipulate import ManipulateBlock, ManipulateBlockVector
+from environments.reach import Reach, MultiReach, FreeReach, FreeReachVisual, \
     ShadowHandTappingSequence, ShadowHandDelayedTappingSequence, FreeReachSequential
 
 # SHADOW HAND
 from utilities.const import SHADOWHAND_MAX_STEPS
 
 gym.envs.register(
-    id='ShadowHand-v0',
-    entry_point='environments:ShadowHandBlock',
-    kwargs={"visual_input": True, "max_steps": 100},
+    id='BaseShadowHand-v0',
+    entry_point='environments:ManipulateBlock',
+    kwargs={"visual_input": True, "max_steps": SHADOWHAND_MAX_STEPS},
 )
 
 gym.envs.register(
     id='ShadowHandBlind-v0',
-    entry_point='environments:ShadowHandBlock',
-    kwargs={"visual_input": False, "max_steps": 500},
+    entry_point='environments:ManipulateBlock',
+    kwargs={"visual_input": False, "max_steps": SHADOWHAND_MAX_STEPS},
 )
 
 # REACH
 
 gym.envs.register(
-    id='HandReachDenseRelative-v0',
-    entry_point='environments:ShadowHandReach',
+    id='ReachDenseRelative-v0',
+    entry_point='environments:Reach',
     kwargs={"reward_type": "dense", "relative_control": True},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
-    id='HandReachDenseRelative-v1',
-    entry_point='environments:ShadowHandReach',
+    id='ReachDenseRelative-v1',
+    entry_point='environments:Reach',
     kwargs={"reward_type": "dense", "relative_control": True, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
-    id='HandReachDenseAbsolute-v0',
-    entry_point='environments:ShadowHandReach',
+    id='ReachDenseAbsolute-v0',
+    entry_point='environments:Reach',
     kwargs={"reward_type": "dense", "relative_control": False},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
-    id='HandReachDenseAbsolute-v1',
-    entry_point='environments:ShadowHandReach',
+    id='ReachDenseAbsolute-v1',
+    entry_point='environments:Reach',
     kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='MultiReachAbsolute-v0',
-    entry_point='environments:ShadowHandMultiReach',
+    entry_point='environments:MultiReach',
     kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
@@ -63,37 +63,37 @@ gym.envs.register(
 # FREE REACHING
 
 gym.envs.register(
-    id='HandFreeReachRelative-v0',
-    entry_point='environments:ShadowHandFreeReach',
+    id='FreeReachRelative-v0',
+    entry_point='environments:FreeReach',
     kwargs={"relative_control": True, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
-    id='HandFreeReachAbsolute-v0',
-    entry_point='environments:ShadowHandFreeReach',
+    id='FreeReachAbsolute-v0',
+    entry_point='environments:FreeReach',
+    kwargs={"relative_control": False, "success_multiplier": 0.1, "initial_qpos": "random"},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
+
+gym.envs.register(
+    id='FreeReachVisualAbsolute-v0',
+    entry_point='environments:FreeReachVisual',
     kwargs={"relative_control": False, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
-    id='HandFreeReachVisualAbsolute-v0',
-    entry_point='environments:ShadowHandFreeReachVisual',
-    kwargs={"relative_control": False, "success_multiplier": 0.1},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='HandFreeReachVisualRelative-v0',
-    entry_point='environments:ShadowHandFreeReachVisual',
+    id='FreeReachVisualRelative-v0',
+    entry_point='environments:FreeReachVisual',
     kwargs={"relative_control": True, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 for i, name in enumerate(["FF", "MF", "RF", "LF"]):
     gym.envs.register(
-        id=f'HandFreeReach{name}Absolute-v0',
-        entry_point='environments:ShadowHandFreeReach',
+        id=f'FreeReach{name}Absolute-v0',
+        entry_point='environments:FreeReach',
         kwargs={"relative_control": False, "success_multiplier": 0.1, "force_finger": i},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
@@ -104,21 +104,21 @@ gym.envs.register(
     id='HandTappingAbsolute-v0',
     entry_point='environments:ShadowHandTappingSequence',
     kwargs={"relative_control": False, "success_multiplier": 1},
-    max_episode_steps=200,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='HandTappingAbsolute-v1',
     entry_point='environments:ShadowHandDelayedTappingSequence',
     kwargs={"relative_control": False},
-    max_episode_steps=200,
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='FreeReachSequentialAbsolute-v0',
     entry_point='environments:FreeReachSequential',
-    kwargs={"relative_control": False, "success_multiplier": 1},
-    max_episode_steps=1000,
+    kwargs={"relative_control": False, "success_multiplier": 1, "initial_qpos": "random"},
+    max_episode_steps=512,
 )
 
 # MANIPULATE

@@ -44,21 +44,24 @@ def overview():
                 with open(os.path.join(path, "meta.json"), "r") as f:
                     meta = json.load(f)
 
-                # for vn, vector in progress.items():
-                #     replace()
-
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])
                 iterations = len(progress["rewards"]["mean"])
+                max_performance = ignore_none(max, progress["rewards"]["mean"])
+                is_success = False
+                if iterations >= 0 and reward_threshold is None:
+                    is_success = "maybe"
+                elif max_performance is not None and max_performance > reward_threshold:
+                    is_success = True
+
                 experiments.update({
                     eid: {
                         "env": meta["environment"]["name"],
                         "date": meta["date"],
                         "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
-                        "max_reward": ignore_none(max, progress["rewards"]["mean"]) if iterations > 0 else "N/A",
-                        "is_success": False if iterations == 0 else ("maybe" if reward_threshold is None else max(
-                            progress["rewards"]["mean"]) > reward_threshold),
+                        "max_reward": max_performance if iterations > 0 else "N/A",
+                        "is_success": is_success,
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,
                         "config_name": meta["config"] if "config" in meta else "unknown",
                     }

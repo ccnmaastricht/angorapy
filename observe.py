@@ -27,7 +27,7 @@ if args.id is None:
     args.id = max(ids)
 
 start = time.time()
-agent = PPOAgent.from_agent_state(args.id, args.state)
+agent = PPOAgent.from_agent_state(args.id, args.state, force_env_name=None if not args.env else args.env)
 print(f"Agent {args.id} successfully loaded.")
 
 investigator = Investigator.from_agent(agent)
@@ -37,11 +37,11 @@ if args.env != "":
 
 print(f"Evaluating on {env.unwrapped.spec.id}")
 
-if not args.force_case_circulation or (env.unwrapped.spec.id != "HandFreeReachAbsolute-v0"):
+if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachAbsolute-v0"):
     for i in range(100):
         investigator.render_episode(env, slow_down=False)
 else:
-    env = gym.make("HandFreeReachFFAbsolute-v0")
+    env = gym.make("FreeReachFFAbsolute-v0")
     for i in range(100):
         env.forced_finger = i % 4
         env.env.forced_finger = i % 4

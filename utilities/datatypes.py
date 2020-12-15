@@ -235,6 +235,6 @@ def mpi_condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None
 if __name__ == '__main__':
     from environments import *
 
-    environment = gym.make("ShadowHand-v1")
+    environment = gym.make("BaseShadowHand-v1")
     buffer = TimeSequenceExperienceBuffer.new(environment, 10, 16, True, True)
     print(buffer)

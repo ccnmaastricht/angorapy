@@ -11,7 +11,7 @@ import tensorflow as tf
 
 def gen_cube_quats_prediction_data(n):
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    hand_env = gym.make("ShadowHand-v0")
+    hand_env = gym.make("BaseShadowHand-v0")
 
     sample = hand_env.observation_space.sample()
     X, Y = np.empty((n,) + sample["observation"][0].shape), np.empty((n,) + sample["achieved_goal"].shape)

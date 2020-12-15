@@ -182,7 +182,7 @@ if __name__ == "__main__":
     sequence_length = 100
     batch_size = 256
 
-    env = gym.make("ShadowHand-v0")
+    env = gym.make("BaseShadowHand-v0")
     _, _, joint = build_shadow_brain_v2(env, BetaPolicyDistribution(), bs=batch_size)
     # plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()

@@ -2,6 +2,8 @@
 """Data reading and writing utilities for distributed learning."""
 import os
 import random
+import re
+from typing import Union
 
 import tensorflow as tf
 
@@ -116,8 +118,16 @@ def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
     return dataset, stats
 
 
-def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bool, shuffle: bool = True):
-    """Read all files in storage into a tf record dataset without actually loading everything into memory."""
+def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bool, id_prefix: Union[str, int],
+                              shuffle: bool = True):
+    """Read all files in storage into a tf record dataset without actually loading everything into memory.
+
+    Args:
+        dtype_actions:  datatype of the actions
+        is_shadow_hand: indicator for whether this is a shadow hand training
+        id_prefix:      prefix (usually agent id) by which to filter available experience files
+        shuffle:        whether or not to shuffle the datafiles
+    """
     feature_description = {
         "action": tf.io.FixedLenFeature([], tf.string),
         "action_prob": tf.io.FixedLenFeature([], tf.string),
@@ -155,7 +165,8 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, is_shadow_hand: bo
 
         return parsed
 
-    files = [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR)]
+    files = [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR) if re.match(f"{id_prefix}_.[0-9]*",
+                                                                                             name)]
     if shuffle:
         random.shuffle(files)
     serialized_dataset = tf.data.TFRecordDataset(files)

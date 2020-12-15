@@ -57,7 +57,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if "ShadowHand" in environment or settings["architecture"] == "shadow":
+    if "BaseShadowHand" in environment or settings["architecture"] == "shadow":
         if settings["model"] == "ffn" and is_root:
             print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
             settings["model"] = "gru"
@@ -127,7 +127,6 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                     stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
     except KeyboardInterrupt:
         print("test")
-        pass
     except Exception:
         if mpi_rank == 0:
             traceback.print_exc()
@@ -218,6 +217,11 @@ if __name__ == "__main__":
         tf.config.experimental_run_functions_eagerly(True)
         if is_root:
             logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
+
+    if is_root:
+        print("Ressources:\n-------------------------")
+        print(f"Number of GPUs Available: {len(tf.config.experimental.list_physical_devices('GPU'))}")
+        print(f"Number of CPUs Available: {len(tf.config.experimental.list_physical_devices('CPU'))}\n\n")
 
     try:
         run_experiment(args.env, vars(args), use_monitor=True)
