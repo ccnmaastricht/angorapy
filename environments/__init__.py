@@ -28,26 +28,12 @@ gym.envs.register(
 gym.envs.register(
     id='ReachDenseRelative-v0',
     entry_point='environments:Reach',
-    kwargs={"reward_type": "dense", "relative_control": True},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='ReachDenseRelative-v1',
-    entry_point='environments:Reach',
     kwargs={"reward_type": "dense", "relative_control": True, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
     id='ReachDenseAbsolute-v0',
-    entry_point='environments:Reach',
-    kwargs={"reward_type": "dense", "relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='ReachDenseAbsolute-v1',
     entry_point='environments:Reach',
     kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
@@ -71,6 +57,13 @@ gym.envs.register(
 
 gym.envs.register(
     id='FreeReachAbsolute-v0',
+    entry_point='environments:FreeReach',
+    kwargs={"relative_control": False, "success_multiplier": 0.1},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
+
+gym.envs.register(
+    id='FreeReachRandomAbsolute-v0',
     entry_point='environments:FreeReach',
     kwargs={"relative_control": False, "success_multiplier": 0.1, "initial_qpos": "random"},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
