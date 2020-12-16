@@ -46,8 +46,8 @@ if not is_gpu_process:
     tf.config.experimental.set_visible_devices([], "GPU")
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 else:
-    pass
-#     tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
+    # pass
+    tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
 
 if INIT_HOROVOD:
     import horovod.tensorflow as hvd
