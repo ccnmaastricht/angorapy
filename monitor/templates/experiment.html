@@ -140,6 +140,25 @@
                 {% endfor %}
                 </tbody>
             </table>
+
+            <h4 align="center" class="sub-title">Training Statistics</h4>
+
+            <table class="table table-striped" title="Training Statistics">
+                <thead>
+                <tr>
+                    <th scope="col"></th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for p, v in info.statistics.training.items() %}
+                    <tr>
+                        <td>{{ p }}</td>
+                        <td>{{ v }}</td>
+                    </tr><?php
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

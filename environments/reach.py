@@ -6,7 +6,7 @@ from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NA
 from gym.envs.robotics.utils import robot_get_obs
 
 from core import reward
-from core.reward import FORCE_MULTIPLIER, sequential_free_reach
+from core.reward import FORCE_MULTIPLIER, sequential_free_reach, calculate_force_penalty
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHand
 from utilities.const import N_SUBSTEPS, VISION_WH
 
@@ -38,12 +38,7 @@ class Reach(HandReachEnv, BaseShadowHand):
         """Compute reward with additional success bonus."""
         return (super().compute_reward(achieved_goal, goal, info)
                 + info["is_success"] * self.success_multiplier
-                - self._get_force_punishment() * FORCE_MULTIPLIER)
-
-    def _get_force_punishment(self):
-        # sum of squares, ignoring wrist (first two)
-        sum_of_squared_forces = (self.sim.data.actuator_force[2:] ** 2).sum()
-        return sum_of_squared_forces
+                - calculate_force_penalty(self.sim))
 
     def _reset_sim(self):
         """Resets a simulation and indicates whether or not it was successful."""

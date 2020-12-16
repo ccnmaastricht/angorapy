@@ -154,17 +154,30 @@ def show_experiment(exp_id):
     with open(os.path.join(path, "meta.json"), "r") as f:
         meta = json.load(f)
 
-    return flask.render_template("experiment.html", info={
-        "env": meta["environment"]["name"],
-        "config": meta["config"] if "config" in meta else None,
-        "host": meta["host"] if "host" in meta else "unknown",
-        "current_id": exp_id,
-        "next_id": experiment_paths[current_index + 1] if current_index != len(experiment_paths) - 1 else None,
-        "prev_id": experiment_paths[current_index - 1] if current_index != 0 else None,
-        "hps": meta["hyperparameters"],
-        "env_meta": meta["environment"],
-        "iterations": meta["iterations"] if "iterations" in meta else None
-    })
+    info = dict(
+        env=meta["environment"]["name"],
+        config=meta["config"] if "config" in meta else None,
+        host=meta["host"] if "host" in meta else "unknown",
+        current_id=exp_id,
+        next_id=experiment_paths[current_index + 1] if current_index != len(experiment_paths) - 1 else None,
+        prev_id=experiment_paths[current_index - 1] if current_index != 0 else None,
+        hps=meta["hyperparameters"],
+        env_meta=meta["environment"],
+        iterations=meta["iterations"] if "iterations" in meta else None
+    )
+
+    stats_path = os.path.join(path, "statistics.json")
+    if os.path.isfile(stats_path):
+        with open(stats_path, "r") as f:
+            stats = json.load(f)
+
+        info.update(dict(
+            statistics=stats
+        ))
+    else:
+        info.update(dict(statistics={}))
+
+    return flask.render_template("experiment.html", info=info)
 
 
 @app.route("/expfile/<int:exp_id>/<path:filename>")

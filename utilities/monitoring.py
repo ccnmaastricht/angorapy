@@ -2,6 +2,7 @@
 """Methods for creating a story about a training process."""
 import datetime
 import socket
+import statistics
 
 import simplejson as json
 import os
@@ -59,6 +60,7 @@ class Monitor:
 
         # tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
         #                           show_shapes=True, dpi=300)
+
         self.make_metadata()
         self.write_progress()
 
@@ -137,14 +139,14 @@ class Monitor:
                 state_norming=str(StateNormalizationWrapper in self.agent.preprocessor),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name.split("_")[1]
-            )
+            ),
         )
 
         with open(f"{self.story_directory}/meta.json", "w") as f:
             json.dump(metadata, f, ignore_nan=True)
 
     def write_progress(self):
-        """Write training statistics into json file."""
+        """Write progress statistics into json file."""
         progress = dict(
             rewards=dict(
                 mean=[round(v, 2) if v is not None else v for v in self.agent.cycle_reward_history],
@@ -163,6 +165,19 @@ class Monitor:
         with open(f"{self.story_directory}/progress.json", "w") as f:
             json.dump(progress, f, ignore_nan=True)
 
+    def write_statistics(self):
+        """Write general statistics into json file."""
+        stat_dict = dict(
+            training=dict(
+                avg_seconds_per_cycle=str(numpy.mean(self.agent.cycle_timings)) if self.agent.cycle_timings else "N/A",
+                total_train_time=str(numpy.sum(self.agent.cycle_timings)) if self.agent.cycle_timings else "0",
+            )
+        )
+
+        with open(f"{self.story_directory}/statistics.json", "w") as f:
+            json.dump(stat_dict, f, ignore_nan=True)
+
     def update(self):
         """Update different components of the Monitor."""
         self.write_progress()
+        self.write_statistics()

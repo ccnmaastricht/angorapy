@@ -2,20 +2,48 @@ import gym
 import numpy as np
 
 from gym.envs.robotics.hand.reach import FINGERTIP_SITE_NAMES
-
 from environments.shadowhand import get_fingertip_distance
 
 FORCE_MULTIPLIER = 0.05
+# ratio between the size of penalty zone of auxiliary fingertips and reard zone of target fingertip
+AUXILIARY_DISTANCE_THRESHOLD_RATIO = 10
 
 
-def free_reach(env, info, punish_used_force=True):
+def calculate_force_penalty(simulator):
+    """Calculate a penalty for applying force. Sum of squares of forces, ignoring the wrist."""
+    return (simulator.data.actuator_force[2:] ** 2).sum() * FORCE_MULTIPLIER
+
+
+def free_reach(env, info, punish_used_force=False):
+    """Reward the relative join of the thumb's and a target finger's fingertip while punishing the closeness of other
+    fingertips."""
+    thumb_position = env._get_thumb_position()
+
+    reward = (- get_fingertip_distance(thumb_position, env._get_target_finger_position())
+              + info["is_success"] * env.success_multiplier)
+
+    if punish_used_force:
+        reward -= calculate_force_penalty(env.sim)
+
+    for i, fname in enumerate(FINGERTIP_SITE_NAMES):
+        if fname == env.thumb_name or i == np.where(env.goal == 1)[0].item():
+            continue
+
+        fingertip_distance = get_fingertip_distance(thumb_position, env._get_finger_position(fname))
+        if not fingertip_distance > env.distance_threshold * AUXILIARY_DISTANCE_THRESHOLD_RATIO:
+            reward += 0.2 * fingertip_distance
+
+    return reward
+
+
+def free_reach_old(env, info, punish_used_force=True):
     """Reward the relative join of the thumb's and a target finger's fingertip while punishing the closeness of other
     fingertips."""
     reward = (- get_fingertip_distance(env._get_thumb_position(), env._get_target_finger_position())
               + info["is_success"] * env.success_multiplier)
 
     if punish_used_force:
-        reward -= env._get_force_punishment() * FORCE_MULTIPLIER
+        reward -= calculate_force_penalty(env.sim)
 
     for i, fname in enumerate(FINGERTIP_SITE_NAMES):
         if fname == env.thumb_name or i == np.where(env.goal == 1)[0].item():
