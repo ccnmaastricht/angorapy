@@ -6,7 +6,7 @@ from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NA
 from gym.envs.robotics.utils import robot_get_obs
 
 from core import reward
-from core.reward import FORCE_MULTIPLIER, sequential_free_reach, calculate_force_penalty
+from core.reward import sequential_free_reach, calculate_force_penalty
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHand
 from utilities.const import N_SUBSTEPS, VISION_WH
 

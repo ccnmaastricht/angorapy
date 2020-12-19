@@ -91,7 +91,7 @@ for i, name in enumerate(["FF", "MF", "RF", "LF"]):
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
 
-# HAND TAPPING
+# REACH SEQUENCES
 
 gym.envs.register(
     id='HandTappingAbsolute-v0',
@@ -110,8 +110,15 @@ gym.envs.register(
 gym.envs.register(
     id='FreeReachSequentialAbsolute-v0',
     entry_point='environments:FreeReachSequential',
+    kwargs={"relative_control": False, "success_multiplier": 1},
+    max_episode_steps=1024,
+)
+
+gym.envs.register(
+    id='FreeReachSequentialRandomAbsolute-v0',
+    entry_point='environments:FreeReachSequential',
     kwargs={"relative_control": False, "success_multiplier": 1, "initial_qpos": "random"},
-    max_episode_steps=512,
+    max_episode_steps=1024,
 )
 
 # MANIPULATE
