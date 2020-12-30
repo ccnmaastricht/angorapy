@@ -236,5 +236,5 @@ if __name__ == '__main__':
     config_table = config_table.drop(["env", "radical_evaluation", "preload", "sequential", "debug", "cpu", "export_file",
                        "load_from", "save_every"])
 
-    with open("docs/hp_table.tex", "w") as f:
+    with open("../docs/hp_table.tex", "w") as f:
         config_table.to_latex(f, bold_rows=True)

@@ -141,6 +141,27 @@
                 </tbody>
             </table>
 
+
+            <h4 align="center" class="sub-title">Reward Function</h4>
+
+            <table class="table table-striped" title="Reward Function">
+                <thead>
+                <tr>
+                    <th scope="col"></th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for p, v in info.reward_function.items() %}
+                    <tr>
+                        <td>{{ p }}</td>
+                        <td>{{ v }}</td>
+                    </tr><?php
+                {% endfor %}
+                </tbody>
+            </table>
+
+
             <h4 align="center" class="sub-title">Training Statistics</h4>
 
             <table class="table table-striped" title="Training Statistics">

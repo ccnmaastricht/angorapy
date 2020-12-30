@@ -4,7 +4,7 @@ import os
 
 import time
 from inspect import getfullargspec as fargs
-from typing import Tuple, Any
+from typing import Tuple, Any, Union
 
 import numpy as np
 import tensorflow as tf
@@ -20,7 +20,7 @@ from models import build_rnn_models, build_ffn_models
 from utilities.const import STORAGE_DIR, DETERMINISTIC
 from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer
 from utilities.model_utils import is_recurrent_model
-from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims
+from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims, make_env
 from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
 
 from mpi4py import MPI
@@ -31,14 +31,15 @@ class Gatherer:
     # joint: tf.keras.Model
     # policy: tf.keras.Model
 
-    def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int, exp_id: int):
+    def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int, exp_id: int,
+                 reward_configuration: Union[str, dict] = None):
         model_builder = getattr(models, model_builder_name)
 
         self.worker_id = worker_id
         self.exp_id = exp_id
 
         # setup persistent tools
-        self.env = gym.make(env_name)
+        self.env = make_env(env_name, reward_config=reward_configuration)
         self.distribution = getattr(policies, distribution_name)(self.env)
         self.policy, _, self.joint = model_builder(
             self.env, self.distribution, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
@@ -232,7 +233,7 @@ if __name__ == "__main__":
     size = comm.Get_size()
 
     env_n = "HalfCheetah-v2"
-    environment = gym.make(env_n)
+    environment = make_env(env_n)
     distro = GaussianPolicyDistribution(environment)
     builder = build_ffn_models
     sd, ad = env_extract_dims(environment)

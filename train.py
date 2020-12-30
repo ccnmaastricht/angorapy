@@ -11,14 +11,14 @@ import argcomplete
 import gym
 from gym.spaces import Box
 
-import configs
+from configs import hp_config
 from agent.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import get_model_builder
 from models.shadow import build_blind_shadow_brain_v1
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
-from utilities.util import env_extract_dims
+from utilities.util import env_extract_dims, make_env
 from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
 
 from mpi4py import MPI
@@ -40,7 +40,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                                         "agent state. This cannot be resolved.")
 
     # setup environment and extract and report information
-    env = gym.make(environment)
+    env = make_env(environment, reward_config=settings["rcon"])
     state_dim, number_of_actions = env_extract_dims(env)
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
@@ -82,7 +82,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
               f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
               f"{bc}{state_dim}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
               f"and {bc}{number_of_actions}{ec} actions ({bc}{env_action_space_type}{ec}).\n"
-              f"Config: {settings['config']}\n"
+              f"Config: {settings['pcon']}\n"
               f"Model: {build_models.__name__}\n"
               f"Distribution: {settings['distribution']}\n"
               f"-----------------------------------------\n")
@@ -106,7 +106,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                          gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
                          tbptt_length=settings["tbptt"], distribution=distribution, preprocessor=preprocessor,
                          pretrained_components=None if settings["preload"] is None else [settings["preload"]],
-                         debug=settings["debug"])
+                         debug=settings["debug"], reward_configuration=settings["rcon"])
 
         if is_root:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
@@ -118,8 +118,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     monitor = None
     if use_monitor and is_root:
-        monitor = Monitor(agent, env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
-                          iterations=settings["iterations"], config_name=settings["config"])
+        monitor = Monitor(agent, agent.env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
+                          iterations=settings["iterations"], config_name=settings["pcon"])
 
     try:
         agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
@@ -160,7 +160,8 @@ if __name__ == "__main__":
     parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
 
     # meta arguments
-    parser.add_argument("--config", type=str, default=None, help="config name (utilities/configs.py) to be loaded")
+    parser.add_argument("--pcon", type=str, default=None, help="config name (utilities/hp_config.py) to be loaded")
+    parser.add_argument("--rcon", type=str, default=None, help="config (utilities/reward_config.py) of the reward function")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
@@ -204,14 +205,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # if config is given load it as default, then overwrite with any other given parameters
-    if args.config is not None:
+    if args.pcon is not None:
         try:
-            parser.set_defaults(**getattr(configs, args.config))
+            parser.set_defaults(**getattr(hp_config, args.pcon))
             args = parser.parse_args()
             if is_root:
-                print(f"Loaded Config {args.config}.")
+                print(f"Loaded Config {args.pcon}.")
         except AttributeError as err:
-            raise ImportError("Cannot find config under given name. Does it exist in utilities/configs.py?")
+            raise ImportError("Cannot find config under given name. Does it exist in utilities/hp_config.py?")
 
     if args.debug:
         tf.config.experimental_run_functions_eagerly(True)

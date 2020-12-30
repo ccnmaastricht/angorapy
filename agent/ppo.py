@@ -31,7 +31,8 @@ from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.statistics import ignore_none
-from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
+from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes, \
+    make_env
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
 
 HOROVOD = False
@@ -82,7 +83,8 @@ class PPOAgent:
                  discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
                  c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
                  tbptt_length: int = 16, lr_schedule: str = None, distribution: BasePolicyDistribution = None,
-                 preprocessor=None, _make_dirs=True, debug: bool = False, pretrained_components: list = None):
+                 reward_configuration: str = None, preprocessor=None, _make_dirs=True, debug: bool = False,
+                 pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
@@ -138,6 +140,7 @@ class PPOAgent:
         self.gradient_clipping = gradient_clipping if gradient_clipping != 0 else None
         self.clip_values = clip_values
         self.tbptt_length = tbptt_length
+        self.reward_configuration = reward_configuration
 
         # learning rate schedule
         self.lr_schedule_type = lr_schedule
@@ -527,7 +530,8 @@ class PPOAgent:
                          self.distribution.__class__.__name__,
                          self.env_name,
                          MPI.COMM_WORLD.rank,
-                         self.agent_id)
+                         self.agent_id,
+                         reward_configuration=self.reward_configuration)
 
         return actor
 
@@ -826,7 +830,7 @@ class PPOAgent:
         with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
             parameters = json.load(f)
 
-        env = gym.make(parameters["env_name"] if force_env_name is None else force_env_name)
+        env = make_env(parameters["env_name"] if force_env_name is None else force_env_name)
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
         preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])

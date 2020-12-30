@@ -140,6 +140,8 @@ class Monitor:
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name.split("_")[1]
             ),
+            reward_function=dict(self.agent.env.reward_config if hasattr(self.agent.env, "reward_config") else dict(),
+                                 identifier=self.agent.reward_configuration)
         )
 
         with open(f"{self.story_directory}/meta.json", "w") as f:
