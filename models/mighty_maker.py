@@ -2,9 +2,8 @@
 import itertools
 from collections import OrderedDict
 from functools import partial
-
 from models.shadow import build_shadow_brain_v1
-from models.simple import build_ffn_models, build_rnn_models, build_simple_models, build_deeper_models
+from models.simple import build_simple_models, build_deeper_models
 
 arguments = OrderedDict(sorted([
     ("model", ["simple", "deeper", "shadow"]),

@@ -25,7 +25,11 @@ REACH_BASE = dict(
 # FREE REACH
 free_reach = dict(
     force_punished=dict(REACH_BASE,
-                        FORCE_MULTIPLIER=0.05)
+                        FORCE_MULTIPLIER=0.05),
+    force_punished_light=dict(REACH_BASE,
+                              FORCE_MULTIPLIER=0.001),
+    narrow_target_zone=dict(REACH_BASE,
+                            SUCCESS_DISTANCE=0.005)
 )
 
 if __name__ == '__main__':

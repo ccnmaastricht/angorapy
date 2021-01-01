@@ -20,11 +20,14 @@ from tqdm import tqdm
 
 import models
 from agent import policies
+
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
+
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from utilities import const
+
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
 from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
@@ -34,6 +37,7 @@ from utilities.statistics import ignore_none
 from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes, \
     make_env
 from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
+
 
 HOROVOD = False
 INIT_HOROVOD = False

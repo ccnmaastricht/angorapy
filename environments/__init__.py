@@ -1,15 +1,16 @@
 """Module for additional environments as well as registering modified environments."""
 
 import gym
-
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
+
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
 from environments.reach import Reach, MultiReach, FreeReach, FreeReachVisual, \
     ShadowHandTappingSequence, ShadowHandDelayedTappingSequence, FreeReachSequential
 
 # SHADOW HAND
 from utilities.const import SHADOWHAND_MAX_STEPS
+
 
 gym.envs.register(
     id='BaseShadowHand-v0',
@@ -48,48 +49,28 @@ gym.envs.register(
 
 # FREE REACHING
 
-gym.envs.register(
-    id='FreeReachRelative-v0',
-    entry_point='environments:FreeReach',
-    kwargs={"relative_control": True},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='FreeReachAbsolute-v0',
-    entry_point='environments:FreeReach',
-    kwargs={"relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='FreeReachRandomAbsolute-v0',
-    entry_point='environments:FreeReach',
-    kwargs={"relative_control": False, "initial_qpos": "random"},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='FreeReachVisualAbsolute-v0',
-    entry_point='environments:FreeReachVisual',
-    kwargs={"relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='FreeReachVisualRelative-v0',
-    entry_point='environments:FreeReachVisual',
-    kwargs={"relative_control": True},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-for i, name in enumerate(["FF", "MF", "RF", "LF"]):
+for control_mode in ["Relative", "Absolute"]:
     gym.envs.register(
-        id=f'FreeReach{name}Absolute-v0',
+        id=f'FreeReach{control_mode}-v0',
         entry_point='environments:FreeReach',
-        kwargs={"relative_control": False, "force_finger": i},
+        kwargs={"relative_control": control_mode == "Relative"},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
+
+    gym.envs.register(
+        id=f'FreeReachRandom{control_mode}-v0',
+        entry_point='environments:FreeReach',
+        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
+    )
+
+    for i, name in enumerate(["FF", "MF", "RF", "LF"]):
+        gym.envs.register(
+            id=f'FreeReach{name}{control_mode}-v0',
+            entry_point='environments:FreeReach',
+            kwargs={"relative_control": control_mode == "Relative", "force_finger": i},
+            max_episode_steps=SHADOWHAND_MAX_STEPS,
+        )
 
 # REACH SEQUENCES
 

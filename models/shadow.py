@@ -13,11 +13,11 @@ from environments import *
 from models.components import _build_fcn_component
 from models.convolutional import _build_visual_encoder
 from utilities.const import VISION_WH
-from utilities.model_utils import is_recurrent_model
 from utilities.util import env_extract_dims
 
 
-def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn", **kwargs):
+def build_shadow_brain_v1(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
+                          **kwargs):
     """Build network for the shadow hand task."""
     state_dimensionality, n_actions = env_extract_dims(env)
     hidden_dimensions = 32

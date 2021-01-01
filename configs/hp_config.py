@@ -179,7 +179,7 @@ hand = make_config(
     workers=16,
     batch_size=256,
     horizon=512,
-    c_entropy=0.01,
+    c_entropy=0.001,
     lr_pi=5e-4,
     lr_schedule="exponential",
     epochs=10,
@@ -192,7 +192,10 @@ hand = make_config(
 )
 
 hand_beta = derive_config(hand, {"distribution": "beta"})
+hand_beta_static_lr = derive_config(hand_beta, {"lr_schedule": None})
+
 hand_beta_no_ent = derive_config(hand_beta, {"c_entropy": 0.0})
+hand_beta_no_ent_static_lr = derive_config(hand_beta_no_ent, {"lr_schedule": None})
 
 hand_shadow = derive_config(hand, {"architecture": "shadow"})
 hand_shadow_beta = derive_config(hand_shadow, {"distribution": "beta"})
