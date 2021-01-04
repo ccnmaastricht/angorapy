@@ -48,7 +48,6 @@ class BasePolicyDistribution(abc.ABC):
 
     @abc.abstractmethod
     def act_deterministic(self, *args, **kwargs):
-
         pass
 
     @abc.abstractmethod

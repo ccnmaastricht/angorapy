@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 from gym.envs.robotics.hand.reach import FINGERTIP_SITE_NAMES, goal_distance
 
@@ -6,9 +8,27 @@ from environments.shadowhand import get_fingertip_distance
 
 # HELPER FUNCTIONS
 
-def calculate_force_penalty(simulator):
+def calculate_force_penalty(simulator) -> float:
     """Calculate a penalty for applying force. Sum of squares of forces, ignoring the wrist."""
     return (simulator.data.actuator_force[2:] ** 2).sum()
+
+
+def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -> float:
+    """Calculate a penalty for auxiliary (non-target) fingers being in a zone around the thumb."""
+    if exclude is None:
+        exclude = []
+
+    penalty = 0
+    for i, fname in enumerate(FINGERTIP_SITE_NAMES):
+        if fname == environment.thumb_name or i == np.where(environment.goal == 1)[0].item() or i in exclude:
+            continue
+
+        fingertip_distance = get_fingertip_distance(environment.get_thumb_position(),
+                                                    environment.get_finger_position(fname))
+        if not fingertip_distance > environment.distance_threshold * environment.reward_config["AUXILIARY_DISTANCE_THRESHOLD_RATIO"]:
+            penalty += 0.2 * fingertip_distance
+
+    return penalty
 
 
 # REWARD FUNCTIONS
@@ -29,62 +49,47 @@ def free_reach(env, achieved_goal, goal, info: dict):
               + info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
               - calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"])
 
-    for i, fname in enumerate(FINGERTIP_SITE_NAMES):
-        if fname == env.thumb_name or i == np.where(env.goal == 1)[0].item():
-            continue
-
-        fingertip_distance = get_fingertip_distance(thumb_position, env._get_finger_position(fname))
-        if not fingertip_distance > env.distance_threshold * env.reward_config["AUXILIARY_DISTANCE_THRESHOLD_RATIO"]:
-            reward += 0.2 * fingertip_distance
+    reward -= calculate_auxiliary_finger_penalty(env)
 
     return reward
 
 
-def free_reach_old(env, info, punish_used_force=True):
-    """Reward the relative join of the thumb's and a target finger's fingertip while punishing the closeness of other
-    fingertips."""
-    reward = (- get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position())
-              + info["is_success"] * env.success_multiplier)
+def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
+    """Reward progress towards the goal position while punishing other fingers for interfering."""
+    thumb_position = env.get_thumb_position()
 
-    if punish_used_force:
-        reward -= calculate_force_penalty(env.sim)
+    # positive reinforcement
+    progress_reward = (get_fingertip_distance(thumb_position, env.get_target_fingers_previous_position())
+                       - get_fingertip_distance(thumb_position, env.get_target_finger_position()))
+    success_reward = info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
+    reinforcement_reward = progress_reward + success_reward
 
-    for i, fname in enumerate(FINGERTIP_SITE_NAMES):
-        if fname == env.thumb_name or i == np.where(env.goal == 1)[0].item():
-            continue
+    # positive punishment
+    penalty = (calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
+               + calculate_auxiliary_finger_penalty(env))
 
-        fingertip_distance = get_fingertip_distance(env.get_thumb_position(), env._get_finger_position(fname))
-        reward += 0.2 * fingertip_distance
+    # print(f"Progress: {progress_reward}, Success: {success_reward}, ForcePenalty: {calculate_force_penalty(env.sim)},"
+    #       f" AuxFinger Penalty: {calculate_auxiliary_finger_penalty(env)}")
 
-    return reward
+    # total reward
+    return reinforcement_reward - penalty
 
 
-def sequential_free_reach(env, info: dict):
+def sequential_free_reach(env, achieved_goal, goal, info: dict):
     """Reward following a sequence of reach movements."""
 
-    # retrieve the id of the current goal finger
-    current_goal_finger_id = env.goal_sequence[env.current_sequence_position]
-    current_goal_finger_name = FINGERTIP_SITE_NAMES[current_goal_finger_id]
+    # reinforcement
+    progress_reward = (get_fingertip_distance(env.get_thumb_position(), env.get_target_fingers_previous_position())
+                       - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
+    success_reward = info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
+    reinforcement_reward = progress_reward + success_reward
 
-    # retrieve the id of the previous goal finger
-    last_goal_finger_id = env.goal_sequence[0]
-    if env.current_sequence_position > 0:
-        last_goal_finger_id = env.goal_sequence[env.current_sequence_position - 1]
+    # punishment
+    exclusions = []
+    if len(env.goal_sequence) > 1:
+        exclusions = [env.current_target_finger]
 
-    # calculate distance between thumb and current goal finger and determine reward accordingly
-    d = get_fingertip_distance(env.get_thumb_position(), env._get_finger_position(current_goal_finger_name))
-    reward = -d + info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
+    punishment_reward = (- calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
+                         - calculate_auxiliary_finger_penalty(env, exclude=exclusions))
 
-    # incentivise distance to non target fingers
-    for i, fname in enumerate(FINGERTIP_SITE_NAMES):
-        # do not reward distance to env, thumb and last target (to give time to move away last target)
-        if fname == env.thumb_name or i == current_goal_finger_id or i == last_goal_finger_id:
-            continue
-
-        reward += 0.2 * get_fingertip_distance(env.get_thumb_position(), env._get_finger_position(fname))
-
-    # add constant punishment to incentivize progress; harm is scaled by position in sequence such that there is no
-    # incentive to not reach a sequence goal because it would again add a lot of distance punishment
-    reward -= (0.1 * (len(env.goal_sequence) - env.current_sequence_position))
-
-    return reward
+    return reinforcement_reward + punishment_reward

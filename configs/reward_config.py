@@ -33,5 +33,11 @@ free_reach = dict(
                             AUXILIARY_DISTANCE_THRESHOLD_RATIO=50)
 )
 
+free_reach_positive_reinforcement = dict(
+    default=REACH_BASE,
+    force_punished=dict(REACH_BASE,
+                        FORCE_MULTIPLIER=0.05),
+)
+
 if __name__ == '__main__':
     print(resolve_config_name("free_reach.force_punished"))

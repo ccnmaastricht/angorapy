@@ -37,6 +37,7 @@ def make_env(env_name, reward_config: Union[str, dict] = None):
     """Make environment, including a possible reward config."""
     env = gym.make(env_name)
     if reward_config is not None and hasattr(env, "reward_config"):
+        env.set_reward_function(reward_config)
         env.set_reward_config(reward_config)
 
     return env

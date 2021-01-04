@@ -5,8 +5,7 @@ from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, Half
     LunarLanderContinuousNoVel
 
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
-from environments.reach import Reach, MultiReach, FreeReach, FreeReachVisual, \
-    ShadowHandTappingSequence, ShadowHandDelayedTappingSequence, FreeReachSequential
+from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential
 
 # SHADOW HAND
 from utilities.const import SHADOWHAND_MAX_STEPS
@@ -72,35 +71,21 @@ for control_mode in ["Relative", "Absolute"]:
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
-# REACH SEQUENCES
+    # REACH SEQUENCES
 
-gym.envs.register(
-    id='HandTappingAbsolute-v0',
-    entry_point='environments:ShadowHandTappingSequence',
-    kwargs={"relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
+    gym.envs.register(
+        id=f'FreeReachSequential{control_mode}-v0',
+        entry_point='environments:FreeReachSequential',
+        kwargs={"relative_control": control_mode == "Relative"},
+        max_episode_steps=512,
+    )
 
-gym.envs.register(
-    id='HandTappingAbsolute-v1',
-    entry_point='environments:ShadowHandDelayedTappingSequence',
-    kwargs={"relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='FreeReachSequentialAbsolute-v0',
-    entry_point='environments:FreeReachSequential',
-    kwargs={"relative_control": False},
-    max_episode_steps=1024,
-)
-
-gym.envs.register(
-    id='FreeReachSequentialRandomAbsolute-v0',
-    entry_point='environments:FreeReachSequential',
-    kwargs={"relative_control": False, "initial_qpos": "random"},
-    max_episode_steps=1024,
-)
+    gym.envs.register(
+        id=f'FreeReachSequentialRandom{control_mode}-v0',
+        entry_point='environments:FreeReachSequential',
+        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
+        max_episode_steps=512,
+    )
 
 # MANIPULATE
 
