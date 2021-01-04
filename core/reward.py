@@ -73,7 +73,7 @@ def sequential_free_reach(env, info: dict):
 
     # calculate distance between thumb and current goal finger and determine reward accordingly
     d = get_fingertip_distance(env.get_thumb_position(), env._get_finger_position(current_goal_finger_name))
-    reward = -d + info["is_success"] * env.success_multiplier
+    reward = -d + info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
 
     # incentivise distance to non target fingers
     for i, fname in enumerate(FINGERTIP_SITE_NAMES):

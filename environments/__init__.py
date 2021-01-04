@@ -77,7 +77,7 @@ for control_mode in ["Relative", "Absolute"]:
 gym.envs.register(
     id='HandTappingAbsolute-v0',
     entry_point='environments:ShadowHandTappingSequence',
-    kwargs={"relative_control": False, "success_multiplier": 1},
+    kwargs={"relative_control": False},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
@@ -91,14 +91,14 @@ gym.envs.register(
 gym.envs.register(
     id='FreeReachSequentialAbsolute-v0',
     entry_point='environments:FreeReachSequential',
-    kwargs={"relative_control": False, "success_multiplier": 1},
+    kwargs={"relative_control": False},
     max_episode_steps=1024,
 )
 
 gym.envs.register(
     id='FreeReachSequentialRandomAbsolute-v0',
     entry_point='environments:FreeReachSequential',
-    kwargs={"relative_control": False, "success_multiplier": 1, "initial_qpos": "random"},
+    kwargs={"relative_control": False, "initial_qpos": "random"},
     max_episode_steps=1024,
 )
 

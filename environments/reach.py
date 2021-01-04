@@ -294,11 +294,10 @@ class FreeReachSequential(FreeReach):
     """Freely join fingers in a sequence, where each element of the sequence will be given in the goal part of the
     state and updated after the current subgoal is reached."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True,
-                 initial_qpos=DEFAULT_INITIAL_QPOS, success_multiplier=10):
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
         self.goal_sequence = [0, 1, 2, 3]
         self.current_sequence_position = 0
-        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, success_multiplier)
+        super().__init__(n_substeps, relative_control, initial_qpos)
 
     def _sample_goal(self):
         f_id = self.goal_sequence[self.current_sequence_position]
