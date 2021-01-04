@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 from jax import random
 from scipy.special import binom
+from jax import vmap, value_and_grad, jit
 
 
 def sigmoid(x):
@@ -33,21 +34,21 @@ def build_decoder(layer_sizes, key, scale=1e-2):
 
 def build_sindy_control_autoencoder(layer_sizes, library_size, key):
     key = random.split(key, 4)
+    key = (k for k in key)
+
     encoding_params = build_encoder(layer_sizes, next(key))
     decoding_params = build_decoder(layer_sizes, next(key))
 
     control_encoding_params = build_encoder(layer_sizes, next(key))
     control_decoding_params = build_decoder(layer_sizes, next(key))
 
-    sindy_coefficients = jnp.ones((library_size, 2 * layer_sizes[-1]))
-    coefficient_mask = jnp.ones((library_size, 2 * layer_sizes[-1]))
-    action_coefficients = jnp.ones((2 * layer_sizes[-1], ))
+    sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
+    coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
 
     params = {'encoder': encoding_params,
               'decoder': decoding_params,
               'control_encoder': control_encoding_params,
               'control_decoder': control_decoding_params,
-              'action_coefficients': action_coefficients,
               'sindy_coefficients': sindy_coefficients}
 
     return params, coefficient_mask
@@ -71,10 +72,34 @@ def decoding_pass(params, input):
     return jnp.matmul(params[-1][0], activation) + params[-1][1]
 
 
-def control_autoencoder_pass(params, coefficient_mask, x, u, a):
+def z_derivative(params, x, dx):
+    dz = dx
+
+    for w, b in params[:-1]:
+        x = jnp.matmul(w, x) + b
+        x = sigmoid(x)
+        dz = jnp.multiply(jnp.multiply(x, 1-x), jnp.matmul(w, dz))
+
+    return jnp.matmul(params[-1][0], dz)
+
+
+def z_derivative_decode(params, z, sindy_predict):
+    dx_decode = sindy_predict
+    params = params[::-1]
+
+    for w, b in params[:-1]:
+        z = jnp.matmul(w, z) + b
+        z = sigmoid(z)
+        dx_decode = jnp.multiply(jnp.multiply(z, 1-z), jnp.matmul(w, dx_decode))
+
+    return jnp.matmul(params[-1][0], dx_decode)
+
+
+def control_autoencoder_pass(params, coefficient_mask, x, dx, u):
 
     z = encoding_pass(params['encoder'], x)
     x_decode = decoding_pass(params['decoder'], z)
+    dz = z_derivative(params['encoder'], x, dx)
 
     y = encoding_pass(params['control_encoder'], u)
     u_decode = decoding_pass(params['control_decoder'], y)
@@ -82,11 +107,58 @@ def control_autoencoder_pass(params, coefficient_mask, x, u, a):
     c = jnp.concatenate((z, y))
     Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 2)
     sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
-    a_predict = jnp.matmul(sindy_predict, params['action_coefficients'])
+    dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
 
-    return [x_decode, u_decode, a_predict, sindy_predict]
+    return [x_decode, u_decode, dz, sindy_predict, dx_decode]
 
 
+batch_control_autoencoder = vmap(control_autoencoder_pass, in_axes=({'encoder': None,
+                                                                     'decoder': None,
+                                                                     'control_encoder': None,
+                                                                     'control_decoder': None,
+                                                                     'sindy_coefficients': None},
+                                                                     None, 0, 0, 0))
+
+
+def loss(params, x, dx, u, coefficient_mask, hps):
+
+    x_decode, u_decode, dz, sindy_predict, dx_decode = batch_control_autoencoder(params, coefficient_mask, x, dx, u)
+
+    system_recon_loss = jnp.mean((x - x_decode)**2)
+    control_recon_loss = jnp.mean((u - u_decode)**2)
+    sindy_z_loss = jnp.mean((dz - sindy_predict)**2)
+    sindy_x_loss = jnp.mean((dx - dx_decode)**2)
+    sindy_regularization_loss = jnp.mean(jnp.abs(params['sindy_coefficients']))
+
+    system_recon_loss = hps['system_loss_coeff'] * system_recon_loss
+    control_recon_loss = hps['control_loss_coeff'] * control_recon_loss
+    sindy_z_loss = hps['dz_loss_weight'] * sindy_z_loss
+    sindy_x_loss = hps['dx_loss_weight'] * sindy_x_loss
+    sindy_regularization_loss = hps['reg_loss_weight'] * sindy_regularization_loss
+    total_loss = system_recon_loss + control_recon_loss + sindy_z_loss + sindy_x_loss + sindy_regularization_loss
+
+    return {'total': total_loss,
+            'sys_loss': system_recon_loss,
+            'control_loss': control_recon_loss,
+            'sindy_z_loss': sindy_z_loss,
+            'sindy_x_loss': sindy_x_loss,
+            'sindy_regularization_loss': sindy_regularization_loss}
+
+
+def training_loss(params, x, dx, u, coefficient_mask, hps):
+    return loss(params, x, dx, u, coefficient_mask, hps)['total']
+
+
+def update(i, opt_state, opt_update, get_params, x, dx, u, coefficient_mask, hps):
+
+    params = get_params(opt_state)
+    value, grads = value_and_grad(training_loss)(params, x, dx, u, coefficient_mask, hps)
+
+    return opt_update(i, grads, opt_state)
+
+
+loss_jit = jit(loss)
+update_jit = jit(update, static_argnums=(2, 3))
 
 
 def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):

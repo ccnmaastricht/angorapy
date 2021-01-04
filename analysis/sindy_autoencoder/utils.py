@@ -177,6 +177,28 @@ def library_size(n, poly_order, use_sine=False, include_constant=True, include_c
     return l
 
 
+def generate_labels(zlabels, ulabels, poly_order):
+
+    combined_labels = zlabels + ulabels
+    latent_dim = len(combined_labels)
+
+    all_labels = ['1']
+
+    for i in range(latent_dim):
+        all_labels.append(combined_labels[i])
+
+    if poly_order > 1:
+        for i in range(latent_dim):
+            for j in range(i, latent_dim):
+                all_labels.append(combined_labels[i] + combined_labels[j])
+
+    if poly_order > 2:
+        for i in range(latent_dim):
+            for j in range(i, latent_dim):
+                for k in range(j, latent_dim):
+                    all_labels.append(combined_labels[i] + combined_labels[j] + combined_labels[k])
+
+    return zlabels, all_labels
 
 '''
 def regress(Y, X, l=0.):
