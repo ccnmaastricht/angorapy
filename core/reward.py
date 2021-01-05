@@ -56,20 +56,15 @@ def free_reach(env, achieved_goal, goal, info: dict):
 
 def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
     """Reward progress towards the goal position while punishing other fingers for interfering."""
-    thumb_position = env.get_thumb_position()
-
     # positive reinforcement
-    progress_reward = (get_fingertip_distance(thumb_position, env.get_target_fingers_previous_position())
-                       - get_fingertip_distance(thumb_position, env.get_target_finger_position()))
+    progress_reward = (get_fingertip_distance(env.get_thumbs_previous_position(), env.get_target_fingers_previous_position())
+                       - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
     success_reward = info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
     reinforcement_reward = progress_reward + success_reward
 
     # positive punishment
     penalty = (calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
                + calculate_auxiliary_finger_penalty(env))
-
-    # print(f"Progress: {progress_reward}, Success: {success_reward}, ForcePenalty: {calculate_force_penalty(env.sim)},"
-    #       f" AuxFinger Penalty: {calculate_auxiliary_finger_penalty(env)}")
 
     # total reward
     return reinforcement_reward - penalty
@@ -79,7 +74,7 @@ def sequential_free_reach(env, achieved_goal, goal, info: dict):
     """Reward following a sequence of reach movements."""
 
     # reinforcement
-    progress_reward = (get_fingertip_distance(env.get_thumb_position(), env.get_target_fingers_previous_position())
+    progress_reward = (get_fingertip_distance(env.get_thumbs_previous_position(), env.get_target_fingers_previous_position())
                        - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
     success_reward = info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
     reinforcement_reward = progress_reward + success_reward
