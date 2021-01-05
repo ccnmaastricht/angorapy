@@ -278,7 +278,9 @@ class FreeReachSequential(FreeReach):
         self.reward_config = REACH_BASE
 
     def _sample_goal(self):
-        self.current_target_finger = random.randint(0, 3)
+        available_fingers = [0, 1, 2, 3]
+        available_fingers.remove(self.current_target_finger)
+        self.current_target_finger = random.choice(available_fingers)
 
         # make one hot encoding
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
