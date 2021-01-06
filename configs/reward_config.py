@@ -19,7 +19,8 @@ REACH_BASE = dict(
     SUCCESS_MULTIPLIER=.1,
 
     # ratio between the size of penalty zone of auxiliary fingertips and success distance of target fingertip
-    AUXILIARY_DISTANCE_THRESHOLD_RATIO=10
+    AUXILIARY_DISTANCE_THRESHOLD_RATIO=10,
+    AUXILIARY_PENALTY_MULTIPLIER=0.05
 )
 
 # FREE REACH
