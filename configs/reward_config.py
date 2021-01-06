@@ -39,5 +39,11 @@ free_reach_positive_reinforcement = dict(
                         FORCE_MULTIPLIER=0.05),
 )
 
+sequential_free_reach = dict(
+    default=REACH_BASE,
+    great_success=dict(REACH_BASE,
+                       SUCCESS_MULTIPLIER=20)
+)
+
 if __name__ == '__main__':
     print(resolve_config_name("free_reach.force_punished"))

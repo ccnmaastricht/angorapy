@@ -52,8 +52,12 @@ class Reach(HandReachEnv, BaseShadowHand):
         return self.sim.data.get_site_xpos(self.thumb_name).flatten()
 
     def get_thumbs_previous_position(self) -> np.ndarray:
-        """Get the position of the thumb in space."""
+        """Get the previous position of the thumb in space."""
         return self.previous_finger_positions[-1]
+
+    def get_fingers_previous_position(self, fname) -> np.ndarray:
+        """Get the previous position of the given finger in space."""
+        return self.previous_finger_positions[FINGERTIP_SITE_NAMES.index(fname)]
 
     def get_target_finger_position(self) -> np.ndarray:
         """Get position of the target finger in space."""
