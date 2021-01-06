@@ -29,7 +29,7 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
 
         penalty += fingertip_distance * 0.5
 
-    return penalty
+    return - penalty
 
 
 # REWARD FUNCTIONS
