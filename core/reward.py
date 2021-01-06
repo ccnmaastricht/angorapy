@@ -27,7 +27,7 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
         fingertip_distance = get_fingertip_distance(environment.get_thumb_position(),
                                                     environment.get_finger_position(fname))
 
-        penalty += math.log(fingertip_distance)
+        penalty += fingertip_distance * 0.5
 
     return penalty
 
