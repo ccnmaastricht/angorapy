@@ -18,8 +18,7 @@ REACH_BASE = dict(
     SUCCESS_DISTANCE=.02,  # fingertip distance at which reach is a success
     SUCCESS_MULTIPLIER=.1,
 
-    # ratio between the size of penalty zone of auxiliary fingertips and success distance of target fingertip
-    AUXILIARY_DISTANCE_THRESHOLD_RATIO=10,
+    AUXILIARY_ZONE_RADIUS=0.06015,  # this is the initial distance to the forefinger
     AUXILIARY_PENALTY_MULTIPLIER=0.05
 )
 

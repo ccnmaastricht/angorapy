@@ -160,6 +160,8 @@ class Reach(HandReachEnv, BaseShadowHand):
         o, r, d, i = super().step(action)
         i.update({"target_finger": self.current_target_finger})
 
+        print(f"Distance Target->Thumb: {get_fingertip_distance(self.get_target_finger_position(), self.get_thumb_position())}")
+
         return o, r, d, i
 
 

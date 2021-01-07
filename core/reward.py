@@ -1,4 +1,3 @@
-import math
 from typing import List
 
 import numpy as np
@@ -27,7 +26,9 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
         fingertip_distance = get_fingertip_distance(environment.get_thumb_position(),
                                                     environment.get_finger_position(fname))
 
-        penalty += fingertip_distance * environment.reward_config["AUXILIARY_PENALTY_MULTIPLIER"]
+        # cap reward at auxiliary zone, scale to focus on the target finger's movement
+        penalty += (max(fingertip_distance, environment.reward_config["AUXILIARY_ZONE_RADIUS"])
+                    * environment.reward_config["AUXILIARY_PENALTY_MULTIPLIER"])
 
     return - penalty
 
@@ -59,8 +60,8 @@ def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
     """Reward progress towards the goal position while punishing other fingers for interfering."""
     # positive reinforcement
     progress_reward = (
-                get_fingertip_distance(env.get_thumbs_previous_position(), env.get_target_fingers_previous_position())
-                - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
+            get_fingertip_distance(env.get_thumbs_previous_position(), env.get_target_fingers_previous_position())
+            - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
     success_reward = info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
     reinforcement_reward = progress_reward + success_reward
 
@@ -77,8 +78,8 @@ def sequential_free_reach(env, achieved_goal, goal, info: dict):
 
     # reinforcement
     progress_reward = (
-                get_fingertip_distance(env.get_thumbs_previous_position(), env.get_target_fingers_previous_position())
-                - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
+            get_fingertip_distance(env.get_thumbs_previous_position(), env.get_target_fingers_previous_position())
+            - get_fingertip_distance(env.get_thumb_position(), env.get_target_finger_position()))
     success_reward = info["is_success"] * env.reward_config["SUCCESS_MULTIPLIER"]
     reinforcement_reward = progress_reward + success_reward
 
