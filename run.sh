@@ -8,6 +8,7 @@
 #SBATCH --constraint=gpu
 #SBATCH --hint=multithread
 #SBATCH --time=08:00:00
+#SBATCH --account=ich020
 
 # load modules
 module load daint-gpu
