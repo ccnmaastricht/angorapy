@@ -1,5 +1,4 @@
-#!/bin/bash
-# vim: ts=4 sw=4 et
+#!/bin/bash -l
 #
 #SBATCH --nodes=1
 #SBATCH --ntasks=24
