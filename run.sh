@@ -1,7 +1,6 @@
 #!/bin/bash
-# -*- coding: utf-8 -*-
 # vim: ts=4 sw=4 et
-
+#
 #SBATCH --nodes=1
 #SBATCH --ntasks=24
 #SBATCH --ntasks-per-node=24
