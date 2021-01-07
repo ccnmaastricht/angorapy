@@ -15,16 +15,11 @@
 module load daint-gpu
 module load cray-python/3.8.2.1
 module load cray-mpich
-module load Horovod/0.19.1-CrayGNU-20.08-tf-2.2.0
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-export NCCL_DEBUG=INFO
-export NCCL_IB_HCA=ipogif0
-export NCCL_IB_CUDA_SUPPORT=1
-
 # load virtual environment
-source ${HOME}/dexterityvenv/bin/activate
+source ${HOME}/dexterityvenv21/bin/activate
 
 # run it
-srun python3 -u train.py LunarLanderContinuous-v2 --config continuous_beta --worker 24
+srun  python3 -u train.py FreeReachRelative-v0 --pcon hand_beta --rcon free_reach_positive_reinforcement.default --model gru --workers 24

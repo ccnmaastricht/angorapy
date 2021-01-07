@@ -16,10 +16,11 @@ def resolve_config_name(config_name: str):
 REACH_BASE = dict(
     FORCE_MULTIPLIER=.0,  # scales punishment for force application
     SUCCESS_DISTANCE=.02,  # fingertip distance at which reach is a success
-    SUCCESS_MULTIPLIER=.1,
+    SUCCESS_BONUS=.1,
 
+    # ZONING and WEIGHTHING for auxiliary fingers; default values guarantee a max reward of ~0.009 per step for this
     AUXILIARY_ZONE_RADIUS=0.06015,  # this is the initial distance to the forefinger
-    AUXILIARY_PENALTY_MULTIPLIER=0.05
+    AUXILIARY_PENALTY_MULTIPLIER=0.01
 )
 
 # FREE REACH
