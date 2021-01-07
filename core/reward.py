@@ -27,7 +27,7 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
                                                     environment.get_finger_position(fname))
 
         # cap reward at auxiliary zone, scale to focus on the target finger's movement
-        penalty += (max(fingertip_distance, environment.reward_config["AUXILIARY_ZONE_RADIUS"])
+        penalty += (min(fingertip_distance, environment.reward_config["AUXILIARY_ZONE_RADIUS"])
                     * environment.reward_config["AUXILIARY_PENALTY_MULTIPLIER"])
 
     return - penalty
