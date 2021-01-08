@@ -10,7 +10,7 @@ from gym.envs.robotics.utils import robot_get_obs
 
 from configs.reward_config import REACH_BASE, resolve_config_name
 from core import reward
-from core.reward import sequential_free_reach, free_reach, reach
+from core.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHand
 from utilities.const import N_SUBSTEPS, VISION_WH
 
@@ -24,8 +24,7 @@ class Reach(HandReachEnv, BaseShadowHand):
 
     def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
         # reward function setup
-        self.reward_function = reach
-        self.reward_config = REACH_BASE
+        self._set_default_reward_function_and_config()
 
         self.current_target_finger = None
         self.thumb_name = 'robot0:S_thtip'
@@ -46,6 +45,10 @@ class Reach(HandReachEnv, BaseShadowHand):
                 self._touch_sensor_id.append(v)
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
+
+    def _set_default_reward_function_and_config(self):
+        self.reward_function = reach
+        self.reward_config = REACH_BASE
 
     def get_thumb_position(self) -> np.ndarray:
         """Get the position of the thumb in space."""
@@ -73,7 +76,7 @@ class Reach(HandReachEnv, BaseShadowHand):
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute reward with additional success bonus."""
-        self.reward_function(self, info, achieved_goal, goal)
+        return self.reward_function(self, achieved_goal, goal, info)
 
     def set_reward_function(self, function: Union[str, Callable]):
         """Set the environment reward function by its config identifier or a callable."""
@@ -160,8 +163,6 @@ class Reach(HandReachEnv, BaseShadowHand):
         o, r, d, i = super().step(action)
         i.update({"target_finger": self.current_target_finger})
 
-        # print(f"Distance Target->Thumb: {get_fingertip_distance(self.get_target_finger_position(), self.get_thumb_position())}")
-
         return o, r, d, i
 
 
@@ -203,6 +204,69 @@ class MultiReach(Reach):
         return goal.flatten()
 
 
+class ReachSequential(Reach):
+    """Generate finger configurations in a sequence. Each new goal is randomly generated as the old goal is reached."""
+
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
+        self.current_target_finger = None
+        self.goal_sequence = []
+
+        super().__init__(n_substeps, relative_control, initial_qpos)
+
+    def _set_default_reward_function_and_config(self):
+        self.reward_function = sequential_reach
+        self.reward_config = REACH_BASE
+
+    def _sample_goal(self):
+        available_fingers = [0, 1, 2, 3, None]  # where None refers to not meeting any fingers
+        available_fingers.remove(self.current_target_finger)
+        self.current_target_finger = random.choice(available_fingers)
+
+        goal = self.initial_goal.copy()
+
+        # pick a meeting point above the hand
+        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
+        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
+
+        # slightly move meeting goal towards the respective finger to avoid that they overlap
+        if self.current_target_finger is not None:
+            goal = goal.reshape(-1, 3)
+            for idx in [self.current_target_finger, -1]:
+                offset_direction = (meeting_pos - goal[idx])
+                offset_direction /= np.linalg.norm(offset_direction)
+                goal[idx] = meeting_pos - 0.005 * offset_direction
+
+        # remember the goals
+        self.goal_sequence.append(self.current_target_finger)
+
+        return goal.flatten()
+
+    def get_target_finger_position(self) -> np.ndarray:
+        return self.sim.data.get_site_xpos(FINGERTIP_SITE_NAMES[self.current_target_finger]).flatten()
+
+    def _is_success(self, achieved_goal, desired_goal):
+        d = get_fingertip_distance(achieved_goal, desired_goal)
+        return (d < self.distance_threshold).astype(np.float32)
+
+    def reset(self):
+        self.current_target_finger = None
+        self.goal_sequence = []
+
+        ret = super().reset()
+
+        return ret
+
+    def step(self, action):
+        observation, reward, done, info = super().step(action)
+
+        # set next subgoal if current one is achieved
+        if info["is_success"]:
+            print(f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
+            self.goal = self._sample_goal()
+
+        return observation, reward, done, info
+
+
 class FreeReach(Reach):
     """Reaching task where the actual position of the joint fingers is irrelevant.
 
@@ -218,10 +282,9 @@ class FreeReach(Reach):
         self.forced_finger = force_finger
         super().__init__(n_substeps, relative_control, initial_qpos)
 
+    def _set_default_reward_function_and_config(self):
         self.reward_function = free_reach
-
-    def compute_reward(self, achieved_goal, goal, info):
-        return self.reward_function(self, achieved_goal, goal, info)
+        self.reward_config = REACH_BASE
 
     def _sample_goal(self):
         if self.forced_finger is None:
@@ -280,6 +343,7 @@ class FreeReachSequential(FreeReach):
 
         super().__init__(n_substeps, relative_control, initial_qpos)
 
+    def _set_default_reward_function_and_config(self):
         self.reward_function = sequential_free_reach
         self.reward_config = REACH_BASE
 

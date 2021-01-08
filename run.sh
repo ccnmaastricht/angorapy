@@ -12,7 +12,7 @@
 
 # load modules
 module load daint-gpu
-module load cray-python/3.8.2.1
+module load cray-python
 module load cray-mpich
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK

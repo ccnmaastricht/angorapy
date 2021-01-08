@@ -1,15 +1,15 @@
 """Module for additional environments as well as registering modified environments."""
 
 import gym
+
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
-
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
-from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential
+from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential
+from utilities.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS
+
 
 # SHADOW HAND
-from utilities.const import SHADOWHAND_MAX_STEPS
-
 
 gym.envs.register(
     id='BaseShadowHand-v0',
@@ -23,32 +23,23 @@ gym.envs.register(
     kwargs={"visual_input": False, "max_steps": SHADOWHAND_MAX_STEPS},
 )
 
-# REACH
-
-gym.envs.register(
-    id='ReachDenseRelative-v0',
-    entry_point='environments:Reach',
-    kwargs={"reward_type": "dense", "relative_control": True},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='ReachDenseAbsolute-v0',
-    entry_point='environments:Reach',
-    kwargs={"reward_type": "dense", "relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='MultiReachAbsolute-v0',
-    entry_point='environments:MultiReach',
-    kwargs={"reward_type": "dense", "relative_control": False},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-# FREE REACHING
+# REACHING
 
 for control_mode in ["Relative", "Absolute"]:
+    gym.envs.register(
+        id=f'Reach{control_mode}-v0',
+        entry_point='environments:Reach',
+        kwargs={"relative_control": control_mode == "Relative"},
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
+    )
+
+    gym.envs.register(
+        id=f'ReachRandom{control_mode}-v0',
+        entry_point='environments:Reach',
+        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
+    )
+
     gym.envs.register(
         id=f'FreeReach{control_mode}-v0',
         entry_point='environments:FreeReach',
@@ -77,14 +68,28 @@ for control_mode in ["Relative", "Absolute"]:
         id=f'FreeReachSequential{control_mode}-v0',
         entry_point='environments:FreeReachSequential',
         kwargs={"relative_control": control_mode == "Relative"},
-        max_episode_steps=512,
+        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
     )
 
     gym.envs.register(
         id=f'FreeReachSequentialRandom{control_mode}-v0',
         entry_point='environments:FreeReachSequential',
         kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
-        max_episode_steps=512,
+        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
+    )
+
+    gym.envs.register(
+        id=f'ReachSequential{control_mode}-v0',
+        entry_point='environments:ReachSequential',
+        kwargs={"relative_control": control_mode == "Relative"},
+        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
+    )
+
+    gym.envs.register(
+        id=f'ReachSequentialRandom{control_mode}-v0',
+        entry_point='environments:ReachSequential',
+        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
+        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
     )
 
 # MANIPULATE

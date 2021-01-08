@@ -23,6 +23,18 @@ REACH_BASE = dict(
     AUXILIARY_PENALTY_MULTIPLIER=0.01
 )
 
+
+# REACH
+reach = dict(
+    default=dict(REACH_BASE)
+)
+
+sequential_reach = dict(
+    default=dict(REACH_BASE),
+    great_success=dict(REACH_BASE,
+                       SUCCESS_MULTIPLIER=20)
+)
+
 # FREE REACH
 free_reach = dict(
     force_punished=dict(REACH_BASE,

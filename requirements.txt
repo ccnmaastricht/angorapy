@@ -16,6 +16,4 @@ argcomplete~=1.12.0
 gym~=0.17.2
 Box2D
 matplotlib~=3.3.2
-
-horovod~=0.20.3
 scikit-learn~=0.23.2

@@ -28,7 +28,8 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
 
         # cap reward at auxiliary zone, scale to focus on the target finger's movement
         penalty += ((min(fingertip_distance, environment.reward_config["AUXILIARY_ZONE_RADIUS"])
-                     - environment.reward_config["AUXILIARY_ZONE_RADIUS"])  # base reward is 0, being in the zone is punished
+                     - environment.reward_config[
+                         "AUXILIARY_ZONE_RADIUS"])  # base reward is 0, being in the zone is punished
                     * environment.reward_config["AUXILIARY_PENALTY_MULTIPLIER"])
 
     return - penalty
@@ -39,7 +40,7 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
 def reach(env, achieved_goal, goal, info: dict):
     """Simple reward function for reaching tasks, combining distance, force and success."""
     return (- get_fingertip_distance(achieved_goal, goal)
-            + info["is_success"] * env.reward_config["SUCCESS_REWARD_MULTIPLIER"]
+            + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
             - calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"])
 
 
@@ -72,6 +73,17 @@ def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
 
     # total reward
     return reinforcement_reward - penalty
+
+
+# SEQUENTIAL REACHING
+
+def sequential_reach(env, achieved_goal, goal, info: dict):  # TODO adjust for sequence?
+    """Reward following a sequence of finger configurations."""
+    reward = (- get_fingertip_distance(achieved_goal, goal)
+              + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
+              - calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"])
+
+    return reward
 
 
 def sequential_free_reach(env, achieved_goal, goal, info: dict):
