@@ -9,6 +9,7 @@ import gym
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
 from utilities.const import BASE_SAVE_PATH
+from common.wrappers import make_env
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -17,6 +18,8 @@ parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults t
 parser.add_argument("--env", type=str, nargs="?", help="force testing environment", default="")
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="b")
 parser.add_argument("--force-case-circulation", action="store_true", help="circle through goal definitions")
+parser.add_argument("--rcon", type=str, help="reward configuration", default=None)
+
 args = parser.parse_args()
 
 if args.state not in ["b", "best"]:
@@ -33,7 +36,7 @@ print(f"Agent {args.id} successfully loaded.")
 investigator = Investigator.from_agent(agent)
 env = agent.env
 if args.env != "":
-    env = gym.make(args.env)
+    env = make_env(args.env, args.rcon)
 
 print(f"Evaluating on {env.unwrapped.spec.id}")
 

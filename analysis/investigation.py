@@ -11,7 +11,7 @@ from agent.ppo import PPOAgent
 from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
-from utilities.wrappers import BaseWrapper, SkipWrapper
+from common.wrappers_old import BaseWrapper, SkipWrapper
 
 
 class Investigator:

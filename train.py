@@ -18,11 +18,11 @@ from models import get_model_builder
 from models.shadow import build_blind_shadow_brain_v1
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
-from utilities.util import env_extract_dims, make_env
-from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, SkipWrapper, RewardNormalizationWrapper
+from utilities.util import env_extract_dims
+from common.wrappers import make_env
+from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 
 from mpi4py import MPI
-
 
 
 class InconsistentArgumentError(Exception):
@@ -40,8 +40,13 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
                                         "agent state. This cannot be resolved.")
 
+    # determine relevant transformers
+    wrappers = []
+    wrappers.append(StateNormalizationTransformer()) if not settings["no_state_norming"] else None
+    wrappers.append(RewardNormalizationTransformer()) if not settings["no_reward_norming"] else None
+
     # setup environment and extract and report information
-    env = make_env(environment, reward_config=settings["rcon"])
+    env = make_env(environment, reward_config=settings["rcon"], transformers=wrappers)
     state_dim, number_of_actions = env_extract_dims(env)
     env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
     env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
@@ -70,11 +75,6 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     else:
         build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
                                          shared=settings["shared"])
-
-    # make preprocessor
-    preprocessor = CombiWrapper(
-        [StateNormalizationWrapper(state_dim) if not settings["no_state_norming"] else SkipWrapper(),
-         RewardNormalizationWrapper() if not settings["no_reward_norming"] else SkipWrapper()])
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
@@ -105,7 +105,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                          clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
                          lam=settings["lam"],
                          gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
-                         tbptt_length=settings["tbptt"], distribution=distribution, preprocessor=preprocessor,
+                         tbptt_length=settings["tbptt"], distribution=distribution, wrappers=wrappers,
                          pretrained_components=None if settings["preload"] is None else [settings["preload"]],
                          debug=settings["debug"], reward_configuration=settings["rcon"])
 
@@ -162,7 +162,8 @@ if __name__ == "__main__":
 
     # meta arguments
     parser.add_argument("--pcon", type=str, default=None, help="config name (utilities/hp_config.py) to be loaded")
-    parser.add_argument("--rcon", type=str, default=None, help="config (utilities/reward_config.py) of the reward function")
+    parser.add_argument("--rcon", type=str, default=None,
+                        help="config (utilities/reward_config.py) of the reward function")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")

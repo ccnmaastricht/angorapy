@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
-import os
 
 import time
 from inspect import getfullargspec as fargs
@@ -9,25 +8,24 @@ from typing import Tuple, Any, Union
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Box
+from mpi4py import MPI
 
 import models
 from agent import policies
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
 from agent.policies import GaussianPolicyDistribution
-from environments import *
-from models import build_rnn_models, build_ffn_models
+from common.wrappers import make_env
+from models import build_ffn_models
 from utilities.const import STORAGE_DIR, DETERMINISTIC
 from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer
 from utilities.model_utils import is_recurrent_model
-from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims, make_env
-from utilities.wrappers import CombiWrapper, RewardNormalizationWrapper, StateNormalizationWrapper, BaseWrapper
-
-from mpi4py import MPI
+from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims
 
 
 class Gatherer:
     """Remote Gathering class."""
+
     # joint: tf.keras.Model
     # policy: tf.keras.Model
 
@@ -53,18 +51,15 @@ class Gatherer:
         """Update the weights of this worker."""
         self.joint.set_weights(weights)
 
-    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, preprocessor_serialized: dict,
-                collector_id: int):
-        """Collect a batch shard of experience for a given number of timesteps."""
-        # import here to avoid pickling errors
-        import tensorflow as tfl
-        tfl.get_logger().setLevel('WARNING')
+    def sync_environment(self, wrapper):
+        """Update the wrapper data."""
+        self.wrapper = wrapper
 
+    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, collector_id: int):
+        """Collect a batch shard of experience for a given number of timesteps."""
         # build new environment for each collector to make multiprocessing possible
         if DETERMINISTIC:
             self.env.seed(1)
-
-        preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
 
         # reset states of potentially recurrent net
         self.joint.reset_states()
@@ -84,29 +79,29 @@ class Gatherer:
         t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
         states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
         episode_endpoints = []
-        state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None))[0]
+        state = parse_state(self.env.reset())
         while t < horizon:
             current_subseq_length += 1
 
-            # based on the given state, predict action distribution and state value; need flatten due to tf eager bug
+            # based on the given state, predict step_tuple distribution and state value; need flatten due to tf eager bug
             policy_out = flatten(
                 self.joint.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
             a_distr, value = policy_out[:-1], policy_out[-1]
             states.append(state)
             values.append(np.squeeze(value))
 
-            # from the action distribution sample an action and remember both the action and its probability
+            # from the step_tuple distribution sample an step_tuple and remember both the step_tuple and its probability
             action, action_probability = self.distribution.act(*a_distr)
 
             action = action if not DETERMINISTIC else np.zeros(action.shape)
             actions.append(action)
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
-            # make a step based on the chosen action and collect the reward for this state
+            # make a step based on the chosen step_tuple and collect the reward for this state
             observation, reward, done, _ = self.env.step(np.atleast_1d(action) if self.is_continuous else action)
             current_episode_return += reward  # true reward for stats
 
-            observation, reward, done, _ = preprocessor.modulate((parse_state(observation), reward, done, None))
+            observation = parse_state(observation)
             rewards.append(reward)
 
             # if recurrent, at a subsequence breakpoint/episode end stack the observations and buffer them
@@ -136,7 +131,7 @@ class Gatherer:
                     buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
 
                 # reset environment to receive next episodes initial state
-                state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None))[0]
+                state = parse_state(self.env.reset())
                 self.joint.reset_states()
 
                 # update/reset some statistics and trackers
@@ -190,20 +185,19 @@ class Gatherer:
         dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=self.is_shadow_brain)
         dataset = dataset.map(tf_serialize_example)
 
-        writer = tfl.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord")
+        writer = tf.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord")
         writer.write(dataset)
 
-        return stats, preprocessor
+        return stats
 
-    def evaluate(self, preprocessor_serialized: dict) -> Tuple[int, int, Any]:
+    def evaluate(self) -> Tuple[int, int, Any]:
         """Evaluate one episode of the given environment following the given policy. Remote implementation."""
-        preprocessor = BaseWrapper.from_serialization(preprocessor_serialized)
 
         # reset policy states as it might be recurrent
         self.policy.reset_states()
 
         done = False
-        state = preprocessor.modulate((parse_state(self.env.reset()), None, None, None), update=False)[0]
+        state = parse_state(self.env.reset())
         cumulative_reward = 0
         steps = 0
         while not done:
@@ -213,8 +207,7 @@ class Gatherer:
             action, _ = self.distribution.act(*probabilities)
             observation, reward, done, _ = self.env.step(action)
             cumulative_reward += reward
-            observation, reward, done, _ = preprocessor.modulate((parse_state(observation), reward, done, None),
-                                                                 update=False)
+            observation = parse_state(observation)
 
             state = observation
             steps += 1
@@ -248,7 +241,7 @@ if __name__ == "__main__":
     actors = [Gatherer(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(n_actors_on_this_node)]
 
     it = time.time()
-    outs_ffn = [actor.collect(512, 0.99, 0.95, 16, wrapper.serialize()) for actor in actors]
+    outs_ffn = [actor.collect(512, 0.99, 0.95, 16, ) for actor in actors]
     gathering_msg = f"Gathering Time: {time.time() - it}"
 
     msgs = comm.gather(gathering_msg, root=0)

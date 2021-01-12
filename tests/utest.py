@@ -1,27 +1,17 @@
-import itertools
-import logging
 import os
 import random
 import unittest
 
 import gym
 import numpy as np
-import ray
 import tensorflow as tf
-from scipy.signal import lfilter
 from scipy.stats import norm, entropy, beta
 
-from agent.core import extract_discrete_action_probabilities, estimate_advantage
+from agent.core import extract_discrete_action_probabilities
 from agent.policies import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
-from agent.ppo import PPOAgent
-from analysis.investigation import Investigator
-from models import get_model_builder
 from utilities.const import NP_FLOAT_PREC
 from utilities.model_utils import reset_states_masked
-from utilities.util import insert_unknown_shape_dimensions
-from utilities.wrappers import StateNormalizationWrapper, RewardNormalizationWrapper
-
-from tests import *
+from common.wrappers_old import StateNormalizationWrapper, RewardNormalizationWrapper
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

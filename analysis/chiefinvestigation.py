@@ -5,17 +5,15 @@ from time import sleep
 import sys
 sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import animation
 import sklearn
 
 from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
-from utilities.wrappers import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
-from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
-from utilities.model_utils import build_sub_model_from, build_sub_model_to
+from common.wrappers_old import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
+from utilities.util import flatten
+from utilities.model_utils import build_sub_model_from
 import autograd.numpy as np
 import sklearn.decomposition as skld
 
@@ -57,7 +55,7 @@ class Chiefinvestigator(Investigator):
         return self.list_layer_names()
 
     def parse_data(self, layer_name: str, previous_layer_name: str):
-        """Get state, activation, action, reward over one episode. Parse data to output.
+        """Get state, activation, step_tuple, reward over one episode. Parse data to output.
 
         Args:
             layer_name: Name of layer to be analysed

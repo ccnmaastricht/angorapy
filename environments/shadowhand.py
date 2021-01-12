@@ -7,7 +7,7 @@ import numpy as np
 from gym.envs.robotics.hand import manipulate
 
 
-def generate_random_sim_qpos(base: dict):
+def generate_random_sim_qpos(base: dict) -> dict:
     """Generate a random state of the simulation."""
     for key, val in base.items():
         if key in ["robot0:WRJ1", "robot0:WRJ0"]:

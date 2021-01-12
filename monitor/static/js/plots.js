@@ -270,12 +270,12 @@ $.when(
     }, objective_layout), {responsive: true});
 
     // NORMALIZATION PLOTS
-    let norm_plot_x = _.range(_.size(prog["preprocessors"]["RewardNormalizationWrapper"]["mean"]))
+    let norm_plot_x = _.range(_.size(prog["preprocessors"]["RewardNormalizationTransformer"]["mean"]))
     let rew_norm_traces = [];
-    for (let i = 0; i < prog["preprocessors"]["RewardNormalizationWrapper"]["mean"][0].length; i++) {
+    for (let i = 0; i < prog["preprocessors"]["RewardNormalizationTransformer"]["mean"][0].length; i++) {
         rew_norm_traces.push({
             x: norm_plot_x,
-            y: prog["preprocessors"]["RewardNormalizationWrapper"]["mean"].map(x => x[i]),
+            y: prog["preprocessors"]["RewardNormalizationTransformer"]["mean"].map(x => x[i]),
             mode: "lines",
             name: "Running Mean Reward",
             marker: {color: "Green"},
@@ -284,17 +284,17 @@ $.when(
 
     let weird_x = _.concat(
         norm_plot_x,
-        _.reverse(_.range(_.size(prog["preprocessors"]["RewardNormalizationWrapper"]["mean"]))))
+        _.reverse(_.range(_.size(prog["preprocessors"]["RewardNormalizationTransformer"]["mean"]))))
 
     let upper_reward_bound = addvector(
-        prog["preprocessors"]["RewardNormalizationWrapper"]["mean"],
-        prog["preprocessors"]["RewardNormalizationWrapper"]["stdev"])
+        prog["preprocessors"]["RewardNormalizationTransformer"]["mean"],
+        prog["preprocessors"]["RewardNormalizationTransformer"]["stdev"])
 
     console.log(upper_reward_bound);
 
     let lower_reward_bound = subtractvector(
-        prog["preprocessors"]["RewardNormalizationWrapper"]["mean"],
-        prog["preprocessors"]["RewardNormalizationWrapper"]["stdev"])
+        prog["preprocessors"]["RewardNormalizationTransformer"]["mean"],
+        prog["preprocessors"]["RewardNormalizationTransformer"]["stdev"])
 
     rew_norm_traces.push({
         x: norm_plot_x,
@@ -319,10 +319,10 @@ $.when(
     }, standard_layout), {responsive: true});
 
     let state_norm_traces = [];
-    for (let i = 0; i < prog["preprocessors"]["StateNormalizationWrapper"]["mean"][0].length; i++) {
+    for (let i = 0; i < prog["preprocessors"]["StateNormalizationTransformer"]["mean"][0].length; i++) {
         state_norm_traces.push({
-            x: _.range(_.size(prog["preprocessors"]["StateNormalizationWrapper"]["mean"])),
-            y: prog["preprocessors"]["StateNormalizationWrapper"]["mean"].map(x => x[i]),
+            x: _.range(_.size(prog["preprocessors"]["StateNormalizationTransformer"]["mean"])),
+            y: prog["preprocessors"]["StateNormalizationTransformer"]["mean"].map(x => x[i]),
             mode: "lines",
             name: "Running Mean State",
             marker: {color: "Green"},
