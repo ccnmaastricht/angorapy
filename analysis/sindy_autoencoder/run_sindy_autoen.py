@@ -45,11 +45,6 @@ batch_size = 2000
 num_batches = int(jnp.ceil(len(training_data['x']) / batch_size))
 
 
-def batch_indices(iter):
-    idx = iter % num_batches
-    return slice(idx * batch_size, (idx + 1) * batch_size)
-
-
 learning_rate = 1e-3
 init_params, coefficient_mask = control_autoencoder.build_sindy_control_autoencoder(layers, lib_size, key)
 opt_init, opt_update, get_params = optimizers.adam(learning_rate)
@@ -61,7 +56,7 @@ print_every = 100
 
 for epoch in range(1000):
     for batch in range(num_batches):
-        ids = batch_indices(batch)
+        ids = utils.batch_indices(batch, num_batches, batch_size)
         opt_state = control_autoencoder.update_jit(batch, opt_state, opt_update, get_params,
                                                    training_data['x'][ids, :],
                                                    training_data['dx'][ids, :],
@@ -76,11 +71,12 @@ for epoch in range(1000):
                                                          training_data['x'][ids, :],
                                                          training_data['dx'][ids, :],
                                                          training_data['u'][ids, :], coefficient_mask, hps))
-    train_loss = all_train_losses[-1]['total']
-    batch_time = time.time() - start_time
-    s = "Epoch {} in {:0.2f} sec, training loss {:0.4f}"
-    print(s.format(epoch+1, batch_time, train_loss))
+
+    utils.print_update(all_train_losses[-1]['total'], epoch, epoch*num_batches, time.time() - start_time)
     start_time = time.time()
+
+print(f"FINISHING...\n"
+      f"Sparsity: {jnp.sum(coefficient_mask)} active terms")
 
 # List of dicts to dict of lists
 all_train_losses = {k: [dic[k] for dic in all_train_losses] for k in all_train_losses[0]}

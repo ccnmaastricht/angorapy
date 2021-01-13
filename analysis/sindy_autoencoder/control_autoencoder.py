@@ -2,6 +2,8 @@ import jax.numpy as jnp
 from jax import random
 from scipy.special import binom
 from jax import vmap, value_and_grad, jit
+from analysis.sindy_autoencoder.utils import sindy_library_jax, library_size
+import matplotlib.pyplot as plt
 
 
 def sigmoid(x):
@@ -112,6 +114,25 @@ def control_autoencoder_pass(params, coefficient_mask, x, dx, u):
     return [x_decode, u_decode, dz, sindy_predict, dx_decode]
 
 
+def compute_latent_space(params, coefficient_mask, x, dx, u):
+    z = encoding_pass(params['encoder'], x)
+    dz = z_derivative(params['encoder'], x, dx)
+
+    y = encoding_pass(params['control_encoder'], u)
+
+    c = jnp.concatenate((z, y))
+    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 2)
+    sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
+
+    return [z, y, sindy_predict]
+
+
+batch_compute_latent_space = vmap(compute_latent_space, in_axes=({'encoder': None,
+                                                                  'decoder': None,
+                                                                  'control_encoder': None,
+                                                                  'control_decoder': None,
+                                                                  'sindy_coefficients': None},
+                                                                 None, 0, 0, 0))
 batch_control_autoencoder = vmap(control_autoencoder_pass, in_axes=({'encoder': None,
                                                                      'decoder': None,
                                                                      'control_encoder': None,
@@ -161,39 +182,68 @@ loss_jit = jit(loss)
 update_jit = jit(update, static_argnums=(2, 3))
 
 
-def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
+def plot_params(params, coefficient_mask):
 
-    library = [1]
+    plt.figure()
+    plt.subplot(121)
+    plt.imshow(params['sindy_coefficients'])
+    plt.title('SINDy Coefficients')
 
-    for i in range(latent_dim):
-        library.append(z[i])
-
-    if poly_order > 1:
-        for i in range(latent_dim):
-            for j in range(i, latent_dim):
-                library.append(jnp.multiply(z[i], z[j]))
-
-    if poly_order > 2:
-        for i in range(latent_dim):
-            for j in range(i, latent_dim):
-                for k in range(j, latent_dim):
-                    library.append(jnp.multiply(jnp.multiply(z[i], z[j]), z[k]))
-
-    if include_sine:
-        for i in range(latent_dim):
-            library.append(jnp.sin(z[i]))
-
-    return jnp.stack(library, axis=0)
+    plt.subplot(122)
+    plt.imshow(coefficient_mask)
+    plt.title('Coefficient Mask')
 
 
-def library_size(n, poly_order, use_sine=False, include_constant=True, include_control=False):
-    l = 0
-    if include_control:
-        n = n * 2
-    for k in range(poly_order+1):
-        l += int(binom(n+k-1, k))
-    if use_sine:
-        l += n
-    if not include_constant:
-        l -= 1
-    return l
+'''
+def save_state(self, filename, save_dir: str = ''):
+    state = {'autoencoder': self.autoencoder,
+             'coefficient_mask': self.coefficient_mask,
+             'hps': {'layers': self.layer_sizes,
+                     'poly_order': self.poly_order,
+                     'library:size': self.library_size,
+                     'lr': self.learning_rate,
+                     'epochs': self.max_epochs,
+                     'batch_size': self.batch_size,
+                     'sequential_threshold': self.sequential_thresholding,
+                     'thresholding_frequency': self.thresholding_frequency,
+                     'threshold_coefficient': self.coefficient_threshold},
+             'history': {'train_loss': self.train_loss,
+                         'refinement_loss': self.refinement_loss}}
+
+    try:
+        directory = os.getcwd() + '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+
+        with open(file=directory, mode='wb') as f:
+            pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
+
+    except FileNotFoundError:
+        directory = '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+
+        with open(file=directory, mode='wb') as f:
+            pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)'''
+
+'''                        
+def load_state(self, filename, save_dir: str = ''):
+    try:
+        directory = os.getcwd() + '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+        with open(directory, 'rb') as f:
+            state = pickle.load(f)
+
+    except FileNotFoundError:
+        directory = '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+        with open(directory, 'rb') as f:
+            state = pickle.load(f)
+
+    self.autoencoder = state['autoencoder']
+    self.coefficient_mask = state['coefficient_mask']
+    self.layer_sizes = state['hps']['layers']
+    self.poly_order = state['hps']['poly_order']
+    self.library_size = state['hps']['library:size']
+    self.learning_rate = state['hps']['lr']
+    self.max_epochs = state['hps']['epochs']
+    self.batch_size = state['hps']['batch_size']
+    self.sequential_thresholding = state['hps']['sequential_threshold']
+    self.thresholding_frequency = state['hps']['thresholding_frequency']
+    self.coefficient_threshold = state['hps']['threshold_coefficient']
+    self.train_loss = state['history']['train_loss']
+    self.refinement_loss = state['history']['refinement_loss']'''

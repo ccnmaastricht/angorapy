@@ -1,142 +1,5 @@
 import jax.numpy as jnp
-from jax import random
 from scipy.special import binom
-
-
-def sigmoid(x):
-    return 1 / (1 + jnp.exp(-x))
-
-
-def sigmoid_layer(params, x):
-    return sigmoid(jnp.matmul(params[0], x) + params[1])
-
-
-def build_encoder(layer_sizes, key, scale=1e-2):
-    keys = random.split(key, len(layer_sizes))
-    encoding_params = []
-    for m, n, k in zip(layer_sizes[:-1], layer_sizes[1:], keys):
-        w_key, b_key = random.split(k)
-        w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n, ))
-        encoding_params.append([w, b])
-    return encoding_params
-
-
-def build_decoder(layer_sizes, key, scale=1e-2):
-    keys = random.split(key, len(layer_sizes))
-    decoding_params = []
-    for m, n, k in zip(layer_sizes[1:], layer_sizes[:-1], keys):
-        w_key, b_key = random.split(k)
-        w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
-        decoding_params.append([w, b])
-    return decoding_params
-
-
-def build_sindy_autoencoder(layer_sizes, library_size, key):
-
-    encoding_params = build_encoder(layer_sizes, key)
-    decoding_params = build_decoder(layer_sizes, key)
-
-    sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
-    coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
-    params = {'encoder': encoding_params,
-              'decoder': decoding_params,
-              'sindy_coefficients': sindy_coefficients}
-    return params, coefficient_mask
-
-
-def build_sindy_control_autoencoder(layer_sizes, library_size, key):
-    key = random.split(key, 4)
-    encoding_params = build_encoder(layer_sizes, next(key))
-    decoding_params = build_decoder(layer_sizes, next(key))
-
-    control_encoding_params = build_encoder(layer_sizes, next(key))
-    control_decoding_params = build_decoder(layer_sizes, next(key))
-
-    sindy_coefficients = jnp.ones((library_size, 2 * layer_sizes[-1]))
-    coefficient_mask = jnp.ones((library_size, 2 * layer_sizes[-1]))
-    params = {'encoder': encoding_params,
-              'decoder': decoding_params,
-              'control_encoder': control_encoding_params,
-              'control_decoder': control_decoding_params,
-              'sindy_coefficients': sindy_coefficients}
-
-    return params, coefficient_mask
-
-
-def z_derivative(params, x, dx):
-    dz = dx
-
-    for w, b in params[:-1]:
-        x = jnp.matmul(w, x) + b
-        x = sigmoid(x)
-        dz = jnp.multiply(jnp.multiply(x, 1-x), jnp.matmul(w, dz))
-
-    return jnp.matmul(params[-1][0], dz)
-
-
-def z_derivative_decode(params, z, sindy_predict):
-    dx_decode = sindy_predict
-    params = params[::-1]
-
-    for w, b in params[:-1]:
-        z = jnp.matmul(w, z) + b
-        z = sigmoid(z)
-        dx_decode = jnp.multiply(jnp.multiply(z, 1-z), jnp.matmul(w, dx_decode))
-
-    return jnp.matmul(params[-1][0], dx_decode)
-
-
-def encoding_pass(params, x):
-    activation = x
-
-    for w, b in params[:-1]:
-        activation = sigmoid_layer([w, b], activation)
-
-    return jnp.matmul(params[-1][0], activation) + params[-1][1]
-
-
-def decoding_pass(params, input):
-    activation = input
-    params = params[::-1]  # reverse order for decoder
-    for w, b in params[:-1]:
-        activation = sigmoid_layer([w, b], activation)
-
-    return jnp.matmul(params[-1][0], activation) + params[-1][1]
-
-
-def autoencoder_pass(params, coefficient_mask, x, dx):
-
-    z = encoding_pass(params['encoder'], x)
-    dz = z_derivative(params['encoder'], x, dx)
-    x_decode = decoding_pass(params['decoder'], z)
-
-    Theta = sindy_library_jax(z, len(params['encoder'][-1][0]), 2)
-    sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
-    dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
-
-    return [x, dx, dz, x_decode, dx_decode, sindy_predict]
-
-
-def control_autoencoder_pass(params, coefficient_mask, x, dx, u, du):
-
-    z = encoding_pass(params['encoder'], x)
-    dz = z_derivative(params['encoder'], x, dx)
-    x_decode = decoding_pass(params['decoder'], z)
-
-    y = encoding_pass(params['control_encoder'], u)
-    dy = z_derivative(params['control_encoder'], u, du)
-    u_decode = decoding_pass(params['control_decoder'], y)
-
-    c = jnp.concatenate((z, y))
-    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 2)
-    sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
-
-    sindy_predict_x, sindy_predict_u = jnp.split(sindy_predict, 2)
-    dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict_x)
-
-    du_decode = z_derivative_decode(params['control_decoder'], y, sindy_predict_u)
-
-    return [x, dx, dz, u, du, x_decode, dx_decode, u_decode, du_decode, sindy_predict]
 
 
 def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
@@ -199,6 +62,18 @@ def generate_labels(zlabels, ulabels, poly_order):
                     all_labels.append(combined_labels[i] + combined_labels[j] + combined_labels[k])
 
     return zlabels, all_labels
+
+
+def batch_indices(iter, num_batches, batch_size):
+    idx = iter % num_batches
+    return slice(idx * batch_size, (idx + 1) * batch_size)
+
+
+def print_update(train_loss, epoch, n_updates, dt):
+    print(f"Epoch {epoch}",
+          f"| Loss {round(train_loss, 7)}",
+          f"| Updates {n_updates}",
+          f"| This took: {round(dt, 4)}s")
 
 '''
 def regress(Y, X, l=0.):
