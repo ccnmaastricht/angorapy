@@ -240,5 +240,6 @@ activate/
 videos/
 media/
 *.mp4
+*.pkl
 
 # End of https://www.gitignore.io/api/python,pycharm+all

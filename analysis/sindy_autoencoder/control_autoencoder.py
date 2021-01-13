@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from jax import random
 from scipy.special import binom
 from jax import vmap, value_and_grad, jit
-from analysis.sindy_autoencoder.utils import sindy_library_jax, library_size
+from analysis.sindy_autoencoder.utils import sindy_library_jax
 import matplotlib.pyplot as plt
 
 
@@ -187,10 +187,12 @@ def plot_params(params, coefficient_mask):
     plt.figure()
     plt.subplot(121)
     plt.imshow(params['sindy_coefficients'])
+    plt.axis('off')
     plt.title('SINDy Coefficients')
 
     plt.subplot(122)
     plt.imshow(coefficient_mask)
+    plt.axis('off')
     plt.title('Coefficient Mask')
 
 
