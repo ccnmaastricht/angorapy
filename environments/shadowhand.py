@@ -38,14 +38,26 @@ class BaseShadowHand(manipulate.ManipulateEnv, abc.ABC):
 
         # set colors
         self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255  # hand
+        # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
         self.sim.model.mat_rgba[4] = np.array([71, 116, 144, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
-        # rotate camera to top down view
-        self.viewer.cam.distance = 0.4  # zoom in
-        self.viewer.cam.azimuth = -90.0  # top down view
-        self.viewer.cam.elevation = -90.0  # top down view
-        self.viewer.cam.lookat[1] -= 0.07  # slightly move forward
+        self.viewpoint = "topdown"
+
+        if self.viewpoint == "topdown":
+            # rotate camera to top down view
+            self.viewer.cam.distance = 0.35  # zoom in
+            self.viewer.cam.azimuth = -0.0  # top down view
+            self.viewer.cam.elevation = -90.0  # top down view
+            self.viewer.cam.lookat[1] -= 0.07  # slightly move forward
+        elif self.viewpoint == "side":
+            # rotate camera to side view
+            self.viewer.cam.distance = 0.35  # zoom in
+            self.viewer.cam.azimuth = 25.0  # top down view
+            self.viewer.cam.elevation = -45.0  # top down view
+            self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
+        else:
+            raise NotImplementedError("Unknown Viewpoint.")
 
 
 if __name__ == "__main__":

@@ -37,11 +37,11 @@ if args.env != "":
 
 print(f"Evaluating on {env.unwrapped.spec.id}")
 
-if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachAbsolute-v0"):
+if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachRelative-v0"):
     for i in range(100):
         investigator.render_episode(env, slow_down=False)
 else:
-    env = gym.make("FreeReachFFAbsolute-v0")
+    env = gym.make("FreeReachFFRelative-v0")
     for i in range(100):
         env.forced_finger = i % 4
         env.env.forced_finger = i % 4

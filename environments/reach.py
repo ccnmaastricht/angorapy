@@ -26,7 +26,7 @@ class Reach(HandReachEnv, BaseShadowHand):
         # reward function setup
         self._set_default_reward_function_and_config()
 
-        self.current_target_finger = None
+        self.current_target_finger = 3
         self.thumb_name = 'robot0:S_thtip'
 
         self._touch_sensor_id_site_id = []
@@ -338,19 +338,28 @@ class FreeReachSequential(FreeReach):
     """Freely join fingers in a sequence, where each new goal is randomly generated as the old goal is reached."""
 
     def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
-        self.current_target_finger = None
         self.goal_sequence = []
 
+        self.force_exemplary_sequence = True
+        self.default_exemplary_sequence = [0, 1, 2, 3]
+        self.exemplary_sequence = self.default_exemplary_sequence.copy()
+
         super().__init__(n_substeps, relative_control, initial_qpos)
+        self.exemplary_sequence = self.default_exemplary_sequence.copy()  # reset after initial init stuff
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = sequential_free_reach
         self.reward_config = REACH_BASE
 
     def _sample_goal(self):
-        available_fingers = [0, 1, 2, 3]
-        available_fingers.remove(self.current_target_finger)
-        self.current_target_finger = random.choice(available_fingers)
+        if not self.force_exemplary_sequence:
+            available_fingers = [0, 1, 2, 3]
+            available_fingers.remove(self.current_target_finger)
+            self.current_target_finger = random.choice(available_fingers)
+        else:
+            self.current_target_finger = self.exemplary_sequence.pop(0)
+            self.goal_sequence.append(self.current_target_finger)
+            self.exemplary_sequence.append(self.current_target_finger)
 
         # make one hot encoding
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
@@ -369,9 +378,10 @@ class FreeReachSequential(FreeReach):
         return (d < self.distance_threshold).astype(np.float32)
 
     def reset(self):
-        ret = super().reset()
         self.goal_sequence = []
+        self.exemplary_sequence = self.default_exemplary_sequence.copy()
 
+        ret = super().reset()
         return ret
 
     def _render_callback(self):
