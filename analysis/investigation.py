@@ -221,7 +221,7 @@ class Investigator:
 
         print(f"Finished after {step} steps.")
         print(f"Achieved a score of {cumulative_reward}. "
-              f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
+              f"{'Good Girl!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
 
 if __name__ == "__main__":
@@ -239,7 +239,8 @@ if __name__ == "__main__":
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
     #agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
     # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
-    agent_id, env = 1591604443, 'HandFreeReachLFAbsolute-v0'  # single goal lf
+    # agent_id, env = 1591604443, 'HandFreeReachLFAbsolute-v0'  # single goal lf
+    agent_id = 1607352660  # inverted pendulum no vel, continuous action
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)
@@ -248,9 +249,7 @@ if __name__ == "__main__":
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
-    for i in range(2):
-        # inv.render_episode(agent_007.env, to_gif=False)
-        sleep(1)
-        inv.render_episode(gym.make(env), to_gif=False)
+    for i in range(5):
+        inv.render_episode(agent_007.env, to_gif=False)
 
 
