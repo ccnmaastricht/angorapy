@@ -130,8 +130,9 @@ def compute_latent_space(params, coefficient_mask, x, u):
     return [z, y, sindy_predict]
 
 
-def simulate_dynamics(params, coefficient_mask, x, u, t):
-    def dynamics(z, t, y):
+def simulate_dynamics(params, coefficient_mask, x, u, dt_sim, dt):
+    @jit
+    def dynamics(z, y):
         c = jnp.concatenate((z, y), axis=0)
         Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 2)
         sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
@@ -139,12 +140,14 @@ def simulate_dynamics(params, coefficient_mask, x, u, t):
 
     [z, y, _] = compute_latent_space(params, coefficient_mask, x, u)
     z0 = z
-
-    tspan = [t-1, t]
-
-    sim_res = odeint(dynamics, z0, tspan, args=(y, ))[1]
-    x_decode = decoding_pass(params['decoder'], sim_res)
-    return sim_res, x_decode
+    # integration loop
+    n_steps = int(dt_sim/dt)
+    for _ in range(n_steps):
+        dz = dynamics(z0, y)
+        z0 = z0 + dt * dz
+    z = z0
+    x_decode = decoding_pass(params['decoder'], z)
+    return z, x_decode
 
 
 def simulate_episode(chiefinv,
@@ -162,7 +165,7 @@ def simulate_episode(chiefinv,
     xt_1 = xt_1[0].numpy()[0, :]
     env.render() if render else ""
     step_count = 0
-    for _ in range(100):
+    for _ in range(1000):
         step_count += 1
         states.append(state)
         dual_out = flatten(submodelto.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
@@ -175,7 +178,7 @@ def simulate_episode(chiefinv,
 
         u = activation[2][0, 0, :]
         actual_activations.append(activation[1][0, :])
-        sim_res, sim_activation = simulate_dynamics(params, coefficient_mask, xt_1, u, t=step_count)
+        sim_res, sim_activation = simulate_dynamics(params, coefficient_mask, xt_1, u, dt_sim=0.02, dt=1e-3)
         simulation_results.append(sim_res)
         simulated_activations.append(sim_activation)
 
@@ -191,9 +194,10 @@ def simulate_episode(chiefinv,
         observation, reward, done, info = chiefinv.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                          update=False)
 
-        xt_1 = sim_activation # this is believing the sindy dynamics are very good, otherwise use state from network to min deviation
-        # xt_1 = actual_activations[-1] # take hidden state from actual network (idea is that deviation should be smaller)
+        # xt_1 = sim_activation # this is believing the sindy dynamics are very good, otherwise use state from network to min deviation
+        xt_1 = actual_activations[-1] # take hidden state from actual network (idea is that deviation should be smaller)
         state = observation
+        env.render()
 
     return states, actual_activations, simulated_activations, simulation_results, actions
 
