@@ -3,6 +3,7 @@ import numpy as np
 import os
 import pickle
 from jax import random
+from jax.nn.initializers import xavier_uniform
 from jax import vmap, value_and_grad, jit
 from analysis.sindy_autoencoder.utils import sindy_library_jax
 import matplotlib.pyplot as plt
@@ -19,37 +20,60 @@ def sigmoid_layer(params, x):
     return sigmoid(jnp.matmul(params[0], x) + params[1])
 
 
-def build_encoder(layer_sizes, key, scale=1e-2):
+def build_encoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_uniform'):
     keys = random.split(key, len(layer_sizes))
     encoding_params = []
     for m, n, k in zip(layer_sizes[:-1], layer_sizes[1:], keys):
         w_key, b_key = random.split(k)
-        w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n, ))
+        if initializer == 'normal':
+            w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n, ))
+        elif initializer == 'xavier_uniform':
+            w_init = xavier_uniform()
+            w, b = w_init(w_key, (n, m)), 0.0 * random.normal(b_key, (n, ))  # SindyAutoencoder
+        else:
+            raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
         encoding_params.append([w, b])
     return encoding_params
 
 
-def build_decoder(layer_sizes, key, scale=1e-2):
+def build_decoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_uniform'):
     keys = random.split(key, len(layer_sizes))
     decoding_params = []
     for m, n, k in zip(layer_sizes[1:], layer_sizes[:-1], keys):
         w_key, b_key = random.split(k)
-        w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
+        if initializer == 'normal':
+            w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
+        elif initializer == 'xavier_uniform':
+            w_init = xavier_uniform()
+            w, b = w_init(w_key, (n, m)), 0.0 * random.normal(b_key, (n,))  # SindyAutoencoder
+        else:
+            raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
         decoding_params.append([w, b])
     return decoding_params
 
 
-def build_sindy_control_autoencoder(layer_sizes, library_size, key):
-    key = random.split(key, 4)
+def build_sindy_control_autoencoder(layer_sizes, library_size, key, initializer: str = 'xavier_uniform',
+                                    sindy_initializer: str = 'constant'):
+    key = random.split(key, 5)
     key = (k for k in key)
 
-    encoding_params = build_encoder(layer_sizes, next(key))
-    decoding_params = build_decoder(layer_sizes, next(key))
+    encoding_params = build_encoder(layer_sizes, next(key), initializer=initializer)
+    decoding_params = build_decoder(layer_sizes, next(key), initializer=initializer)
 
-    control_encoding_params = build_encoder(layer_sizes, next(key))
-    control_decoding_params = build_decoder(layer_sizes, next(key))
+    control_encoding_params = build_encoder(layer_sizes, next(key), initializer=initializer)
+    control_decoding_params = build_decoder(layer_sizes, next(key), initializer=initializer)
 
-    sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
+    if sindy_initializer == 'constant':
+        sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
+    elif sindy_initializer == 'xavier_uniform':
+        sindy_init = xavier_uniform()
+        sindy_coefficients = sindy_init(next(key), (library_size, layer_sizes[-1]))
+    elif sindy_initializer == 'normal':
+        sindy_coefficients = random.normal(next(key), (library_size, layer_sizes[-1]))
+    else:
+        raise ValueError(f"Sindy Initializer was {sindy_initializer} which is not supported. Try to specify one of \n"
+                         f"constant, xavier_uniform or normal")
+
     coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
 
     params = {'encoder': encoding_params,
