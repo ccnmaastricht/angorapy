@@ -1,5 +1,8 @@
 import jax.numpy as jnp
 from scipy.special import binom
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
 
 def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
@@ -40,7 +43,13 @@ def library_size(n, poly_order, use_sine=False, include_constant=True, include_c
     return l
 
 
-def generate_labels(zlabels, ulabels, poly_order):
+def generate_labels(ndim, poly_order):
+
+    zlabels, ulabels, latex_labels = [], [], []
+    for i in range(ndim):
+        zlabels.append('z'+str(i))
+        ulabels.append('y'+str(i))
+        latex_labels.append(r"$\dot{z}_"+str(i)+"$")
 
     combined_labels = zlabels + ulabels
     latent_dim = len(combined_labels)
@@ -61,7 +70,7 @@ def generate_labels(zlabels, ulabels, poly_order):
                 for k in range(j, latent_dim):
                     all_labels.append(combined_labels[i] + combined_labels[j] + combined_labels[k])
 
-    return zlabels, all_labels
+    return zlabels, all_labels, latex_labels
 
 
 def batch_indices(iter, num_batches, batch_size):
@@ -75,6 +84,46 @@ def print_update(train_loss, epoch, n_updates, dt):
           f"| Updates {n_updates}",
           f"| This took: {round(dt, 4)}s")
 
+
+def plot_training_data(states_all_episodes, FILE_DIR):  # needs generalization towards task
+    plt.figure(figsize=(12, 5))
+    x = np.linspace(0, 1000 * 0.02, 1000)
+    plt.subplot(121)
+    plt.plot(x, states_all_episodes[:1000, 0])
+    plt.xlabel("Time [s]")
+    plt.ylabel("Cart Position")
+
+    plt.subplot(122)
+    plt.plot(x, states_all_episodes[:1000, 1])
+    plt.xlabel("Time [s]")
+    plt.ylabel("Pole Position")
+    plt.savefig(FILE_DIR + "figures/InvPend.png", dpi=300)
+
+
+def plot_losses(time_steps, all_train_losses, FILE_DIR):
+    plt.figure()
+    plt.subplot(231)
+    plt.plot(time_steps, all_train_losses['total'], 'k')
+    plt.title('Total Loss')
+
+    plt.subplot(232)
+    plt.plot(time_steps, all_train_losses['sys_loss'], 'r', label='System')
+    plt.plot(time_steps, all_train_losses['control_loss'], 'g', label='Control')
+    plt.legend()
+    plt.title('Reconstruction Losses')
+
+    plt.subplot(233)
+    plt.plot(time_steps, all_train_losses['sindy_z_loss'], 'b')
+    plt.title('Sindy z loss')
+
+    plt.subplot(234)
+    plt.plot(time_steps, all_train_losses['sindy_x_loss'], 'g')
+    plt.title('Sindy x loss')
+
+    plt.subplot(235)
+    plt.plot(time_steps, all_train_losses['sindy_regularization_loss'], 'r')
+    plt.title('L2 Loss')
+    plt.savefig(FILE_DIR + "figures/losses.png", dpi=300)
 '''
 def regress(Y, X, l=0.):
 

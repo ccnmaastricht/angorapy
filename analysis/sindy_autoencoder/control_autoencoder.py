@@ -16,8 +16,16 @@ def sigmoid(x):
     return 1 / (1 + jnp.exp(-x))
 
 
+def relu(x):
+    return jnp.max((0, x))
+
+
 def sigmoid_layer(params, x):
     return sigmoid(jnp.matmul(params[0], x) + params[1])
+
+
+def relu_layer(params, x):
+    return relu(jnp.matmul(params[0], x) + params[1])
 
 
 def build_encoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_uniform'):
@@ -29,7 +37,7 @@ def build_encoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_unifo
             w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n, ))
         elif initializer == 'xavier_uniform':
             w_init = xavier_uniform()
-            w, b = w_init(w_key, (n, m)), 0.0 * random.normal(b_key, (n, ))  # SindyAutoencoder
+            w, b = w_init(w_key, (n, m)), scale * random.normal(b_key, (n, ))  # SindyAutoencoder
         else:
             raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
         encoding_params.append([w, b])
@@ -45,7 +53,7 @@ def build_decoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_unifo
             w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
         elif initializer == 'xavier_uniform':
             w_init = xavier_uniform()
-            w, b = w_init(w_key, (n, m)), 0.0 * random.normal(b_key, (n,))  # SindyAutoencoder
+            w, b = w_init(w_key, (n, m)), scale * random.normal(b_key, (n,))  # SindyAutoencoder
         else:
             raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
         decoding_params.append([w, b])
@@ -221,7 +229,7 @@ def simulate_episode(chiefinv,
         # xt_1 = sim_activation # this is believing the sindy dynamics are very good, otherwise use state from network to min deviation
         xt_1 = actual_activations[-1] # take hidden state from actual network (idea is that deviation should be smaller)
         state = observation
-        env.render()
+        env.render() if render else ""
 
     return states, actual_activations, simulated_activations, simulation_results, actions
 
@@ -297,28 +305,28 @@ def plot_params(params, coefficient_mask):
     plt.title('Coefficient Mask')
 
 
-def save_state(state, filename, save_dir: str = 'storage/'):
+def save_state(state, filename):
     try:
-        directory = os.getcwd() + '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+        directory = os.getcwd() + '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
 
         with open(file=directory, mode='wb') as f:
             pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
 
     except FileNotFoundError:
-        directory = '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+        directory = '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
 
         with open(file=directory, mode='wb') as f:
             pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
 
 
-def load_state(filename, save_dir: str = 'storage/'):
+def load_state(filename):
     try:
-        directory = os.getcwd() + '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+        directory = os.getcwd() + '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
         with open(directory, 'rb') as f:
             state = pickle.load(f)
 
     except FileNotFoundError:
-        directory = '/analysis/sindy_autoencoder/' + save_dir + filename + '.pkl'
+        directory = '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
         with open(directory, 'rb') as f:
             state = pickle.load(f)
 
