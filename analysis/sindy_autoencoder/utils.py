@@ -2,7 +2,9 @@ import jax.numpy as jnp
 from scipy.special import binom
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 import os
+import scipy as sc
 
 
 def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
@@ -47,9 +49,9 @@ def generate_labels(ndim, poly_order):
 
     zlabels, ulabels, latex_labels = [], [], []
     for i in range(ndim):
-        zlabels.append('z'+str(i))
-        ulabels.append('y'+str(i))
-        latex_labels.append(r"$\dot{z}_"+str(i)+"$")
+        zlabels.append('z'+str(i+1))
+        ulabels.append('y'+str(i+1))
+        latex_labels.append(r"$\dot{z}_"+str(i+1)+"$")
 
     combined_labels = zlabels + ulabels
     latent_dim = len(combined_labels)
@@ -85,18 +87,39 @@ def print_update(train_loss, epoch, n_updates, dt):
           f"| This took: {round(dt, 4)}s")
 
 
-def plot_training_data(states_all_episodes, FILE_DIR):  # needs generalization towards task
+def save_data(training_data, testing_data, save_dir):
+    try:
+        os.mkdir(save_dir)
+    except FileExistsError:
+        pass
+
+    with open(file=save_dir + 'training_data.pkl', mode='wb') as f:
+        pickle.dump(training_data, f, pickle.HIGHEST_PROTOCOL)
+
+    with open(file=save_dir + 'testing_data.pkl', mode='wb') as f:
+        pickle.dump(testing_data, f, pickle.HIGHEST_PROTOCOL)
+    print("SAVED EPISODE DATA")
+
+
+def plot_training_data(states_all_episodes, episode_size, FILE_DIR):  # needs generalization towards task
     plt.figure(figsize=(12, 5))
-    x = np.linspace(0, 1000 * 0.02, 1000)
+
+    x = np.linspace(0, episode_size * 0.02, episode_size)
     plt.subplot(121)
-    plt.plot(x, states_all_episodes[:1000, 0])
+    plt.plot(x, states_all_episodes[:episode_size, 0])
     plt.xlabel("Time [s]")
     plt.ylabel("Cart Position")
 
     plt.subplot(122)
-    plt.plot(x, states_all_episodes[:1000, 1])
+    plt.plot(x, states_all_episodes[:episode_size, 1])
     plt.xlabel("Time [s]")
     plt.ylabel("Pole Position")
+    try:
+        os.mkdir(FILE_DIR)
+        os.mkdir(FILE_DIR + "figures/")
+    except FileExistsError:
+        pass
+
     plt.savefig(FILE_DIR + "figures/InvPend.png", dpi=300)
 
 
@@ -124,24 +147,24 @@ def plot_losses(time_steps, all_train_losses, FILE_DIR):
     plt.plot(time_steps, all_train_losses['sindy_regularization_loss'], 'r')
     plt.title('L2 Loss')
     plt.savefig(FILE_DIR + "figures/losses.png", dpi=300)
-'''
+
+
 def regress(Y, X, l=0.):
 
+    """Parameters
+    ----------
+    Y : floating point array (observations-by-outcomes)
+        outcome variables
+    X : floating pint array (observation-by-predictors)
+        predictors
+    l : float
+        (optional) ridge penalty parameter
 
-Parameters
-----------
-Y : floating point array (observations-by-outcomes)
-    outcome variables
-X : floating pint array (observation-by-predictors)
-    predictors
-l : float
-    (optional) ridge penalty parameter
-
-Returns
--------
-beta : floating point array (predictors-by-outcomes)
-    beta coefficients
-
+    Returns
+    -------
+    beta : floating point array (predictors-by-outcomes)
+        beta coefficients
+    """
 
     if X.ndim > 1:
         n_observations, n_predictors = X.shape
@@ -149,7 +172,6 @@ beta : floating point array (predictors-by-outcomes)
     else:
         n_observations = X.size
         n_predictors = 1
-
 
     if n_observations < n_predictors:
         U, D, V = np.linalg.svd(X, full_matrices=False)
@@ -174,5 +196,3 @@ beta : floating point array (predictors-by-outcomes)
                 X.transpose()), Y)
 
     return beta
-    
-'''

@@ -6,10 +6,13 @@ from jax import random
 from jax.nn.initializers import xavier_uniform
 from jax import vmap, value_and_grad, jit
 from analysis.sindy_autoencoder.utils import sindy_library_jax
+from analysis.sindy_autoencoder import utils
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from utilities.model_utils import is_recurrent_model
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
+from jax.experimental import optimizers
+import time
 
 
 def sigmoid(x):
@@ -197,7 +200,7 @@ def simulate_episode(chiefinv,
     xt_1 = xt_1[0].numpy()[0, :]
     env.render() if render else ""
     step_count = 0
-    for _ in range(1000):
+    for _ in range(100):
         step_count += 1
         states.append(state)
         dual_out = flatten(submodelto.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
@@ -214,13 +217,15 @@ def simulate_episode(chiefinv,
         simulation_results.append(sim_res)
         simulated_activations.append(sim_activation)
 
-        activation = np.asarray(sim_activation.reshape(1, 1, 64))
-        probabilities = flatten(submodelfrom.predict(activation))
+        #activation = np.asarray(sim_activation.reshape(1, 1, 64))
+        #probabilities = flatten(submodelfrom.predict(activation))
 
-        try:
-            action = chiefinv.distribution.act_deterministic(*probabilities)
-        except NotImplementedError:
-            action, _ = chiefinv.distribution.act(*probabilities)
+        #try:
+        #    action = chiefinv.distribution.act_deterministic(*probabilities)
+        #except NotImplementedError:
+       #     action, _ = chiefinv.distribution.act(*probabilities)
+
+        action = jnp.matmul(sim_res, params['output_weights'])
         actions.append(action)
         observation, reward, done, info = env.step(action)
         observation, reward, done, info = chiefinv.preprocessor.modulate((parse_state(observation), reward, done, info),
@@ -291,6 +296,102 @@ loss_jit = jit(loss)
 update_jit = jit(update, static_argnums=(2, 3))
 
 
+def train(training_data, testing_data, settings, hps, FILE_DIR):
+    lib_size = utils.library_size(settings['layers'][-1], settings['poly_order'], include_control=True)
+    key = random.PRNGKey(settings['seed'])
+
+    num_batches = int(jnp.ceil(len(training_data['x']) / settings['batch_size']))
+    params, coefficient_mask = build_sindy_control_autoencoder(settings['layers'], lib_size, key)
+    plot_params(params, coefficient_mask)
+    plt.savefig(FILE_DIR + "figures/" + "params.png", dpi=300)
+
+    # set up optimizer
+    batch_size = settings['batch_size']
+    opt_init, opt_update, get_params = optimizers.adam(settings['learning_rate'])
+    opt_state = opt_init(params)
+
+    # train
+    all_train_losses = []
+    start_time = time.time()
+    for epoch in range(settings['epochs']):
+        for batch in range(num_batches):
+            ids = utils.batch_indices(batch, num_batches, batch_size)
+            opt_state = update_jit(batch, opt_state, opt_update, get_params,
+                                   training_data['x'][ids, :],
+                                   training_data['dx'][ids, :],
+                                   training_data['u'][ids, :], coefficient_mask, hps)
+
+        params = get_params(opt_state)
+        if epoch % settings['thresholding_frequency'] == 0 and epoch > 1:
+            coefficient_mask = jnp.abs(params['sindy_coefficients']) > settings['thresholding_coefficient']
+            print("Updated coefficient mask")
+
+        all_train_losses.append(loss_jit(params,
+                                         training_data['x'][:batch_size, :],
+                                         training_data['dx'][:batch_size, :],
+                                         training_data['u'][:batch_size, :], coefficient_mask,
+                                         hps))
+        if epoch % settings['print_every'] == 0:
+            utils.print_update(all_train_losses[-1]['total'], epoch, epoch * num_batches, time.time() - start_time)
+            start_time = time.time()
+
+    print(f"FINISHING TRAINING...\n"
+          f"Sparsity: {jnp.sum(coefficient_mask)} active terms")
+
+    all_train_losses = {k: [dic[k] for dic in all_train_losses] for k in all_train_losses[0]}
+    time_steps = np.linspace(0, settings['epochs'], settings['epochs'])
+    utils.plot_losses(time_steps, all_train_losses, FILE_DIR)
+
+    hps['reg_loss_weight'] = 0  # no regularization
+    print('REFINEMENT...')
+    all_refine_losses = []
+
+    start_time = time.time()
+    for epoch in range(settings['refine_epochs']):
+        for batch in range(num_batches):
+            ids = utils.batch_indices(batch, num_batches, batch_size)
+            opt_state = update_jit(batch, opt_state, opt_update, get_params,
+                                   training_data['x'][ids, :],
+                                   training_data['dx'][ids, :],
+                                   training_data['u'][ids, :], coefficient_mask, hps)
+
+        all_refine_losses.append(loss_jit(get_params(opt_state),
+                                          training_data['x'][:batch_size, :],
+                                          training_data['dx'][:batch_size, :],
+                                          training_data['u'][:batch_size, :], coefficient_mask,
+                                          hps))
+        if epoch % settings['print_every'] == 0:
+            utils.print_update(all_refine_losses[-1]['total'], epoch, epoch * num_batches, time.time() - start_time)
+            start_time = time.time()
+
+    all_refine_losses = {k: [dic[k] for dic in all_refine_losses] for k in all_refine_losses[0]}
+    # test
+    params = get_params(opt_state)
+    test_batch_size = 10000  # 10 episodes
+    test_loss = loss_jit(params,
+                         testing_data['x'][:test_batch_size, :],
+                         testing_data['dx'][:test_batch_size, :],
+                         testing_data['u'][:test_batch_size, :],
+                         coefficient_mask, hps)['total']
+    print(f"Loss on large test batch: {round(test_loss, 6)}")
+
+    state = {'autoencoder': get_params(opt_state),
+             'coefficient_mask': coefficient_mask,
+             'hps': {'layers': settings['layers'],
+                     'poly_order': settings['poly_order'],
+                     'library:size': lib_size,
+                     'lr': settings['learning_rate'],
+                     'epochs': settings['epochs'],
+                     'batch_size': batch_size,
+                     'thresholding_frequency': settings['thresholding_frequency'],
+                     'threshold_coefficient': settings['thresholding_coefficient']},
+             'history': {'train_loss': all_train_losses,
+                         'refinement_loss': all_refine_losses}}
+    save_state(state, str(settings['agent_id']))
+
+    return state
+
+
 def plot_params(params, coefficient_mask):
 
     plt.figure()
@@ -306,17 +407,16 @@ def plot_params(params, coefficient_mask):
 
 
 def save_state(state, filename):
+
     try:
-        directory = os.getcwd() + '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
+        os.mkdir(os.getcwd() + '/analysis/sindy_autoencoder/storage/' + filename)
+    except FileExistsError:
+        pass
 
-        with open(file=directory, mode='wb') as f:
-            pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
+    directory = os.getcwd() + '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
 
-    except FileNotFoundError:
-        directory = '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
-
-        with open(file=directory, mode='wb') as f:
-            pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
+    with open(file=directory, mode='wb') as f:
+        pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
 
 
 def load_state(filename):

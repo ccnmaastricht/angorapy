@@ -111,6 +111,29 @@ class Chiefinvestigator(Investigator):
 
         return activations, inputs, actions
 
+    def get_sindy_datasets(self, settings):
+
+        # collect data from episodes
+        print("GENERATING DATA...")
+        activations_all_episodes, inputs_all_episodes, actions_all_episodes, states_all_episodes, _ \
+            = self.get_data_over_episodes(settings['n_episodes'], "policy_recurrent_layer", self.get_layer_names()[1])
+        print(f"SIMULATED {settings['n_episodes']} episodes to generate {len(activations_all_episodes)} data points.")
+
+        # create training and testing datasets
+        training_size = int(len(inputs_all_episodes) * 0.8)
+        dx = np.gradient(activations_all_episodes, axis=0)
+        training_data = {'x': activations_all_episodes[:training_size, :],
+                         'dx': dx[:training_size, :],
+                         'u': inputs_all_episodes[:training_size, :],
+                         'a': actions_all_episodes[:training_size, :]}
+        testing_data = {'x': activations_all_episodes[training_size:, :],
+                        'dx': dx[training_size:, :],
+                        'u': inputs_all_episodes[training_size:, :],
+                        'a': actions_all_episodes[training_size:, :]}
+
+        episode_size = int(len(states_all_episodes) / settings['n_episodes'])
+        return training_data, testing_data, states_all_episodes, episode_size
+
     def render_fixed_points(self, activations):
         '''Function to repeatedly apply and render the state approached by an action.'''
         self.env.reset()
