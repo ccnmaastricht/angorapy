@@ -37,10 +37,10 @@ def build_encoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_unifo
     for m, n, k in zip(layer_sizes[:-1], layer_sizes[1:], keys):
         w_key, b_key = random.split(k)
         if initializer == 'normal':
-            w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n, ))
+            w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
         elif initializer == 'xavier_uniform':
             w_init = xavier_uniform()
-            w, b = w_init(w_key, (n, m)), scale * random.normal(b_key, (n, ))  # SindyAutoencoder
+            w, b = w_init(w_key, (n, m)), scale * random.normal(b_key, (n,))
         else:
             raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
         encoding_params.append([w, b])
@@ -61,6 +61,13 @@ def build_decoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_unifo
             raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
         decoding_params.append([w, b])
     return decoding_params
+
+
+def build_action_head(layer_sizes, action_size, key, scale=1e-2):
+    w_key, b_key = random.split(key)
+    w, b = scale * random.normal(w_key, (action_size, layer_sizes[-1])), scale * random.normal(b_key, (action_size,))
+
+    return [w, b]
 
 
 def build_sindy_control_autoencoder(layer_sizes, library_size, key, initializer: str = 'xavier_uniform',
@@ -87,11 +94,13 @@ def build_sindy_control_autoencoder(layer_sizes, library_size, key, initializer:
 
     coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
 
+    output_weights = build_action_head(layer_sizes, 1, next(key))
     params = {'encoder': encoding_params,
               'decoder': decoding_params,
               'control_encoder': control_encoding_params,
               'control_decoder': control_decoding_params,
-              'sindy_coefficients': sindy_coefficients}
+              'sindy_coefficients': sindy_coefficients,
+              'output_weights': output_weights}
 
     return params, coefficient_mask
 
@@ -120,7 +129,7 @@ def z_derivative(params, x, dx):
     for w, b in params[:-1]:
         x = jnp.matmul(w, x) + b
         x = sigmoid(x)
-        dz = jnp.multiply(jnp.multiply(x, 1-x), jnp.matmul(w, dz))
+        dz = jnp.multiply(jnp.multiply(x, 1 - x), jnp.matmul(w, dz))
 
     return jnp.matmul(params[-1][0], dz)
 
@@ -132,13 +141,12 @@ def z_derivative_decode(params, z, sindy_predict):
     for w, b in params[:-1]:
         z = jnp.matmul(w, z) + b
         z = sigmoid(z)
-        dx_decode = jnp.multiply(jnp.multiply(z, 1-z), jnp.matmul(w, dx_decode))
+        dx_decode = jnp.multiply(jnp.multiply(z, 1 - z), jnp.matmul(w, dx_decode))
 
     return jnp.matmul(params[-1][0], dx_decode)
 
 
-def control_autoencoder_pass(params, coefficient_mask, x, dx, u):
-
+def control_autoencoder_pass(params, coefficient_mask, x, dx, u, a):
     z = encoding_pass(params['encoder'], x)
     x_decode = decoding_pass(params['decoder'], z)
     dz = z_derivative(params['encoder'], x, dx)
@@ -151,7 +159,9 @@ def control_autoencoder_pass(params, coefficient_mask, x, dx, u):
     sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
     dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
 
-    return [x_decode, u_decode, dz, sindy_predict, dx_decode]
+    a_pred = sigmoid_layer(params['output_weights'], z)
+
+    return [x_decode, u_decode, dz, sindy_predict, dx_decode, a_pred]
 
 
 def compute_latent_space(params, coefficient_mask, x, u):
@@ -176,7 +186,7 @@ def simulate_dynamics(params, coefficient_mask, x, u, dt_sim, dt):
     [z, y, _] = compute_latent_space(params, coefficient_mask, x, u)
     z0 = z
     # integration loop
-    n_steps = int(dt_sim/dt)
+    n_steps = int(dt_sim / dt)
     for _ in range(n_steps):
         dz = dynamics(z0, y)
         z0 = z0 + dt * dz
@@ -188,7 +198,6 @@ def simulate_dynamics(params, coefficient_mask, x, u, dt_sim, dt):
 def simulate_episode(chiefinv,
                      params, coefficient_mask,
                      render: bool = False):
-
     env, submodelto, submodelfrom = chiefinv.env, chiefinv.sub_model_to, chiefinv.sub_model_from
     is_recurrent = is_recurrent_model(chiefinv.network)
 
@@ -206,10 +215,10 @@ def simulate_episode(chiefinv,
         dual_out = flatten(submodelto.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
         try:
             activation, _ = dual_out[:-chiefinv.network.output.shape[0]], \
-                                     dual_out[-chiefinv.network.output.shape[0]:]
+                            dual_out[-chiefinv.network.output.shape[0]:]
         except:
             activation, _ = dual_out[:-len(chiefinv.network.output)], \
-                                     dual_out[-len(chiefinv.network.output):]
+                            dual_out[-len(chiefinv.network.output):]
 
         u = activation[2][0, 0, :]
         actual_activations.append(activation[1][0, :])
@@ -217,77 +226,80 @@ def simulate_episode(chiefinv,
         simulation_results.append(sim_res)
         simulated_activations.append(sim_activation)
 
-        #activation = np.asarray(sim_activation.reshape(1, 1, 64))
-        #probabilities = flatten(submodelfrom.predict(activation))
+        # activation = np.asarray(sim_activation.reshape(1, 1, 64))
+        # probabilities = flatten(submodelfrom.predict(activation))
 
-        #try:
+        # try:
         #    action = chiefinv.distribution.act_deterministic(*probabilities)
-        #except NotImplementedError:
-       #     action, _ = chiefinv.distribution.act(*probabilities)
+        # except NotImplementedError:
+        #     action, _ = chiefinv.distribution.act(*probabilities)
 
-        action = jnp.matmul(sim_res, params['output_weights'])
+        action = sigmoid_layer(params['output_weights'], sim_res)
         actions.append(action)
         observation, reward, done, info = env.step(action)
         observation, reward, done, info = chiefinv.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                          update=False)
-
         # xt_1 = sim_activation # this is believing the sindy dynamics are very good, otherwise use state from network to min deviation
-        xt_1 = actual_activations[-1] # take hidden state from actual network (idea is that deviation should be smaller)
+        xt_1 = actual_activations[
+            -1]  # take hidden state from actual network (idea is that deviation should be smaller)
         state = observation
         env.render() if render else ""
 
     return states, actual_activations, simulated_activations, simulation_results, actions
 
 
-
-
 batch_compute_latent_space = vmap(compute_latent_space, in_axes=({'encoder': None,
                                                                   'decoder': None,
                                                                   'control_encoder': None,
                                                                   'control_decoder': None,
-                                                                  'sindy_coefficients': None},
+                                                                  'sindy_coefficients': None,
+                                                                  'output_weights': None},
                                                                  None, 0, 0))
 batch_control_autoencoder = vmap(control_autoencoder_pass, in_axes=({'encoder': None,
                                                                      'decoder': None,
                                                                      'control_encoder': None,
                                                                      'control_decoder': None,
-                                                                     'sindy_coefficients': None},
-                                                                     None, 0, 0, 0))
+                                                                     'sindy_coefficients': None,
+                                                                     'output_weights': None},
+                                                                    None, 0, 0, 0, 0))
 
 
-def loss(params, x, dx, u, coefficient_mask, hps):
+def loss(params, x, dx, u, a, coefficient_mask, hps):
+    x_decode, u_decode, dz, sindy_predict, dx_decode, a_pred = batch_control_autoencoder(params, coefficient_mask,
+                                                                                         x, dx, u, a)
 
-    x_decode, u_decode, dz, sindy_predict, dx_decode = batch_control_autoencoder(params, coefficient_mask, x, dx, u)
-
-    system_recon_loss = jnp.mean((x - x_decode)**2)
-    control_recon_loss = jnp.mean((u - u_decode)**2)
-    sindy_z_loss = jnp.mean((dz - sindy_predict)**2)
-    sindy_x_loss = jnp.mean((dx - dx_decode)**2)
+    system_recon_loss = jnp.mean((x - x_decode) ** 2)
+    control_recon_loss = jnp.mean((u - u_decode) ** 2)
+    sindy_z_loss = jnp.mean((dz - sindy_predict) ** 2)
+    sindy_x_loss = jnp.mean((dx - dx_decode) ** 2)
     sindy_regularization_loss = jnp.mean(jnp.abs(params['sindy_coefficients']))
+    action_loss = jnp.mean((a_pred - a) ** 2)
 
     system_recon_loss = hps['system_loss_coeff'] * system_recon_loss
     control_recon_loss = hps['control_loss_coeff'] * control_recon_loss
     sindy_z_loss = hps['dz_loss_weight'] * sindy_z_loss
     sindy_x_loss = hps['dx_loss_weight'] * sindy_x_loss
     sindy_regularization_loss = hps['reg_loss_weight'] * sindy_regularization_loss
-    total_loss = system_recon_loss + control_recon_loss + sindy_z_loss + sindy_x_loss + sindy_regularization_loss
+    action_loss = hps['action_loss_weight'] * action_loss
+    total_loss = system_recon_loss + control_recon_loss + sindy_z_loss + sindy_x_loss + \
+                 sindy_regularization_loss + action_loss
 
     return {'total': total_loss,
             'sys_loss': system_recon_loss,
             'control_loss': control_recon_loss,
             'sindy_z_loss': sindy_z_loss,
             'sindy_x_loss': sindy_x_loss,
-            'sindy_regularization_loss': sindy_regularization_loss}
+            'sindy_regularization_loss': sindy_regularization_loss,
+            'action_loss': action_loss}
 
 
-def training_loss(params, x, dx, u, coefficient_mask, hps):
-    return loss(params, x, dx, u, coefficient_mask, hps)['total']
+def training_loss(params, x, dx, u, a, coefficient_mask, hps):
+    return loss(params, x, dx, u, a, coefficient_mask, hps)['total']
 
 
-def update(i, opt_state, opt_update, get_params, x, dx, u, coefficient_mask, hps):
-
+def update(i, opt_state, opt_update, get_params, x, dx, u, a, coefficient_mask, hps):
     params = get_params(opt_state)
-    value, grads = value_and_grad(training_loss)(params, x, dx, u, coefficient_mask, hps)
+    value, grads = value_and_grad(training_loss)(params, x, dx, u, a, coefficient_mask, hps)
 
     return opt_update(i, grads, opt_state)
 
@@ -302,8 +314,6 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
 
     num_batches = int(jnp.ceil(len(training_data['x']) / settings['batch_size']))
     params, coefficient_mask = build_sindy_control_autoencoder(settings['layers'], lib_size, key)
-    plot_params(params, coefficient_mask)
-    plt.savefig(FILE_DIR + "figures/" + "params.png", dpi=300)
 
     # set up optimizer
     batch_size = settings['batch_size']
@@ -319,7 +329,8 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
             opt_state = update_jit(batch, opt_state, opt_update, get_params,
                                    training_data['x'][ids, :],
                                    training_data['dx'][ids, :],
-                                   training_data['u'][ids, :], coefficient_mask, hps)
+                                   training_data['u'][ids, :],
+                                   training_data['a'][ids, :], coefficient_mask, hps)
 
         params = get_params(opt_state)
         if epoch % settings['thresholding_frequency'] == 0 and epoch > 1:
@@ -329,8 +340,8 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
         all_train_losses.append(loss_jit(params,
                                          training_data['x'][:batch_size, :],
                                          training_data['dx'][:batch_size, :],
-                                         training_data['u'][:batch_size, :], coefficient_mask,
-                                         hps))
+                                         training_data['u'][:batch_size, :],
+                                         training_data['a'][:batch_size, :], coefficient_mask, hps))
         if epoch % settings['print_every'] == 0:
             utils.print_update(all_train_losses[-1]['total'], epoch, epoch * num_batches, time.time() - start_time)
             start_time = time.time()
@@ -353,12 +364,14 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
             opt_state = update_jit(batch, opt_state, opt_update, get_params,
                                    training_data['x'][ids, :],
                                    training_data['dx'][ids, :],
-                                   training_data['u'][ids, :], coefficient_mask, hps)
+                                   training_data['u'][ids, :],
+                                   training_data['a'][ids, :], coefficient_mask, hps)
 
         all_refine_losses.append(loss_jit(get_params(opt_state),
                                           training_data['x'][:batch_size, :],
                                           training_data['dx'][:batch_size, :],
-                                          training_data['u'][:batch_size, :], coefficient_mask,
+                                          training_data['u'][:batch_size, :],
+                                          training_data['a'][:batch_size, :], coefficient_mask,
                                           hps))
         if epoch % settings['print_every'] == 0:
             utils.print_update(all_refine_losses[-1]['total'], epoch, epoch * num_batches, time.time() - start_time)
@@ -372,6 +385,7 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
                          testing_data['x'][:test_batch_size, :],
                          testing_data['dx'][:test_batch_size, :],
                          testing_data['u'][:test_batch_size, :],
+                         testing_data['a'][:test_batch_size, :],
                          coefficient_mask, hps)['total']
     print(f"Loss on large test batch: {round(test_loss, 6)}")
 
@@ -392,8 +406,7 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
     return state
 
 
-def plot_params(params, coefficient_mask):
-
+def plot_params(params, coefficient_mask, FILE_DIR):
     plt.figure()
     plt.subplot(121)
     plt.imshow(params['sindy_coefficients'])
@@ -405,9 +418,10 @@ def plot_params(params, coefficient_mask):
     plt.axis('off')
     plt.title('Coefficient Mask')
 
+    plt.savefig(FILE_DIR + "figures/" + "params.png", dpi=300)
+
 
 def save_state(state, filename):
-
     try:
         os.mkdir(os.getcwd() + '/analysis/sindy_autoencoder/storage/' + filename)
     except FileExistsError:

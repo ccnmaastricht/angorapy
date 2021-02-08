@@ -1,10 +1,13 @@
 import jax.numpy as jnp
 from scipy.special import binom
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pickle
 import os
 import scipy as sc
+import sklearn.decomposition as skld
+from sympy import symbols
 
 
 def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
@@ -101,9 +104,11 @@ def save_data(training_data, testing_data, save_dir):
     print("SAVED EPISODE DATA")
 
 
-def plot_training_data(states_all_episodes, episode_size, FILE_DIR):  # needs generalization towards task
-    plt.figure(figsize=(12, 5))
+def plot_training_data(training_data, FILE_DIR):  # needs generalization towards task
+    states_all_episodes = training_data['s']
+    episode_size = training_data['e_size']
 
+    plt.figure(figsize=(12, 5))
     x = np.linspace(0, episode_size * 0.02, episode_size)
     plt.subplot(121)
     plt.plot(x, states_all_episodes[:episode_size, 0])
@@ -120,7 +125,7 @@ def plot_training_data(states_all_episodes, episode_size, FILE_DIR):  # needs ge
     except FileExistsError:
         pass
 
-    plt.savefig(FILE_DIR + "figures/InvPend.png", dpi=300)
+    plt.savefig(FILE_DIR + "figures/Episode.png", dpi=300)
 
 
 def plot_losses(time_steps, all_train_losses, FILE_DIR):
@@ -146,7 +151,68 @@ def plot_losses(time_steps, all_train_losses, FILE_DIR):
     plt.subplot(235)
     plt.plot(time_steps, all_train_losses['sindy_regularization_loss'], 'r')
     plt.title('L2 Loss')
+
+    plt.subplot(236)
+    plt.plot(time_steps, all_train_losses['action_loss'], 'b')
+    plt.title('Action Loss')
+
     plt.savefig(FILE_DIR + "figures/losses.png", dpi=300)
+
+
+def plot_coefficients(params, coefficient_mask, settings, FILE_DIR):
+    # plot sindy coefficients
+    xlabels, ylabels, latex_labels = generate_labels(settings['layers'][-1], settings['poly_order'])
+    plt.figure(figsize=(10, 20))
+    plt.spy(coefficient_mask * params['sindy_coefficients'],
+            marker='o', markersize=10, aspect='auto')
+    plt.xticks([0, 1, 2, 3], latex_labels, size=12)
+    yticks = list(np.arange(len(coefficient_mask)))
+    plt.yticks(yticks, ylabels, size=12)
+    plt.savefig(FILE_DIR + "figures/" + "sindy_coefficients.png", dpi=400)
+
+
+def plot_equations(params, coefficient_mask, settings, FILE_DIR):
+    # Print Sparse State Equations
+    xlabels, ylabels, latex_labels = generate_labels(settings['layers'][-1], settings['poly_order'])
+    theta_syms = symbols(ylabels)
+    dz_syms = symbols(latex_labels)
+    expr = np.matmul(theta_syms, coefficient_mask * params['sindy_coefficients'])
+
+    plt.figure()
+    for i, dz_sym in enumerate(dz_syms):
+        plt.text(0.2, 1 - 0.1 * i, f"{dz_sym} = {expr[i]}")
+    plt.axis('off')
+    plt.savefig(FILE_DIR + "figures/" + "sindy_equations.png", dpi=400)
+
+
+def plot_simulations(training_data, simulation_results, simulated_activations, z,
+                     n_points, FILE_DIR):
+    # Reduce Dimensions
+    activation_pca = skld.PCA(3)
+    X_activations = activation_pca.fit_transform(training_data['x'])
+    reconstruction_pca = skld.PCA(3)
+    X_reconstruction = reconstruction_pca.fit_transform(z)
+    X_rec_simulation = reconstruction_pca.transform(simulation_results)
+    X_act_simulation = activation_pca.transform(simulated_activations)
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(221, projection=Axes3D.name)
+    ax.plot(X_activations[:n_points, 0], X_activations[:n_points, 1], X_activations[:n_points, 2],
+            linewidth=0.7)
+    plt.title("True Activations")
+    ax = fig.add_subplot(222, projection=Axes3D.name)
+    ax.plot(X_reconstruction[:n_points, 0], X_reconstruction[:n_points, 1], X_reconstruction[:n_points, 2],
+            linewidth=0.7)
+    plt.title("Latent Space")
+    ax =fig.add_subplot(223, projection=Axes3D.name)
+    ax.plot(X_act_simulation[:n_points, 0], X_act_simulation[:n_points, 1], X_act_simulation[:n_points, 2],
+            linewidth=0.7)
+    plt.title("Simulated Dynamics")
+    ax =fig.add_subplot(224, projection=Axes3D.name)
+    ax.plot(X_rec_simulation[:n_points, 0], X_rec_simulation[:n_points, 1], X_rec_simulation[:n_points, 2],
+            linewidth=0.7)
+    plt.title("Simulated Latent Dynamics")
+    plt.savefig(FILE_DIR + "figures/" + "sim_res.png", dpi=300)
 
 
 def regress(Y, X, l=0.):
@@ -196,3 +262,4 @@ def regress(Y, X, l=0.):
                 X.transpose()), Y)
 
     return beta
+

@@ -121,18 +121,22 @@ class Chiefinvestigator(Investigator):
 
         # create training and testing datasets
         training_size = int(len(inputs_all_episodes) * 0.8)
+        episode_size = int(len(states_all_episodes) / settings['n_episodes'])
         dx = np.gradient(activations_all_episodes, axis=0)
         training_data = {'x': activations_all_episodes[:training_size, :],
                          'dx': dx[:training_size, :],
                          'u': inputs_all_episodes[:training_size, :],
-                         'a': actions_all_episodes[:training_size, :]}
+                         'a': actions_all_episodes[:training_size, :],
+                         's': states_all_episodes[:training_size, :],
+                         'e_size': episode_size}
         testing_data = {'x': activations_all_episodes[training_size:, :],
                         'dx': dx[training_size:, :],
                         'u': inputs_all_episodes[training_size:, :],
-                        'a': actions_all_episodes[training_size:, :]}
+                        'a': actions_all_episodes[training_size:, :],
+                        's': states_all_episodes[training_size:, :],
+                        'e_size': episode_size}
 
-        episode_size = int(len(states_all_episodes) / settings['n_episodes'])
-        return training_data, testing_data, states_all_episodes, episode_size
+        return training_data, testing_data
 
     def render_fixed_points(self, activations):
         '''Function to repeatedly apply and render the state approached by an action.'''
