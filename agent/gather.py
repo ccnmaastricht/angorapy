@@ -14,11 +14,11 @@ import models
 from agent import policies
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
-from agent.policies import GaussianPolicyDistribution
-from common.wrappers import make_env
+from agent.policies import GaussianPolicyDistribution, BasePolicyDistribution
+from common.wrappers import make_env, BaseWrapper
 from models import build_ffn_models
 from utilities.const import STORAGE_DIR, DETERMINISTIC
-from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer
+from utilities.datatypes import ExperienceBuffer, TimeSequenceExperienceBuffer, StatBundle
 from utilities.model_utils import is_recurrent_model
 from utilities.util import parse_state, add_state_dims, flatten, env_extract_dims
 
@@ -26,86 +26,77 @@ from utilities.util import parse_state, add_state_dims, flatten, env_extract_dim
 class Gatherer:
     """Remote Gathering class."""
 
-    # joint: tf.keras.Model
-    # policy: tf.keras.Model
-
-    def __init__(self, model_builder_name: str, distribution_name: str, env_name: str, worker_id: int, exp_id: int,
-                 reward_configuration: Union[str, dict] = None):
-        model_builder = getattr(models, model_builder_name)
-
+    def __init__(self, worker_id: int, exp_id: int):
+        # worker identification
         self.worker_id = worker_id
         self.exp_id = exp_id
 
-        # setup persistent tools
-        self.env = make_env(env_name, reward_config=reward_configuration)
-        self.distribution = getattr(policies, distribution_name)(self.env)
-        self.policy, _, self.joint = model_builder(
-            self.env, self.distribution, **({"bs": 1} if "bs" in fargs(model_builder).args else {}))
+    def collect(self, env: BaseWrapper, joint: tf.keras.Model, distribution: BasePolicyDistribution,
+                horizon: int, discount: float, lam: float, subseq_length: int, collector_id: int) -> StatBundle:
+        """Collect a batch shard of experience for a given number of timesteps.
 
-        # some attributes for adaptive behaviour
-        self.is_recurrent = is_recurrent_model(self.joint)
-        self.is_continuous = isinstance(self.env.action_space, Box)
-        self.is_shadow_brain = "BaseShadowHand" in env_name
+        Args:
+            env:            environment from which to gather the data
+            joint:          joint model of the policy, having both an action and a value head
+            distribution:   policy distribution object
+            horizon:        the number of steps gatherd by this worker
+            discount:       discount factor
+            lam:            lambda parameter of GAE balancing the tradeoff between bias and variance
+            subseq_length:  the length of connected subsequences for TBPTT
+            collector_id:   the ID of this gathering, different from the worker's ID
+        """
+        is_recurrent = is_recurrent_model(joint)
+        is_continuous = isinstance(env.action_space, Box)
+        is_shadow_brain = "BaseShadowHand" in env.unwrapped.spec.id
 
-    def update_weights(self, weights):
-        """Update the weights of this worker."""
-        self.joint.set_weights(weights)
-
-    def sync_environment(self, wrapper):
-        """Update the wrapper data."""
-        self.wrapper = wrapper
-
-    def collect(self, horizon: int, discount: float, lam: float, subseq_length: int, collector_id: int):
-        """Collect a batch shard of experience for a given number of timesteps."""
-        # build new environment for each collector to make multiprocessing possible
         if DETERMINISTIC:
-            self.env.seed(1)
+            env.seed(1)
 
         # reset states of potentially recurrent net
-        self.joint.reset_states()
+        joint.reset_states()
 
         # buffer storing the experience and stats
-        if self.is_recurrent:
-            assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the observations."
-            buffer: TimeSequenceExperienceBuffer = TimeSequenceExperienceBuffer.new(env=self.env,
+        if is_recurrent:
+            assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the n_steps."
+            buffer: TimeSequenceExperienceBuffer = TimeSequenceExperienceBuffer.new(env=env,
                                                                                     size=horizon // subseq_length,
                                                                                     seq_len=subseq_length,
-                                                                                    is_continuous=self.is_continuous,
-                                                                                    is_multi_feature=self.is_shadow_brain)
+                                                                                    is_continuous=is_continuous,
+                                                                                    is_multi_feature=is_shadow_brain)
         else:
-            buffer: ExperienceBuffer = ExperienceBuffer.new_empty(self.is_continuous, self.is_shadow_brain)
+            buffer: ExperienceBuffer = ExperienceBuffer.new_empty(is_continuous, is_shadow_brain)
 
         # go for it
         t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
         states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
         episode_endpoints = []
-        state = parse_state(self.env.reset())
+        state = parse_state(env.reset())
         while t < horizon:
             current_subseq_length += 1
 
-            # based on the given state, predict step_tuple distribution and state value; need flatten due to tf eager bug
+            # based on given state, predict step_tuple distribution and state value; need flatten due to tf eager bug
             policy_out = flatten(
-                self.joint.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
+                joint.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
             a_distr, value = policy_out[:-1], policy_out[-1]
             states.append(state)
             values.append(np.squeeze(value))
 
             # from the step_tuple distribution sample an step_tuple and remember both the step_tuple and its probability
-            action, action_probability = self.distribution.act(*a_distr)
+            action, action_probability = distribution.act(*a_distr)
 
             action = action if not DETERMINISTIC else np.zeros(action.shape)
             actions.append(action)
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
             # make a step based on the chosen step_tuple and collect the reward for this state
-            observation, reward, done, _ = self.env.step(np.atleast_1d(action) if self.is_continuous else action)
+            observation, reward, done, _ = env.step(np.atleast_1d(action) if is_continuous else action)
             current_episode_return += reward  # true reward for stats
 
             observation = parse_state(observation)
             rewards.append(reward)
 
-            # if recurrent, at a subsequence breakpoint/episode end stack the observations and buffer them
-            if self.is_recurrent and (current_subseq_length == subseq_length or done):
+            # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
+            if is_recurrent and (current_subseq_length == subseq_length or done):
                 buffer.push_seq_to_buffer(states, actions, action_probabilities, values[-current_subseq_length:])
 
                 # clear the buffered information
@@ -123,7 +114,7 @@ class Gatherer:
                                                                  discount, lam)
                 episode_returns = episode_advantages + values[-episode_steps:]
 
-                if not self.is_recurrent:
+                if not is_recurrent:
                     advantages.append(episode_advantages)
                 else:
                     # skip as many steps as are missing to fill the subsequence, then push adv ant ret to buffer
@@ -131,8 +122,8 @@ class Gatherer:
                     buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
 
                 # reset environment to receive next episodes initial state
-                state = parse_state(self.env.reset())
-                self.joint.reset_states()
+                state = parse_state(env.reset())
+                joint.reset_states()
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
@@ -146,30 +137,30 @@ class Gatherer:
 
             t += 1
 
-        self.env.close()
+        env.close()
 
-        # get last non-visited state's value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(self.joint.predict(add_state_dims(state, dims=2 if self.is_recurrent else 1))[-1]))
+        # get last non-visited state'serialization value to incorporate it into the advantage estimation of last visited state
+        values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1))[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
             leftover_advantages = estimate_episode_advantages(rewards[-episode_steps + 1:], values[-episode_steps:],
                                                               discount, lam)
-            if not self.is_recurrent:
+            if not is_recurrent:
                 advantages.append(leftover_advantages)
             else:
                 leftover_returns = leftover_advantages + values[-len(leftover_advantages) - 1:-1]
                 buffer.push_adv_ret_to_buffer(leftover_advantages, leftover_returns)
 
         # if not recurrent, fill the buffer with everything we gathered
-        if not self.is_recurrent:
+        if not is_recurrent:
             values = np.array(values, dtype="float32")
 
             # write to the buffer
             advantages = np.hstack(advantages).astype("float32")
             returns = advantages + values[:-1]
             buffer.fill(np.array(states, dtype="float32"),
-                        np.array(actions, dtype="float32" if self.is_continuous else "int32"),
+                        np.array(actions, dtype="float32" if is_continuous else "int32"),
                         np.array(action_probabilities, dtype="float32"),
                         advantages,
                         returns,
@@ -178,11 +169,11 @@ class Gatherer:
         # normalize advantages
         buffer.normalize_advantages()
 
-        if self.is_recurrent:
+        if is_recurrent:
             buffer.inject_batch_dimension()
 
         # convert buffer to dataset and save it to tf record
-        dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=self.is_shadow_brain)
+        dataset, stats = make_dataset_and_stats(buffer, is_shadow_brain=is_shadow_brain)
         dataset = dataset.map(tf_serialize_example)
 
         writer = tf.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord")
@@ -190,30 +181,30 @@ class Gatherer:
 
         return stats
 
-    def evaluate(self) -> Tuple[int, int, Any]:
+    def evaluate(self, env: BaseWrapper, policy: tf.keras.Model, distribution: BasePolicyDistribution) -> \
+            Tuple[int, int, Any]:
         """Evaluate one episode of the given environment following the given policy. Remote implementation."""
 
         # reset policy states as it might be recurrent
-        self.policy.reset_states()
+        policy.reset_states()
 
         done = False
-        state = parse_state(self.env.reset())
+        state = parse_state(env.reset())
         cumulative_reward = 0
         steps = 0
         while not done:
             probabilities = flatten(
-                self.policy.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
+                policy.predict(add_state_dims(parse_state(state), dims=2 if self.is_recurrent else 1)))
 
-            action, _ = self.distribution.act(*probabilities)
-            observation, reward, done, _ = self.env.step(action)
+            action, _ = distribution.act(*probabilities)
+            observation, reward, done, _ = env.step(action)
             cumulative_reward += reward
             observation = parse_state(observation)
 
             state = observation
             steps += 1
 
-        eps_class = self.env.unwrapped.current_target_finger if hasattr(self.env.unwrapped,
-                                                                        "current_target_finger") else None
+        eps_class = env.unwrapped.current_target_finger if hasattr(env.unwrapped, "current_target_finger") else None
 
         return steps, cumulative_reward, eps_class
 
@@ -238,7 +229,7 @@ if __name__ == "__main__":
     print(n_actors_on_this_node)
 
     t = time.time()
-    actors = [Gatherer(builder.__name__, distro.__class__.__name__, env_n, i) for i in range(n_actors_on_this_node)]
+    actors = [Gatherer(i, ) for i in range(n_actors_on_this_node)]
 
     it = time.time()
     outs_ffn = [actor.collect(512, 0.99, 0.95, 16, ) for actor in actors]

@@ -42,8 +42,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     # determine relevant transformers
     wrappers = []
-    wrappers.append(StateNormalizationTransformer()) if not settings["no_state_norming"] else None
-    wrappers.append(RewardNormalizationTransformer()) if not settings["no_reward_norming"] else None
+    wrappers.append(StateNormalizationTransformer) if not settings["no_state_norming"] else None
+    wrappers.append(RewardNormalizationTransformer) if not settings["no_reward_norming"] else None
 
     # setup environment and extract and report information
     env = make_env(environment, reward_config=settings["rcon"], transformers=wrappers)
@@ -100,14 +100,12 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
-                         learning_rate=settings["lr_pi"], lr_schedule=settings["lr_schedule"],
-                         discount=settings["discount"],
+                         learning_rate=settings["lr_pi"], discount=settings["discount"], lam=settings["lam"],
                          clip=settings["clip"], c_entropy=settings["c_entropy"], c_value=settings["c_value"],
-                         lam=settings["lam"],
                          gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
-                         tbptt_length=settings["tbptt"], distribution=distribution, wrappers=wrappers,
-                         pretrained_components=None if settings["preload"] is None else [settings["preload"]],
-                         debug=settings["debug"], reward_configuration=settings["rcon"])
+                         tbptt_length=settings["tbptt"], lr_schedule=settings["lr_schedule"], distribution=distribution,
+                         reward_configuration=settings["rcon"], debug=settings["debug"],
+                         pretrained_components=None if settings["preload"] is None else [settings["preload"]])
 
         if is_root:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")

@@ -3,7 +3,7 @@
 import os
 import random
 import re
-from typing import Union
+from typing import Union, Tuple
 
 import tensorflow as tf
 
@@ -75,7 +75,7 @@ def tf_serialize_example(sample):
     return tf.reshape(tf_string, ())
 
 
-def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool):
+def make_dataset_and_stats(buffer: ExperienceBuffer, is_shadow_brain: bool) -> Tuple[tf.data.Dataset, StatBundle]:
     """Make dataset object and StatBundle from ExperienceBuffer."""
     completed_episodes = buffer.episodes_completed
     numb_processed_frames = buffer.capacity

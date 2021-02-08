@@ -32,7 +32,7 @@ class BasePolicyDistribution(abc.ABC):
     @property
     @abc.abstractmethod
     def short_name(self):
-        """Distribution's short name."""
+        """Distribution'serialization short name."""
         return "base"
 
     @property
@@ -95,7 +95,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy's short identidier."""
+        """Policy'serialization short identidier."""
         return "categorical"
 
     @property
@@ -184,7 +184,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy's short identidier."""
+        """Policy'serialization short identidier."""
         return "gaussian"
 
     @property
@@ -233,7 +233,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
@@ -245,7 +245,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         entropy = .5 * (tf.math.log(math.pi * 2) + (tf.multiply(2.0, log_stdevs) + 1.0))
@@ -259,7 +259,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         return tf.reduce_sum(log_stdevs, axis=-1)
@@ -270,7 +270,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         log_stdevs = params[1]
@@ -308,7 +308,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy's short identidier."""
+        """Policy'serialization short identidier."""
         return "beta"
 
     @property

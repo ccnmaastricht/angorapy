@@ -98,7 +98,7 @@ class Reach(HandReachEnv, BaseShadowHand):
         self.reward_function = function
 
     def set_reward_config(self, new_config: Union[str, dict]):
-        """Set the environment's reward configuration by its identifier or a dict."""
+        """Set the environment'serialization reward configuration by its identifier or a dict."""
         if isinstance(new_config, str):
             new_config: dict = resolve_config_name(new_config)
 

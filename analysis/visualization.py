@@ -81,13 +81,13 @@ class Visualizer(Investigator):
         Explanation at: http://cs231n.stanford.edu/slides/2017/cs231n_2017_lecture12.pdf
 
         In feature maximization, a random input image is created (here, uniform noise) and then successively updated
-        to maximize the response in a filter (feature) of the specified layer(s). The procedure is extended to start
+        to maximize the response in a filter (feature) of the specified layer(serialization). The procedure is extended to start
         with a low-resolution input image that is upscaled after every 30 optimization steps by some factor. This
         encourages the optimization to go towards a local minimum with low-frequency patterns, which are generally
         easier to interpret.
 
         Args:
-            layer_name (str): the unique string identifying the layer who's response shall be maximized
+            layer_name (str): the unique string identifying the layer who'serialization response shall be maximized
             feature_ids (list): a list of filter/feature IDs that will be maximized and shown as a tiling
             optimization_steps: the number of optimization steps between upscalings.
 

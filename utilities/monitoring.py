@@ -16,11 +16,12 @@ from gym.spaces import Box
 from matplotlib import animation
 
 from agent.ppo import PPOAgent
+from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from common.wrappers import TransformationWrapper
 from models import get_model_type
 from utilities import const
 from utilities.const import PATH_TO_EXPERIMENTS
 from utilities.util import parse_state, add_state_dims, flatten
-from common.wrappers_old import RewardNormalizationWrapper, StateNormalizationWrapper
 
 matplotlib.use('Agg')
 
@@ -34,7 +35,7 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None,
+    def __init__(self, agent: PPOAgent, env: TransformationWrapper, frequency: int, gif_every: int, id=None, iterations=None,
                  config_name: str = "unknown"):
         self.agent = agent
         self.env = env
@@ -133,8 +134,8 @@ class Monitor:
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
-                reward_norming=str(RewardNormalizationWrapper in self.agent.wrappers),
-                state_norming=str(StateNormalizationWrapper in self.agent.wrappers),
+                reward_norming=str(RewardNormalizationTransformer in self.env.transformers),
+                state_norming=str(StateNormalizationTransformer in self.env.transformers),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name.split("_")[1]
             ),

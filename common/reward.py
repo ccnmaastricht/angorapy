@@ -26,7 +26,7 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
         fingertip_distance = get_fingertip_distance(environment.get_thumb_position(),
                                                     environment.get_finger_position(fname))
 
-        # cap reward at auxiliary zone, scale to focus on the target finger's movement
+        # cap reward at auxiliary zone, scale to focus on the target finger'serialization movement
         penalty += ((min(fingertip_distance, environment.reward_config["AUXILIARY_ZONE_RADIUS"])
                      - environment.reward_config[
                          "AUXILIARY_ZONE_RADIUS"])  # base reward is 0, being in the zone is punished
@@ -45,7 +45,7 @@ def reach(env, achieved_goal, goal, info: dict):
 
 
 def free_reach(env, achieved_goal, goal, info: dict):
-    """Reward the relative join of the thumb's and a target's fingertip while punishing close other fingertips."""
+    """Reward the relative join of the thumb'serialization and a target'serialization fingertip while punishing close other fingertips."""
 
     thumb_position = env.get_thumb_position()
 

@@ -140,7 +140,7 @@ class Investigator:
         return sub_model.predict(input_tensor)
 
     def get_activations_over_episode(self, layer_names: Union[List[str], str], env: gym.Env, render: bool = False):
-        """Run an episode using the network and get (s, activation, r) tuples for each timestep."""
+        """Run an episode using the network and get (serialization, activation, r) tuples for each timestep."""
         layer_names = layer_names if isinstance(layer_names, list) else [layer_names]
 
         states, activations, reward_trajectory, action_trajectory = [], [], [], []

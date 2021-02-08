@@ -4,5 +4,5 @@
 
 
 class UninterpretableObservationSpace(Exception):
-    """The environment has an observations space that can currently not be handled by our implementation."""
+    """The environment has an n_steps space that can currently not be handled by our implementation."""
     pass

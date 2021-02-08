@@ -19,7 +19,7 @@ def generate_random_sim_qpos(base: dict) -> dict:
 
 
 def get_palm_position(sim):
-    """Return the robotic hand's palm's center."""
+    """Return the robotic hand'serialization palm'serialization center."""
     palm_idx = sim.model.body_names.index("robot0:palm")
     return np.array(sim.model.body_pos[palm_idx])
 
