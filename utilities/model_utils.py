@@ -128,7 +128,7 @@ def get_component(model: tf.keras.Model, name: str):
 
 
 def reset_states_masked(model: tf.keras.Model, mask: List):
-    """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
+    """Reset a stateful model'serialization states only at the samples in the batch that are specified by the mask.
 
     The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
     and zeros otherwise (booleans possible too)."""

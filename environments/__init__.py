@@ -26,71 +26,50 @@ gym.envs.register(
 # REACHING
 
 for control_mode in ["Relative", "Absolute"]:
-    gym.envs.register(
-        id=f'Reach{control_mode}-v0',
-        entry_point='environments:Reach',
-        kwargs={"relative_control": control_mode == "Relative"},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-    gym.envs.register(
-        id=f'ReachRandom{control_mode}-v0',
-        entry_point='environments:Reach',
-        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-    gym.envs.register(
-        id=f'FreeReach{control_mode}-v0',
-        entry_point='environments:FreeReach',
-        kwargs={"relative_control": control_mode == "Relative"},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-    gym.envs.register(
-        id=f'FreeReachRandom{control_mode}-v0',
-        entry_point='environments:FreeReach',
-        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-    for i, name in enumerate(["FF", "MF", "RF", "LF"]):
+    for init_mode in ["", "Random", "Buffered"]:
         gym.envs.register(
-            id=f'FreeReach{name}{control_mode}-v0',
-            entry_point='environments:FreeReach',
-            kwargs={"relative_control": control_mode == "Relative", "force_finger": i},
+            id=f'Reach{init_mode}{control_mode}-v0',
+            entry_point='environments:Reach',
+            kwargs={"relative_control": control_mode == "Relative",
+                    **({"initial_qpos": init_mode.lower()} if init_mode else {})},
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
-    # REACH SEQUENCES
+        gym.envs.register(
+            id=f'FreeReach{init_mode}{control_mode}-v0',
+            entry_point='environments:FreeReach',
+            kwargs={"relative_control": control_mode == "Relative",
+                    **({"initial_qpos": init_mode.lower()} if init_mode else {})},
+            max_episode_steps=SHADOWHAND_MAX_STEPS,
+        )
 
-    gym.envs.register(
-        id=f'FreeReachSequential{control_mode}-v0',
-        entry_point='environments:FreeReachSequential',
-        kwargs={"relative_control": control_mode == "Relative"},
-        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
-    )
+        for i, name in enumerate(["FF", "MF", "RF", "LF"]):
+            gym.envs.register(
+                id=f'FreeReach{name}{init_mode}{control_mode}-v0',
+                entry_point='environments:FreeReach',
+                kwargs={"relative_control": control_mode == "Relative", "force_finger": i,
+                        **({"initial_qpos": init_mode.lower()} if init_mode else {})},
+                max_episode_steps=SHADOWHAND_MAX_STEPS,
+            )
 
-    gym.envs.register(
-        id=f'FreeReachSequentialRandom{control_mode}-v0',
-        entry_point='environments:FreeReachSequential',
-        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
-        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
-    )
+        # REACH SEQUENCES
 
-    gym.envs.register(
-        id=f'ReachSequential{control_mode}-v0',
-        entry_point='environments:ReachSequential',
-        kwargs={"relative_control": control_mode == "Relative"},
-        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
-    )
+        gym.envs.register(
+            id=f'FreeReachSequential{init_mode}{control_mode}-v0',
+            entry_point='environments:FreeReachSequential',
+            kwargs={"relative_control": control_mode == "Relative",
+                    **({"initial_qpos": init_mode.lower()} if init_mode else {})},
+            max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
+        )
 
-    gym.envs.register(
-        id=f'ReachSequentialRandom{control_mode}-v0',
-        entry_point='environments:ReachSequential',
-        kwargs={"relative_control": control_mode == "Relative", "initial_qpos": "random"},
-        max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
-    )
+        gym.envs.register(
+            id=f'ReachSequential{init_mode}{control_mode}-v0',
+            entry_point='environments:ReachSequential',
+            kwargs={"relative_control": control_mode == "Relative",
+                    **({"initial_qpos": init_mode.lower()} if init_mode else {})},
+            max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
+        )
+
 
 # MANIPULATE
 

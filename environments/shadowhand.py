@@ -7,7 +7,7 @@ import numpy as np
 from gym.envs.robotics.hand import manipulate
 
 
-def generate_random_sim_qpos(base: dict):
+def generate_random_sim_qpos(base: dict) -> dict:
     """Generate a random state of the simulation."""
     for key, val in base.items():
         if key in ["robot0:WRJ1", "robot0:WRJ0"]:
@@ -19,7 +19,7 @@ def generate_random_sim_qpos(base: dict):
 
 
 def get_palm_position(sim):
-    """Return the robotic hand's palm's center."""
+    """Return the robotic hand'serialization palm'serialization center."""
     palm_idx = sim.model.body_names.index("robot0:palm")
     return np.array(sim.model.body_pos[palm_idx])
 

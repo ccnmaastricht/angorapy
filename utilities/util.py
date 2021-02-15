@@ -33,18 +33,8 @@ def set_all_seeds(seed):
     random.seed(seed)
 
 
-def make_env(env_name, reward_config: Union[str, dict] = None):
-    """Make environment, including a possible reward config."""
-    env = gym.make(env_name)
-    if reward_config is not None and hasattr(env, "reward_config"):
-        env.set_reward_function(reward_config)
-        env.set_reward_config(reward_config)
-
-    return env
-
-
 def env_extract_dims(env: gym.Env) -> Tuple[Union[int, Tuple[int]], int]:
-    """Returns state and action space dimensionality for given environment."""
+    """Returns state and step_tuple space dimensionality for given environment."""
 
     # observation space
     if isinstance(env.observation_space, Dict):
@@ -62,7 +52,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Union[int, Tuple[int]], int]:
         # standard observation in box form
         obs_dim = env.observation_space.shape[0]
 
-    # action space
+    # step_tuple space
     if isinstance(env.action_space, Discrete):
         act_dim = env.action_space.n
     elif isinstance(env.action_space, Box):
@@ -129,7 +119,7 @@ def insert_unknown_shape_dimensions(shape, none_replacer: int = 1):
 
 
 def detect_finished_episodes(action_log_probabilities: tf.Tensor):
-    """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the action
+    """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the step_tuple
     log probabilities and return a 1D boolean tensor.
 
     Input Shape:

@@ -2,7 +2,6 @@
 """Methods for creating a story about a training process."""
 import datetime
 import socket
-import statistics
 
 import simplejson as json
 import os
@@ -13,16 +12,16 @@ import gym
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy
-import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
 
 from agent.ppo import PPOAgent
+from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from common.wrappers import TransformationWrapper
 from models import get_model_type
 from utilities import const
 from utilities.const import PATH_TO_EXPERIMENTS
 from utilities.util import parse_state, add_state_dims, flatten
-from utilities.wrappers import RewardNormalizationWrapper, StateNormalizationWrapper
 
 matplotlib.use('Agg')
 
@@ -36,7 +35,7 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: gym.Env, frequency: int, gif_every: int, id=None, iterations=None,
+    def __init__(self, agent: PPOAgent, env: TransformationWrapper, frequency: int, gif_every: int, id=None, iterations=None,
                  config_name: str = "unknown"):
         self.agent = agent
         self.env = env
@@ -135,8 +134,8 @@ class Monitor:
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
-                reward_norming=str(RewardNormalizationWrapper in self.agent.preprocessor),
-                state_norming=str(StateNormalizationWrapper in self.agent.preprocessor),
+                reward_norming=str(RewardNormalizationTransformer in self.env.transformers),
+                state_norming=str(StateNormalizationTransformer in self.env.transformers),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name.split("_")[1]
             ),
@@ -161,7 +160,7 @@ class Monitor:
             entropies=[round(v, 4) if v is not None else v for v in self.agent.entropy_history],
             vloss=[round(v, 4) if v is not None else v for v in self.agent.value_loss_history],
             ploss=[round(v, 4) if v is not None else v for v in self.agent.policy_loss_history],
-            preprocessors=self.agent.preprocessor_stat_history
+            preprocessors=self.agent.wrapper_stat_history
         )
 
         with open(f"{self.story_directory}/progress.json", "w") as f:

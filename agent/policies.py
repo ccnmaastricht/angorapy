@@ -19,7 +19,7 @@ class BasePolicyDistribution(abc.ABC):
 
     Each policy implementation provides basic probabilistic methods to calculate probability density and entropy, both
     in standard and in log space. It furthermore gives the characteristic act method that given the probability
-    parameters samples the action and provides the actions probability."""
+    parameters samples the step_tuple and provides the actions probability."""
 
     def __init__(self, env: gym.Env):
         self.state_dim, self.action_dim = env_extract_dims(env)
@@ -32,7 +32,7 @@ class BasePolicyDistribution(abc.ABC):
     @property
     @abc.abstractmethod
     def short_name(self):
-        """Distribution's short name."""
+        """Distribution'serialization short name."""
         return "base"
 
     @property
@@ -43,7 +43,7 @@ class BasePolicyDistribution(abc.ABC):
 
     @abc.abstractmethod
     def act(self, *args, **kwargs):
-        """Sample an action from the distribution and return it alongside its probability."""
+        """Sample an step_tuple from the distribution and return it alongside its probability."""
         pass
 
     @abc.abstractmethod
@@ -52,7 +52,7 @@ class BasePolicyDistribution(abc.ABC):
 
     @abc.abstractmethod
     def sample(self, *args, **kwargs):
-        """Sample an action from the distribution."""
+        """Sample an step_tuple from the distribution."""
         pass
 
     @abc.abstractmethod
@@ -82,20 +82,20 @@ class BasePolicyDistribution(abc.ABC):
 
     @abc.abstractmethod
     def build_action_head(self, n_actions: int, input_shape: tuple, batch_size: Union[int, None]):
-        """Build the action head of a policy using this distribution."""
+        """Build the step_tuple head of a policy using this distribution."""
         pass
 
 
 class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
-    case where the action space is discrete and the agent thus predicts a pmf over the possible actions."""
+    case where the step_tuple space is discrete and the agent thus predicts a pmf over the possible actions."""
 
     def act_deterministic(self, *args, **kwargs):
         raise NotImplementedError("Act deterministic not defined for Categorical Distribution.")
 
     @property
     def short_name(self):
-        """Policy's short identidier."""
+        """Policy'serialization short identidier."""
         return "categorical"
 
     @property
@@ -104,12 +104,12 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         return True
 
     def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
-        """Sample an action from a discrete action distribution predicted by the given policy for a given state."""
+        """Sample an step_tuple from a discrete step_tuple distribution predicted by the given policy for a given state."""
         action = self.sample(log_probabilities)
         return action, tf.squeeze(log_probabilities)[action]
 
     def sample(self, log_probabilities):
-        """Sample an action from the distribution."""
+        """Sample an step_tuple from the distribution."""
         assert isinstance(log_probabilities, tf.Tensor) or isinstance(log_probabilities, np.ndarray), \
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."
@@ -149,7 +149,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         return - self._entropy_from_log_pmf(pmf)
 
     def build_action_head(self, n_actions: int, input_shape: tuple, batch_size: int):
-        """Build a discrete action head as a log softmax output layer."""
+        """Build a discrete step_tuple head as a log softmax output layer."""
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
         x = tf.keras.layers.Dense(n_actions,
@@ -184,7 +184,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy's short identidier."""
+        """Policy'serialization short identidier."""
         return "gaussian"
 
     @property
@@ -193,7 +193,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         return True
 
     def act(self, means: tf.Tensor, log_stdevs: tf.Tensor) -> Tuple[np.ndarray, np.ndarray]:
-        """Sample an action from a gaussian action distribution defined by the means and log standard deviations."""
+        """Sample an step_tuple from a gaussian step_tuple distribution defined by the means and log standard deviations."""
         actions = tf.random.normal(means.shape, means, tf.exp(log_stdevs))
         probabilities = self.log_probability(actions, means=means, log_stdevs=log_stdevs)
 
@@ -233,7 +233,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
@@ -245,7 +245,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         entropy = .5 * (tf.math.log(math.pi * 2) + (tf.multiply(2.0, log_stdevs) + 1.0))
@@ -259,7 +259,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         return tf.reduce_sum(log_stdevs, axis=-1)
@@ -270,7 +270,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'s are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         log_stdevs = params[1]
@@ -294,10 +294,10 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
 
 class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
-    """Beta Distribution for bounded action spaces.
+    """Beta Distribution for bounded step_tuple spaces.
 
     The beta distribution has finite support in the interval [0, 1]. In contrast to infinitely supported distributions
-    it is henceforth bias free and can be scaled to fit any bounded action space.
+    it is henceforth bias free and can be scaled to fit any bounded step_tuple space.
     """
 
     def __init__(self, env: gym.Env):
@@ -308,7 +308,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy's short identidier."""
+        """Policy'serialization short identidier."""
         return "beta"
 
     @property
@@ -317,14 +317,14 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         return False
 
     def act(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
-        """Sample an action from a beta distribution."""
+        """Sample an step_tuple from a beta distribution."""
         actions = self.sample(alphas, betas)
         probabilities = tf.squeeze(self.log_probability(actions, alphas, betas)).numpy()
 
         return actions, probabilities
 
     def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
-        """Compute the mode of a beta distribution as action."""
+        """Compute the mode of a beta distribution as step_tuple."""
         actions = (alphas - 1) / (alphas + betas - 2)
 
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()

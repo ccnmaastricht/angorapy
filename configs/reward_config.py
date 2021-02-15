@@ -37,6 +37,7 @@ sequential_reach = dict(
 
 # FREE REACH
 free_reach = dict(
+    default=REACH_BASE,
     force_punished=dict(REACH_BASE,
                         FORCE_MULTIPLIER=0.05),
     force_punished_light=dict(REACH_BASE,
@@ -55,7 +56,9 @@ free_reach_positive_reinforcement = dict(
 sequential_free_reach = dict(
     default=REACH_BASE,
     great_success=dict(REACH_BASE,
-                       SUCCESS_MULTIPLIER=20)
+                       SUCCESS_MULTIPLIER=20),
+    gentle_success=dict(REACH_BASE,
+                        SUCCESS_DISTANCE=0.025)
 )
 
 if __name__ == '__main__':

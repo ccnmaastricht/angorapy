@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=24
 #SBATCH --ntasks-per-node=24
-#SBATCH --ntasks-per-core=2
+#SBATCH --ntasks-per-common=2
 #SBATCH --cpus-per-task=1
 #SBATCH --constraint=gpu
 #SBATCH --hint=multithread

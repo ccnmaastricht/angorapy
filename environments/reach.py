@@ -1,3 +1,5 @@
+import collections
+import queue
 import random
 from typing import Union, Callable
 
@@ -9,8 +11,8 @@ from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NA
 from gym.envs.robotics.utils import robot_get_obs
 
 from configs.reward_config import REACH_BASE, resolve_config_name
-from core import reward
-from core.reward import sequential_free_reach, free_reach, reach, sequential_reach
+from common import reward
+from common.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHand
 from utilities.const import N_SUBSTEPS, VISION_WH
 
@@ -32,9 +34,15 @@ class Reach(HandReachEnv, BaseShadowHand):
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
 
-        self.random_initial_state = initial_qpos == "random"
-        if self.random_initial_state:
+        # STATE INITIALIZATION
+        assert initial_qpos in ["random", "buffered"] or isinstance(initial_qpos, dict), "Illegal state initialization."
+
+        self.state_memory_buffer = collections.deque(maxlen=1000)
+        self.state_initialization = initial_qpos
+        if self.state_initialization == "random":
             initial_qpos = generate_random_sim_qpos(DEFAULT_INITIAL_QPOS)
+        elif self.state_initialization == "buffered":
+            initial_qpos = DEFAULT_INITIAL_QPOS
 
         super().__init__(self.reward_config["SUCCESS_DISTANCE"], n_substeps, relative_control, initial_qpos, "dense")
 
@@ -89,7 +97,7 @@ class Reach(HandReachEnv, BaseShadowHand):
         self.reward_function = function
 
     def set_reward_config(self, new_config: Union[str, dict]):
-        """Set the environment's reward configuration by its identifier or a dict."""
+        """Set the environment'serialization reward configuration by its identifier or a dict."""
         if isinstance(new_config, str):
             new_config: dict = resolve_config_name(new_config)
 
@@ -102,13 +110,18 @@ class Reach(HandReachEnv, BaseShadowHand):
         """Resets a simulation and indicates whether or not it was successful."""
         self.sim.set_state(self.initial_state)  # reset everything
 
-        # if wanted, generate and set random initial state
-        if self.random_initial_state:
+        if self.state_initialization == "random":
+            # generate and set random initial state
             initial_qpos = generate_random_sim_qpos(DEFAULT_INITIAL_QPOS)
 
             for name, value in initial_qpos.items():
                 self.sim.data.set_joint_qpos(name, value)
                 self.sim.data.set_joint_qvel(name, 0)
+        elif self.state_initialization == "buffered":
+            # pull state from buffer as initial state for the environment
+            if len(self.state_memory_buffer) > 100:  # TODO as variable in config?
+                sampled_initial_state = random.choice(self.state_memory_buffer)
+                self.sim.set_state(sampled_initial_state)
 
         self.sim.forward()
         return True
@@ -161,7 +174,10 @@ class Reach(HandReachEnv, BaseShadowHand):
         self.previous_finger_positions = [self.get_finger_position(fname).copy() for fname in FINGERTIP_SITE_NAMES]
 
         o, r, d, i = super().step(action)
+
+        # update memory
         i.update({"target_finger": self.current_target_finger})
+        self.state_memory_buffer.append(self.sim.get_state())
 
         return o, r, d, i
 

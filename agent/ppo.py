@@ -20,24 +20,20 @@ from tqdm import tqdm
 
 import models
 from agent import policies
-
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
-
 from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from common.transformers import BaseTransformer, BaseRunningMeanTransformer
+from common.wrappers import BaseWrapper, make_env
 from utilities import const
-
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
 from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size
 from utilities.statistics import ignore_none
-from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes, \
-    make_env
-from utilities.wrappers import CombiWrapper, SkipWrapper, BaseRunningMeanWrapper, mpi_merge_wrappers
-
+from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 
 HOROVOD = False
 INIT_HOROVOD = False
@@ -83,16 +79,15 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
-    def __init__(self, model_builder, environment: gym.Env, horizon: int, workers: int, learning_rate: float = 0.001,
-                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
-                 c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
-                 tbptt_length: int = 16, lr_schedule: str = None, distribution: BasePolicyDistribution = None,
-                 reward_configuration: str = None, preprocessor=None, _make_dirs=True, debug: bool = False,
-                 pretrained_components: list = None):
+    def __init__(self, model_builder, environment: BaseWrapper, horizon: int, workers: int,
+                 learning_rate: float = 0.001, discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
+                 c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
+                 clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
+                 distribution: BasePolicyDistribution = None, reward_configuration: str = None, _make_dirs=True,
+                 debug: bool = False, pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
-            preprocessor:
             model_builder: a function creating a policy, value and joint model
             environment (gym.Env): the environment in which the agent will learn 
             horizon (int): the number of timesteps each worker collects 
@@ -117,7 +112,7 @@ class PPOAgent:
         assert lr_schedule is None or isinstance(lr_schedule, str)
 
         # environment info
-        self.env = environment
+        self.env: BaseWrapper = environment
         self.env_name = self.env.unwrapped.spec.id
         self.state_dim, self.n_actions = env_extract_dims(self.env)
         if isinstance(self.env.action_space, Discrete):
@@ -126,11 +121,11 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
-        self.preprocessor = preprocessor if preprocessor is not None else SkipWrapper()
-        self.preprocessor.warmup(self.env)
+
+        self.env.warmup(self.env)
 
         if MPI.COMM_WORLD.rank == 0:
-            print(f"Using {self.preprocessor} for preprocessing.")
+            print(f"Using {self.env.transformers} for preprocessing.")
 
         # hyperparameters
         self.horizon = horizon
@@ -236,28 +231,39 @@ class PPOAgent:
         self.cycle_timings = []
         self.underflow_history = []
 
-        self.preprocessor_stat_history = {
-            w.__class__.__name__: {"mean": [w.simplified_mean()], "stdev": [w.simplified_stdev()]}
-            for w in self.preprocessor if isinstance(w, BaseRunningMeanWrapper)
-        }
+        self.wrapper_stat_history = {}
+        for transformer in self.env.transformers:
+            self.wrapper_stat_history.update(
+                {transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
+                                                  "stdev": [transformer.simplified_stdev()]}})
+
+    def record_wrapper_stats(self) -> None:
+        """Records the stats from RunningMeanWrappers."""
+        for transformer in self.env.transformers:
+            if transformer.name not in self.wrapper_stat_history.keys() or not isinstance(transformer,
+                                                                                          BaseRunningMeanTransformer):
+                continue
+
+            self.wrapper_stat_history[transformer.__class__.__name__]["mean"].append(transformer.simplified_mean())
+            self.wrapper_stat_history[transformer.__class__.__name__]["stdev"].append(transformer.simplified_stdev())
 
     def __repr__(self):
         return f"PPOAgent[at {self.iteration}][{self.env_name}]"
 
-    def set_gpu(self, activated: bool):
+    def set_gpu(self, activated: bool) -> None:
         """Set GPU usage mode."""
         self.device = "GPU:0" if activated else "CPU:0"
 
     def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
-        """Actor's clipped objective as given in the PPO paper. Original objective is to be maximized
+        """Actor'serialization clipped objective as given in the PPO paper. Original objective is to be maximized
         (as given in the paper), but this is the negated objective to be minimized! In the recurrent version
         a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied in the mean
         operation of the loss.
 
         Args:
-          action_prob (tf.Tensor): the probability of the action for the state under the current policy
-          old_action_prob (tf.Tensor): the probability of the action taken given by the old policy during the episode
-          advantage (tf.Tensor): the advantage that taking the action gives over the estimated state value
+          action_prob (tf.Tensor): the probability of the step_tuple for the state under the current policy
+          old_action_prob (tf.Tensor): the probability of the step_tuple taken given by the old policy during the episode
+          advantage (tf.Tensor): the advantage that taking the step_tuple gives over the estimated state value
 
         Returns:
           the value of the objective function
@@ -310,8 +316,8 @@ class PPOAgent:
             return tf.reduce_mean(error) * 0.5
 
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
-        """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
-        entropy, the less probability mass lies on a single action, which would hinder exploration. We hence reduce
+        """Entropy of policy output acting as regularization by preventing dominance of one step_tuple. The higher the
+        entropy, the less probability mass lies on a single step_tuple, which would hinder exploration. We hence reduce
         the loss by the (scaled by c_entropy) entropy to encourage a certain degree of exploration.
 
         Args:
@@ -393,27 +399,25 @@ class PPOAgent:
             # distribute parameters from rank 0 to all other ranks
             values = mpi_comm.bcast(self.joint.get_weights(), root=0)
             self.joint.set_weights(values)
-            actor.update_weights(self.joint.get_weights())
 
             # run simulations in parallel
-            worker_stats, worker_preprocessors = [], []
-            serialized_wrapper = self.preprocessor.serialize()
+            worker_stats = []
             for i in worker_collection_ids:
-                collection = actor.collect(self.horizon, self.discount, self.lam, self.tbptt_length, serialized_wrapper,
-                                           collector_id=i)
-                worker_stats.append(collection[0])
-                worker_preprocessors.append(collection[1])
+                stats = actor.collect(self.env, self.joint, self.distribution,
+                                      self.horizon, self.discount, self.lam, self.tbptt_length, collector_id=i)
+                worker_stats.append(stats)
 
             # merge gatherings from all workers
             stats = mpi_condense_stats(worker_stats)
-            self.preprocessor = mpi_merge_wrappers(worker_preprocessors, self.preprocessor)
-            self.preprocessor = mpi_comm.bcast(self.preprocessor, root=0)
+            stats = mpi_comm.bcast(stats, root=0)
+
+            # sync the environments to share statistics for transformers etc.
+            self.env.mpi_sync()
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
             # make seperate evaluation if necessary and wanted
-            stats = mpi_comm.bcast(stats, root=0)
             stats_with_evaluation = stats
             if separate_eval:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
@@ -434,8 +438,8 @@ class PPOAgent:
                 continue
 
             if mpi_comm.rank == 0:
-                # record stats and preprocessor in the agent
-                self.record_preprocessor(self.preprocessor)
+                # record stats and transformers in the agent
+                self.record_wrapper_stats()
                 self.record_stats(stats_with_evaluation)
 
                 time_dict["evaluating"] = time.time() - subprocess_start
@@ -493,7 +497,7 @@ class PPOAgent:
                 self.time_dicts.append(time_dict)
 
         if mpi_comm.rank == 0:
-            print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}s.")
+            print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
 
         return self
 
@@ -520,22 +524,8 @@ class PPOAgent:
         self.cycle_stat_n_history.append(stats.numb_completed_episodes)
         self.underflow_history.append(stats.tbptt_underflow)
 
-    def record_preprocessor(self, preprocessor):
-        """Record the stats of a given preprocessor in the history of the agent."""
-        for w in preprocessor:
-            if w.name not in self.preprocessor_stat_history.keys() or not isinstance(w, BaseRunningMeanWrapper):
-                continue
-
-            self.preprocessor_stat_history[w.name]["mean"].append(w.simplified_mean())
-            self.preprocessor_stat_history[w.name]["stdev"].append(w.simplified_stdev())
-
     def _make_actor(self) -> Gatherer:
-        actor = Gatherer(self.builder_function_name,
-                         self.distribution.__class__.__name__,
-                         self.env_name,
-                         MPI.COMM_WORLD.rank,
-                         self.agent_id,
-                         reward_configuration=self.reward_configuration)
+        actor = Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
 
         return actor
 
@@ -549,11 +539,11 @@ class PPOAgent:
             old_values = batch["value"]
 
             if self.continuous_control:
-                # if action space is continuous, calculate PDF at chosen action value
-                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
+                # if step_tuple space is continuous, calculate PDF at chosen step_tuple value
+                action_probabilities = self.distribution.log_probability(batch["step_tuple"], *policy_output)
             else:
-                # if the action space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
+                # if the step_tuple space is discrete, extract the probabilities of actions actually chosen
+                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["step_tuple"])
 
             # calculate the clipped loss
             policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
@@ -575,12 +565,12 @@ class PPOAgent:
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        # apply the gradients to the joint model's parameters
+        # apply the gradients to the joint model'serialization parameters
         self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
 
         info = {
             "policy_output": policy_output,
-            # "actions": batch["action"],
+            # "actions": batch["step_tuple"],
             # "action_probabilities": action_probabilities,
             # "old_action_probabilities": batch["action_prob"],
             # "value_output": value_output,
@@ -590,7 +580,7 @@ class PPOAgent:
         return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
-        """Optimize the agent's policy and value network based on a given dataset.
+        """Optimize the agent'serialization policy and value network based on a given dataset.
         
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
         handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
@@ -600,7 +590,7 @@ class PPOAgent:
         not. Even more so this applies with running simulations on the cluster.
 
         Args:
-            dataset (tf.data.Dataset): tensorflow dataset containing s, a, p(a), r and A as components per data point
+            dataset (tf.data.Dataset): tensorflow dataset containing serialization, a, p(a), r and A as components per data point
             epochs (int): number of epochs to train on this dataset
             batch_size (int): batch size with which the dataset is sampled
 
@@ -686,7 +676,7 @@ class PPOAgent:
         values = mpi_comm.bcast(self.joint.get_weights(), root=0)
         self.joint.set_weights(values)
 
-        evaluation_result = actor.evaluate(self.preprocessor.serialize())
+        evaluation_result = actor.evaluate(self.env, self.policy, self.distribution)
         gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
         stats, classes = None, None
@@ -785,13 +775,12 @@ class PPOAgent:
         parameters = self.__dict__.copy()
         del parameters["env"]
         del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["preprocessor"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
-
-        parameters["preprocessor"] = self.preprocessor.serialize()
         parameters["distribution"] = self.distribution.__class__.__name__
+        parameters["transformer"] = self.env.serialize()
 
         return parameters
 
@@ -815,7 +804,7 @@ class PPOAgent:
                 "The given agent ID does not match any existing save history from your current path.")
 
         if len(os.listdir(agent_path)) == 0:
-            raise FileNotFoundError("The given agent ID's save history is empty.")
+            raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
         latest_matches = PPOAgent.get_saved_iterations(agent_id)
         if from_iteration is None:
@@ -834,21 +823,22 @@ class PPOAgent:
         with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
             parameters = json.load(f)
 
-        env = make_env(parameters["env_name"] if force_env_name is None else force_env_name)
+        env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
+                       reward_config=parameters.get("reward_configuration"),
+                       transformers=[BaseTransformer.from_serialization(parameters["transformers"])])
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
-        preprocessor = CombiWrapper.from_serialization(parameters["preprocessor"])
 
         loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],
                                 workers=parameters["n_workers"], learning_rate=parameters["learning_rate"],
                                 discount=parameters["discount"], lam=parameters["lam"], clip=parameters["clip"],
                                 c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
-                                gradient_clipping=parameters["gradient_clipping"], preprocessor=preprocessor,
+                                gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
 
         for p, v in parameters.items():
-            if p in ["distribution", "preprocessor"]:
+            if p in ["distribution", "transformers"]:
                 continue
 
             loaded_agent.__dict__[p] = v

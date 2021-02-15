@@ -1,4 +1,5 @@
 """A collection of builder functions for models usable with different environments in PPO."""
+from typing import Callable
 
 from models.components import _build_fcn_component, _build_encoding_sub_model
 from models.convolutional import _build_visual_decoder, _build_visual_encoder
@@ -9,7 +10,7 @@ from models.simple import build_ffn_models, build_deeper_models, build_rnn_model
     build_simple_models
 
 
-def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = True):
+def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = True) -> Callable:
     """Get a builder function for a model with the described parameters."""
     # TODO shared seems not to work yet
     params = locals()

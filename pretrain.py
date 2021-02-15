@@ -52,7 +52,7 @@ def pretrain_on_reconstruction(pretrainable_component: Union[tf.keras.Model, str
     if isinstance(pretrainable_component, tf.keras.Model):
         checkpoint_path = PRETRAINED_COMPONENTS_PATH + "/ckpts/weights.ckpt"
 
-        # Create a callback that saves the model's weights
+        # Create a callback that saves the model'serialization weights
         cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                          save_weights_only=True,
                                                          verbose=1)
