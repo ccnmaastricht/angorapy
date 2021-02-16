@@ -48,12 +48,12 @@ def main(agent_id, settings: dict):
     z, _, _ = control_autoencoder.batch_compute_latent_space(params, coefficient_mask,
                                                              training_data['x'], training_data['u'])
     # Simulate Dynamics and produce 3 episodes
-    _, _, simulated_activations, simulation_results, actions = control_autoencoder.simulate_episode(chiefinv,
-                                                                                                    params,
-                                                                                                    coefficient_mask,
-                                                                                                    render=False)
-    utils.plot_simulations(training_data, simulation_results, simulated_activations, z, n_points,
-                           FILE_DIR)
+    #_, _, simulated_activations, simulation_results, actions = control_autoencoder.simulate_episode(chiefinv,
+    #                                                                                                params,
+     #                                                                                               coefficient_mask,
+     #                                                                                               render=False)
+    #utils.plot_simulations(training_data, simulation_results, simulated_activations, z, n_points,
+    #                       FILE_DIR)
 
 
 if __name__ == "__main__":
@@ -69,12 +69,12 @@ if __name__ == "__main__":
     parser.add_argument("--n_networks", type=int, default=1, help="Number of different networks for comparison")
     parser.add_argument("--seed", type=int, default=123, help="Seed for key generation")
     parser.add_argument("--poly_order", type=int, default=2, help="Polynomial Order in Sindy Library")
-    parser.add_argument("--layers", type=list, default=[64, 32, 8, 4], help="List of layer sizes for autoencoder")
+    parser.add_argument("--layers", type=list, default=[64, 8, 4], help="List of layer sizes for autoencoder")
     parser.add_argument("--thresholding_frequency", type=int, default=500,
                         help="Number of epochs after which the coefficient mask will be updated")
     parser.add_argument("--thresholding_coefficient", type=float, default=0.1,
                         help="Thresholding coefficient below which coefficients will be set to zero.")
-    parser.add_argument("--batch_size", type=int, default=8000, help="Batch Size for training and refinement")
+    parser.add_argument("--batch_size", type=int, default=5000, help="Batch Size for training and refinement")
     parser.add_argument("--learning_rate", type=float, default=1e-3,
                         help="Step size for updating parameters by")
     parser.add_argument("--epochs", type=int, default=5000, help="Number of epochs to train for")
