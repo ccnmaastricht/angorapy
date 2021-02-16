@@ -153,7 +153,7 @@ def plot_losses(time_steps, all_train_losses, FILE_DIR):
     plt.title('L2 Loss')
 
     plt.subplot(236)
-    plt.plot(time_steps, all_train_losses['action_loss'], 'b')
+    plt.plot(time_steps, all_train_losses['sindy_u_loss'], 'b')
     plt.title('Action Loss')
 
     plt.savefig(FILE_DIR + "figures/losses.png", dpi=300)

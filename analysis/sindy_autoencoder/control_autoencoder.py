@@ -224,16 +224,14 @@ def simulate_episode(chiefinv,
         simulation_results.append(sim_res)
         simulated_activations.append(sim_activation)
 
-        # activation = np.asarray(sim_activation.reshape(1, 1, 64))
-        # probabilities = flatten(submodelfrom.predict(activation))
+        activation = np.asarray(sim_activation.reshape(1, 1, 64))
+        probabilities = flatten(submodelfrom.predict(activation))
 
-        # try:
-        #    action = chiefinv.distribution.act_deterministic(*probabilities)
-        # except NotImplementedError:
-        #     action, _ = chiefinv.distribution.act(*probabilities)
+        try:
+            action = chiefinv.distribution.act_deterministic(*probabilities)
+        except NotImplementedError:
+            action, _ = chiefinv.distribution.act(*probabilities)
 
-        action = sigmoid_layer(params['output_weights'], sim_res)
-        actions.append(action)
         observation, reward, done, info = env.step(action)
         observation, reward, done, info = chiefinv.preprocessor.modulate((parse_state(observation), reward, done, info),
                                                                          update=False)
@@ -252,14 +250,16 @@ batch_compute_latent_space = vmap(compute_latent_space, in_axes=({'encoder': Non
                                                                   'control_decoder': None,
                                                                   'sindy_coefficients': None,
                                                                   'sindy_u_coefficients': None},
-                                                                 None, 0, 0))
+                                                                 [None, None],
+                                                                 0, 0))
 batch_control_autoencoder = vmap(control_autoencoder_pass, in_axes=({'encoder': None,
                                                                      'decoder': None,
                                                                      'control_encoder': None,
                                                                      'control_decoder': None,
                                                                      'sindy_coefficients': None,
                                                                      'sindy_u_coefficients': None},
-                                                                    None, 0, 0, 0, 0))
+                                                                    [None, None],
+                                                                    0, 0, 0, 0))
 
 
 def loss(params, x, dx, u, du, coefficient_mask, hps):
@@ -350,7 +350,7 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
             start_time = time.time()
 
     print(f"FINISHING TRAINING...\n"
-          f"Sparsity: {jnp.sum(coefficient_mask)} active terms")
+          f"Sparsity: {jnp.sum(coefficient_mask[0])} active terms")
 
     all_train_losses = {k: [dic[k] for dic in all_train_losses] for k in all_train_losses[0]}
     time_steps = np.linspace(0, settings['epochs'], settings['epochs'])
@@ -446,5 +446,5 @@ def load_state(filename):
         directory = '/analysis/sindy_autoencoder/storage/' + filename + "/" + filename + '.pkl'
         with open(directory, 'rb') as f:
             state = pickle.load(f)
-
+    print(f"LOADING TRAINED SYSTEM for agent: " + filename)
     return state
