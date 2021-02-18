@@ -8,6 +8,7 @@ import os
 import scipy as sc
 import sklearn.decomposition as skld
 from sympy import symbols
+from utilities.const import COLORS
 
 
 def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
@@ -213,6 +214,16 @@ def plot_simulations(training_data, simulation_results, simulated_activations, z
             linewidth=0.7)
     plt.title("Simulated Latent Dynamics")
     plt.savefig(FILE_DIR + "figures/" + "sim_res.png", dpi=300)
+
+
+bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
+
+
+def print_behaviour(settings):
+    print(f"Running {bc}SindyControlAutoencoder{ec} \n"
+          f"------------------------------------------ \n"
+          f"{wn}Hyperparameters:{ec} {settings}\n"
+          f"------------------------------------------ \n")
 
 
 def regress(Y, X, l=0.):

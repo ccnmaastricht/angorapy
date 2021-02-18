@@ -152,8 +152,8 @@ def control_autoencoder_pass(params, coefficient_mask, x, dx, u, du):
     dy = z_derivative(params['control_encoder'], u, du)
 
     c = jnp.concatenate((z, y))
-    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 2)
-    Theta_u = sindy_library_jax(y, len(params['encoder'][-1][0]), 2)
+    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 3)
+    Theta_u = sindy_library_jax(y, len(params['encoder'][-1][0]), 3)
     sindy_predict = jnp.matmul(Theta, coefficient_mask[0] * params['sindy_coefficients'])
     sindy_u_predict = jnp.matmul(Theta_u, coefficient_mask[1] * params['sindy_u_coefficients'])
     dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
@@ -167,7 +167,7 @@ def compute_latent_space(params, coefficient_mask, x, u):
     y = encoding_pass(params['control_encoder'], u)
 
     c = jnp.concatenate((z, y))
-    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 2)
+    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 3)
     sindy_predict = jnp.matmul(Theta, coefficient_mask[0] * params['sindy_coefficients'])
 
     return [z, y, sindy_predict]
@@ -273,16 +273,19 @@ def loss(params, x, dx, u, du, coefficient_mask, hps):
     sindy_y_loss = jnp.mean((dy - sindy_u_predict)**2)
     sindy_u_loss = jnp.mean((du - du_decode)**2)
     sindy_regularization_loss = jnp.mean(jnp.abs(params['sindy_coefficients']))
+    sindy_u_reg_loss = jnp.mean(jnp.abs(params['sindy_u_coefficients']))
 
     system_recon_loss = hps['system_loss_coeff'] * system_recon_loss
     control_recon_loss = hps['control_loss_coeff'] * control_recon_loss
     sindy_z_loss = hps['dz_loss_weight'] * sindy_z_loss
     sindy_x_loss = hps['dx_loss_weight'] * sindy_x_loss
-    sindy_y_loss = hps['dz_loss_weight'] * sindy_y_loss
-    sindy_u_loss = hps['dx_loss_weight'] * sindy_u_loss
+    sindy_y_loss = hps['dy_loss_weight'] * sindy_y_loss
+    sindy_u_loss = hps['du_loss_weight'] * sindy_u_loss
     sindy_regularization_loss = hps['reg_loss_weight'] * sindy_regularization_loss
+    sindy_u_reg_loss = hps['reg_u_loss_weight'] * sindy_u_reg_loss
+
     total_loss = system_recon_loss + control_recon_loss + sindy_z_loss + sindy_x_loss + \
-                 sindy_regularization_loss + sindy_y_loss + sindy_u_loss
+                 sindy_regularization_loss + sindy_y_loss + sindy_u_loss + sindy_u_reg_loss
 
     return {'total': total_loss,
             'sys_loss': system_recon_loss,
@@ -291,7 +294,8 @@ def loss(params, x, dx, u, du, coefficient_mask, hps):
             'sindy_x_loss': sindy_x_loss,
             'sindy_y_loss': sindy_y_loss,
             'sindy_u_loss': sindy_u_loss,
-            'sindy_regularization_loss': sindy_regularization_loss}
+            'sindy_regularization_loss': sindy_regularization_loss,
+            'sindy_u_reg_loss': sindy_u_reg_loss}
 
 
 def training_loss(params, x, dx, u, du, coefficient_mask, hps):
@@ -319,12 +323,14 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
 
     # set up optimizer
     batch_size = settings['batch_size']
-    opt_init, opt_update, get_params = optimizers.adam(settings['learning_rate'])
+    decay_fun = optimizers.exponential_decay(settings['learning_rate'], decay_steps=1, decay_rate=0.9999)
+    opt_init, opt_update, get_params = optimizers.adam(decay_fun)
     opt_state = opt_init(params)
 
     # train
     all_train_losses = []
     start_time = time.time()
+
     for epoch in range(settings['epochs']):
         for batch in range(num_batches):
             ids = utils.batch_indices(batch, num_batches, batch_size)
