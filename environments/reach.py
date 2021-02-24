@@ -13,11 +13,11 @@ from gym.envs.robotics.utils import robot_get_obs
 from configs.reward_config import REACH_BASE, resolve_config_name
 from common import reward
 from common.reward import sequential_free_reach, free_reach, reach, sequential_reach
-from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHand
+from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
 from utilities.const import N_SUBSTEPS, VISION_WH
 
 
-class Reach(HandReachEnv, BaseShadowHand):
+class Reach(HandReachEnv, BaseShadowHandEnv):
     """Simple Reaching task."""
 
     def assert_reward_setup(self):
@@ -127,19 +127,22 @@ class Reach(HandReachEnv, BaseShadowHand):
         return True
 
     def _get_obs(self):
-        # proprioception
-        robot_qpos, robot_qvel = robot_get_obs(self.sim)
-
-        # touch sensor information
         touch = self.sim.data.sensordata[self._touch_sensor_id]
 
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        proprioception = np.concatenate([robot_qpos, robot_qvel])
+
         achieved_goal = self._get_achieved_goal().ravel()
-        observation = np.concatenate([robot_qpos, robot_qvel, touch, achieved_goal, self.goal.copy()])
 
         return {
-            'observation': observation.copy(),
-            'achieved_goal': achieved_goal.copy(),
+            'observation': {
+                'somatosensation': touch,
+                'proprioception': proprioception,
+                'goal': self.goal.copy(),
+            },
+
             'desired_goal': self.goal.copy(),
+            'achieved_goal': achieved_goal.copy(),
         }
 
     def _sample_goal(self):

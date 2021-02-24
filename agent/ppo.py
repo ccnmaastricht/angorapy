@@ -122,7 +122,7 @@ class PPOAgent:
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
 
-        self.env.warmup(self.env)
+        self.env.warmup()
 
         if MPI.COMM_WORLD.rank == 0:
             print(f"Using {self.env.transformers} for preprocessing.")
@@ -396,7 +396,7 @@ class PPOAgent:
             time_dict = OrderedDict()
             subprocess_start = time.time()
 
-            # distribute parameters from rank 0 to all other ranks
+            # distribute parameters from rank 0 to all goal ranks
             values = mpi_comm.bcast(self.joint.get_weights(), root=0)
             self.joint.set_weights(values)
 
@@ -465,8 +465,7 @@ class PPOAgent:
             # PARALLELIZED OPTIMIZATION
             mpi_flat_print("Optimizing...")
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                is_shadow_hand=isinstance(self.state_dim, tuple),
-                                                id_prefix=self.agent_id)
+                                                id_prefix=self.agent_id, responsive_senses=self.policy.input_names)
             self.optimize(dataset, epochs, batch_size)
 
             if mpi_comm.rank == 0:
@@ -533,8 +532,7 @@ class PPOAgent:
     def _learn_on_batch(self, batch):
         # optimize policy and value network simultaneously
         with tf.GradientTape() as tape:
-            state_batch = batch["state"] if "state" in batch else (batch["in_vision"], batch["in_proprio"],
-                                                                   batch["in_touch"], batch["in_goal"])
+            state_batch = {fname: f for fname, f in batch.items() if fname in ["vision", "proprioception", "somatosensation", "goal"]}
             policy_output, value_output = self.joint(state_batch, training=True)
             old_values = batch["value"]
 

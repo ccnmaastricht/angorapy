@@ -63,7 +63,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if "BaseShadowHand" in environment or settings["architecture"] == "shadow":
+    if "BaseShadowHandEnv" in environment or settings["architecture"] == "shadow":
         if settings["model"] == "ffn" and is_root:
             print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
             settings["model"] = "gru"
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    # if config is given load it as default, then overwrite with any other given parameters
+    # if config is given load it as default, then overwrite with any goal given parameters
     if args.pcon is not None:
         try:
             parser.set_defaults(**getattr(hp_config, args.pcon))

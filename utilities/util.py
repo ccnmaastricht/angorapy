@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 """Helper functions."""
 import random
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Dict
 
 import gym
 import numpy
 import numpy as np
 import tensorflow as tf
-from gym.spaces import Discrete, Box, Dict
+from gym import spaces
+from gym.spaces import Discrete, Box
 from mpi4py import MPI
 from tensorflow.python.client import device_lib
 
@@ -33,26 +34,29 @@ def set_all_seeds(seed):
     random.seed(seed)
 
 
-def env_extract_dims(env: gym.Env) -> Tuple[Union[int, Tuple[int]], int]:
-    """Returns state and step_tuple space dimensionality for given environment."""
+def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], int]:
+    """Returns state and action space dimensionality for given environment."""
+    obs_dim: dict
 
-    # observation space
-    if isinstance(env.observation_space, Dict):
-        # dict observation with observation field
-        if isinstance(env.observation_space["observation"], gym.spaces.Box):
-            obs_dim = env.observation_space["observation"].shape[0]
-        elif isinstance(env.observation_space["observation"], gym.spaces.Tuple):
-            # e.g. shadow hand environment with multiple inputs
-            obs_dim = tuple(field.shape for field in env.observation_space["observation"])
+    # extract observation space dimensionalities from environment
+    if isinstance(env.observation_space, spaces.Dict):
+        # dict observation with observation field, for all GoalEnvs
+        if isinstance(env.observation_space["observation"], spaces.Box):
+            obs_dim = {"proprioception": env.observation_space["observation"].shape}
+        elif isinstance(env.observation_space["observation"], spaces.Dict):
+            # made for sensation
+            obs_dim = {field: field.shape for field in env.observation_space["observation"]}
         else:
-            raise UninterpretableObservationSpace(f"Cannot extract the dimensionality from a Dict observation space "
+            raise UninterpretableObservationSpace(f"Cannot extract the dimensionality from a spaces.Dict observation space "
                                                   f"where the observation is of type "
                                                   f"{type(env.observation_space['observation']).__name__}")
+    elif isinstance(env.observation_space, gym.spaces.Box):  # standard observation in box form
+        obs_dim = {"proprioception": env.observation_space.shape}
     else:
-        # standard observation in box form
-        obs_dim = env.observation_space.shape[0]
+        raise UninterpretableObservationSpace(
+            f"Cannot interpret observation space of type {type(env.observation_space)}.")
 
-    # step_tuple space
+    # action space
     if isinstance(env.action_space, Discrete):
         act_dim = env.action_space.n
     elif isinstance(env.action_space, Box):
@@ -75,30 +79,18 @@ def flatten(some_list):
 
 
 def is_array_collection(a: numpy.ndarray) -> bool:
-    """Check if an array is an array of objects (e.g. other arrays) or an actual array of direct data."""
+    """Check if an array is an array of objects (e.g. goal arrays) or an actual array of direct data."""
     return a.dtype == "O"
 
 
-def parse_state(state: Union[numpy.ndarray, dict]) -> Union[numpy.ndarray, Tuple]:
-    """Parse a state (array or array of arrays) received from an environment to have type float32."""
-    if not isinstance(state, dict):
-        return state.astype(numpy.float32)
-    else:
-        observation = state["observation"]
-        if isinstance(observation, np.ndarray):
-            return observation
-        else:
-            # multi input state like shadowhand
-            return tuple(map(lambda x: x.astype(numpy.float32), state["observation"]))
-
-
-def add_state_dims(state: Union[numpy.ndarray, Tuple], dims: int = 1, axis: int = 0) -> Union[numpy.ndarray, Tuple]:
+def add_state_dims(state: "Sensation", dims: int = 1, axis: int = 0) -> Union[numpy.ndarray, Tuple]:
     """Expand state (array or lost of arrays) to have a batch and/or time dimension."""
     if dims < 1:
         return state
 
-    return numpy.expand_dims(add_state_dims(state, dims=dims - 1, axis=axis), axis=axis) if not isinstance(state, Tuple) \
-        else tuple(map(lambda x: numpy.expand_dims(x, axis=axis), add_state_dims(state, dims=dims - 1, axis=axis)))
+    state.inject_leading_dims()
+
+    return state
 
 
 def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
@@ -114,7 +106,7 @@ def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):
 
 
 def insert_unknown_shape_dimensions(shape, none_replacer: int = 1):
-    """Replace Nones in a shape tuple with 1 or a given other value."""
+    """Replace Nones in a shape tuple with 1 or a given goal value."""
     return tuple(map(lambda s: none_replacer if s is None else s, shape))
 
 

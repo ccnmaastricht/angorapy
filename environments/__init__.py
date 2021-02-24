@@ -12,7 +12,7 @@ from utilities.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS
 # SHADOW HAND
 
 gym.envs.register(
-    id='BaseShadowHand-v0',
+    id='BaseShadowHandEnv-v0',
     entry_point='environments:ManipulateBlock',
     kwargs={"visual_input": True, "max_steps": SHADOWHAND_MAX_STEPS},
 )

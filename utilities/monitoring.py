@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
 import datetime
-import socket
-
-import simplejson as json
 import os
+import socket
 import time
 from inspect import getfullargspec as fargs
 
-import gym
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy
+import simplejson as json
 from gym.spaces import Box
 from matplotlib import animation
 
@@ -21,7 +19,7 @@ from common.wrappers import TransformationWrapper
 from models import get_model_type
 from utilities import const
 from utilities.const import PATH_TO_EXPERIMENTS
-from utilities.util import parse_state, add_state_dims, flatten
+from utilities.util import add_state_dims, flatten
 
 matplotlib.use('Agg')
 
@@ -35,7 +33,8 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: TransformationWrapper, frequency: int, gif_every: int, id=None, iterations=None,
+    def __init__(self, agent: PPOAgent, env: TransformationWrapper, frequency: int, gif_every: int, id=None,
+                 iterations=None,
                  config_name: str = "unknown"):
         self.agent = agent
         self.env = env
@@ -77,7 +76,7 @@ class Monitor:
             # collect an episode
             done = False
             frames = []
-            state = parse_state(self.env.reset())
+            state = self.env.reset()
             while not done:
                 frames.append(self.env.render(mode="rgb_array"))
 
@@ -85,7 +84,7 @@ class Monitor:
                 action, _ = self.agent.distribution.act(*probabilities)
                 observation, reward, done, _ = self.env.step(
                     numpy.atleast_1d(action) if self.continuous_control else action)
-                state = parse_state(observation)
+                state = observation
 
             # the figure
             plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
@@ -99,7 +98,6 @@ class Monitor:
             anim.save(f"{self.story_directory}/iteration_{self.agent.iteration}_{episode_letter}.gif",
                       writer='pillow',
                       fps=25)
-
 
             plt.close()
 
@@ -117,8 +115,10 @@ class Monitor:
                 deterministic=str(self.agent.env.spec.nondeterministic),
                 max_steps=str(self.agent.env.spec.max_episode_steps),
                 reward_threshold=str(self.agent.env.spec.reward_threshold),
-                max_action_values=str(self.agent.env.action_space.high) if hasattr(self.agent.env.action_space, "high") else "None",
-                min_action_values=str(self.agent.env.action_space.low) if hasattr(self.agent.env.action_space, "low") else "None",
+                max_action_values=str(self.agent.env.action_space.high) if hasattr(self.agent.env.action_space,
+                                                                                   "high") else "None",
+                min_action_values=str(self.agent.env.action_space.low) if hasattr(self.agent.env.action_space,
+                                                                                  "low") else "None",
             ),
             hyperparameters=dict(
                 continuous=str(self.agent.continuous_control),

@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-"""BaseShadowHand Environment Wrappers."""
+"""BaseShadowHandEnv Environment Wrappers."""
 import abc
 import random
 
+import gym
 import numpy as np
+from gym.envs.robotics import hand_env
 from gym.envs.robotics.hand import manipulate
 
 
@@ -30,7 +32,7 @@ def get_fingertip_distance(ft_a, ft_b):
     return np.linalg.norm(ft_a - ft_b, axis=-1)
 
 
-class BaseShadowHand(manipulate.ManipulateEnv, abc.ABC):
+class BaseShadowHandEnv(hand_env.HandEnv, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
 
     def _viewer_setup(self):
@@ -65,7 +67,7 @@ if __name__ == "__main__":
 
     # env = gym.make("HandTappingAbsolute-v1")
     # env = gym.make("HandFreeReachLFAbsolute-v0")
-    # env = gym.make("BaseShadowHand-v0")
+    # env = gym.make("BaseShadowHandEnv-v0")
     # env = gym.make("HandManipulateBlock-v0")
     env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()

@@ -6,7 +6,8 @@ from gym.envs.robotics import HandBlockEnv
 from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.utils import robot_get_obs
 
-from environments.shadowhand import BaseShadowHand, get_palm_position
+from common.senses import Sensation
+from environments.shadowhand import BaseShadowHandEnv, get_palm_position
 from utilities.const import VISION_WH, N_SUBSTEPS
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
@@ -17,7 +18,7 @@ MANIPULATE_EGG_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpa
                                   'manipulate_egg_touch_sensors.xml')
 
 
-class BaseManipulate(BaseShadowHand, manipulate.ManipulateEnv):
+class BaseManipulate(BaseShadowHandEnv, manipulate.ManipulateEnv):
     """Base class for in-hand manipulation tasks."""
 
     def __init__(self, model_path, target_position, target_rotation, target_position_range, reward_type,
@@ -130,7 +131,11 @@ class BaseManipulate(BaseShadowHand, manipulate.ManipulateEnv):
             raise NotImplementedError("Only sensor data supported atm, sorry.")
 
         return {
-            "observation": np.array((primary.copy(), proprioception.copy(), touch.copy(), self.goal.ravel().copy())),
+            "observation": Sensation(
+                vision=primary.copy(),
+                proprioception=proprioception.copy(),
+                somatosensation=touch.copy(),
+                goal=self.goal.ravel().copy()),
             "achieved_goal": achieved_goal.copy(),
             "desired_goal": self.goal.ravel().copy(),
         }

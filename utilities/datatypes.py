@@ -47,7 +47,7 @@ class ExperienceBuffer:
         return f"{self.__class__.__name__}[{self.filled}/{self.capacity}]"
 
     def fill(self, s, a, ap, adv, ret, v):
-        """Fill the buffer with 5-tuple of experience."""
+        """Fill (and thereby overwrite) the buffer with a 5-tuple of experience."""
         assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), "Inconsistent input sizes."
 
         self.capacity = len(adv)
@@ -66,7 +66,7 @@ class ExperienceBuffer:
 
     def inject_batch_dimension(self):
         """Add a batch dimension to the buffered experience."""
-        self.states = add_state_dims(self.states, axis=0)
+        self.states = add_state_dims(self.states)
         self.actions = np.expand_dims(self.actions, axis=0)
         self.action_probabilities = np.expand_dims(self.action_probabilities, axis=0)
         self.returns = np.expand_dims(self.returns, axis=0)
@@ -127,7 +127,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
 
         self.last_advantage_stop = 0
 
-    def push_seq_to_buffer(self, states: List[arr], actions: List[arr], action_probabilities: List[arr], values: List[arr]):
+    def push_seq_to_buffer(self, states: List["Sensation"], actions: List[arr], action_probabilities: List[arr], values: List[arr]):
         """Push a sequence to the buffer, constructed from given lists of values."""
         assert np.all(np.array([len(states), len(actions), len(action_probabilities), len(values)]) == len(states)), \
             "Inconsistent input sizes."
@@ -235,6 +235,6 @@ def mpi_condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None
 if __name__ == '__main__':
     from environments import *
 
-    environment = gym.make("BaseShadowHand-v1")
+    environment = gym.make("BaseShadowHandEnv-v1")
     buffer = TimeSequenceExperienceBuffer.new(environment, 10, 16, True, True)
     print(buffer)

@@ -12,8 +12,10 @@ from mpi4py import MPI
 from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer, BaseTransformer, \
     merge_transformers
 
+from agent.dataio import Sensation
 
-class BaseWrapper(gym.Wrapper, abc.ABC):
+
+class BaseWrapper(gym.ObservationWrapper, abc.ABC):
     """Abstract base class for preprocessors."""
 
     def __init__(self, env):
@@ -25,9 +27,19 @@ class BaseWrapper(gym.Wrapper, abc.ABC):
         return self.__class__.__name__
 
     @abc.abstractmethod
-    def warmup(self, env, n_steps=10):
+    def warmup(self, n_steps=10):
         """Warmup the environment."""
         pass
+
+    def observation(self, observation):
+        """Process an observation to be of type 'Sensation'."""
+        if isinstance(observation, Sensation):
+            return observation
+        elif isinstance(observation, dict):
+            assert "observation" in observation.keys(), "Unknown dict type of state couldnt be resolved to Sensation."
+            return Sensation(proprioception=observation["observation"])
+
+        return Sensation(proprioception=observation)
 
     # SYNCHRONIZATION
 
@@ -62,6 +74,19 @@ class TransformationWrapper(BaseWrapper):
     def __contains__(self, item):
         return item in self.transformers
 
+    def step(self, action):
+        """PErform a step and transform the results."""
+        step_tuple = super().step(action)
+        if len(self.transformers) != 0:
+            for transformer in self.transformers:
+                o, r, done, i = transformer.transform(step_tuple)
+
+            # include original reward in info
+            i["original_reward"] = step_tuple[1]
+            step_tuple = o, r, done, i
+
+        return step_tuple
+
     def add_transformers(self, transformers):
         """Add a list of transformers to the environment."""
         self.transformers.extend(transformers)
@@ -70,10 +95,10 @@ class TransformationWrapper(BaseWrapper):
         """Clear the list of transformers."""
         self.transformers = []
 
-    def warmup(self, env, n_steps=10):
+    def warmup(self, n_steps=10):
         """Warmup the transformers."""
         for t in self.transformers:
-            t.warmup(env, n_steps=n_steps)
+            t.warmup(self, n_steps=n_steps)
 
     def _mpi_sync(self):
         """Synchronise the transformers of the wrapper over all MPI ranks."""

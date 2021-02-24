@@ -393,7 +393,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         # directly get log of bab to prevent numerical issues, lgamma is save because alpha beta always > 0
         bab_log = tf.math.lgamma(alphas) + (tf.math.lgamma(betas) - tf.math.lgamma(tf.add(alphas, betas)))
 
-        # get other parts of equation; polygamma is save because alpha and beta cannot become 0
+        # get goal parts of equation; polygamma is save because alpha and beta cannot become 0
         a = tf.multiply(tf.subtract(alphas, 1.), tf.math.polygamma(0., alphas))
         b = tf.multiply(tf.subtract(betas, 1.), tf.math.polygamma(0., betas))
         ab = tf.multiply(tf.subtract(alphas + betas, 2.), tf.math.polygamma(0., tf.add(alphas, betas)))

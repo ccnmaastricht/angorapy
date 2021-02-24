@@ -1,14 +1,14 @@
 import abc
-import inspect
 import sys
 from collections import namedtuple
-from typing import List, Union, Tuple, Iterable
+from typing import List, Tuple, Dict
 
-import gym
 import numpy as np
 
+from common.senses import Sensation
 from utilities.const import NP_FLOAT_PREC, EPSILON
-from utilities.util import env_extract_dims, parse_state
+from utilities.types import StepTuple
+from utilities.util import env_extract_dims
 
 TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "data"])
 
@@ -36,7 +36,7 @@ class BaseTransformer(abc.ABC):
         """The name of the transformers."""
         return self.__class__.__name__
 
-    def transform(self, step_result, **kwargs):
+    def transform(self, step_result: StepTuple, **kwargs) -> StepTuple:
         """Transform the step results."""
         pass
 
@@ -44,7 +44,7 @@ class BaseTransformer(abc.ABC):
         """Just for the sake of interchangeability, all transformers have an update method even if they do not update."""
         pass
 
-    def warmup(self, env, n_steps=10):
+    def warmup(self, env: "BaseWrapper", n_steps=10):
         """Warm up the transformer for n steps."""
         pass
 
@@ -82,67 +82,61 @@ class BaseTransformer(abc.ABC):
 class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
     """Abstract base class for transformers implementing a running mean over some statistic."""
 
-    mean: List[np.ndarray]
-    variance: List[np.ndarray]
+    mean: Dict[str, np.ndarray]
+    variance: Dict[str, np.ndarray]
 
     def __add__(self, other) -> "BaseRunningMeanTransformer":
         nt = self.__class__(self.env)
         nt.n = self.n + other.n
 
-        for i in range(len(self.mean)):
-            nt.mean[i] = (self.n / nt.n) * self.mean[i] + (other.n / nt.n) * other.mean[i]
-            nt.variance[i] = (self.n * (self.variance[i] + (self.mean[i] - nt.mean[i]) ** 2)
-                              + other.n * (other.variance[i] + (other.mean[i] - nt.mean[i]) ** 2)) / nt.n
+        for name in self.mean.keys():
+            nt.mean[name] = (self.n / nt.n) * self.mean[name] + (other.n / nt.n) * other.mean[name]
+            nt.variance[name] = (self.n * (self.variance[name] + (self.mean[name] - nt.mean[name]) ** 2)
+                                 + other.n * (other.variance[name] + (other.mean[name] - nt.mean[name]) ** 2)) / nt.n
 
         return nt
 
-    def update(self, observation: Union[Tuple[np.ndarray], np.ndarray]) -> None:
+    def update(self, observation: dict) -> None:
         """Update the mean(serialization) and variance(serialization) of the tracked statistic based on the new sample.
 
-        Simplification of https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm.
-
-        The method can handle multi input states where the observation is a tuple of numpy arrays. For each element
-        a separate mean/variance is tracked. Any non-vector input will be skipped as they are assumed to be images
-        and should be handled seperatly."""
+        Simplification of https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm.."""
         self.n += 1
 
-        if not isinstance(observation, Tuple):
-            observation = (observation,)
+        for name, obs in filter(lambda o: isinstance(o[1], (int, float)) or len(o[1].shape) in [0, 1], observation.items()):
+            delta = obs - self.mean[name]
+            m_a = self.variance[name] * (self.n - 1)
 
-        for i, obs in enumerate(filter(lambda o: isinstance(o, (int, float)) or len(o.shape) in [0, 1], observation)):
-            delta = obs - self.mean[i]
-            m_a = self.variance[i] * (self.n - 1)
-
-            self.mean[i] = np.array(self.mean[i] + delta * (1 / self.n), dtype=NP_FLOAT_PREC)
-            self.variance[i] = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n, dtype=NP_FLOAT_PREC)
+            self.mean[name] = np.array(self.mean[name] + delta * (1 / self.n), dtype=NP_FLOAT_PREC)
+            self.variance[name] = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n,
+                                           dtype=NP_FLOAT_PREC)
 
     def serialize(self) -> TransformerSerialization:
         """Serialize the transformer to allow for saving it in a file."""
         return TransformerSerialization(self.__class__.__name__, [self.n,
-                                                                  list(map(lambda m: m.tolist(), self.mean)),
-                                                                  list(map(lambda v: v.tolist(), self.variance))])
+                                                                  {n: m.tolist() for n, m in self.mean.items()},
+                                                                  {n: v.tolist() for n, v in self.variance.items()}])
 
     @classmethod
-    def recover(cls, data):
+    def recover(cls, data: TransformerSerialization):
         """Recover a running mean transformer from its serialization"""
-        transformer = cls() if len(data) == 3 else cls(data[3])
+        transformer = cls()
         transformer.n = np.array(data[0])
         transformer.mean = list(map(lambda l: np.array(l), data[1]))
         transformer.variance = list(map(lambda l: np.array(l), data[2]))
 
         return transformer
 
-    def simplified_mean(self) -> List[float]:
+    def simplified_mean(self) -> Dict[str, float]:
         """Get a simplified, one dimensional mean by meaning any means."""
-        return [np.mean(m).item() for m in self.mean]
+        return {n: np.mean(m).item() for n, m in self.mean.items()}
 
-    def simplified_variance(self) -> List[float]:
+    def simplified_variance(self) -> Dict[str, float]:
         """Get a simplified, one dimensional variance by meaning any variances."""
-        return [np.mean(v).item() for v in self.variance]
+        return {n: np.mean(v).item() for n, v in self.variance.items()}
 
-    def simplified_stdev(self) -> List[float]:
+    def simplified_stdev(self) -> Dict[str, float]:
         """Get a simplified, one dimensional stdev by meaning any variances and taking their square root."""
-        return [np.sqrt(np.mean(v)).item() for v in self.variance]
+        return {n: np.sqrt(np.mean(v)).item() for n, v in self.variance.items()}
 
 
 class StateNormalizationTransformer(BaseRunningMeanTransformer):
@@ -152,52 +146,34 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
         # parse input types into normed shape format
         super().__init__(env)
 
-        self.shapes: Iterable[Iterable[int]]
-        if isinstance(self.state_dim, Iterable) and all(isinstance(x, Iterable) for x in self.state_dim):
-            self.shapes = self.state_dim
-        elif isinstance(self.state_dim, int):
-            self.shapes = ((self.state_dim,),)
-        elif isinstance(self.state_dim, Iterable) and all(isinstance(x, int) for x in self.state_dim):
-            self.shapes = (self.state_dim,)
-        else:
-            raise ValueError("Cannot understand shape format.")
+        self.shapes = self.state_dim
 
-        self.mean = [np.zeros(i_shape, NP_FLOAT_PREC) for i_shape in self.shapes if len(i_shape) == 1]
-        self.variance = [np.ones(i_shape, NP_FLOAT_PREC) for i_shape in self.shapes if len(i_shape) == 1]
+        self.mean = {k: np.zeros(i_shape, NP_FLOAT_PREC) for k, i_shape in self.shapes.items() if len(i_shape) == 1}
+        self.variance = {k: np.ones(i_shape, NP_FLOAT_PREC) for k, i_shape in self.shapes.items() if len(i_shape) == 1}
 
         assert len(self.mean) > 0 and len(self.variance) > 0, "Initialized StateNormalizationTransformer got no vector " \
                                                               "states."
 
-    def step(self, step_result, update=True) -> Tuple:
+    def transform(self, step_result: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
         o, r, done, info = step_result
 
         if update:
-            self.update(o)
+            self.update(o.dict())
 
-        # normalize
-        if not isinstance(o, Tuple):
-            o = (o,)
+        normed_o = {}
+        for sense_name, sense_value in filter(lambda a: len(a[1].shape) == 1, o.dict().items()):
+            normed_o[sense_name] = np.clip((sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
 
-        normed_o = []
-        for i, op in enumerate(filter(lambda a: len(a.shape) == 1, o)):
-            normed_o.append(np.clip((op - self.mean[i]) / (np.sqrt(self.variance[i] + EPSILON)), -10., 10.))
+        normed_o = Sensation(**normed_o)
 
-        normed_o = normed_o[0] if len(normed_o) == 1 else tuple(normed_o)
         return normed_o, r, done, info
 
-    def warmup(self, env, n_steps=10):
+    def warmup(self, env: "BaseWrapper", n_steps=10):
         """Warmup the transformer by sampling the observation space."""
         env.reset()
         for i in range(n_steps):
-            self.update(parse_state(env.observation_space.sample()))
-
-    def serialize(self) -> TransformerSerialization:
-        """Serialize the transformer to allow for saving it in a file."""
-        serialization = super().serialize()
-        serialization.data.append(self.shapes)
-
-        return serialization
+            self.update(env.step(env.action_space.sample())[0].dict())
 
 
 class RewardNormalizationTransformer(BaseRunningMeanTransformer):
@@ -206,11 +182,11 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
     def __init__(self, env):
         super().__init__(env)
 
-        self.mean = [np.array(0, NP_FLOAT_PREC)]
-        self.variance = [np.array(1, NP_FLOAT_PREC)]
+        self.mean = {"reward": np.array(0, NP_FLOAT_PREC)}
+        self.variance = {"reward": np.array(1, NP_FLOAT_PREC)}
         self.ret = np.float64(0)
 
-    def transform(self, step_tuple: Tuple, update=True) -> Tuple:
+    def transform(self, step_tuple: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
         o, r, done, info = step_tuple
 
@@ -220,21 +196,21 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
         # update based on cumulative discounted reward
         if update:
             self.ret = 0.99 * self.ret + r
-            self.update(self.ret)
+            self.update({"reward": self.ret})
 
         # normalize
-        r = np.clip(r / (np.sqrt(self.variance[0] + EPSILON)), -10., 10.)
+        r = np.clip(r / (np.sqrt(self.variance["reward"] + EPSILON)), -10., 10.)
 
         if done:
             self.ret = 0.
 
         return o, r, done, info
 
-    def warmup(self, env: gym.Env, n_steps=10):
+    def warmup(self, env: "BaseWrapper", n_steps=10):
         """Warmup the transformer by randomly stepping the environment through step_tuple space sampling."""
         env.reset()
         for i in range(n_steps):
-            self.update(env.step(env.action_space.sample())[1])
+            self.update({"reward": env.step(env.action_space.sample())[1]})
 
 
 class StateMemory(BaseTransformer):
