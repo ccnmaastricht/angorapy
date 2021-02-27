@@ -9,21 +9,21 @@ import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from agent.policies import BasePolicyDistribution, BetaPolicyDistribution, CategoricalPolicyDistribution
+from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution
 from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
 
 def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False,
                      layer_sizes: Tuple = (64, 64)):
-    """Build simple two-layer model."""
+    """Build a simple fully connected feed-forward model model."""
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
 
     # input preprocessing
     inputs = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
-    input_dict = {"proprioception": inputs}
+    # input_dict = {"proprioception": inputs}
 
     # policy network
     latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="policy_encoder")(inputs)
@@ -42,9 +42,9 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(latent)
 
-    value = tf.keras.Model(inputs=input_dict, outputs=value_out, name="value")
+    value = tf.keras.Model(inputs=inputs, outputs=value_out, name="value")
 
-    return policy, value, tf.keras.Model(inputs=input_dict, outputs=[out_policy, value_out], name="policy_value")
+    return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, value_out], name="policy_value")
 
 
 def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
@@ -98,7 +98,7 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="simple_rnn_policy")
     value = tf.keras.Model(inputs=inputs, outputs=out_value, name="simple_rnn_value")
 
-    return policy, value, tf.keras.Model(inputs=input_dict, outputs=[out_policy, out_value], name="simple_rnn")
+    return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="simple_rnn")
 
 
 def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,

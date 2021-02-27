@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
-
+from pprint import pprint
 from typing import Tuple, Any
 
 import numpy as np
@@ -76,6 +76,7 @@ class Gatherer:
             prepared_state = add_state_dims(state, dims=(2 if is_recurrent else 1)).dict()
             policy_out = flatten(joint.predict(prepared_state))
             a_distr, value = policy_out[:-1], policy_out[-1]
+
             states.append(state)
             values.append(np.squeeze(value))
 
@@ -137,7 +138,7 @@ class Gatherer:
 
         env.close()
 
-        # get last non-visited state's serialization value to incorporate it into the advantage estimation of last visited state
+        # get last non-visited state value to incorporate it into the advantage estimation of last visited state
         values.append(np.squeeze(joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
@@ -153,6 +154,14 @@ class Gatherer:
         # if not recurrent, fill the buffer with everything we gathered
         if not is_recurrent:
             values = np.array(values, dtype="float32")
+
+            # print("\n\n")
+            # pprint({
+            #     "action": actions,
+            #     "action_prob": action_probabilities,
+            #     "proprioception": states,
+            #     "value": values,
+            #  })
 
             # write to the buffer
             advantages = np.hstack(advantages).astype("float32")

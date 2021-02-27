@@ -77,13 +77,27 @@ class Sensation:
     # OTHER
 
     def inject_leading_dims(self, time=False):
-        """Expand state to have a batch and/or time dimension."""
+        """Expand state (inplace) to have a batch and/or time dimension."""
         sense: numpy.ndarray
+
         for sense, value in self.dict().items():
             if value is None:
                 continue
 
             self[sense] = np.expand_dims(value, axis=(0 if not time else (0, 1)))
+
+    def with_leading_dims(self, time=False):
+        """Return a new state with batch and/or time dimension but keep this Sensation as is."""
+        sense: numpy.ndarray
+
+        new_sensation = Sensation(**(self.dict()))
+        for sense, value in new_sensation.dict().items():
+            if value is None:
+                continue
+
+            new_sensation[sense] = np.expand_dims(value, axis=(0 if not time else (0, 1)))
+
+        return new_sensation
 
     def dict(self):
         """Return a dict of the senses and their values."""

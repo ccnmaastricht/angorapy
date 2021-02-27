@@ -59,7 +59,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
         "action_prob": buffer.action_probabilities,
         "return": buffer.returns,
         "advantage": buffer.advantages,
-        "value": buffer.advantages,
+        "value": buffer.values,
     }
 
     for sense in buffer.states[0].dict().keys():

@@ -74,7 +74,7 @@ def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Te
 
     if len(actions.shape) == 1:
         indices = tf.concat([tf.reshape(tf.range(actions.shape[0]), [-1, 1]), tf.reshape(actions, [-1, 1])], axis=-1)
-        choices = tf.gather_nd(predictions, indices, batch_dims=1)
+        choices = tf.gather_nd(predictions, indices)
     else:
         batch_indices = tf.reshape(
             tf.tile(tf.expand_dims(tf.range(actions.shape[0]), axis=-1), [1, actions.shape[1]]), [-1, 1])
@@ -83,7 +83,7 @@ def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Te
 
         indices = tf.concat((batch_indices, sequence_indices, tf.reshape(actions, [-1, 1])), axis=-1)
 
-        choices = tf.gather_nd(predictions, indices, batch_dims=2)
+        choices = tf.gather_nd(predictions, indices)  #, batch_dims=1)
         choices = tf.reshape(choices, actions.shape)
 
     return choices

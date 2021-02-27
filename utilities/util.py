@@ -88,9 +88,9 @@ def add_state_dims(state: "Sensation", dims: int = 1, axis: int = 0) -> 'Sensati
     if dims < 1:
         return state
 
-    state.inject_leading_dims()
+    new_state = state.with_leading_dims()
 
-    return state
+    return new_state
 
 
 def merge_into_batch(list_of_states: List[Union[numpy.ndarray, Tuple]]):

@@ -8,6 +8,7 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
+from pprint import pprint
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -585,6 +586,8 @@ class PPOAgent:
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
+                # print("\n\n")
+                # print(b)
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:

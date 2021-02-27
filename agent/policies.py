@@ -106,7 +106,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         """Sample an step_tuple from a discrete step_tuple distribution predicted by the given policy for a given state."""
         action = self.sample(log_probabilities)
-        return action, tf.expand_dims(tf.squeeze(log_probabilities)[action], 0)
+        return action, tf.squeeze(log_probabilities)[action]
 
     def sample(self, log_probabilities):
         """Sample an step_tuple from the distribution."""

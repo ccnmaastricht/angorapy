@@ -13,6 +13,6 @@ model = tf.keras.Model(inputs={"vision": vision, "somatosensation": touch}, outp
 
 sens = Sensation(vision=numpy.random.normal(size=(3,)), somatosensation=numpy.random.normal(size=(4,)))
 
-sens.inject_leading_dims()
+sens.with_leading_dims()
 print(sens.dict())
 print(model.predict(sens.dict()))
