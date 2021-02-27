@@ -7,8 +7,9 @@ from typing import Tuple
 import gym
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
+from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from agent.policies import BasePolicyDistribution, BetaPolicyDistribution
+from agent.policies import BasePolicyDistribution, BetaPolicyDistribution, CategoricalPolicyDistribution
 from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
@@ -25,8 +26,7 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     input_dict = {"proprioception": inputs}
 
     # policy network
-    latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes,
-                                       name="policy_encoder")(inputs)
+    latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="policy_encoder")(inputs)
     out_policy = distribution.build_action_head(n_actions, (layer_sizes[-1],), None)(latent)
 
     policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
@@ -131,13 +131,13 @@ if __name__ == '__main__':
 
     # _, _, ffn_distinct = build_ffn_models(cont_env, GaussianPolicyDistribution(cont_env), False)
     # _, _, ffn_shared = build_ffn_models(cont_env, BetaPolicyDistribution(cont_env), True)
-    # _, _, ffn_distinct_discrete = build_ffn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
-    _, _, rnn_distinct = build_rnn_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, "lstm")
+    _, _, ffn_distinct_discrete = build_ffn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
+    # _, _, rnn_distinct = build_rnn_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, "lstm")
     # _, _, rnn_shared = build_rnn_models(cont_env, GaussianPolicyDistribution(cont_env), True, 1, "gru")
     # _, _, rnn_shared_discrete = build_rnn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
 
     # plot_model(ffn_distinct, "ffn_distinct.png", expand_nested=True)
-    # plot_model(ffn_distinct_discrete, "ffn_distinct_discrete.png", expand_nested=True)
+    plot_model(ffn_distinct_discrete, "ffn_distinct_discrete.png", expand_nested=True)
     # plot_model(ffn_shared, "ffn_shared.png", expand_nested=True)
     # plot_model(rnn_distinct, "rnn_distinct.png", expand_nested=True)
     # plot_model(rnn_shared, "rnn_shared.png", expand_nested=True)

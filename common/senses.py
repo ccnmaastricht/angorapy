@@ -3,7 +3,7 @@ import numpy as np
 
 
 class Sensation:
-    """Class wrapper for state representations. Designed for sensory readings, but non-sensory data can be
+    """Wrapper for state representations. Designed for sensory readings, but non-sensory data can be
     encapsulated too. The convention is to refer to any non-sensory data as proprioception, following the intuition
     that it represents inner states."""
 
@@ -68,17 +68,22 @@ class Sensation:
     def __getitem__(self, item):
         return self.dict()[item]
 
+    def __setitem__(self, key, value):
+        if key in self.__dict__.keys():
+            self.__dict__[key] = value
+        else:
+            raise ValueError(f"{key} is not a sense")
+
     # OTHER
 
     def inject_leading_dims(self, time=False):
         """Expand state to have a batch and/or time dimension."""
         sense: numpy.ndarray
-        for sense in self:
-            if sense is None:
+        for sense, value in self.dict().items():
+            if value is None:
                 continue
 
-            new_dims = (1,) if not time else (1, 1,)
-            sense.shape = new_dims + sense.shape
+            self[sense] = np.expand_dims(value, axis=(0 if not time else (0, 1)))
 
     def dict(self):
         """Return a dict of the senses and their values."""

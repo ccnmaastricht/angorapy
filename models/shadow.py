@@ -9,7 +9,7 @@ from tensorflow.keras.layers import TimeDistributed as TD
 from tqdm import tqdm
 
 from agent.policies import BasePolicyDistribution, BetaPolicyDistribution
-from environments import *
+import gym
 from models.components import _build_fcn_component
 from models.convolutional import _build_visual_encoder
 from utilities.const import VISION_WH

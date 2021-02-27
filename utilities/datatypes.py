@@ -25,11 +25,9 @@ class ExperienceBuffer:
     def __init__(self, states: Union[List, arr], actions: Union[List, arr], action_probabilities: Union[List, arr],
                  returns: Union[List, arr], advantages: Union[List, arr], values: Union[List, arr],
                  episodes_completed: int, episode_rewards: List[int], capacity: int, episode_lengths: List[int],
-                 is_multi_feature: bool, is_continuous: bool):
+                 is_continuous: bool):
 
         self.is_continuous = is_continuous
-        self.is_multi_feature = is_multi_feature
-
         self.capacity = capacity
         self.filled = 0
 
@@ -74,19 +72,11 @@ class ExperienceBuffer:
         self.advantages = np.expand_dims(self.advantages, axis=0)
 
     @staticmethod
-    def new_empty(is_continuous, is_multi_feature):
+    def new_empty(is_continuous):
         """Return an empty buffer."""
-        return ExperienceBuffer(states=[],
-                                actions=[],
-                                action_probabilities=[],
-                                returns=[],
-                                advantages=[],
-                                values=[],
-                                episodes_completed=0, episode_rewards=[],
-                                capacity=0,
-                                episode_lengths=[],
-                                is_continuous=is_continuous,
-                                is_multi_feature=is_multi_feature)
+        return ExperienceBuffer(states=[], actions=[], action_probabilities=[], returns=[], advantages=[], values=[],
+                                episodes_completed=0, episode_rewards=[], capacity=0, episode_lengths=[],
+                                is_continuous=is_continuous)
 
     @staticmethod
     def new(env: gym.Env, size: int, is_continuous, is_multi_feature):
@@ -97,16 +87,10 @@ class ExperienceBuffer:
             state_buffer = np.zeros((size, action_dim))
         else:
             state_buffer = tuple(np.zeros((size,) + shape) for shape in state_dim)
-        return ExperienceBuffer(states=state_buffer,
-                                actions=np.zeros((size, action_dim)),
-                                action_probabilities=np.zeros((size,)),
-                                returns=np.zeros((size,)),
-                                advantages=np.zeros((size,)),
-                                values=np.zeros((size,)),
-                                episodes_completed=0, episode_rewards=[], episode_lengths=[],
-                                capacity=size,
-                                is_continuous=is_continuous,
-                                is_multi_feature=is_multi_feature)
+        return ExperienceBuffer(states=state_buffer, actions=np.zeros((size, action_dim)),
+                                action_probabilities=np.zeros((size,)), returns=np.zeros((size,)),
+                                advantages=np.zeros((size,)), values=np.zeros((size,)), episodes_completed=0,
+                                episode_rewards=[], capacity=size, episode_lengths=[], is_continuous=is_continuous)
 
 
 class TimeSequenceExperienceBuffer(ExperienceBuffer):
@@ -115,10 +99,10 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
     def __init__(self, states: Union[List, arr], actions: Union[List, arr], action_probabilities: Union[List, arr],
                  returns: Union[List, arr], advantages: Union[List, arr], values: Union[List, arr],
                  episodes_completed: int, episode_rewards: List[int], capacity: int, seq_length: int,
-                 episode_lengths: List[int], is_multi_feature: bool, is_continuous: bool):
+                 episode_lengths: List[int], is_continuous: bool):
 
         super().__init__(states, actions, action_probabilities, returns, advantages, values, episodes_completed,
-                         episode_rewards, capacity, episode_lengths, is_multi_feature, is_continuous)
+                         episode_rewards, capacity, episode_lengths, is_continuous)
 
         self.seq_length = seq_length
         self.true_number_of_transitions = 0
@@ -133,12 +117,9 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
             "Inconsistent input sizes."
 
         seq_length = len(actions)
-        if self.is_multi_feature:
-            states = [np.stack(list(map(lambda s: s[f_id], states))) for f_id in range(len(states[0]))]
-            for feature_array, features in zip(self.states, states):
-                feature_array[self.number_of_subsequences_pushed, :seq_length, ...] = features
-        else:
-            self.states[self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(states)
+        states = {np.stack(list(map(lambda s: s[f_name], states))) for f_name in states[0].dict().keys()}
+        for feature_array, features in zip(self.states, states):
+            feature_array[self.number_of_subsequences_pushed, :seq_length, ...] = features
 
         # can I point out for a second that numpy slicing is beautiful as fu**
         self.actions[self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(actions)
@@ -202,11 +183,9 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
                                             action_probabilities=np.zeros((size, seq_len,), dtype=np.float32),
                                             returns=np.zeros((size, seq_len), dtype=np.float32),
                                             advantages=np.zeros((size, seq_len), dtype=np.float32),
-                                            values=np.zeros((size, seq_len), dtype=np.float32),
-                                            episodes_completed=0, episode_rewards=[],
-                                            capacity=size * seq_len, seq_length=seq_len,
-                                            episode_lengths=[],
-                                            is_continuous=is_continuous, is_multi_feature=is_multi_feature)
+                                            values=np.zeros((size, seq_len), dtype=np.float32), episodes_completed=0,
+                                            episode_rewards=[], capacity=size * seq_len, seq_length=seq_len,
+                                            episode_lengths=[], is_continuous=is_continuous)
 
 
 def condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None]:
@@ -233,8 +212,6 @@ def mpi_condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None
 
 
 if __name__ == '__main__':
-    from environments import *
-
     environment = gym.make("BaseShadowHandEnv-v1")
     buffer = TimeSequenceExperienceBuffer.new(environment, 10, 16, True, True)
     print(buffer)

@@ -83,7 +83,7 @@ def is_array_collection(a: numpy.ndarray) -> bool:
     return a.dtype == "O"
 
 
-def add_state_dims(state: "Sensation", dims: int = 1, axis: int = 0) -> Union[numpy.ndarray, Tuple]:
+def add_state_dims(state: "Sensation", dims: int = 1, axis: int = 0) -> 'Sensation':
     """Expand state (array or lost of arrays) to have a batch and/or time dimension."""
     if dims < 1:
         return state

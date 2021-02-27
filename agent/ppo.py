@@ -8,7 +8,7 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
-from typing import Union, Tuple, Any
+from typing import Union, Tuple, Any, Callable
 
 import gym
 import numpy as np
@@ -35,9 +35,6 @@ from utilities.model_utils import is_recurrent_model, get_layer_names, get_compo
 from utilities.statistics import ignore_none
 from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 
-HOROVOD = False
-INIT_HOROVOD = False
-
 # get COMM and find gpus
 mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
@@ -49,21 +46,6 @@ if not is_gpu_process:
 else:
     # pass
     tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
-
-if INIT_HOROVOD:
-    import horovod.tensorflow as hvd
-
-    # create subcomm with GPUs
-    gpu_subcomm = mpi_comm.Split(color=int(is_gpu_process))
-    hvd.init(comm=gpu_subcomm)
-
-    # prevent full blockage of VRAM
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
-
-    if is_gpu_process:
-        if gpus:
-            tf.config.experimental.set_visible_devices(gpus[mpi_comm.rank], 'GPU')
 
 
 class PPOAgent:
@@ -79,7 +61,7 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
-    def __init__(self, model_builder, environment: BaseWrapper, horizon: int, workers: int,
+    def __init__(self, model_builder: Callable, environment: BaseWrapper, horizon: int, workers: int,
                  learning_rate: float = 0.001, discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
                  c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
                  clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
@@ -145,10 +127,10 @@ class PPOAgent:
         self.lr_schedule_type = lr_schedule
         if lr_schedule is None:
             # adjust learning rate based on number of parallel GPUs
-            self.lr_schedule = self.learning_rate * (hvd.size() if HOROVOD else 1)
+            self.lr_schedule = self.learning_rate
         elif lr_schedule.lower() == "exponential":
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=self.learning_rate * (hvd.size() if HOROVOD else 1),
+                initial_learning_rate=self.learning_rate,
                 decay_steps=workers * horizon,  # decay after every cycle
                 decay_rate=0.98
             )
@@ -255,15 +237,14 @@ class PPOAgent:
         self.device = "GPU:0" if activated else "CPU:0"
 
     def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
-        """Actor'serialization clipped objective as given in the PPO paper. Original objective is to be maximized
-        (as given in the paper), but this is the negated objective to be minimized! In the recurrent version
-        a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied in the mean
-        operation of the loss.
+        """Clipped objective as given in the PPO paper. Original objective is to be maximized, but this is the negated
+        objective to be minimized! In the recurrent version a mask is calculated based on 0 values in the
+        old_action_prob tensor. The mask is then applied in the mean operation of the loss.
 
         Args:
-          action_prob (tf.Tensor): the probability of the step_tuple for the state under the current policy
-          old_action_prob (tf.Tensor): the probability of the step_tuple taken given by the old policy during the episode
-          advantage (tf.Tensor): the advantage that taking the step_tuple gives over the estimated state value
+          action_prob (tf.Tensor): the probability of the action for the state under the current policy
+          old_action_prob (tf.Tensor): the probability of the action taken given by the old policy during the episode
+          advantage (tf.Tensor): the advantage that taking the action gives over the estimated state value
 
         Returns:
           the value of the objective function
@@ -316,8 +297,8 @@ class PPOAgent:
             return tf.reduce_mean(error) * 0.5
 
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
-        """Entropy of policy output acting as regularization by preventing dominance of one step_tuple. The higher the
-        entropy, the less probability mass lies on a single step_tuple, which would hinder exploration. We hence reduce
+        """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
+        entropy, the less probability mass lies on a single action, which would hinder exploration. We hence reduce
         the loss by the (scaled by c_entropy) entropy to encourage a certain degree of exploration.
 
         Args:
@@ -360,7 +341,8 @@ class PPOAgent:
 
         if MPI.COMM_WORLD.rank == 0:
             print(
-                f"\n\nDrill started using {MPI.COMM_WORLD.size} processes of which {len(gpus)} are GPU optimizers."
+                f"\n\nDrill started using {MPI.COMM_WORLD.size} processes for {self.n_workers} workers of which "
+                f"{len(gpus)} are GPU optimizers."
                 f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
                 f"IDs over Workers: {list_of_collection_id_lists}")
 
@@ -397,8 +379,8 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # distribute parameters from rank 0 to all goal ranks
-            values = mpi_comm.bcast(self.joint.get_weights(), root=0)
-            self.joint.set_weights(values)
+            joint_weights = mpi_comm.bcast(self.joint.get_weights(), root=0)
+            self.joint.set_weights(joint_weights)
 
             # run simulations in parallel
             worker_stats = []
@@ -537,11 +519,11 @@ class PPOAgent:
             old_values = batch["value"]
 
             if self.continuous_control:
-                # if step_tuple space is continuous, calculate PDF at chosen step_tuple value
-                action_probabilities = self.distribution.log_probability(batch["step_tuple"], *policy_output)
+                # if action space is continuous, calculate PDF at chosen action value
+                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
             else:
-                # if the step_tuple space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["step_tuple"])
+                # if the action space is discrete, extract the probabilities of actions actually chosen
+                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
             # calculate the clipped loss
             policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
@@ -551,10 +533,6 @@ class PPOAgent:
                                          clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
             total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
-
-        # wrap for distribution
-        if HOROVOD:
-            tape = hvd.DistributedGradientTape(tape)
 
         # calculate the gradient of the joint model based on total loss
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
@@ -568,7 +546,7 @@ class PPOAgent:
 
         info = {
             "policy_output": policy_output,
-            # "actions": batch["step_tuple"],
+            # "actions": batch["action"],
             # "action_probabilities": action_probabilities,
             # "old_action_probabilities": batch["action_prob"],
             # "value_output": value_output,
@@ -603,14 +581,8 @@ class PPOAgent:
             if not self.is_recurrent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            if HOROVOD:
-                # dataset = dataset.take(dataset.cardinality() // hvd.size())  # todo wont work before 2.3
-                dataset = dataset
-
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
-
-            first_batch = True
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
                 # use the dataset to optimize the model
@@ -632,11 +604,6 @@ class PPOAgent:
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["action_prob"])
                             reset_states_masked(self.joint, reset_mask)
-
-                if first_batch and HOROVOD:
-                    hvd.broadcast_variables(self.joint.variables, root_rank=0)
-                    hvd.broadcast_variables(self.optimizer.variables(), root_rank=0)
-                first_batch = False
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -862,6 +829,6 @@ class PPOAgent:
 
     def finalize(self):
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
-        print(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord")
+
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)

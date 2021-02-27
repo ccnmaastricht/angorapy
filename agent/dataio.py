@@ -6,9 +6,7 @@ import re
 from functools import partial
 from typing import Union, Tuple, List
 
-import numpy as np
 import tensorflow as tf
-from common.senses import Sensation
 
 from utilities.const import STORAGE_DIR
 from utilities.datatypes import ExperienceBuffer, StatBundle, TimeSequenceExperienceBuffer
@@ -24,42 +22,6 @@ def _bytes_feature(value):
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy()
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
-
-def serialize_flat_sample(s, a, ap, r, adv, v):
-    """Serialize a sample from a dataset."""
-    feature = {
-        "state": _bytes_feature(tf.io.serialize_tensor(s)),
-        "step_tuple": _bytes_feature(tf.io.serialize_tensor(a)),
-        "action_prob": _bytes_feature(tf.io.serialize_tensor(ap)),
-        "return": _bytes_feature(tf.io.serialize_tensor(r)),
-        "advantage": _bytes_feature(tf.io.serialize_tensor(adv)),
-        "value": _bytes_feature(tf.io.serialize_tensor(v))
-    }
-
-    # Create a Features message using tf.train.Example.
-    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
-    return example_proto.SerializeToString()
-
-
-def serialize_sampleold(sv, sp, st, sg, a, ap, r, adv, v, feature_names):
-    """Serialize a multi-input (shadow hand) sample from a dataset."""
-    feature = {
-        "vision": _bytes_feature(tf.io.serialize_tensor(sv)),
-        "somatosensation": _bytes_feature(tf.io.serialize_tensor(st)),
-        "proprioception": _bytes_feature(tf.io.serialize_tensor(sp)),
-        "goal": _bytes_feature(tf.io.serialize_tensor(sg)),
-
-        "step_tuple": _bytes_feature(tf.io.serialize_tensor(a)),
-        "action_prob": _bytes_feature(tf.io.serialize_tensor(ap)),
-        "return": _bytes_feature(tf.io.serialize_tensor(r)),
-        "advantage": _bytes_feature(tf.io.serialize_tensor(adv)),
-        "value": _bytes_feature(tf.io.serialize_tensor(v))
-    }
-
-    # Create a Features message using tf.train.Example.
-    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
-    return example_proto.SerializeToString()
 
 
 def serialize_sample(*args, feature_names):
@@ -78,7 +40,7 @@ def serialize_sample(*args, feature_names):
 def tf_serialize_example(sample):
     """TF wrapper for serialization function."""
     feature_names = ([sense for sense in ["vision", "somatosensation", "proprioception", "goal"] if sense in sample]
-                     + ["step_tuple", "action_prob", "return", "advantage", "value"])
+                     + ["action", "action_prob", "return", "advantage", "value"])
 
     inputs = [sample[f] for f in feature_names]
 
@@ -93,7 +55,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
 
     # build the dataset
     tensor_slices = {
-        "step_tuple": buffer.actions,
+        "action": buffer.actions,
         "action_prob": buffer.action_probabilities,
         "return": buffer.returns,
         "advantage": buffer.advantages,
@@ -135,7 +97,7 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
     assert all(r in ["proprioception", "vision", "somatosensation", "goal"] for r in responsive_senses)
 
     feature_description = {
-        "step_tuple": tf.io.FixedLenFeature([], tf.string),
+        "action": tf.io.FixedLenFeature([], tf.string),
         "action_prob": tf.io.FixedLenFeature([], tf.string),
         "return": tf.io.FixedLenFeature([], tf.string),
         "advantage": tf.io.FixedLenFeature([], tf.string),
@@ -149,7 +111,7 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
         # Parse the input `tf.Example` proto using the dictionary above.
         parsed = tf.io.parse_single_example(example_proto, feature_description)
 
-        parsed["step_tuple"] = tf.io.parse_tensor(parsed["step_tuple"], out_type=dtype_actions)
+        parsed["action"] = tf.io.parse_tensor(parsed["action"], out_type=dtype_actions)
         parsed["action_prob"] = tf.io.parse_tensor(parsed["action_prob"], out_type=tf.float32)
         parsed["return"] = tf.io.parse_tensor(parsed["return"], out_type=tf.float32)
         parsed["advantage"] = tf.io.parse_tensor(parsed["advantage"], out_type=tf.float32)
@@ -168,12 +130,3 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
     serialized_dataset = serialized_dataset.map(_parse_function)
 
     return serialized_dataset
-
-
-if __name__ == '__main__':
-    s = Sensation(np.array([1, 3, 4]), np.array([1, 3, 3]), np.array([1, 3, 2]))
-
-    print()
-    print(s)
-    s.inject_leading_dims(time=True)
-    print(s)

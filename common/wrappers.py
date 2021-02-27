@@ -1,18 +1,12 @@
 """Wrappers encapsulating environments to modulate n_steps, rewards, and control state initialization."""
 import abc
-import itertools
-import sys
-from copy import copy
 from typing import Union, List, Type
 
 import gym
-import numpy as np
 from mpi4py import MPI
 
-from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer, BaseTransformer, \
-    merge_transformers
-
-from agent.dataio import Sensation
+from common.senses import Sensation
+from common.transformers import BaseTransformer, merge_transformers
 
 
 class BaseWrapper(gym.ObservationWrapper, abc.ABC):
@@ -107,7 +101,7 @@ class TransformationWrapper(BaseWrapper):
             collection = MPI.COMM_WORLD.gather(transformer, root=0)
 
             if MPI.COMM_WORLD.Get_rank() == 0:
-                 synced_transformers.append(merge_transformers(collection))
+                synced_transformers.append(merge_transformers(collection))
 
         self.transformers = MPI.COMM_WORLD.bcast(synced_transformers, root=0)
 
