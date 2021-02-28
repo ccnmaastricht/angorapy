@@ -237,10 +237,13 @@ if __name__ == "__main__":
     # agent_id = 1583404415  # 1583180664 lunarlandercont
     # agent_id = 1588341681  # halfcheetah
     # agent_id, env = 1585777856, "HandFreeReachLFAbsolute-v0"  # free reach
-    #agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
+    # agent_id, env = 1588151579, 'HandFreeReachRFAbsolute-v0'  # small step reach task
     # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
     # agent_id, env = 1591604443, 'HandFreeReachLFAbsolute-v0'  # single goal lf
-    agent_id = 1607352660  # inverted pendulum no vel, continuous action
+    # 1614529727 'CartPoleContinuous-v0' but categorial distribution
+    # agent_id, env = 1614534937, 'CartPoleContinuous-v0'  # continuous agent
+    agent_id, env = 1614531835, 'CartPoleContinuous-v0'  # discrete, heavier pole
+    # agent_id = 1607352660  # inverted pendulum no vel, continuous action
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 
     inv = Investigator.from_agent(agent_007)

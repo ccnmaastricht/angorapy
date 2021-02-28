@@ -16,20 +16,11 @@ hps = {'system_loss_coeff': 1,
        'reg_u_loss_weight': 0.1}
 
 
-def main(agent_id, settings: dict):
+def main(agent_id, settings: dict, training_data=None, testing_data=None):
     utils.print_behaviour(settings)
-    chiefinv = Chiefinvestigator(agent_id)
-    # get data for training and testing
     FILE_DIR = "/home/raphael/Code/dexterous-robot-hand/analysis/sindy_autoencoder/files/" + str(agent_id) + "/"
     SAVE_DIR = "analysis/sindy_autoencoder/storage/" + str(agent_id) + "/"
-    try:
-        training_data = pickle.load(open(SAVE_DIR + "training_data.pkl", "rb"))
-        testing_data = pickle.load(open(SAVE_DIR + "testing_data.pkl", "rb"))
-        print("LOADING DATA...")
-    except FileNotFoundError:
-        training_data, testing_data = chiefinv.get_sindy_datasets(settings)
-        utils.save_data(training_data, testing_data, SAVE_DIR)
-    utils.plot_training_data(training_data, FILE_DIR)  # TODO: needs to be generalized to tasks
+
 
     try:
         # load trained system
@@ -59,9 +50,22 @@ def main(agent_id, settings: dict):
 if __name__ == "__main__":
     # os.chdir("../../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
     # agent_id = 1607352660  # cartpole-v1
-    agent_id = 1607352660  # inverted pendulum no vel, continuous action
+    # agent_id = 1607352660  # inverted pendulum no vel, continuous action
+
+    chiefinv = Chiefinvestigator(agent_id)
+    # get data for training and testing
+    FILE_DIR = "/home/raphael/Code/dexterous-robot-hand/analysis/sindy_autoencoder/files/" + str(agent_id) + "/"
+    SAVE_DIR = "analysis/sindy_autoencoder/storage/" + str(agent_id) + "/"
+
+    try:
+        training_data = pickle.load(open(SAVE_DIR + "training_data.pkl", "rb"))
+        testing_data = pickle.load(open(SAVE_DIR + "testing_data.pkl", "rb"))
+        print("LOADING DATA...")
+    except FileNotFoundError:
+        training_data, testing_data = chiefinv.get_sindy_datasets(settings)
+        utils.save_data(training_data, testing_data, SAVE_DIR)
+    utils.plot_training_data(training_data, FILE_DIR)  # TODO: needs to be generalized to tasks
 
     parser = argparse.ArgumentParser(description="Train SindyControlAutoencoder for some RL task")
 

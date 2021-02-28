@@ -2,10 +2,11 @@
 
 import gym
 
-from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
-    LunarLanderContinuousNoVel
-from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector, ShadowHandMultiReach, \
-    ShadowHandFreeReach, ShadowHandTappingSequence, ShadowHandDelayedTappingSequence
+#from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
+#    LunarLanderContinuousNoVel, CartPoleEnv
+from environments.adapted import CartPoleEnv
+#from environments.shadowhand import ShadowHandBlock, ShadowHandReach, ShadowHandBlockVector, ShadowHandMultiReach, \
+#    ShadowHandFreeReach, ShadowHandTappingSequence, ShadowHandDelayedTappingSequence
 
 # SHADOW HAND
 from utilities.const import SHADOWHAND_MAX_STEPS
@@ -143,4 +144,9 @@ gym.envs.register(
     entry_point='environments:LunarLanderContinuousNoVel',
     max_episode_steps=1000,
     reward_threshold=200,
+)
+
+gym.envs.register(
+    id='CartPoleContinuous-v0',
+    entry_point='environments:CartPoleEnv',
 )
