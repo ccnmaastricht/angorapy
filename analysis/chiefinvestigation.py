@@ -220,7 +220,10 @@ if __name__ == "__main__":
     os.chdir("../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    agent_id = 1585500821  # cartpole-v1
+    # agent_id = 1585500821  # cartpole-v1
+    # agent_id, env = 1614534937, 'CartPoleContinuous-v0'  # continuous agent
+    # agent_id = 1585500821  # cartpole-v1
+    agent_id = 1614610158  # 'CartPoleContinuous-v0'  # continuous agent, no normalization
     # agent_id = 1586597938# finger tapping
 
     chiefinvesti = Chiefinvestigator(agent_id)
@@ -232,4 +235,13 @@ if __name__ == "__main__":
     n_episodes = 1
     activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done \
         = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
+
+    import matplotlib.pyplot as plt
+    a = ['x', 'x_dot', 'theta', 'theta_dot']
+    fig = plt.figure()
+    for i in range(4):
+        plt.subplot(2, 2, i+1)
+        plt.plot(states_all_episodes[:, i])
+        plt.title(a[i])
+    plt.show()
 

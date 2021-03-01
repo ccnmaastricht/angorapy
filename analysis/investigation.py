@@ -241,8 +241,8 @@ if __name__ == "__main__":
     # agent_id, env = 1588944848, 'HandFreeReachFFAbsolute-v0'  # single goal reach task
     # agent_id, env = 1591604443, 'HandFreeReachLFAbsolute-v0'  # single goal lf
     # 1614529727 'CartPoleContinuous-v0' but categorial distribution
-    # agent_id, env = 1614534937, 'CartPoleContinuous-v0'  # continuous agent
-    agent_id, env = 1614531835, 'CartPoleContinuous-v0'  # discrete, heavier pole
+    agent_id, env = 1614534937, 'CartPoleContinuous-v0'  # continuous agent
+    # agent_id, env = 1614531835, 'CartPoleContinuous-v0'  # discrete, heavier pole
     # agent_id = 1607352660  # inverted pendulum no vel, continuous action
     agent_007 = PPOAgent.from_agent_state(agent_id, from_iteration="b")
 

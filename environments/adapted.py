@@ -145,7 +145,6 @@ class CartPoleEnv(gym.Env):
         err_msg = "%r (%s) invalid" % (action, type(action))
         assert self.action_space.contains(action), err_msg
 
-
         x, x_dot, theta, theta_dot = self.state
         force = float(max(min(self.force_mag, action), -self.force_mag))
         # force = self.force_mag if action == 1 else -self.force_mag
