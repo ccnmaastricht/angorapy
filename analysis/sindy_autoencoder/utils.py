@@ -11,7 +11,7 @@ from sympy import symbols
 from utilities.const import COLORS
 
 
-def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
+def sindy_library_jax(z, latent_dim, poly_order, include_sin=False):
 
     library = [1]
 
@@ -29,7 +29,7 @@ def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
                 for k in range(j, latent_dim):
                     library.append(jnp.multiply(jnp.multiply(z[i], z[j]), z[k]))
 
-    if include_sine:
+    if include_sin:
         for i in range(latent_dim):
             library.append(jnp.sin(z[i]))
 

@@ -149,6 +149,6 @@ gym.envs.register(
 gym.envs.register(
     id='CartPoleContinuous-v0',
     entry_point='environments:CartPoleEnv',
-    max_episode_steps=400,
+    max_episode_steps=1000,
     reward_threshold=950
 )

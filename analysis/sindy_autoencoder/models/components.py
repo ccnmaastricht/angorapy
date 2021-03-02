@@ -105,24 +105,56 @@ def z_derivative_decode(params, z, sindy_predict):
     return jnp.matmul(params[-1][0], dx_decode)
 
 
-def autoencoder_pass(params, coefficient_mask, x, dx, u, lib_size,
-                     poly_order: int = 2, include_sine: bool = False):
+def sindy_pass(params, coefficient_mask, c, lib_size, poly_order=2, include_sin=False):
+    Theta = sindy_library_jax(c, lib_size, poly_order=poly_order, include_sin=include_sin)
+    return jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
+
+
+def autoencoder_pass(params, x, dx):
 
     z = encoding_pass(params['encoder'], x)
     x_decode = decoding_pass(params['decoder'], z)
     dz = z_derivative(params['encoder'], x, dx)
 
-    c = jnp.concatenate((z, u))
-    Theta = sindy_library_jax(c, lib_size, poly_order=poly_order, include_sine=include_sine)
-    sindy_predict = jnp.matmul(Theta, coefficient_mask * params['sindy_coefficients'])
+    return [x_decode, dz, z]
+
+
+def sindy_autoencoder_pass(params, coefficient_mask, x, dx, lib_size,
+                           poly_order: int = 2, include_sin: bool = False):
+
+    x_decode, dz, z = autoencoder_pass(params, x, dx)
+    sindy_predict = sindy_pass(params, coefficient_mask, z, lib_size,
+                               poly_order=poly_order, include_sin=include_sin)
     dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
 
     return [x_decode, dz, sindy_predict, dx_decode]
+
+
+def control_autoencoder_pass(params, u, du):
+
+    y = encoding_pass(params['control_encoder'], u)
+    u_decode = decoding_pass(params['control_decoder'], y)
+    dy = z_derivative(params['control_encoder'], u, du)
+
+    return [u_decode, dy, y]
+
+
+def sindy_control_autoencoder_pass(params, coefficient_mask, x, dx, u, du, lib_size,
+                                   poly_order: int = 2, include_sin: bool = False):
+
+    x_decode, dz, z = autoencoder_pass(params, x, dx)
+    u_decode, dy, y = control_autoencoder_pass(params, u, du)
+    c = jnp.concatenate((z, y))
+    sindy_predict = sindy_pass(params, coefficient_mask, c, lib_size,
+                               poly_order=poly_order, include_sin=include_sin)
+    dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
+
+    return [x_decode, dz, sindy_predict, u_decode, dx_decode]
 
 
 batch_autoencoder = vmap(autoencoder_pass, in_axes=({'encoder': None,
                                                      'decoder': None,
                                                      'sindy_coefficients': None},
                                                     None,
-                                                    0, 0, 0,
+                                                    0, 0,
                                                     None, None, None))

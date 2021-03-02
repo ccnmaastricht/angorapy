@@ -162,8 +162,8 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
     for epoch in range(settings['epochs']):
         for batch in range(num_batches):
             opt_state = update_jit(batch, opt_state, opt_update, get_params,
-                                   training_data['s'][batch],
-                                   training_data['ds'][batch],
+                                   training_data['x'][batch],
+                                   training_data['dx'][batch],
                                    training_data['u'][batch], coefficient_mask, hps)
 
         params = get_params(opt_state)
