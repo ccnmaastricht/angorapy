@@ -1,11 +1,8 @@
-import jax.numpy as jnp
 import numpy as np
 import os
 import pickle
-from jax import random
-from jax.nn.initializers import xavier_uniform
 from jax import vmap, value_and_grad, jit
-from analysis.sindy_autoencoder.utils import sindy_library_jax
+from analysis.sindy_autoencoder.models.components import *
 from analysis.sindy_autoencoder import utils
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
@@ -13,153 +10,6 @@ from utilities.model_utils import is_recurrent_model
 from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
 from jax.experimental import optimizers
 import time
-
-
-def sigmoid(x):
-    return 1 / (1 + jnp.exp(-x))
-
-
-def relu(x):
-    return jnp.max((0, x))
-
-
-def sigmoid_layer(params, x):
-    return sigmoid(jnp.matmul(params[0], x) + params[1])
-
-
-def relu_layer(params, x):
-    return relu(jnp.matmul(params[0], x) + params[1])
-
-
-def build_encoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_uniform'):
-    keys = random.split(key, len(layer_sizes))
-    encoding_params = []
-    for m, n, k in zip(layer_sizes[:-1], layer_sizes[1:], keys):
-        w_key, b_key = random.split(k)
-        if initializer == 'normal':
-            w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
-        elif initializer == 'xavier_uniform':
-            w_init = xavier_uniform()
-            w, b = w_init(w_key, (n, m)), scale * random.normal(b_key, (n,))
-        else:
-            raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
-        encoding_params.append([w, b])
-    return encoding_params
-
-
-def build_decoder(layer_sizes, key, scale=1e-2, initializer: str = 'xavier_uniform'):
-    keys = random.split(key, len(layer_sizes))
-    decoding_params = []
-    for m, n, k in zip(layer_sizes[1:], layer_sizes[:-1], keys):
-        w_key, b_key = random.split(k)
-        if initializer == 'normal':
-            w, b = scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
-        elif initializer == 'xavier_uniform':
-            w_init = xavier_uniform()
-            w, b = w_init(w_key, (n, m)), scale * random.normal(b_key, (n,))  # SindyAutoencoder
-        else:
-            raise ValueError(f"Weight Initializer was {initializer} which is not supported.")
-        decoding_params.append([w, b])
-    return decoding_params
-
-
-def build_sindy_control_autoencoder(layer_sizes, library_size, lib_size_u, key, initializer: str = 'xavier_uniform',
-                                    sindy_initializer: str = 'constant'):
-    key = random.split(key, 5)
-    key = (k for k in key)
-
-    encoding_params = build_encoder(layer_sizes, next(key), initializer=initializer)
-    decoding_params = build_decoder(layer_sizes, next(key), initializer=initializer)
-
-    control_encoding_params = build_encoder(layer_sizes, next(key), initializer=initializer)
-    control_decoding_params = build_decoder(layer_sizes, next(key), initializer=initializer)
-
-    if sindy_initializer == 'constant':
-        sindy_coefficients = jnp.ones((library_size, layer_sizes[-1]))
-        sindy_u_coefficients = jnp.ones((lib_size_u, layer_sizes[-1]))
-    elif sindy_initializer == 'xavier_uniform':
-        sindy_init = xavier_uniform()
-        sindy_coefficients = sindy_init(next(key), (library_size, layer_sizes[-1]))
-        sindy_u_coefficients = sindy_init(next(key), (lib_size_u, layer_sizes[-1]))
-    elif sindy_initializer == 'normal':
-        sindy_coefficients = random.normal(next(key), (library_size, layer_sizes[-1]))
-        sindy_u_coefficients = random.normal(next(key), (lib_size_u, layer_sizes[-1]))
-    else:
-        raise ValueError(f"Sindy Initializer was {sindy_initializer} which is not supported. Try to specify one of \n"
-                         f"constant, xavier_uniform or normal")
-
-    coefficient_mask = jnp.ones((library_size, layer_sizes[-1]))
-    coefficient_mask_u = jnp.ones((lib_size_u, layer_sizes[-1]))
-
-    params = {'encoder': encoding_params,
-              'decoder': decoding_params,
-              'control_encoder': control_encoding_params,
-              'control_decoder': control_decoding_params,
-              'sindy_coefficients': sindy_coefficients,
-              'sindy_u_coefficients': sindy_u_coefficients}
-
-    return params, [coefficient_mask, coefficient_mask_u]
-
-
-def encoding_pass(params, x):
-    activation = x
-
-    for w, b in params[:-1]:
-        activation = sigmoid_layer([w, b], activation)
-
-    return jnp.matmul(params[-1][0], activation) + params[-1][1]
-
-
-def decoding_pass(params, input):
-    activation = input
-    params = params[::-1]  # reverse order for decoder
-    for w, b in params[:-1]:
-        activation = sigmoid_layer([w, b], activation)
-
-    return jnp.matmul(params[-1][0], activation) + params[-1][1]
-
-
-def z_derivative(params, x, dx):
-    dz = dx
-
-    for w, b in params[:-1]:
-        x = jnp.matmul(w, x) + b
-        x = sigmoid(x)
-        dz = jnp.multiply(jnp.multiply(x, 1 - x), jnp.matmul(w, dz))
-
-    return jnp.matmul(params[-1][0], dz)
-
-
-def z_derivative_decode(params, z, sindy_predict):
-    dx_decode = sindy_predict
-    params = params[::-1]
-
-    for w, b in params[:-1]:
-        z = jnp.matmul(w, z) + b
-        z = sigmoid(z)
-        dx_decode = jnp.multiply(jnp.multiply(z, 1 - z), jnp.matmul(w, dx_decode))
-
-    return jnp.matmul(params[-1][0], dx_decode)
-
-
-def control_autoencoder_pass(params, coefficient_mask, x, dx, u, du):
-    z = encoding_pass(params['encoder'], x)
-    x_decode = decoding_pass(params['decoder'], z)
-    dz = z_derivative(params['encoder'], x, dx)
-
-    y = encoding_pass(params['control_encoder'], u)
-    u_decode = decoding_pass(params['control_decoder'], y)
-    dy = z_derivative(params['control_encoder'], u, du)
-
-    c = jnp.concatenate((z, y))
-    Theta = sindy_library_jax(c, 2 * len(params['encoder'][-1][0]), 3)
-    Theta_u = sindy_library_jax(y, len(params['encoder'][-1][0]), 3)
-    sindy_predict = jnp.matmul(Theta, coefficient_mask[0] * params['sindy_coefficients'])
-    sindy_u_predict = jnp.matmul(Theta_u, coefficient_mask[1] * params['sindy_u_coefficients'])
-    dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
-    du_decode = z_derivative_decode(params['control_decoder'], y, sindy_u_predict)
-
-    return [x_decode, u_decode, dz, dy, sindy_predict, sindy_u_predict, dx_decode, du_decode]
 
 
 def compute_latent_space(params, coefficient_mask, x, u):
@@ -246,85 +96,72 @@ def simulate_episode(chiefinv,
 
 batch_compute_latent_space = vmap(compute_latent_space, in_axes=({'encoder': None,
                                                                   'decoder': None,
-                                                                  'control_encoder': None,
-                                                                  'control_decoder': None,
-                                                                  'sindy_coefficients': None,
-                                                                  'sindy_u_coefficients': None},
-                                                                 [None, None],
-                                                                 0, 0))
-batch_control_autoencoder = vmap(control_autoencoder_pass, in_axes=({'encoder': None,
-                                                                     'decoder': None,
-                                                                     'control_encoder': None,
-                                                                     'control_decoder': None,
-                                                                     'sindy_coefficients': None,
-                                                                     'sindy_u_coefficients': None},
-                                                                    [None, None],
-                                                                    0, 0, 0, 0))
+                                                                  'sindy_coefficients': None},
+                                                                 None,
+                                                                 0, 0,
+                                                                 None, None, None))
+batch_control_autoencoder = vmap(autoencoder_pass, in_axes=({'encoder': None,
+                                                             'decoder': None,
+                                                             'sindy_coefficients': None},
+                                                            None,
+                                                            0, 0, 0,
+                                                            None, None, None))
 
 
-def loss(params, x, dx, u, du, coefficient_mask, hps):
-    x_decode, u_decode, dz, dy, sindy_predict, sindy_u_predict, dx_decode, du_decode = \
-        batch_control_autoencoder(params, coefficient_mask, x, dx, u, du)
+def loss(params, x, dx, u, coefficient_mask, hps, sindyps):
+    x_decode, dz, sindy_predict, dx_decode, = batch_control_autoencoder(params, coefficient_mask, x, dx, u,
+                                                                        sindyps['lib_size'], sindyps['poly_order'],
+                                                                        sindyps['use_sine'])
 
     system_recon_loss = jnp.mean((x - x_decode) ** 2)
-    control_recon_loss = jnp.mean((u - u_decode) ** 2)
     sindy_z_loss = jnp.mean((dz - sindy_predict) ** 2)
     sindy_x_loss = jnp.mean((dx - dx_decode) ** 2)
-    sindy_y_loss = jnp.mean((dy - sindy_u_predict)**2)
-    sindy_u_loss = jnp.mean((du - du_decode)**2)
     sindy_regularization_loss = jnp.mean(jnp.abs(params['sindy_coefficients']))
     sindy_u_reg_loss = jnp.mean(jnp.abs(params['sindy_u_coefficients']))
 
     system_recon_loss = hps['system_loss_coeff'] * system_recon_loss
-    control_recon_loss = hps['control_loss_coeff'] * control_recon_loss
     sindy_z_loss = hps['dz_loss_weight'] * sindy_z_loss
     sindy_x_loss = hps['dx_loss_weight'] * sindy_x_loss
-    sindy_y_loss = hps['dy_loss_weight'] * sindy_y_loss
-    sindy_u_loss = hps['du_loss_weight'] * sindy_u_loss
     sindy_regularization_loss = hps['reg_loss_weight'] * sindy_regularization_loss
     sindy_u_reg_loss = hps['reg_u_loss_weight'] * sindy_u_reg_loss
 
-    total_loss = system_recon_loss + control_recon_loss + sindy_z_loss + sindy_x_loss + \
-                 sindy_regularization_loss + sindy_y_loss + sindy_u_loss + sindy_u_reg_loss
+    total_loss = system_recon_loss + sindy_z_loss + sindy_x_loss + \
+                 sindy_regularization_loss + sindy_u_reg_loss
 
     return {'total': total_loss,
             'sys_loss': system_recon_loss,
-            'control_loss': control_recon_loss,
             'sindy_z_loss': sindy_z_loss,
             'sindy_x_loss': sindy_x_loss,
-            'sindy_y_loss': sindy_y_loss,
-            'sindy_u_loss': sindy_u_loss,
             'sindy_regularization_loss': sindy_regularization_loss,
             'sindy_u_reg_loss': sindy_u_reg_loss}
 
 
-def training_loss(params, x, dx, u, du, coefficient_mask, hps):
-    return loss(params, x, dx, u, du, coefficient_mask, hps)['total']
+def training_loss(params, x, dx, u, coefficient_mask, hps, sindyps):
+    return loss(params, x, dx, u, coefficient_mask, hps, sindyps)['total']
 
 
-def update(i, opt_state, opt_update, get_params, x, dx, u, du, coefficient_mask, hps):
+def update(i, opt_state, opt_update, get_params, x, dx, u, coefficient_mask, hps, sindyps):
     params = get_params(opt_state)
-    value, grads = value_and_grad(training_loss)(params, x, dx, u, du, coefficient_mask, hps)
+    value, grads = value_and_grad(training_loss)(params, x, dx, u, coefficient_mask, hps, sindyps)
 
     return opt_update(i, grads, opt_state)
 
 
-loss_jit = jit(loss)
-update_jit = jit(update, static_argnums=(2, 3))
+loss_jit = jit(loss, static_argnums=(5, 6))
+update_jit = jit(update, static_argnums=(2, 3, 8, 9))
 
 
 def train(training_data, testing_data, settings, hps, FILE_DIR):
-    lib_size = utils.library_size(settings['layers'][-1], settings['poly_order'], include_control=True)
-    lib_size_u = utils.library_size(settings['layers'][-1], settings['poly_order'], include_control=False)
+    lib_size = utils.library_size(settings['layers'][-1], settings['poly_order'], include_control=settings['SINDYc'])
     key = random.PRNGKey(settings['seed'])
 
     num_batches = int(jnp.ceil(len(training_data['x']) / settings['batch_size']))
-    params, coefficient_mask = build_sindy_control_autoencoder(settings['layers'], lib_size, lib_size_u, key)
+    params, coefficient_mask = build_sindy_autoencoder(settings['layers'], lib_size, key)
+
 
     # set up optimizer
     batch_size = settings['batch_size']
-    decay_fun = optimizers.exponential_decay(settings['learning_rate'], decay_steps=1, decay_rate=0.9999)
-    opt_init, opt_update, get_params = optimizers.adam(decay_fun)
+    opt_init, opt_update, get_params = optimizers.adam(settings['learning_rate'])
     opt_state = opt_init(params)
 
     # train

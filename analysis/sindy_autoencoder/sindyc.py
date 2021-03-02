@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pysindy as ps
 import os
-
+"""Experimental file to figure out SINDYc"""
 
 os.chdir("../../")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -29,12 +29,13 @@ plt.show()
 
 t = np.linspace(0, 1000*0.02, 1000)
 
-X, U = [], []
+X, U, A = [], [], []
 for i in range(n_episodes):
     X.append(states_all_episodes[i*1000:(i+1)*1000])
     U.append(actions_over_all_episodes[i*1000:(i+1)*1000])
+    A.append(activations_over_all_episodes[i*1000:(i+1)*1000])
 
-poly_library = ps.PolynomialLibrary(degree=2)
+poly_library = ps.PolynomialLibrary(degree=3)
 tri_library = ps.FourierLibrary()
 combined_library = poly_library + tri_library
 model = ps.SINDy(feature_library=combined_library)
@@ -56,3 +57,16 @@ for i in range(4):
     plt.title(a[i])
 plt.show()
 
+from sklearn.decomposition import PCA
+
+pca = PCA(3)
+scores = pca.fit_transform(activations_over_all_episodes)
+
+from mpl_toolkits.mplot3d import Axes3D
+c = ['k', 'r', 'g', 'b', 'y']
+fig = plt.figure()
+ax = fig.add_subplot(111, projection=Axes3D.name)
+for i in range(5):
+    ax.plot(scores[i*1000:(i+1)*1000, 0], scores[i*1000:(i+1)*1000, 1], scores[i*1000:(i+1)*1000, 2],
+            c=c[i])
+plt.show()

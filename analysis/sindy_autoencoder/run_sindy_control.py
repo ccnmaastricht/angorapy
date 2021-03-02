@@ -16,11 +16,21 @@ hps = {'system_loss_coeff': 1,
        'reg_u_loss_weight': 0.1}
 
 
-def main(agent_id, settings: dict, training_data=None, testing_data=None):
+def main(agent_id, settings: dict):
     utils.print_behaviour(settings)
+    chiefinv = Chiefinvestigator(agent_id)
+    # get data for training and testing
     FILE_DIR = "/home/raphael/Code/dexterous-robot-hand/analysis/sindy_autoencoder/files/" + str(agent_id) + "/"
     SAVE_DIR = "analysis/sindy_autoencoder/storage/" + str(agent_id) + "/"
 
+    try:
+        training_data = pickle.load(open(SAVE_DIR + "training_data.pkl", "rb"))
+        testing_data = pickle.load(open(SAVE_DIR + "testing_data.pkl", "rb"))
+        print("LOADING DATA...")
+    except FileNotFoundError:
+        training_data, testing_data = chiefinv.get_sindy_datasets(settings)
+        utils.save_data(training_data, testing_data, SAVE_DIR)
+    utils.plot_training_data(training_data, FILE_DIR)  # TODO: needs to be generalized to tasks
 
     try:
         # load trained system
@@ -35,7 +45,7 @@ def main(agent_id, settings: dict, training_data=None, testing_data=None):
     utils.plot_equations(params, coefficient_mask[0], settings, FILE_DIR)
 
     # Simulate
-    n_points = 1000  # 3 episodes
+    #n_points = 1000  # 3 episodes
     #z, _, _ = control_autoencoder.batch_compute_latent_space(params, coefficient_mask,
     #                                                         training_data['x'], training_data['u'])
     # Simulate Dynamics and produce 3 episodes
@@ -53,19 +63,6 @@ if __name__ == "__main__":
     # agent_id = 1607352660  # cartpole-v1
     # agent_id = 1607352660  # inverted pendulum no vel, continuous action
 
-    chiefinv = Chiefinvestigator(agent_id)
-    # get data for training and testing
-    FILE_DIR = "/home/raphael/Code/dexterous-robot-hand/analysis/sindy_autoencoder/files/" + str(agent_id) + "/"
-    SAVE_DIR = "analysis/sindy_autoencoder/storage/" + str(agent_id) + "/"
-
-    try:
-        training_data = pickle.load(open(SAVE_DIR + "training_data.pkl", "rb"))
-        testing_data = pickle.load(open(SAVE_DIR + "testing_data.pkl", "rb"))
-        print("LOADING DATA...")
-    except FileNotFoundError:
-        training_data, testing_data = chiefinv.get_sindy_datasets(settings)
-        utils.save_data(training_data, testing_data, SAVE_DIR)
-    utils.plot_training_data(training_data, FILE_DIR)  # TODO: needs to be generalized to tasks
 
     parser = argparse.ArgumentParser(description="Train SindyControlAutoencoder for some RL task")
 

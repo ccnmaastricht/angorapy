@@ -36,10 +36,9 @@ def sindy_library_jax(z, latent_dim, poly_order, include_sine=False):
     return jnp.stack(library, axis=0)
 
 
-def library_size(n, poly_order, use_sine=False, include_constant=True, include_control=False):
+def library_size(n, nc, poly_order, use_sine=False, include_constant=True):
     l = 0
-    if include_control:
-        n = n * 2
+    n = n + nc
     for k in range(poly_order+1):
         l += int(binom(n+k-1, k))
     if use_sine:
@@ -49,7 +48,7 @@ def library_size(n, poly_order, use_sine=False, include_constant=True, include_c
     return l
 
 
-def generate_labels(ndim, poly_order):
+def generate_labels(ndim, poly_order, use_sine=False):
 
     zlabels, ulabels, latex_labels = [], [], []
     for i in range(ndim):
@@ -75,6 +74,10 @@ def generate_labels(ndim, poly_order):
             for j in range(i, latent_dim):
                 for k in range(j, latent_dim):
                     all_labels.append(combined_labels[i] + combined_labels[j] + combined_labels[k])
+
+    if use_sine:
+        for i in range(latent_dim):
+            all_labels.append('sin'+combined_labels[i])
 
     return zlabels, all_labels, latex_labels
 
@@ -106,20 +109,19 @@ def save_data(training_data, testing_data, save_dir):
 
 
 def plot_training_data(training_data, FILE_DIR):  # needs generalization towards task
-    states_all_episodes = training_data['s']
+    S = training_data['s'][0]  # plot first episode
     episode_size = training_data['e_size']
 
-    plt.figure(figsize=(12, 5))
+    plt.figure()
     x = np.linspace(0, episode_size * 0.02, episode_size)
-    plt.subplot(121)
-    plt.plot(x, states_all_episodes[:episode_size, 0])
-    plt.xlabel("Time [s]")
-    plt.ylabel("Cart Position")
 
-    plt.subplot(122)
-    plt.plot(x, states_all_episodes[:episode_size, 1])
-    plt.xlabel("Time [s]")
-    plt.ylabel("Pole Position")
+    n_plots = S.shape[1]
+    for i in range(n_plots):
+        plt.subplot(np.floor(n_plots), np.ceil(n_plots), i+1)
+        plt.plot(x, S[:, i])
+        plt.xlabel("Time [s]")
+        # plt.ylabel("Cart Position")
+
     try:
         os.mkdir(FILE_DIR)
         os.mkdir(FILE_DIR + "figures/")

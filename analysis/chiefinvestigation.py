@@ -2,7 +2,7 @@ import os
 import sys
 
 import autograd.numpy as np
-
+from tqdm import tqdm
 import gym
 import sklearn
 
@@ -87,20 +87,17 @@ class Chiefinvestigator(Investigator):
             previous_layer_name: Name of layer feeding into recurrent layer
 
         Returns: activations, inputs, actions, observations, info"""
-        all_activations, all_inputs, all_actions, all_observations, all_done = [], [], [], [], []
-        for i in range(n_episodes):
-            states, activations, rewards, actions, done = \
-                self.parse_data(layer_name, previous_layer_name)
+        A, I, U, S, d = [], [], [], [], []
+        for _ in tqdm(range(n_episodes)):
+            s, a, r, u, done = self.parse_data(layer_name, previous_layer_name)
 
-            all_activations.append(np.reshape(activations[1], (activations[1].shape[0], self.n_hidden)))
-            all_inputs.append(np.reshape(activations[2], (activations[2].shape[0], self.n_hidden)))
-            all_actions.append(np.vstack(actions))
-            all_observations.append(np.vstack(states))
-            all_done.append(done)
+            A.append(np.reshape(a[1], (a[1].shape[0], self.n_hidden)))
+            I.append(np.reshape(a[2], (a[2].shape[0], self.n_hidden)))
+            U.append(np.vstack(u))
+            S.append(np.vstack(s))
+            d.append(done)
 
-        return np.vstack(all_activations), np.vstack(all_inputs), \
-               np.concatenate(all_actions, axis=0), np.vstack(all_observations), \
-               all_done
+        return A, I, U, S, d
 
     def get_data_over_single_run(self, layer_name: str, previous_layer_name: str):
 
@@ -115,28 +112,35 @@ class Chiefinvestigator(Investigator):
 
         # collect data from episodes
         print("GENERATING DATA...")
-        activations_all_episodes, inputs_all_episodes, actions_all_episodes, states_all_episodes, _ \
+        A, I, U, S, _ \
             = self.get_data_over_episodes(settings['n_episodes'], "policy_recurrent_layer", self.get_layer_names()[1])
-        print(f"SIMULATED {settings['n_episodes']} episodes to generate {len(activations_all_episodes)} data points.")
+        print(f"SIMULATED {settings['n_episodes']} episodes to generate {len(np.vstack(A))} data points.")
 
         # create training and testing datasets
-        training_size = int(len(inputs_all_episodes) * 0.8)
-        episode_size = int(len(states_all_episodes) / settings['n_episodes'])
-        dx = np.gradient(activations_all_episodes, axis=0)
-        du = np.gradient(inputs_all_episodes, axis=0)
-        training_data = {'x': activations_all_episodes[:training_size, :],
-                         'dx': dx[:training_size, :],
-                         'u': inputs_all_episodes[:training_size, :],
-                         'du': du[:training_size, :],
-                         'a': actions_all_episodes[:training_size, :],
-                         's': states_all_episodes[:training_size, :],
+        training_size = int(len(I) * 0.8)
+        episode_size = int(len(np.vstack(S)) / settings['n_episodes'])  # average measure, may be meaningless
+
+        dX, dI, dS = [], [], []
+        for a, i, s in zip(A, I, S):  # TODO: improve gradient computation
+            dX.append(np.gradient(a, axis=0))
+            dI.append(np.gradient(i, axis=0))
+            dS.append(np.gradient(s, axis=0))
+
+        training_data = {'x': A[:training_size],
+                         'dx': dX[:training_size],
+                         'i': I[:training_size],
+                         'di': dI[:training_size],
+                         'u': U[:training_size],
+                         's': S[:training_size],
+                         'ds': dS[:training_size],
                          'e_size': episode_size}
-        testing_data = {'x': activations_all_episodes[training_size:, :],
-                        'dx': dx[training_size:, :],
-                        'u': inputs_all_episodes[training_size:, :],
-                        'du': du[training_size:, :],
-                        'a': actions_all_episodes[training_size:, :],
-                        's': states_all_episodes[training_size:, :],
+        testing_data = {'x': A[training_size:],
+                        'dx': dX[training_size:],
+                        'i': I[training_size:],
+                        'di': dI[training_size:],
+                        'u': U[training_size:],
+                        's': S[training_size:],
+                        'ds': dS[training_size:],
                         'e_size': episode_size}
 
         return training_data, testing_data
