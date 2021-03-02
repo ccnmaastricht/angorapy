@@ -5,6 +5,7 @@ from typing import List, Union
 import numpy as np
 import gym
 import tensorflow as tf
+from skimage.transform import rescale
 
 from agent.policies import BasePolicyDistribution
 from agent.ppo import PPOAgent
@@ -146,7 +147,7 @@ class Investigator:
         layer_names = layer_names if isinstance(layer_names, list) else [layer_names]
 
         states, activations, reward_trajectory, action_trajectory, done_recorder = [], [], [], [], []
-
+        # srgb = []
         # make new model with multiple outputs
         polymodel = build_sub_model_to(self.network, layer_names, include_original=True)
         is_recurrent = is_recurrent_model(self.network)
@@ -154,7 +155,7 @@ class Investigator:
         done = False
         state = env.reset()
         state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
-        env.render() if render else ""
+        # env.render(mode='rgb_array')
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
             try:
@@ -180,6 +181,11 @@ class Investigator:
             except KeyError:
                 done_recorder.append(info)
 
+            # img = env.render(mode='rgb_array')
+            # img = rescale(img, 0.1, anti_aliasing=False, multichannel=True)
+            # length, height, depth = img.shape
+            # print(img.shape)
+            # srgb.append(img.reshape((length * height * depth,)))
             state = observation
             reward_trajectory.append(reward)
 

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import pickle
-from jax import vmap, value_and_grad, jit
+from jax import value_and_grad, jit
 from analysis.sindy_autoencoder.models.components import *
 from analysis.sindy_autoencoder import utils
 import matplotlib.pyplot as plt
@@ -100,64 +100,55 @@ batch_compute_latent_space = vmap(compute_latent_space, in_axes=({'encoder': Non
                                                                  None,
                                                                  0, 0,
                                                                  None, None, None))
-batch_control_autoencoder = vmap(autoencoder_pass, in_axes=({'encoder': None,
-                                                             'decoder': None,
-                                                             'sindy_coefficients': None},
-                                                            None,
-                                                            0, 0, 0,
-                                                            None, None, None))
 
 
-def loss(params, x, dx, u, coefficient_mask, hps, sindyps):
-    x_decode, dz, sindy_predict, dx_decode, = batch_control_autoencoder(params, coefficient_mask, x, dx, u,
-                                                                        sindyps['lib_size'], sindyps['poly_order'],
-                                                                        sindyps['use_sine'])
+def loss(params, x, dx, u, coefficient_mask, hps):
+    x_decode, dz, sindy_predict, dx_decode, = batch_autoencoder(params, coefficient_mask, x, dx, u,
+                                                                hps['lib_size'], hps['poly_order'],
+                                                                hps['use_sine'])
 
     system_recon_loss = jnp.mean((x - x_decode) ** 2)
     sindy_z_loss = jnp.mean((dz - sindy_predict) ** 2)
     sindy_x_loss = jnp.mean((dx - dx_decode) ** 2)
     sindy_regularization_loss = jnp.mean(jnp.abs(params['sindy_coefficients']))
-    sindy_u_reg_loss = jnp.mean(jnp.abs(params['sindy_u_coefficients']))
 
     system_recon_loss = hps['system_loss_coeff'] * system_recon_loss
     sindy_z_loss = hps['dz_loss_weight'] * sindy_z_loss
     sindy_x_loss = hps['dx_loss_weight'] * sindy_x_loss
     sindy_regularization_loss = hps['reg_loss_weight'] * sindy_regularization_loss
-    sindy_u_reg_loss = hps['reg_u_loss_weight'] * sindy_u_reg_loss
 
-    total_loss = system_recon_loss + sindy_z_loss + sindy_x_loss + \
-                 sindy_regularization_loss + sindy_u_reg_loss
+    total_loss = system_recon_loss + sindy_z_loss + sindy_x_loss + sindy_regularization_loss
 
     return {'total': total_loss,
             'sys_loss': system_recon_loss,
             'sindy_z_loss': sindy_z_loss,
             'sindy_x_loss': sindy_x_loss,
-            'sindy_regularization_loss': sindy_regularization_loss,
-            'sindy_u_reg_loss': sindy_u_reg_loss}
+            'sindy_regularization_loss': sindy_regularization_loss}
 
 
-def training_loss(params, x, dx, u, coefficient_mask, hps, sindyps):
-    return loss(params, x, dx, u, coefficient_mask, hps, sindyps)['total']
+def training_loss(params, x, dx, u, coefficient_mask, hps):
+    return loss(params, x, dx, u, coefficient_mask, hps)['total']
 
 
-def update(i, opt_state, opt_update, get_params, x, dx, u, coefficient_mask, hps, sindyps):
+def update(i, opt_state, opt_update, get_params, x, dx, u, coefficient_mask, hps):
     params = get_params(opt_state)
-    value, grads = value_and_grad(training_loss)(params, x, dx, u, coefficient_mask, hps, sindyps)
+    value, grads = value_and_grad(training_loss)(params, x, dx, u, coefficient_mask, hps)
 
     return opt_update(i, grads, opt_state)
 
 
-loss_jit = jit(loss, static_argnums=(5, 6))
-update_jit = jit(update, static_argnums=(2, 3, 8, 9))
+loss_jit = jit(loss, static_argnums=(5, ))
+update_jit = jit(update, static_argnums=(2, 3, 8))
 
 
 def train(training_data, testing_data, settings, hps, FILE_DIR):
-    lib_size = utils.library_size(settings['layers'][-1], settings['poly_order'], include_control=settings['SINDYc'])
+    hps['lib_size'] = utils.library_size(settings['layers'][-1], 1, settings['poly_order'])
+    hps['poly_order'] = settings['poly_order']  # TODO: make less ugly
+    hps['use_sine'] = True
     key = random.PRNGKey(settings['seed'])
 
-    num_batches = int(jnp.ceil(len(training_data['x']) / settings['batch_size']))
-    params, coefficient_mask = build_sindy_autoencoder(settings['layers'], lib_size, key)
-
+    num_batches = len(training_data['x'])
+    params, coefficient_mask = build_sindy_autoencoder(settings['layers'], hps['lib_size'], key)
 
     # set up optimizer
     batch_size = settings['batch_size']
@@ -170,17 +161,14 @@ def train(training_data, testing_data, settings, hps, FILE_DIR):
 
     for epoch in range(settings['epochs']):
         for batch in range(num_batches):
-            ids = utils.batch_indices(batch, num_batches, batch_size)
             opt_state = update_jit(batch, opt_state, opt_update, get_params,
-                                   training_data['x'][ids, :],
-                                   training_data['dx'][ids, :],
-                                   training_data['u'][ids, :],
-                                   training_data['du'][ids, :], coefficient_mask, hps)
+                                   training_data['s'][batch],
+                                   training_data['ds'][batch],
+                                   training_data['u'][batch], coefficient_mask, hps)
 
         params = get_params(opt_state)
         if epoch % settings['thresholding_frequency'] == 0 and epoch > 1:
-            coefficient_mask[0] = jnp.abs(params['sindy_coefficients']) > settings['thresholding_coefficient']
-            coefficient_mask[1] = jnp.abs(params['sindy_u_coefficients']) > settings['thresholding_coefficient']
+            coefficient_mask = jnp.abs(params['sindy_coefficients']) > settings['thresholding_coefficient']
             print("Updated coefficient mask")
 
         all_train_losses.append(loss_jit(params,

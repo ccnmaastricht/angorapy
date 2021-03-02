@@ -1,4 +1,4 @@
-from jax import random
+from jax import random, vmap
 from jax.nn.initializers import xavier_uniform
 from analysis.sindy_autoencoder.models.layers import *
 from analysis.sindy_autoencoder.utils import sindy_library_jax
@@ -118,3 +118,11 @@ def autoencoder_pass(params, coefficient_mask, x, dx, u, lib_size,
     dx_decode = z_derivative_decode(params['decoder'], z, sindy_predict)
 
     return [x_decode, dz, sindy_predict, dx_decode]
+
+
+batch_autoencoder = vmap(autoencoder_pass, in_axes=({'encoder': None,
+                                                     'decoder': None,
+                                                     'sindy_coefficients': None},
+                                                    None,
+                                                    0, 0, 0,
+                                                    None, None, None))

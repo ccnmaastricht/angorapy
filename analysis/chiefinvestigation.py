@@ -88,7 +88,7 @@ class Chiefinvestigator(Investigator):
 
         Returns: activations, inputs, actions, observations, info"""
         A, I, U, S, d = [], [], [], [], []
-        for _ in tqdm(range(n_episodes)):
+        for _ in tqdm(range(n_episodes), leave=False, desc="Generating data", unit=' episodes'):
             s, a, r, u, done = self.parse_data(layer_name, previous_layer_name)
 
             A.append(np.reshape(a[1], (a[1].shape[0], self.n_hidden)))
@@ -111,14 +111,13 @@ class Chiefinvestigator(Investigator):
     def get_sindy_datasets(self, settings):
 
         # collect data from episodes
-        print("GENERATING DATA...")
         A, I, U, S, _ \
             = self.get_data_over_episodes(settings['n_episodes'], "policy_recurrent_layer", self.get_layer_names()[1])
         print(f"SIMULATED {settings['n_episodes']} episodes to generate {len(np.vstack(A))} data points.")
 
         # create training and testing datasets
         training_size = int(len(I) * 0.8)
-        episode_size = int(len(np.vstack(S)) / settings['n_episodes'])  # average measure, may be meaningless
+        episode_size = int(len(np.vstack(I)) / settings['n_episodes'])  # average measure, may be meaningless
 
         dX, dI, dS = [], [], []
         for a, i, s in zip(A, I, S):  # TODO: improve gradient computation
@@ -236,16 +235,15 @@ if __name__ == "__main__":
     print(layer_names)
 
     # collect data from episodes
-    n_episodes = 1
-    activations_over_all_episodes, inputs_over_all_episodes, actions_over_all_episodes, states_all_episodes, done \
-        = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
+    n_episodes = 10
+    A, I, U, S, done = chiefinvesti.get_data_over_episodes(n_episodes, "policy_recurrent_layer", layer_names[1])
 
     import matplotlib.pyplot as plt
     a = ['x', 'x_dot', 'theta', 'theta_dot']
     fig = plt.figure()
     for i in range(4):
         plt.subplot(2, 2, i+1)
-        plt.plot(states_all_episodes[:, i])
+        plt.plot(S[0][:, i])
         plt.title(a[i])
     plt.show()
 
