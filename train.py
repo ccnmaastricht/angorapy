@@ -8,11 +8,10 @@ import argparse
 import logging
 
 import argcomplete
-import gym
 from gym.spaces import Box
 
 from configs import hp_config
-from agent.policies import get_distribution_by_short_name
+from common.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
 from models import get_model_builder
 from models.shadow import build_blind_shadow_brain_v1
@@ -21,6 +20,8 @@ from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from common.wrappers import make_env
 from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
+
+from environments import *
 
 from mpi4py import MPI
 

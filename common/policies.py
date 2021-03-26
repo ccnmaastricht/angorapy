@@ -9,7 +9,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from agent.layers import StdevLayer
+from common.layers import StdevLayer
 from utilities.const import EPSILON
 from utilities.util import env_extract_dims
 

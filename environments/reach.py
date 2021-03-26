@@ -3,6 +3,7 @@ import queue
 import random
 from typing import Union, Callable
 
+import gym
 import numpy as np
 from gym import spaces
 from gym.envs.robotics import HandReachEnv
@@ -430,3 +431,4 @@ class FreeReachSequential(FreeReach):
             self.goal = self._sample_goal()
 
         return observation, reward, done, info
+

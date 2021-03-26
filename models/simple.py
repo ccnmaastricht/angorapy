@@ -2,6 +2,7 @@
 """Collection of generic fully connected and recurrent policy networks."""
 
 import os
+from contextlib import suppress
 from typing import Tuple
 
 import gym
@@ -9,7 +10,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution
+from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution
 from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
@@ -48,29 +49,33 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
 
 def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                     model_type: str = "rnn", layer_sizes: Tuple = (64,)):
-    """Build simple policy and value models having a recurrent layer before their heads."""
+                     model_type: str = "rnn", layer_sizes: Tuple = (64,), sequence_length=1):
+    """Build simple policy and value models having a recurrent layer before their heads.
+
+    Args:
+        sequence_length:
+    """
+    # TODO: remove current workaround: solve issue with stateful masked RNNs by fixing the models sequence length
+
     state_dimensionality, n_actions = env_extract_dims(env)
     rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
                   "lstm": tf.keras.layers.LSTM,
-                  "gru": tf.keras.layers.GRU}[
-        model_type]
+                  "gru": tf.keras.layers.GRU}[model_type]
 
-    sequence_length = None
-
-    inputs = tf.keras.Input(batch_shape=(bs, sequence_length, state_dimensionality,), name="proprioception")
-    input_dict = {"proprioception": inputs}
-
-    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length, state_dimensionality,))(inputs)
+    inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
+    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + state_dimensionality["proprioception"])(inputs)
+    # masked = inputs
 
     # policy network; stateful, so batch size needs to be known
-    x = TimeDistributed(_build_encoding_sub_model(
-        (state_dimensionality,), bs,
+    encoder_sub_model = _build_encoding_sub_model(
+        state_dimensionality["proprioception"],
+        None,
         layer_sizes=layer_sizes,
-        name="policy_encoder"),
-        name="TD_policy")(masked)
+        name="policy_encoder")
 
+    x = TimeDistributed(encoder_sub_model, name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
+
     x, *_ = rnn_choice(layer_sizes[-1],
                        stateful=True,
                        return_sequences=True,
@@ -83,9 +88,10 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     # value network
     if not shared:
         x = TimeDistributed(
-            _build_encoding_sub_model((state_dimensionality,), bs, layer_sizes=layer_sizes, name="value_encoder"),
+            _build_encoding_sub_model(state_dimensionality["proprioception"], bs, layer_sizes=layer_sizes, name="value_encoder"),
             name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
+
         x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
                            name="value_recurrent_layer")(x)
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
@@ -102,25 +108,26 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
 
 def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                        model_type: str = "rnn", **kwargs):
+                        sequence_length: int = None, model_type: str = "rnn", **kwargs):
     """Build simple networks (policy, value, joint) for given parameter settings."""
 
     # this function is just a wrapper routing the requests for ffn and rnns
     if model_type == "ffn":
         return build_ffn_models(env, distribution, shared)
     else:
-        return build_rnn_models(env, distribution, shared, bs=bs, model_type=model_type)
+        return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length, model_type=model_type)
 
 
 def build_deeper_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                        model_type: str = "rnn", **kwargs):
+                        sequence_length: int = 1, model_type: str = "rnn", **kwargs):
     """Build deeper simple networks (policy, value, joint) for given parameter settings."""
 
     # this function is just a wrapper routing the requests for ffn and rnns
     if model_type == "ffn":
         return build_ffn_models(env, distribution, shared, layer_sizes=(64, 64, 64, 32))
     else:
-        return build_rnn_models(env, distribution, shared, bs=bs, model_type=model_type, layer_sizes=(64, 64, 64, 32))
+        return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length,
+                                model_type=model_type, layer_sizes=(64, 64, 64, 32))
 
 
 if __name__ == '__main__':

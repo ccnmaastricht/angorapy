@@ -8,7 +8,6 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
-from pprint import pprint
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -20,11 +19,11 @@ from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from agent import policies
+from common import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
-from agent.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from common.transformers import BaseTransformer, BaseRunningMeanTransformer
 from common.wrappers import BaseWrapper, make_env
 from utilities import const
@@ -32,7 +31,7 @@ from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, 
 from utilities.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
-    requires_batch_size
+    requires_batch_size, requires_sequence_length
 from utilities.statistics import ignore_none
 from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
 
@@ -146,8 +145,14 @@ class PPOAgent:
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
-        self.policy, self.value, self.joint = model_builder(self.env, self.distribution,
-                                                            **({"bs": 1} if requires_batch_size(model_builder) else {}))
+        self.policy, self.value, self.joint = model_builder(
+            self.env,
+            self.distribution,
+            **({"bs": 1} if requires_batch_size(model_builder) else {}),
+            **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {})
+        )
+        tf.keras.utils.plot_model(self.joint, "initial_model.png", expand_nested=True)
+
 
         if pretrained_components is not None:
             print("Loading pretrained components:")
@@ -173,10 +178,10 @@ class PPOAgent:
         if not self.is_recurrent:
             self.tbptt_length = 1
 
-        # passing one sample, which for some reason prevents cuDNN init error
-        if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
-            self.joint(merge_into_batch(
-                [add_state_dims(self.env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
+        # # passing one sample, which for some reason prevents cuDNN init error
+        # if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
+        #     self.joint(merge_into_batch(
+        #         [add_state_dims(self.env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
         # miscellaneous
         self.iteration = 0
@@ -357,19 +362,18 @@ class PPOAgent:
                 f"transitions per batch.")
             batch_size = self.n_workers
 
-            if mpi_comm.rank == 0:
-                logging.warning(
-                    f"Batchsize is larger than possible with the available number of independent sequences for "
-                    f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
-                    f"transitions per batch.")
-
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
-        self.policy, self.value, self.joint = self.model_builder(self.env, self.distribution, **(
-            {"bs": batch_size} if requires_batch_size(self.model_builder) else {}))
+        self.policy, self.value, self.joint = self.model_builder(
+            self.env, self.distribution,
+            **({"bs": batch_size} if requires_batch_size(self.model_builder) else {}),
+            **({"sequence_length": self.tbptt_length} if requires_sequence_length(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
+        tf.keras.utils.plot_model(self.joint)
+
         actor = self._make_actor()
+        actor.set_weights(weights)
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -382,12 +386,13 @@ class PPOAgent:
             # distribute parameters from rank 0 to all goal ranks
             joint_weights = mpi_comm.bcast(self.joint.get_weights(), root=0)
             self.joint.set_weights(joint_weights)
+            actor.set_weights(joint_weights)
 
             # run simulations in parallel
             worker_stats = []
             for i in worker_collection_ids:
-                stats = actor.collect(self.env, self.joint, self.distribution,
-                                      self.horizon, self.discount, self.lam, self.tbptt_length, collector_id=i)
+                stats = actor.collect(self.env, self.distribution, self.horizon, self.discount, self.lam,
+                                      self.tbptt_length, collector_id=i)
                 worker_stats.append(stats)
 
             # merge gatherings from all workers
@@ -507,9 +512,13 @@ class PPOAgent:
         self.underflow_history.append(stats.tbptt_underflow)
 
     def _make_actor(self) -> Gatherer:
-        actor = Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
+        # rebuild network with batch size 1
+        policy, value, joint = self.model_builder(
+            self.env, self.distribution,
+            **({"bs": 1} if requires_batch_size(self.model_builder) else {}),
+            **({"sequence_length": 1} if requires_sequence_length(self.model_builder) else {}))
 
-        return actor
+        return Gatherer(joint, policy, MPI.COMM_WORLD.rank, self.agent_id)
 
     @tf.function
     def _learn_on_batch(self, batch):
@@ -644,7 +653,7 @@ class PPOAgent:
         values = mpi_comm.bcast(self.joint.get_weights(), root=0)
         self.joint.set_weights(values)
 
-        evaluation_result = actor.evaluate(self.env, self.policy, self.distribution)
+        evaluation_result = actor.evaluate(self.env, self.distribution)
         gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
         stats, classes = None, None

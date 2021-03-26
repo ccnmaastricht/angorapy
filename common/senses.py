@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy
 import numpy as np
 
@@ -102,3 +104,20 @@ class Sensation:
     def dict(self):
         """Return a dict of the senses and their values."""
         return {k: self.__dict__[k] for k in Sensation.sense_names if self.__dict__[k] is not None}
+
+
+def stack_sensations(sensations: List[Sensation]):
+    """Stack Sensation objects over a prepended temporal domain."""
+    return Sensation(**{
+        sense: np.stack([s[sense] for s in sensations], axis=0) for sense in sensations[0].dict().keys()
+    })
+
+
+if __name__ == '__main__':
+    ss = stack_sensations([
+        Sensation(goal=np.array([1, 2, 3, 4])),
+        Sensation(goal=np.array([0, 1, 2, 3])),
+        Sensation(goal=np.array([1, 1, 1, 1])),
+    ])
+
+    print(ss)

@@ -9,7 +9,8 @@ from typing import Union, Tuple, List
 import tensorflow as tf
 
 from utilities.const import STORAGE_DIR
-from utilities.datatypes import ExperienceBuffer, StatBundle, TimeSequenceExperienceBuffer
+from utilities.datatypes import StatBundle
+from common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 
 
 def _float_feature(value):
@@ -62,8 +63,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
         "value": buffer.values,
     }
 
-    for sense in buffer.states[0].dict().keys():
-        tensor_slices[sense] = [e[sense] for e in buffer.states]
+    tensor_slices.update(buffer.states)
 
     dataset = tf.data.Dataset.from_tensor_slices(tensor_slices)
 

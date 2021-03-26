@@ -8,7 +8,7 @@ import tensorflow as tf
 from scipy.stats import norm, entropy, beta
 
 from agent.core import extract_discrete_action_probabilities
-from agent.policies import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
+from common.policies import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
 from utilities.const import NP_FLOAT_PREC
 from utilities.model_utils import reset_states_masked
 from common.wrappers_old import StateNormalizationWrapper, RewardNormalizationWrapper

@@ -19,7 +19,7 @@ def _build_fcn_component(input_dim: int, hidden_dim: int, output_dim: int, batch
 def _build_encoding_sub_model(shape, batch_size, layer_sizes=(64, 64), name=None):
     assert len(layer_sizes) > 0, "You need at least one layer in an encoding submodel."
 
-    inputs = tf.keras.Input(shape=shape, batch_size=batch_size)
+    inputs = tf.keras.Input(shape=shape, batch_size=batch_size, name=f"{name}_input")
 
     x = inputs
     for i in range(len(layer_sizes)):

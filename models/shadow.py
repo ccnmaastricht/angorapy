@@ -8,7 +8,7 @@ from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
 from tqdm import tqdm
 
-from agent.policies import BasePolicyDistribution, BetaPolicyDistribution
+from common.policies import BasePolicyDistribution, BetaPolicyDistribution
 import gym
 from models.components import _build_fcn_component
 from models.convolutional import _build_visual_encoder

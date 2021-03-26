@@ -24,6 +24,11 @@ def requires_batch_size(model_builder) -> bool:
     return "bs" in fargs(model_builder).args + fargs(model_builder).kwonlyargs
 
 
+def requires_sequence_length(model_builder) -> bool:
+    """Check if model building function requires a sequenc_length when building."""
+    return "sequence_length" in fargs(model_builder).args + fargs(model_builder).kwonlyargs
+
+
 def list_layer_names(network, only_para_layers=True) -> List[str]:
     """Get a list of unique string representations of all layers in the network."""
     if only_para_layers:

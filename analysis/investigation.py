@@ -6,7 +6,7 @@ from typing import List, Union
 import gym
 import tensorflow as tf
 
-from agent.policies import BasePolicyDistribution
+from common.policies import BasePolicyDistribution
 from agent.ppo import PPOAgent
 from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv

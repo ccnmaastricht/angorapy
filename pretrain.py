@@ -31,7 +31,7 @@ class TestCallback(tf.keras.callbacks.Callback):
         self.test_data = test_data
 
     def on_epoch_end(self, epoch, logs={}):
-        out = self.model.evaluate(self.test_data)
+        out = self.model.evaluate(self.test_data, )
         print(f"\n{out}\n")
 
 

@@ -88,7 +88,7 @@ def add_state_dims(state: "Sensation", dims: int = 1, axis: int = 0) -> 'Sensati
     if dims < 1:
         return state
 
-    new_state = state.with_leading_dims()
+    new_state = state.with_leading_dims(time=dims == 2)
 
     return new_state
 
