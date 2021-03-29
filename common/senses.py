@@ -27,6 +27,10 @@ class Sensation:
     # PROPERTIES
 
     @property
+    def shape(self):
+        return (99,)
+
+    @property
     def v(self):
         """Shortcut for vision."""
         return self.vision

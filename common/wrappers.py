@@ -3,6 +3,7 @@ import abc
 from typing import Union, List, Type
 
 import gym
+import numpy
 from mpi4py import MPI
 
 from common.senses import Sensation
@@ -31,7 +32,11 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
             return observation
         elif isinstance(observation, dict):
             assert "observation" in observation.keys(), "Unknown dict type of state couldnt be resolved to Sensation."
-            return Sensation(proprioception=observation["observation"])
+
+            if isinstance(observation["observation"], Sensation):
+                return observation["observation"]
+            elif isinstance(observation["observation"], numpy.ndarray):
+                return Sensation(proprioception=observation["observation"])
 
         return Sensation(proprioception=observation)
 

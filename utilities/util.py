@@ -45,7 +45,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], int]:
             obs_dim = {"proprioception": env.observation_space["observation"].shape}
         elif isinstance(env.observation_space["observation"], spaces.Dict):
             # made for sensation
-            obs_dim = {field: field.shape for field in env.observation_space["observation"]}
+            obs_dim = {name: field.shape for name, field in env.observation_space["observation"].spaces.items()}
         else:
             raise UninterpretableObservationSpace(f"Cannot extract the dimensionality from a spaces.Dict observation space "
                                                   f"where the observation is of type "

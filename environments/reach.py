@@ -1,21 +1,19 @@
 import collections
-import queue
 import random
 from typing import Union, Callable
 
-import gym
 import numpy as np
 from gym import spaces
 from gym.envs.robotics import HandReachEnv
-from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from gym.envs.robotics.utils import robot_get_obs
 
-from configs.reward_config import REACH_BASE, resolve_config_name
 from common import reward
 from common.reward import sequential_free_reach, free_reach, reach, sequential_reach
+from common.senses import Sensation
+from configs.reward_config import REACH_BASE, resolve_config_name
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
-from utilities.const import N_SUBSTEPS, VISION_WH
+from utilities.const import N_SUBSTEPS
 
 
 class Reach(HandReachEnv, BaseShadowHandEnv):
@@ -54,6 +52,16 @@ class Reach(HandReachEnv, BaseShadowHandEnv):
                 self._touch_sensor_id.append(v)
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
+
+        obs = self._get_obs()
+        self.observation_space = spaces.Dict(dict(
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            observation=spaces.Dict(
+                {name: spaces.Box(-np.inf, np.inf, shape=val.shape, dtype="float32")
+                 for name, val in obs['observation'].dict().items()}
+            ),
+        ))
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = reach
@@ -136,11 +144,11 @@ class Reach(HandReachEnv, BaseShadowHandEnv):
         achieved_goal = self._get_achieved_goal().ravel()
 
         return {
-            'observation': {
-                'somatosensation': touch,
-                'proprioception': proprioception,
-                'goal': self.goal.copy(),
-            },
+            'observation': Sensation(
+                proprioception=proprioception,
+                somatosensation=touch,
+                goal=self.goal.copy()
+            ),
 
             'desired_goal': self.goal.copy(),
             'achieved_goal': achieved_goal.copy(),
@@ -189,8 +197,7 @@ class Reach(HandReachEnv, BaseShadowHandEnv):
 class MultiReach(Reach):
     """Reaching task where three fingers have to be joined."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True,
-                 initial_qpos=DEFAULT_INITIAL_QPOS):
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
         super().__init__(n_substeps, relative_control, initial_qpos)
 
     def _sample_goal(self):
@@ -281,7 +288,8 @@ class ReachSequential(Reach):
 
         # set next subgoal if current one is achieved
         if info["is_success"]:
-            print(f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
+            print(
+                f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
             self.goal = self._sample_goal()
 
         return observation, reward, done, info
@@ -427,8 +435,8 @@ class FreeReachSequential(FreeReach):
 
         # set next subgoal if current one is achieved
         if info["is_success"]:
-            print(f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
+            print(
+                f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
             self.goal = self._sample_goal()
 
         return observation, reward, done, info
-

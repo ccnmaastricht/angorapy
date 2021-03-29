@@ -24,7 +24,6 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
     # input preprocessing
     inputs = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
-    # input_dict = {"proprioception": inputs}
 
     # policy network
     latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="policy_encoder")(inputs)
@@ -64,7 +63,6 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
     inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
     masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + state_dimensionality["proprioception"])(inputs)
-    # masked = inputs
 
     # policy network; stateful, so batch size needs to be known
     encoder_sub_model = _build_encoding_sub_model(

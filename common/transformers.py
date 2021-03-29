@@ -3,6 +3,7 @@ import sys
 from collections import namedtuple
 from typing import List, Tuple, Dict
 
+import gym
 import numpy as np
 
 from common.senses import Sensation
@@ -21,7 +22,7 @@ class BaseTransformer(abc.ABC):
         self.previous_n = self.n
 
         # extract env info
-        self.env = env
+        self.env_name = env.unwrapped.spec.id
         self.state_dim, self.number_of_actions = env_extract_dims(env)
 
     @abc.abstractmethod
@@ -86,7 +87,7 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
     variance: Dict[str, np.ndarray]
 
     def __add__(self, other) -> "BaseRunningMeanTransformer":
-        nt = self.__class__(self.env)
+        nt = self.__class__(gym.make(self.env_name))
         nt.n = self.n + other.n
 
         for name in self.mean.keys():
