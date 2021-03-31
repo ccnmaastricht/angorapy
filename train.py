@@ -13,8 +13,7 @@ from gym.spaces import Box
 from configs import hp_config
 from common.policies import get_distribution_by_short_name
 from agent.ppo import PPOAgent
-from models import get_model_builder
-from models.shadow import build_blind_shadow_brain_v1
+from models import get_model_builder, build_shadow_brain_base
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
@@ -64,15 +63,17 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if "BaseShadowHandEnv" in environment or settings["architecture"] == "shadow":
+    if settings["architecture"] == "shadow":
         if settings["model"] == "ffn" and is_root:
             print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
             settings["model"] = "gru"
 
-        if env.visual_input:
-            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"])
+        if "vision" in env.observation_space["observation"].spaces.keys():
+            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
+                                             blind=False)
         else:
-            build_models = build_blind_shadow_brain_v1
+            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
+                                             blind=True)
     else:
         build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
                                          shared=settings["shared"])

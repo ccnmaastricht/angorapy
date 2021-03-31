@@ -25,6 +25,7 @@ from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from common.transformers import BaseTransformer, BaseRunningMeanTransformer
+from common.validators import validate_env_model_compatibility
 from common.wrappers import BaseWrapper, make_env
 from utilities import const
 from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
@@ -132,8 +133,7 @@ class PPOAgent:
             self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                 initial_learning_rate=self.learning_rate,
                 decay_steps=workers * horizon,  # decay after every cycle
-                decay_rate=0.98
-            )
+                decay_rate=0.98)
         else:
             raise ValueError("Unknown Schedule type. Choose one of (None, exponential)")
 
@@ -149,10 +149,8 @@ class PPOAgent:
             self.env,
             self.distribution,
             **({"bs": 1} if requires_batch_size(model_builder) else {}),
-            **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {})
-        )
-        tf.keras.utils.plot_model(self.joint, "initial_model.png", expand_nested=True)
-
+            **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {}))
+        validate_env_model_compatibility(self.env, self.joint)
 
         if pretrained_components is not None:
             print("Loading pretrained components:")
@@ -177,11 +175,6 @@ class PPOAgent:
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
-
-        # # passing one sample, which for some reason prevents cuDNN init error
-        # if isinstance(self.env.observation_space, Dict) and "observation" in self.env.observation_space.sample():
-        #     self.joint(merge_into_batch(
-        #         [add_state_dims(self.env.observation_space.sample()["observation"], dims=1) for _ in range(1)]))
 
         # miscellaneous
         self.iteration = 0

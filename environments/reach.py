@@ -5,7 +5,7 @@ from typing import Union, Callable
 import numpy as np
 from gym import spaces
 from gym.envs.robotics import HandReachEnv
-from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
+from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance
 from gym.envs.robotics.utils import robot_get_obs
 
 from common import reward
@@ -16,22 +16,15 @@ from environments.shadowhand import get_fingertip_distance, generate_random_sim_
 from utilities.const import N_SUBSTEPS
 
 
-class Reach(HandReachEnv, BaseShadowHandEnv):
+class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
-    def assert_reward_setup(self):
-        """Assert whether the reward config fits the environment. """
-        assert set(REACH_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete free reach reward configuration."
-
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
+    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True):
         # reward function setup
         self._set_default_reward_function_and_config()
 
         self.current_target_finger = 3
         self.thumb_name = 'robot0:S_thtip'
-
-        self._touch_sensor_id_site_id = []
-        self._touch_sensor_id = []
 
         # STATE INITIALIZATION
         assert initial_qpos in ["random", "buffered"] or isinstance(initial_qpos, dict), "Illegal state initialization."
@@ -43,29 +36,25 @@ class Reach(HandReachEnv, BaseShadowHandEnv):
         elif self.state_initialization == "buffered":
             initial_qpos = DEFAULT_INITIAL_QPOS
 
-        super().__init__(self.reward_config["SUCCESS_DISTANCE"], n_substeps, relative_control, initial_qpos, "dense")
-
-        for k, v in self.sim.model._sensor_name2id.items():
-            if 'robot0:TS_' in k:
-                self._touch_sensor_id_site_id.append(
-                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
-                self._touch_sensor_id.append(v)
+        super().__init__(initial_qpos, self.reward_config["SUCCESS_DISTANCE"], n_substeps, relative_control)
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
-
-        obs = self._get_obs()
-        self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
-            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
-            observation=spaces.Dict(
-                {name: spaces.Box(-np.inf, np.inf, shape=val.shape, dtype="float32")
-                 for name, val in obs['observation'].dict().items()}
-            ),
-        ))
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = reach
         self.reward_config = REACH_BASE
+
+    def assert_reward_setup(self):
+        """Assert whether the reward config fits the environment. """
+        assert set(REACH_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete free reach reward configuration."
+
+    def _get_achieved_goal(self):
+        goal = [self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        return np.array(goal).flatten()
+
+    def _is_success(self, achieved_goal, desired_goal):
+        d = goal_distance(achieved_goal, desired_goal)
+        return (d < self.distance_threshold).astype(np.float32)
 
     def get_thumb_position(self) -> np.ndarray:
         """Get the position of the thumb in space."""
@@ -180,6 +169,31 @@ class Reach(HandReachEnv, BaseShadowHandEnv):
             goal = self.initial_goal.copy()
 
         return goal.flatten()
+
+    def _env_setup(self, initial_qpos):
+        for name, value in initial_qpos.items():
+            self.sim.data.set_joint_qpos(name, value)
+        self.sim.forward()
+
+        self.initial_goal = self._get_achieved_goal().copy()
+        self.palm_xpos = self.sim.data.body_xpos[self.sim.model.body_name2id('robot0:palm')].copy()
+
+    def _render_callback(self):
+        # Visualize targets.
+        sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
+        goal = self.goal.reshape(5, 3)
+        for finger_idx in range(5):
+            site_name = 'target{}'.format(finger_idx)
+            site_id = self.sim.model.site_name2id(site_name)
+            self.sim.model.site_pos[site_id] = goal[finger_idx] - sites_offset[site_id]
+
+        # Visualize finger positions.
+        achieved_goal = self._get_achieved_goal().reshape(5, 3)
+        for finger_idx in range(5):
+            site_name = 'finger{}'.format(finger_idx)
+            site_id = self.sim.model.site_name2id(site_name)
+            self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
+        self.sim.forward()
 
     def step(self, action):
         """Step the environment."""
