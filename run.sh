@@ -14,6 +14,6 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export CRAY_CUDA_MPS=1
 
 # load virtual environment
-source ${HOME}/dexterityvenv21/bin/activate
+source ${HOME}/dexterityvenv/bin/activate
 
 srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru --architecture shadow
