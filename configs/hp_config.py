@@ -187,7 +187,8 @@ hand = make_config(
     discount=0.998,
     grad_norm=0.5,
     clip_values=False,
-    architecture="deeper"
+    architecture="shadow",
+    model="gru"
 )
 
 hand_beta = derive_config(hand, {"distribution": "beta"})

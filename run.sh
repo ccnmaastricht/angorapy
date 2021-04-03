@@ -16,4 +16,4 @@ export CRAY_CUDA_MPS=1
 # load virtual environment
 source ${HOME}/dexterityvenv21/bin/activate
 
-srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru
+srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru --architecture shadow
