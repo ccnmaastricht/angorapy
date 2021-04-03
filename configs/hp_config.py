@@ -175,7 +175,7 @@ roboschool_beta = derive_config(roboschool, {"distribution": "beta"})
 
 hand = make_config(
     iterations=5000,
-    workers=16,
+    workers=24,
     batch_size=256,
     horizon=512,
     c_entropy=0.001,
