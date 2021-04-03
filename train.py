@@ -12,13 +12,13 @@ from gym.spaces import Box
 
 from configs import hp_config
 from common.policies import get_distribution_by_short_name
-from agent.ppo import PPOAgent
 from models import get_model_builder, build_shadow_brain_base
 from utilities.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from common.wrappers import make_env
 from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
+from agent.ppo import PPOAgent
 
 from environments import *
 
@@ -30,8 +30,12 @@ class InconsistentArgumentError(Exception):
     pass
 
 
-def run_experiment(environment, settings: dict, verbose=True, use_monitor=False) -> PPOAgent:
+def run_experiment(environment, settings: dict, verbose=True, use_monitor=False):
     """Run an experiment with the given settings ."""
+    if settings["cpu"]:
+        tf.config.experimental.set_visible_devices([], "GPU")
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
     mpi_rank = MPI.COMM_WORLD.rank
     is_root = mpi_rank == 0
 
@@ -91,9 +95,6 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
               f"-----------------------------------------\n")
 
         print(f"{wn}HyperParameters{ec}: {settings}\n")
-
-    if settings["cpu"]:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     if settings["load_from"] is not None:
         if verbose and is_root:

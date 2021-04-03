@@ -84,7 +84,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
 
 
 def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[str, int], responsive_senses: List[str],
-                              shuffle: bool = True):
+                              shuffle: bool = True, worker_ids: List = None):
     """Read all files in storage into a tf record dataset without actually loading everything into memory.
 
     Args:
@@ -122,8 +122,13 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
 
         return parsed
 
+    worker_id_regex = "[0-9]*"
+    if worker_ids is not None:
+        worker_id_regex = "[" + "|".join(map(str, worker_ids)) + "]"
+
     files = [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR) if
-             re.match(f"{id_prefix}_.[0-9]*", name)]
+             re.match(f"{id_prefix}_data_{worker_id_regex}\.tfrecord", name)]
+
     random.shuffle(files) if shuffle else None
 
     serialized_dataset = tf.data.TFRecordDataset(files)

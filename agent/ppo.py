@@ -13,16 +13,17 @@ from typing import Union, Tuple, Any, Callable
 import gym
 import numpy as np
 import tensorflow as tf
-from gym.spaces import Discrete, Box, Dict
+from gym.spaces import Discrete, Box
 from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
 from tqdm import tqdm
 
 import models
-from common import policies
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
+from common import policies
+from common.mpi_optim import MpiAdam
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from common.transformers import BaseTransformer, BaseRunningMeanTransformer
 from common.validators import validate_env_model_compatibility
@@ -34,19 +35,27 @@ from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
 from utilities.statistics import ignore_none
-from utilities.util import mpi_flat_print, env_extract_dims, add_state_dims, merge_into_batch, detect_finished_episodes
+from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes
 
-# get COMM and find gpus
+# get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
-is_gpu_process = MPI.COMM_WORLD.rank < len(gpus)
+is_root = mpi_comm.rank == 0
 
-if not is_gpu_process:
+if len(gpus) > 0:
+    is_optimization_process = MPI.COMM_WORLD.rank < len(gpus)
+else:
+    is_optimization_process = True
+
+if not is_optimization_process:
     tf.config.experimental.set_visible_devices([], "GPU")
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 else:
-    # pass
-    tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
+    if len(gpus) > 0:
+        tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
+
+optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
+n_optimizers = mpi_comm.allreduce(is_optimization_process, op=MPI.SUM)
 
 
 class PPOAgent:
@@ -171,7 +180,7 @@ class PPOAgent:
                 else:
                     print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-        self.optimizer: Optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.optimizer: Optimizer = MpiAdam(comm=optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -331,35 +340,47 @@ class PPOAgent:
         Returns:
             self
         """
+
         # determine the number of independent repeated gatherings required on this worker
-        base, extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
-        worker_split = [base + (r < extra) for r in range(MPI.COMM_WORLD.size)]
+        worker_base, worker_extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
+        worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
         worker_collection_ids = list(range(self.n_workers))[
                                 sum(worker_split[:mpi_comm.rank]):sum(worker_split[:mpi_comm.rank + 1])]
-        list_of_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
 
-        if MPI.COMM_WORLD.rank == 0:
+        # determine the split of worker outputs over optimizers
+        optimizer_base, optimizer_extra = divmod(self.n_workers, n_optimizers)
+        optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(n_optimizers)]
+        optimizer_collection_ids = list(range(self.n_workers))[
+                                   sum(optimizer_split[:mpi_comm.rank]):sum(optimizer_split[:mpi_comm.rank + 1])]
+
+        list_of_worker_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
+        list_of_optimizer_collection_id_lists = mpi_comm.gather(optimizer_collection_ids, root=0)
+
+        if is_root:
             print(
                 f"\n\nDrill started using {MPI.COMM_WORLD.size} processes for {self.n_workers} workers of which "
-                f"{len(gpus)} are GPU optimizers."
-                f" Worker distribution: {[base + (r < extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
-                f"IDs over Workers: {list_of_collection_id_lists}")
+                f"{n_optimizers} are optimizers."
+                f" Worker distribution: {[worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
+                f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
+                f"IDs over Optimizers: {list_of_optimizer_collection_id_lists}")
 
             assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-
         assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-        if mpi_comm.rank == 0 and self.is_recurrent and batch_size > self.n_workers:
-            logging.warning(
-                f"Batchsize is larger than possible with the available number of independent sequences for "
-                f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
-                f"transitions per batch.")
+
+        if self.is_recurrent and batch_size > self.n_workers:
+            if is_root:
+                logging.warning(
+                    f"Batchsize is larger than possible with the available number of independent sequences for "
+                    f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
+                    f"transitions per batch.")
+
             batch_size = self.n_workers
 
         # rebuild model with desired batch size
         weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.model_builder(
             self.env, self.distribution,
-            **({"bs": batch_size} if requires_batch_size(self.model_builder) else {}),
+            **({"bs": batch_size // n_optimizers} if requires_batch_size(self.model_builder) else {}),
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
@@ -384,7 +405,8 @@ class PPOAgent:
             # run simulations in parallel
             worker_stats = []
             for i in worker_collection_ids:
-                stats = actor.collect(self.env, self.distribution, self.horizon, self.discount, self.lam,
+                stats = actor.collect(self.env, self.distribution, self.horizon,
+                                      self.discount, self.lam,
                                       self.tbptt_length, collector_id=i)
                 worker_stats.append(stats)
 
@@ -414,11 +436,11 @@ class PPOAgent:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            if not is_gpu_process:
-                # only the GPU processes optimize and calculate the rest
+            if not is_optimization_process:
+                # only optimizers go for the rest
                 continue
 
-            if mpi_comm.rank == 0:
+            if is_root:
                 # record stats and transformers in the agent
                 self.record_wrapper_stats()
                 self.record_stats(stats_with_evaluation)
@@ -437,7 +459,7 @@ class PPOAgent:
                     print("\rAll catch a breath, we stop the drill early due to the formidable result!")
                     break
 
-            if mpi_comm.rank == 0:
+            if is_root:
                 if cycle_start is not None:
                     self.cycle_timings.append(round(time.time() - cycle_start, 2))
                 self.report(total_iterations=n)
@@ -446,10 +468,12 @@ class PPOAgent:
             # PARALLELIZED OPTIMIZATION
             mpi_flat_print("Optimizing...")
             dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                id_prefix=self.agent_id, responsive_senses=self.policy.input_names)
-            self.optimize(dataset, epochs, batch_size)
+                                                id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
+                                                responsive_senses=self.policy.input_names)
 
-            if mpi_comm.rank == 0:
+            self.optimize(dataset, epochs, batch_size // n_optimizers)
+
+            if is_root:
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 mpi_flat_print("Finalizing...")
@@ -476,7 +500,7 @@ class PPOAgent:
                 self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
                 self.time_dicts.append(time_dict)
 
-        if mpi_comm.rank == 0:
+        if is_root:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
 
         return self
@@ -517,7 +541,8 @@ class PPOAgent:
     def _learn_on_batch(self, batch):
         # optimize policy and value network simultaneously
         with tf.GradientTape() as tape:
-            state_batch = {fname: f for fname, f in batch.items() if fname in ["vision", "proprioception", "somatosensation", "goal"]}
+            state_batch = {fname: f for fname, f in batch.items() if
+                           fname in ["vision", "proprioception", "somatosensation", "goal"]}
             policy_output, value_output = self.joint(state_batch, training=True)
             old_values = batch["value"]
 
@@ -544,9 +569,6 @@ class PPOAgent:
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        # apply the gradients to the joint model'serialization parameters
-        self.optimizer.apply_gradients(zip(gradients, self.joint.trainable_variables))
-
         info = {
             "policy_output": policy_output,
             # "actions": batch["action"],
@@ -556,10 +578,10 @@ class PPOAgent:
             # "gradients": gradients
         }
 
-        return tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
+        return gradients, tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
-        """Optimize the agent'serialization policy and value network based on a given dataset.
+        """Optimize the agent's policy and value network based on a given dataset.
         
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
         handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
@@ -576,8 +598,6 @@ class PPOAgent:
         Returns:
             None
         """
-        progressbar = tqdm(total=epochs * ((self.horizon * self.n_workers / self.tbptt_length) / batch_size),
-                           leave=False, desc="Optimizing", disable=True)
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation
@@ -586,15 +606,15 @@ class PPOAgent:
 
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+
+            # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
-                # print("\n\n")
-                # print(b)
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        ent, pi_loss, v_loss, info = self._learn_on_batch(b)
-                        progressbar.update(1)
+                        grad, ent, pi_loss, v_loss, info = self._learn_on_batch(b)
+                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
                         # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
@@ -602,9 +622,8 @@ class PPOAgent:
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
-                            ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
-
-                            progressbar.update(1)
+                            grad, ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
+                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["action_prob"])
@@ -622,12 +641,12 @@ class PPOAgent:
             value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
             entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
+        optimization_comm.Barrier()
+
         # store statistics in agent history
         self.policy_loss_history.append(statistics.mean(policy_loss_history))
         self.value_loss_history.append(statistics.mean(value_loss_history))
         self.entropy_history.append(statistics.mean(entropy_history))
-
-        progressbar.close()
 
     def evaluate(self, n: int, actor: Gatherer = None, save: bool = False) -> Tuple[StatBundle, Any]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
@@ -716,7 +735,7 @@ class PPOAgent:
             time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
 
         # print the report
-        if mpi_comm.rank == 0:
+        if is_root:
             mpi_flat_print(
                 f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
                 f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "

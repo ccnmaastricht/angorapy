@@ -1,24 +1,19 @@
 #!/bin/bash -l
-#
-#SBATCH --nodes=1
-#SBATCH --ntasks=24
-#SBATCH --ntasks-per-node=24
-#SBATCH --ntasks-per-common=2
-#SBATCH --cpus-per-task=1
-#SBATCH --constraint=gpu
-#SBATCH --hint=multithread
+#SBATCH --job-name="dexterity"
+#SBATCH --account="ich020"
 #SBATCH --time=08:00:00
-#SBATCH --account=ich020
-
-# load modules
-module load daint-gpu
-module load cray-python
-module load cray-mpich
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-core=1
+#SBATCH --ntasks-per-node=6
+#SBATCH --cpus-per-task=2
+#SBATCH --partition=normal
+#SBATCH --constraint=gpu
+#SBATCH --hint=nomultithread
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export CRAY_CUDA_MPS=1
 
 # load virtual environment
 source ${HOME}/dexterityvenv21/bin/activate
 
-# run it
-srun  python3 -u train.py FreeReachRelative-v0 --pcon hand_beta --rcon free_reach_positive_reinforcement.default --model gru --workers 24
+srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru

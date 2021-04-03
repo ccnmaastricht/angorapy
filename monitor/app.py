@@ -148,8 +148,8 @@ def show_experiment(exp_id):
     current_index = experiment_paths.index(exp_id)
 
     path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
-    with open(os.path.join(path, "progress.json"), "r") as f:
-        progress = json.load(f)
+    # with open(os.path.join(path, "progress.json"), "r") as f:
+    #     progress = json.load(f)
 
     with open(os.path.join(path, "meta.json"), "r") as f:
         meta = json.load(f)
@@ -163,7 +163,7 @@ def show_experiment(exp_id):
         prev_id=experiment_paths[current_index - 1] if current_index != 0 else None,
         hps=meta["hyperparameters"],
         env_meta=meta["environment"],
-        reward_function=meta["reward_function"] if "reward_function" in meta else "default",
+        reward_function=meta["reward_function"] if "reward_function" in meta else {},
         iterations=meta["iterations"] if "iterations" in meta else None
     )
 
