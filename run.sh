@@ -13,7 +13,11 @@
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export CRAY_CUDA_MPS=1
 
+module load daint-gpu
+module load cray-python
+module load cudatoolkit
+
 # load virtual environment
-source ${HOME}/dexterityvenv/bin/activate
+source ${HOME}/robovenv/bin/activate
 
 srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru --architecture shadow
