@@ -222,11 +222,6 @@ if __name__ == "__main__":
         if is_root:
             logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
-    if is_root:
-        print("Ressources:\n-------------------------")
-        print(f"Number of GPUs Available: {len(tf.config.experimental.list_physical_devices('GPU'))}")
-        print(f"Number of CPUs Available: {len(tf.config.experimental.list_physical_devices('CPU'))}\n\n")
-
     try:
         run_experiment(args.env, vars(args), use_monitor=True)
     except Exception as e:

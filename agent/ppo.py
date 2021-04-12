@@ -39,6 +39,7 @@ from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_epi
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
+print(gpus)
 is_root = mpi_comm.rank == 0
 
 if len(gpus) > 0:
