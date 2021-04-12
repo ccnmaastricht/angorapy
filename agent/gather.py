@@ -5,7 +5,6 @@ from typing import Tuple, Any
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Box
-from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from agent.core import estimate_episode_advantages
 from agent.dataio import tf_serialize_example, make_dataset_and_stats
@@ -45,8 +44,6 @@ class Gatherer:
             collector_id:   the ID of this gathering, different from the worker's ID
         """
         state: Sensation
-        if self.worker_id == 0:
-            plot_model(self.joint, show_shapes=True, expand_nested=True)
 
         is_recurrent = is_recurrent_model(self.joint)
         is_continuous = isinstance(env.action_space, Box)
