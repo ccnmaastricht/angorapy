@@ -16,7 +16,6 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box
 from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
-from tqdm import tqdm
 
 import models
 from agent.core import extract_discrete_action_probabilities
@@ -384,7 +383,7 @@ class PPOAgent:
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(self.model_builder) else {}))
         self.joint.set_weights(weights)
 
-        tf.keras.utils.plot_model(self.joint)
+        # tf.keras.utils.plot_model(self.joint)
 
         actor = self._make_actor()
         actor.set_weights(weights)
