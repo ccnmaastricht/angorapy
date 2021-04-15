@@ -4,6 +4,7 @@ import os
 import random
 import re
 from functools import partial
+from pprint import pprint
 from typing import Union, Tuple, List
 
 import tensorflow as tf
@@ -124,7 +125,7 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
 
     worker_id_regex = "[0-9]*"
     if worker_ids is not None:
-        worker_id_regex = "[" + "|".join(map(str, worker_ids)) + "]"
+        worker_id_regex = "(" + "|".join(map(str, worker_ids)) + ")"
 
     files = [os.path.join(STORAGE_DIR, name) for name in os.listdir(STORAGE_DIR) if
              re.match(f"{id_prefix}_data_{worker_id_regex}\.tfrecord", name)]

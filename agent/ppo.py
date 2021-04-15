@@ -39,7 +39,6 @@ from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_epi
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
-print(gpus)
 is_root = mpi_comm.rank == 0
 
 if len(gpus) > 0:
@@ -243,6 +242,7 @@ class PPOAgent:
     def set_gpu(self, activated: bool) -> None:
         """Set GPU usage mode."""
         self.device = "GPU:0" if activated else "CPU:0"
+        pass
 
     def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Clipped objective as given in the PPO paper. Original objective is to be maximized, but this is the negated
