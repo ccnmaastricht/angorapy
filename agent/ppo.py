@@ -42,7 +42,12 @@ gpus = tf.config.list_physical_devices('GPU')
 is_root = mpi_comm.rank == 0
 
 if len(gpus) > 0:
-    is_optimization_process = MPI.COMM_WORLD.rank < len(gpus)
+    node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
+    node_comm = mpi_comm.Split(color=node_names.index(MPI.Get_processor_name()))
+    node_optimizer_rank = node_comm.allreduce(mpi_comm.rank, op=MPI.MIN)
+
+    # TODO make this work for multiple GPUs per node?
+    is_optimization_process = MPI.COMM_WORLD.rank == node_optimizer_rank
 else:
     is_optimization_process = True
 
