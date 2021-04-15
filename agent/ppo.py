@@ -56,7 +56,7 @@ if not is_optimization_process:
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 else:
     if len(gpus) > 0:
-        tf.config.experimental.set_memory_growth(gpus[mpi_comm.rank], True)
+        tf.config.experimental.set_memory_growth(gpus[0], True)
 
 optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
 n_optimizers = mpi_comm.allreduce(is_optimization_process, op=MPI.SUM)
