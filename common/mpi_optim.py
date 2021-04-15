@@ -15,6 +15,9 @@ class MpiAdam(tf.keras.optimizers.Adam):
         super().__init__(learning_rate=learning_rate, epsilon=epsilon)
         self.comm = comm
 
+        if MPI.COMM_WORLD.rank == 0:
+            print(f"MPI Optimizer with {self.comm.size} ranks has been created; the following ranks optimize: {self.comm.gather(MPI.COMM_WORLD.rank)}")
+
     def _sync_parameters(self):
         root_variables = self.comm.bcast(self.weights(), int_root=0)
         self.set_weights(root_variables)
