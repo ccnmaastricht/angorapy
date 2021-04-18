@@ -8,6 +8,7 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
+from pprint import pprint
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -24,7 +25,7 @@ from agent.gather import Gatherer
 from common import policies
 from common.mpi_optim import MpiAdam
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
-from common.transformers import BaseTransformer, BaseRunningMeanTransformer
+from common.transformers import BaseTransformer, BaseRunningMeanTransformer, transformers_from_serializations
 from common.validators import validate_env_model_compatibility
 from common.wrappers import BaseWrapper, make_env
 from utilities import const
@@ -622,11 +623,15 @@ class PPOAgent:
                         self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
-                        # batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                        split_batch = {k: tf.split(v, v.shape[1], axis=1) for k, v in b.items()}
+                        # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
+                        # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
+                        # fed into the model chronologically to adhere to statefulness
+                        split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
+
+                            # find and apply the gradients
                             grad, ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
                             self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
@@ -774,7 +779,7 @@ class PPOAgent:
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
         parameters["distribution"] = self.distribution.__class__.__name__
-        parameters["transformer"] = self.env.serialize()
+        parameters["transformers"] = self.env.serialize()
 
         return parameters
 
@@ -819,7 +824,7 @@ class PPOAgent:
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
                        reward_config=parameters.get("reward_configuration"),
-                       transformers=[BaseTransformer.from_serialization(parameters["transformers"])])
+                       transformers=transformers_from_serializations(parameters["transformers"]))
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
 

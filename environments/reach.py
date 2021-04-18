@@ -7,21 +7,27 @@ from gym import spaces
 from gym.envs.robotics import HandReachEnv
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance
 from gym.envs.robotics.utils import robot_get_obs
+from mujoco_py import GlfwContext
 
 from common import reward
 from common.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from common.senses import Sensation
 from configs.reward_config import REACH_BASE, resolve_config_name
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
-from utilities.const import N_SUBSTEPS
+from utilities.const import N_SUBSTEPS, VISION_WH
+from utilities.util import HiddenPrints
 
 
 class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
-    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True):
+    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False):
+        with HiddenPrints():
+            GlfwContext(offscreen=True)  # fix to "ERROR: GLEW initalization error: Missing GL version"
+
         # reward function setup
         self._set_default_reward_function_and_config()
+        self.vision = vision
 
         self.current_target_finger = 3
         self.thumb_name = 'robot0:S_thtip'
@@ -136,6 +142,7 @@ class Reach(BaseShadowHandEnv):
             'observation': Sensation(
                 proprioception=proprioception,
                 somatosensation=touch,
+                vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else None,
                 goal=self.goal.copy()
             ),
 
@@ -179,8 +186,9 @@ class Reach(BaseShadowHandEnv):
         self.palm_xpos = self.sim.data.body_xpos[self.sim.model.body_name2id('robot0:palm')].copy()
 
     def _render_callback(self):
-        # Visualize targets.
         sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
+
+        # Visualize targets.
         goal = self.goal.reshape(5, 3)
         for finger_idx in range(5):
             site_name = 'target{}'.format(finger_idx)
@@ -193,6 +201,7 @@ class Reach(BaseShadowHandEnv):
             site_name = 'finger{}'.format(finger_idx)
             site_id = self.sim.model.site_name2id(site_name)
             self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
+
         self.sim.forward()
 
     def step(self, action):
@@ -211,8 +220,8 @@ class Reach(BaseShadowHandEnv):
 class MultiReach(Reach):
     """Reaching task where three fingers have to be joined."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
-        super().__init__(n_substeps, relative_control, initial_qpos)
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False):
+        super().__init__(n_substeps, relative_control, initial_qpos, vision)
 
     def _sample_goal(self):
         thumb_name = 'robot0:S_thtip'
@@ -248,11 +257,11 @@ class MultiReach(Reach):
 class ReachSequential(Reach):
     """Generate finger configurations in a sequence. Each new goal is randomly generated as the old goal is reached."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False):
         self.current_target_finger = None
         self.goal_sequence = []
 
-        super().__init__(n_substeps, relative_control, initial_qpos)
+        super().__init__(n_substeps, relative_control, initial_qpos, vision)
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = sequential_reach
@@ -317,12 +326,12 @@ class FreeReach(Reach):
 
     The goal is represented as a one-hot vector of size 4."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS,
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False,
                  force_finger=None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
         self.forced_finger = force_finger
-        super().__init__(n_substeps, relative_control, initial_qpos)
+        super().__init__(n_substeps, relative_control, initial_qpos, vision)
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = free_reach
@@ -379,14 +388,14 @@ class FreeReach(Reach):
 class FreeReachSequential(FreeReach):
     """Freely join fingers in a sequence, where each new goal is randomly generated as the old goal is reached."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS):
+    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False):
         self.goal_sequence = []
 
         self.force_exemplary_sequence = True
         self.default_exemplary_sequence = [0, 1, 2, 3]
         self.exemplary_sequence = self.default_exemplary_sequence.copy()
 
-        super().__init__(n_substeps, relative_control, initial_qpos)
+        super().__init__(n_substeps, relative_control, initial_qpos, vision)
         self.exemplary_sequence = self.default_exemplary_sequence.copy()  # reset after initial init stuff
 
     def _set_default_reward_function_and_config(self):

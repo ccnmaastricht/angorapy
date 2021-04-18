@@ -4,9 +4,83 @@
 import tensorflow as tf
 
 
+def _residual_block(x, filters, kernel_size=3, stride=1, conv_shortcut=True, name=None):
+    """A residual block.
+
+    Arguments:
+      x: input tensor.
+      filters: integer, filters of the bottleneck layer.
+      kernel_size: default 3, kernel size of the bottleneck layer.
+      stride: default 1, stride of the first layer.
+      conv_shortcut: default True, use convolution shortcut if True,
+          otherwise identity shortcut.
+      name: string, block label.
+
+    Returns:
+      Output tensor for the residual block.
+    """
+    bn_axis = 3 if tf.keras.backend.image_data_format() == 'channels_last' else 1
+
+    if conv_shortcut:
+        # linear convolutional shortcut that matches the sizes
+        shortcut = tf.keras.layers.Conv2D(4 * filters, 1, strides=stride, name=name + '_0_conv')(x)
+        shortcut = tf.keras.layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5, name=name + '_0_bn')(shortcut)
+    else:
+        shortcut = x
+
+    x = tf.keras.layers.Conv2D(filters, 1, strides=stride, name=name + '_1_conv')(x)
+    x = tf.keras.layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5, name=name + '_1_bn')(x)
+    x = tf.keras.layers.Activation('relu', name=name + '_1_relu')(x)
+
+    x = tf.keras.layers.Conv2D(filters, kernel_size, padding='SAME', name=name + '_2_conv')(x)
+    x = tf.keras.layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5, name=name + '_2_bn')(x)
+    x = tf.keras.layers.Activation('relu', name=name + '_2_relu')(x)
+
+    x = tf.keras.layers.Conv2D(4 * filters, 1, name=name + '_3_conv')(x)
+    x = tf.keras.layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5, name=name + '_3_bn')(x)
+
+    x = tf.keras.layers.Add(name=name + '_add')([shortcut, x])
+    x = tf.keras.layers.Activation('relu', name=name + '_out')(x)
+
+    return x
+
+
 # VISUAL ENCODING
 
-def _build_visual_encoder(shape, batch_size=None, name="visual_component"):
+def _build_openai_encoder(shape, batch_size=None, name="visual_component"):
+    """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory."""
+    inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
+
+    # first layer
+    x = tf.keras.layers.Conv2D(32, 5, 1, padding="valid")(inputs)  # 196 x 196
+    x = tf.keras.layers.Activation("relu")(x)
+
+    # second layer
+    x = tf.keras.layers.Conv2D(32, 3, 1, padding="valid")(x)  # 195 x 195
+    x = tf.keras.layers.Activation("relu")(x)
+
+    # pooling
+    x = tf.keras.layers.MaxPool2D(3, 3)(x)  # 64 x 64
+
+    # resnet
+    x = _residual_block(x, 16, 3, 3, name="res1")
+    x = _residual_block(x, 32, 3, 3, name="res2")
+    x = _residual_block(x, 64, 3, 3, name="res3")
+    x = _residual_block(x, 64, 3, 3, name="res4")
+
+    # fully connected
+    x = tf.keras.layers.Activation("softmax")(x)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128)(x)
+    x = tf.keras.layers.Activation("relu")(x)
+
+    # output
+    x = tf.keras.layers.Dense(7)(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
+
+
+def _build_alexnet_encoder(shape, batch_size=None, name="visual_component"):
     """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory."""
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
@@ -67,7 +141,5 @@ def _build_visual_decoder(input_dim):
 
 
 if __name__ == "__main__":
-    conv_comp = _build_visual_encoder((227, 227, 3))
-    conv_dec = _build_visual_decoder(512)
+    conv_comp = _build_openai_encoder((200, 200, 3))
     conv_comp.summary()
-    conv_dec.summary()

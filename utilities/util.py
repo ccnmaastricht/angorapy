@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 """Helper functions."""
 import random
+import sys
 from typing import Tuple, Union, List, Dict
+import os
 
 import gym
 import numpy
@@ -123,8 +125,20 @@ def detect_finished_episodes(action_log_probabilities: tf.Tensor):
     return finished
 
 
+class HiddenPrints:
+    """Context that hides print calls."""
+
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
+
+
+
 if __name__ == "__main__":
-    import os
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'

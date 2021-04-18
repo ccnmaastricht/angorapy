@@ -10,7 +10,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from common.policies import BasePolicyDistribution, BetaPolicyDistribution
 from models import _build_encoding_sub_model
-from models.convolutional import _build_visual_encoder
+from models.convolutional import _build_openai_encoder
 from utilities.const import VISION_WH
 from utilities.util import env_extract_dims
 
@@ -35,7 +35,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     # concatenation of touch and proprioception
     proprio_touch = tf.keras.layers.Concatenate()([proprio_in, touch_in])
     proprio_touch_masked = tf.keras.layers.Masking(
-        batch_input_shape=(bs, sequence_length,) + state_dimensionality["proprioception"])(proprio_touch)
+        batch_input_shape=(bs, sequence_length,) + proprio_touch.shape)(proprio_touch)
 
     encoder_sub_model = _build_encoding_sub_model(
         proprio_touch_masked.shape[-1],
@@ -52,17 +52,18 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     if not blind:
         visual_in = tf.keras.Input(batch_shape=(bs, None, VISION_WH, VISION_WH, 3), name="vision")
         input_list.append(visual_in)
-        visual_latent = TD(_build_visual_encoder(shape=(VISION_WH, VISION_WH, 3), batch_size=bs))(visual_in)
-        visual_latent = TD(tf.keras.layers.Dense(128))(visual_latent)
-        visual_latent = TD(tf.keras.layers.Activation("relu"))(visual_latent)
+        visual_masked = tf.keras.layers.Masking(
+            batch_input_shape=(bs, sequence_length,) + state_dimensionality["vision"])(visual_in)
+
+        visual_latent = TD(_build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), batch_size=bs))(visual_masked)
         visual_latent.set_shape([bs] + visual_latent.shape[1:])
+
         visual_plus_goal = tf.keras.layers.Concatenate()([visual_latent, goal_in])
+        goal_vision = TD(tf.keras.layers.Dense(20))(visual_plus_goal)
+        goal_vision = TD(tf.keras.layers.Activation("relu"))(goal_vision)
+        goal_vision.set_shape([bs] + goal_vision.shape[1:])
 
-        eigengrasps = TD(tf.keras.layers.Dense(20))(visual_plus_goal)
-        eigengrasps = TD(tf.keras.layers.ReLU())(eigengrasps)
-        eigengrasps.set_shape([bs] + eigengrasps.shape[1:])
-
-        abstractions.append(eigengrasps)
+        abstractions.append(goal_vision)
 
     # concatenation of goal and perception
     x = tf.keras.layers.Concatenate()(abstractions)

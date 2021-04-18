@@ -1,7 +1,7 @@
 import abc
 import sys
 from collections import namedtuple
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
 import gym
 import numpy as np
@@ -11,7 +11,9 @@ from utilities.const import NP_FLOAT_PREC, EPSILON
 from utilities.types import StepTuple
 from utilities.util import env_extract_dims
 
-TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "data"])
+from environments import *
+
+TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "env_id", "data"])
 
 
 class BaseTransformer(abc.ABC):
@@ -49,9 +51,10 @@ class BaseTransformer(abc.ABC):
         """Warm up the transformer for n steps."""
         pass
 
+    @abc.abstractmethod
     def serialize(self) -> dict:
         """Serialize the transformer to allow for saving its data in a file."""
-        return {self.__class__.__name__: (self.n,)}
+        pass
 
     @staticmethod
     def from_serialization(serialization: TransformerSerialization):
@@ -60,7 +63,7 @@ class BaseTransformer(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def recover(cls, serialization_data: list):
+    def recover(cls, env_id, serialization_data: list):
         """Recover from serialization."""
         pass
 
@@ -103,7 +106,8 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
         Simplification of https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm.."""
         self.n += 1
 
-        for name, obs in filter(lambda o: isinstance(o[1], (int, float)) or len(o[1].shape) in [0, 1], observation.items()):
+        for name, obs in filter(lambda o: isinstance(o[1], (int, float)) or len(o[1].shape) in [0, 1],
+                                observation.items()):
             delta = obs - self.mean[name]
             m_a = self.variance[name] * (self.n - 1)
 
@@ -113,17 +117,19 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
 
     def serialize(self) -> TransformerSerialization:
         """Serialize the transformer to allow for saving it in a file."""
-        return TransformerSerialization(self.__class__.__name__, [self.n,
-                                                                  {n: m.tolist() for n, m in self.mean.items()},
-                                                                  {n: v.tolist() for n, v in self.variance.items()}])
+        return TransformerSerialization(self.__class__.__name__,
+                                        self.env_name,
+                                        [self.n,
+                                         {n: m.tolist() for n, m in self.mean.items()},
+                                         {n: v.tolist() for n, v in self.variance.items()}])
 
     @classmethod
-    def recover(cls, data: TransformerSerialization):
+    def recover(cls, env_id, data: TransformerSerialization):
         """Recover a running mean transformer from its serialization"""
-        transformer = cls()
+        transformer = cls(gym.make(env_id))
         transformer.n = np.array(data[0])
-        transformer.mean = list(map(lambda l: np.array(l), data[1]))
-        transformer.variance = list(map(lambda l: np.array(l), data[2]))
+        transformer.mean = {name: np.array(l) for name, l in data[1].items()}
+        transformer.variance = {name: np.array(l) for name, l in data[1].items()}
 
         return transformer
 
@@ -164,7 +170,8 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
         normed_o = {}
         for sense_name, sense_value in filter(lambda a: len(a[1].shape) == 1, o.dict().items()):
-            normed_o[sense_name] = np.clip((sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
+            normed_o[sense_name] = np.clip(
+                (sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
 
         normed_o = Sensation(**normed_o)
 
@@ -237,3 +244,15 @@ def merge_transformers(transformers: List[BaseTransformer]) -> BaseTransformer:
     merged_transformer.previous_n = merged_transformer.n
 
     return merged_transformer
+
+
+def transformers_from_serializations(list_of_serializations: List[TransformerSerialization]) -> List[BaseTransformer]:
+    """From a list of TransformerSerializations recover the respective transformers."""
+    transformers = []
+    for cereal in list_of_serializations:
+        cereal = TransformerSerialization(*cereal)
+        transformers.append(
+            getattr(sys.modules[__name__], cereal.class_name).recover(cereal.env_id, cereal.data)
+        )
+
+    return transformers

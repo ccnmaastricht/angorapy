@@ -10,8 +10,7 @@ from common.policies import BasePolicyDistribution
 from agent.ppo import PPOAgent
 from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
-from utilities.util import parse_state, add_state_dims, flatten, insert_unknown_shape_dimensions
-from common.wrappers_old import BaseWrapper, SkipWrapper
+from utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
 
 
 class Investigator:
@@ -19,7 +18,7 @@ class Investigator:
 
     The class serves as a wrapper to use a collection of methods that can extract information about the network."""
 
-    def __init__(self, network: tf.keras.Model, distribution: BasePolicyDistribution, preprocessor: BaseWrapper = None):
+    def __init__(self, network: tf.keras.Model, distribution: BasePolicyDistribution):
         """Build an investigator for a network using a distribution.
 
         Args:
@@ -28,12 +27,11 @@ class Investigator:
         """
         self.network: tf.keras.Model = network
         self.distribution: BasePolicyDistribution = distribution
-        self.preprocessor: BaseWrapper = preprocessor if preprocessor is not None else SkipWrapper()
 
     @staticmethod
     def from_agent(agent: PPOAgent):
         """Instantiate an investigator from an agent object."""
-        return Investigator(agent.policy, agent.distribution, preprocessor=agent.preprocessor)
+        return Investigator(agent.policy, agent.distribution)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
@@ -152,7 +150,6 @@ class Investigator:
         done = False
         state = env.reset()
         env.goal = 1
-        state = self.preprocessor.modulate((parse_state(state), None, None, None))[0]
         env.render() if render else ""
         while not done:
             dual_out = flatten(polymodel.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
@@ -180,20 +177,18 @@ class Investigator:
         self.network.reset_states()
 
         done, step = False, 0
-        state = self.preprocessor.modulate((parse_state(env.reset()), None, None, None), update=False)[0]
+        state = env.reset()
         cumulative_reward = 0
         env.render() if not to_gif else env.render(mode="rgb_array")
         while not done:
             step += 1
 
-            probabilities = flatten(
-                self.network.predict(add_state_dims(parse_state(state), dims=2 if is_recurrent else 1)))
+            prepared_state = state.with_leading_dims(time=is_recurrent).dict()
+            probabilities = flatten(self.network.predict(prepared_state))
 
             action = self.distribution.act_deterministic(*probabilities)
             observation, reward, done, info = env.step(action)
-            cumulative_reward += reward
-            observation, reward, done, info = self.preprocessor.modulate((parse_state(observation), reward, done, info),
-                                                                         update=False)
+            cumulative_reward += (reward if "original_reward" not in info else info["original_reward"])
 
             state = observation
 

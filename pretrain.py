@@ -10,7 +10,7 @@ import numpy
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from models.convolutional import _build_visual_encoder, _build_visual_decoder
+from models.convolutional import _build_openai_encoder, _build_visual_decoder
 from utilities.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
 from utilities.data_generation import gen_cube_quats_prediction_data
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    visual_component = _build_visual_encoder(shape=(VISION_WH, VISION_WH, 3), name="visual_component")
+    visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), name="visual_component")
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
 
