@@ -3,8 +3,6 @@ import random
 from typing import Union, Callable
 
 import numpy as np
-from gym import spaces
-from gym.envs.robotics import HandReachEnv
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance
 from gym.envs.robotics.utils import robot_get_obs
 from mujoco_py import GlfwContext
@@ -14,7 +12,7 @@ from common.reward import sequential_free_reach, free_reach, reach, sequential_r
 from common.senses import Sensation
 from configs.reward_config import REACH_BASE, resolve_config_name
 from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
-from utilities.const import N_SUBSTEPS, VISION_WH
+from common.const import N_SUBSTEPS, VISION_WH
 from utilities.util import HiddenPrints
 
 
@@ -186,21 +184,21 @@ class Reach(BaseShadowHandEnv):
         self.palm_xpos = self.sim.data.body_xpos[self.sim.model.body_name2id('robot0:palm')].copy()
 
     def _render_callback(self):
-        sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
-
-        # Visualize targets.
-        goal = self.goal.reshape(5, 3)
-        for finger_idx in range(5):
-            site_name = 'target{}'.format(finger_idx)
-            site_id = self.sim.model.site_name2id(site_name)
-            self.sim.model.site_pos[site_id] = goal[finger_idx] - sites_offset[site_id]
-
-        # Visualize finger positions.
-        achieved_goal = self._get_achieved_goal().reshape(5, 3)
-        for finger_idx in range(5):
-            site_name = 'finger{}'.format(finger_idx)
-            site_id = self.sim.model.site_name2id(site_name)
-            self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
+        # sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
+        #
+        # # Visualize targets.
+        # goal = self.goal.reshape(5, 3)
+        # for finger_idx in range(5):
+        #     site_name = 'target{}'.format(finger_idx)
+        #     site_id = self.sim.model.site_name2id(site_name)
+        #     self.sim.model.site_pos[site_id] = goal[finger_idx] - sites_offset[site_id]
+        #
+        # # Visualize finger positions.
+        # achieved_goal = self._get_achieved_goal().reshape(5, 3)
+        # for finger_idx in range(5):
+        #     site_name = 'finger{}'.format(finger_idx)
+        #     site_id = self.sim.model.site_name2id(site_name)
+        #     self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
 
         self.sim.forward()
 

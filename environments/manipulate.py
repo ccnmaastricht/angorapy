@@ -8,7 +8,7 @@ from gym.envs.robotics.utils import robot_get_obs
 
 from common.senses import Sensation
 from environments.shadowhand import BaseShadowHandEnv, get_palm_position
-from utilities.const import VISION_WH, N_SUBSTEPS
+from common.const import VISION_WH, N_SUBSTEPS
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "assets/hand",

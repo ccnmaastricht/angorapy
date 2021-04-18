@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 from scipy.signal import savgol_filter
 
 from agent.ppo import PPOAgent
-from utilities.const import QUALITATIVE_COLOR_PALETTE, PATH_TO_EXPERIMENTS
+from common.const import QUALITATIVE_COLOR_PALETTE, PATH_TO_EXPERIMENTS
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

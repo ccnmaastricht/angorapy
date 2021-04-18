@@ -8,7 +8,7 @@ import numpy as np
 import configs
 from configs import derive_config
 from train import run_experiment
-from utilities.const import PATH_TO_BENCHMARKS
+from common.const import PATH_TO_BENCHMARKS
 from utilities.statistics import increment_mean_var
 
 if __name__ == '__main__':

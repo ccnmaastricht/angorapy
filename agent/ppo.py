@@ -8,7 +8,6 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
-from pprint import pprint
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -22,15 +21,14 @@ import models
 from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
-from common import policies
+from common import policies, const
 from common.mpi_optim import MpiAdam
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
-from common.transformers import BaseTransformer, BaseRunningMeanTransformer, transformers_from_serializations
+from common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
 from common.validators import validate_env_model_compatibility
 from common.wrappers import BaseWrapper, make_env
-from utilities import const
-from utilities.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
-from utilities.const import MIN_STAT_EPS
+from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
+from common.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length

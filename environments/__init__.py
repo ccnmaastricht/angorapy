@@ -6,7 +6,7 @@ from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, Half
     LunarLanderContinuousNoVel
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
 from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential
-from utilities.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS
+from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS
 
 
 # SHADOW HAND

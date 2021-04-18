@@ -10,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 
 from common.layers import StdevLayer
-from utilities.const import EPSILON
+from common.const import EPSILON
 from utilities.util import env_extract_dims
 
 

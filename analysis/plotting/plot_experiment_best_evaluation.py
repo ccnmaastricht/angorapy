@@ -1,15 +1,9 @@
-import json
 import os
 
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
-from scipy.signal import savgol_filter
 import seaborn as sns
 
 from agent.ppo import PPOAgent
-from utilities.const import QUALITATIVE_COLOR_PALETTE
-from utilities.datatypes import StatBundle
 
 AGENT_ID = 1582658038
 

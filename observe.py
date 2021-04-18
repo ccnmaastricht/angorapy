@@ -8,7 +8,7 @@ import gym
 
 from agent.ppo import PPOAgent
 from analysis.investigation import Investigator
-from utilities.const import BASE_SAVE_PATH
+from common.const import BASE_SAVE_PATH
 from common.wrappers import make_env
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

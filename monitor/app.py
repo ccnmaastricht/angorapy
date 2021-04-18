@@ -8,7 +8,7 @@ from flask import request, Blueprint, send_from_directory
 from flask_jsglue import JSGlue
 
 from agent.ppo import PPOAgent
-from utilities.const import PATH_TO_EXPERIMENTS
+from common.const import PATH_TO_EXPERIMENTS
 from utilities.statistics import ignore_none
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

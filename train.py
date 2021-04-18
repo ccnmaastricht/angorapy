@@ -12,8 +12,8 @@ from gym.spaces import Box
 
 from configs import hp_config
 from common.policies import get_distribution_by_short_name
-from models import get_model_builder, build_shadow_brain_base
-from utilities.const import COLORS
+from models import get_model_builder
+from common.const import COLORS
 from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from common.wrappers import make_env

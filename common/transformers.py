@@ -3,11 +3,10 @@ import sys
 from collections import namedtuple
 from typing import List, Dict
 
-import gym
 import numpy as np
 
 from common.senses import Sensation
-from utilities.const import NP_FLOAT_PREC, EPSILON
+from common.const import NP_FLOAT_PREC, EPSILON
 from utilities.types import StepTuple
 from utilities.util import env_extract_dims
 

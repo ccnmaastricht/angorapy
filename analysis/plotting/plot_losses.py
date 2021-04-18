@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from utilities.const import QUALITATIVE_COLOR_PALETTE
+from common.const import QUALITATIVE_COLOR_PALETTE
 
 AGENT_ID =  1581809147
 

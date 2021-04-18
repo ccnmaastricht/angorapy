@@ -266,8 +266,8 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.35  # zoom in
-            self.viewer.cam.azimuth = -0.0  # top down view
+            self.viewer.cam.distance = 0.32  # zoom in
+            self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[1] -= 0.07  # slightly move forward
         elif self.viewpoint == "side":

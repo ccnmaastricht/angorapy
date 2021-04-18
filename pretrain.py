@@ -5,13 +5,11 @@ import os
 from typing import Union
 
 import argcomplete
-import matplotlib.pyplot as plt
-import numpy
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from models.convolutional import _build_openai_encoder, _build_visual_decoder
-from utilities.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
+from common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
 from utilities.data_generation import gen_cube_quats_prediction_data
 
 

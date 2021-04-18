@@ -11,7 +11,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 from common.policies import BasePolicyDistribution, BetaPolicyDistribution
 from models import _build_encoding_sub_model
 from models.convolutional import _build_openai_encoder
-from utilities.const import VISION_WH
+from common.const import VISION_WH
 from utilities.util import env_extract_dims
 
 

@@ -17,8 +17,8 @@ from agent.ppo import PPOAgent
 from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
 from common.wrappers import TransformationWrapper
 from models import get_model_type
-from utilities import const
-from utilities.const import PATH_TO_EXPERIMENTS
+from common import const
+from common.const import PATH_TO_EXPERIMENTS
 from utilities.util import add_state_dims, flatten
 
 matplotlib.use('Agg')

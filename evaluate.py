@@ -6,7 +6,7 @@ import statistics
 import time
 
 from agent.ppo import PPOAgent
-from utilities.const import BASE_SAVE_PATH
+from common.const import BASE_SAVE_PATH
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

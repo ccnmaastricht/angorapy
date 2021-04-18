@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Core methods providing functionality to the agent."""
-import random
 from itertools import accumulate
 from typing import List
 
@@ -8,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.signal import lfilter
 
-from utilities.const import NP_FLOAT_PREC, DETERMINISTIC, DEBUG
+from common.const import NP_FLOAT_PREC
 
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):
