@@ -715,19 +715,18 @@ class PPOAgent:
             elif self.cycle_reward_history[-1] > half_way_there_threshold:
                 reward_col = COLORS["ORANGE"]
 
-        # calculate percentages of computation spend on different phases of the iteration
+        # calculate computation spend on different phases of the iteration and the percentages
+        time_string = ""
         time_distribution_string = ""
         if len(self.time_dicts) > 0:
             times = [time for time in self.time_dicts[-1].values() if time is not None]
             time_percentages = [str(round(100 * t / sum(times))) for i, t in enumerate(times)]
+            time_string = "[" + "|".join([str(round(t, 1)) for t in times]) + "]"
             time_distribution_string = "[" + "|".join(map(str, time_percentages)) + "]"
         if isinstance(self.lr_schedule, tf.keras.optimizers.schedules.LearningRateSchedule):
             current_lr = self.lr_schedule(self.optimizer.iterations)
         else:
             current_lr = self.lr_schedule
-
-        # make fps string
-        fps_string = f"[{nc}{int(round(self.gathering_fps)):6d}{ec}|{nc}{int(round(self.optimization_fps)):7d}{ec}]"
 
         # losses
         pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
@@ -755,7 +754,7 @@ class PPOAgent:
                 f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
                 f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                 f"{underflow}"
-                f"fps: {fps_string} {time_distribution_string}; "
+                f"times: {time_string} {time_distribution_string}; "
                 f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]\n")
 
     def save_agent_state(self, name=None):

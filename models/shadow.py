@@ -9,8 +9,9 @@ from tensorflow.keras.layers import TimeDistributed as TD
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from common.policies import BasePolicyDistribution, BetaPolicyDistribution
+from common.wrappers import make_env
 from models import _build_encoding_sub_model
-from models.convolutional import _build_openai_encoder
+from models.convolutional import _build_openai_encoder, _build_openai_small_encoder
 from common.const import VISION_WH
 from utilities.util import env_extract_dims
 
@@ -27,9 +28,9 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         model_type]
 
     # inputs
-    proprio_in = tf.keras.Input(batch_shape=(bs, None, 48,), name="proprioception")
-    touch_in = tf.keras.Input(batch_shape=(bs, None, 92,), name="somatosensation")
-    goal_in = tf.keras.Input(batch_shape=(bs, None, 15,), name="goal")
+    proprio_in = tf.keras.Input(batch_shape=(bs, sequence_length, 48,), name="proprioception")
+    touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, 92,), name="somatosensation")
+    goal_in = tf.keras.Input(batch_shape=(bs, sequence_length, 15,), name="goal")
     input_list = [proprio_in, touch_in, goal_in]
 
     # concatenation of touch and proprioception
@@ -55,7 +56,8 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         visual_masked = tf.keras.layers.Masking(
             batch_input_shape=(bs, sequence_length,) + state_dimensionality["vision"])(visual_in)
 
-        visual_latent = TD(_build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), batch_size=bs))(visual_masked)
+        visual_encoder = _build_openai_small_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=7, batch_size=bs)
+        visual_latent = TD(visual_encoder)(visual_masked)
         visual_latent.set_shape([bs] + visual_latent.shape[1:])
 
         visual_plus_goal = tf.keras.layers.Concatenate()([visual_latent, goal_in])
@@ -83,7 +85,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     # define models
     policy = tf.keras.Model(inputs=input_list, outputs=[policy_out], name="shadow_brain_policy")
     value = tf.keras.Model(inputs=input_list, outputs=[value_out], name="shadow_brain_value")
-    joint = tf.keras.Model(inputs=input_list, outputs=[policy_out, value_out], name="shadow_brain")
+    joint = tf.keras.Model(inputs=input_list, outputs=[policy_out, value_out], name="shadow_brain" + ("_visual" if not blind else ""))
 
     return policy, value, joint
 
@@ -103,12 +105,20 @@ if __name__ == "__main__":
     from environments import *
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    # tf.config.experimental.set_memory_growth("GPU:0", True)
 
-    sequence_length = 100
+    sequence_length = 4
     batch_size = 256
 
-    env = gym.make("ReachAbsolute-v0")
-    _, _, joint = build_shadow_brain_base(env, BetaPolicyDistribution(env), bs=batch_size, blind=True)
+    env = make_env("ReachAbsoluteVisual-v0")
+    _, _, joint = build_shadow_brain_base(env, BetaPolicyDistribution(env), bs=batch_size, blind=False, sequence_length=sequence_length)
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
+
+    joint({
+        "vision": tf.random.normal((batch_size, sequence_length, VISION_WH, VISION_WH, 3)),
+        "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
+        "somatosensation": tf.random.normal((batch_size, sequence_length, 92)),
+        "goal": tf.random.normal((batch_size, sequence_length, 15)),
+    })

@@ -125,6 +125,13 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     def dt(self):
         return self.sim.model.opt.timestep * self.sim.nsubsteps
 
+    # INFROMATION METHODS
+    def get_fingertip_positions(self):
+        """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
+        as such the output is a 15-D numpy array."""
+        goal = [self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        return np.array(goal).flatten()
+
     # ENV METHODS
 
     def seed(self, seed=None):

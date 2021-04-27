@@ -51,7 +51,7 @@ NUMPY_INTEGER_PRECISION = np.int64
 EPSILON = 1e-6  # dont make this lower! 1e-8 would be ignored due to float32 precision
 
 # SHAPES
-VISION_WH = 200
+VISION_WH = 100
 
 # DEBUGGING
 DETERMINISTIC = False

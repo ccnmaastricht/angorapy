@@ -2,15 +2,18 @@
 """Pretrain the visual component."""
 import argparse
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 from typing import Union
 
 import argcomplete
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from models.convolutional import _build_openai_encoder, _build_visual_decoder
+from models.convolutional import _build_openai_encoder, _build_visual_decoder, _build_openai_small_encoder
 from common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
-from utilities.data_generation import gen_cube_quats_prediction_data
+from utilities.data_generation import gen_cube_quats_prediction_data, gen_hand_pos_prediction_data
+from common.loss import EuclideanDistanceLoss
 
 
 def load_caltech():
@@ -78,11 +81,13 @@ def pretrain_on_classification(pretrainable_component: Union[tf.keras.Model, str
 
     # resize and normalize images, extract one hot vectors from labels
     train_images = train_images.map(
-        lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255, tf.one_hot(img["label"], depth=n_classes)))
+        lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255,
+                     tf.one_hot(img["label"], depth=n_classes)))
     train_images = train_images.batch(128)
 
     test_images = test_images.map(
-        lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255, tf.one_hot(img["label"], depth=n_classes)))
+        lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255,
+                     tf.one_hot(img["label"], depth=n_classes)))
     test_images = test_images.batch(128)
 
     # model is constructed from visual component and classification layer
@@ -110,11 +115,12 @@ def pretrain_on_classification(pretrainable_component: Union[tf.keras.Model, str
     print(results)
 
 
-def pretrain_on_hands(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_h"):
-    """Pretrain a visual component on the classification of images."""
+def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_op"):
+    """Pretrain a visual component on prediction of cube position."""
 
-    # load datas
+    # generate training data
     X, Y = gen_cube_quats_prediction_data(1024 * 8)
+    X = tf.image.per_image_standardization(X)
 
     # model is constructed from visual component and regression output
     model = tf.keras.Sequential((
@@ -124,7 +130,7 @@ def pretrain_on_hands(pretrainable_component: Union[tf.keras.Model, str], epochs
 
     if isinstance(pretrainable_component, tf.keras.Model):
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="mse", metrics=[])
+        model.compile(optimizer, loss="mse", metrics=[EuclideanDistanceLoss])
 
         # train and save encoder
         model.fit(X, Y, epochs=epochs, callbacks=[], batch_size=128)
@@ -135,26 +141,67 @@ def pretrain_on_hands(pretrainable_component: Union[tf.keras.Model, str], epochs
         raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
 
 
+def pretrain_on_hand_pose(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_hp"):
+    """Pretrain a visual component on prediction of cube position."""
+
+    # model is constructed from visual component and regression output
+    model = pretrainable_component
+
+    if isinstance(pretrainable_component, tf.keras.Model):
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
+
+        for epoch_i in range(epochs):
+            print(f"Starting Epoch {epoch_i}")
+
+            # generate training data
+            X, Y = gen_hand_pos_prediction_data(1024 * 8)
+            X = tf.image.per_image_standardization(X)
+
+            dataset = tf.data.Dataset.from_tensor_slices((X, Y))
+            dataset = dataset.shuffle(buffer_size=1024).batch(128)
+
+            for step, (batch_x, batch_y) in enumerate(dataset):
+                with tf.GradientTape() as tape:
+                    output = model(batch_x, training=True)
+                    loss = tf.keras.losses.MSE(batch_y, output)
+
+                grads = tape.gradient(loss, model.trainable_weights)
+                optimizer.apply_gradients(zip(grads, model.trainable_weights))
+
+                if step % 4 == 0:
+                    print(f"Training loss (for one batch) at step {step}: {float(tf.reduce_mean(loss))}. "
+                          f"Seen so far: {((step + 1) * 128)} samples")
+
+            del dataset
+
+        # save encoder
+        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
+    elif isinstance(pretrainable_component, str):
+        model.load_weights(pretrainable_component)
+    else:
+        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to a model.")
+
+
 if __name__ == "__main__":
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    tf.get_logger().setLevel('INFO')
 
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
 
     # general parameters
-    parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hands", "c", "r", "h"],
-                        default="h")
+    parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hand", "object",
+                                                              "c", "r", "h", "o", "hp", "op"], default="h")
     parser.add_argument("--name", type=str, default="pretrained_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=10, help=f"number of pretraining epochs")
+    parser.add_argument("--epochs", type=int, default=60, help=f"number of pretraining epochs")
 
     # read arguments
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), name="visual_component")
+    visual_component = _build_openai_small_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15, name="visual_component")
+    visual_component(tf.random.normal((16, VISION_WH, VISION_WH, 3)))  # needed to initialize keras or whatever
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
 
@@ -164,7 +211,7 @@ if __name__ == "__main__":
         pretrain_on_classification(visual_component, args.epochs, name=args.name)
     elif args.task in ["reconstruct", "r"]:
         pretrain_on_reconstruction(visual_component, args.epochs, name=args.name)
-    elif args.task in ["hands", "h"]:
-        pretrain_on_hands(visual_component, args.epochs, name=args.name)
+    elif args.task in ["hand", "h"]:
+        pretrain_on_hand_pose(visual_component, args.epochs, name=args.name)
     else:
         raise ValueError("I dont know that task type.")

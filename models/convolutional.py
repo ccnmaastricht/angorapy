@@ -47,8 +47,12 @@ def _residual_block(x, filters, kernel_size=3, stride=1, conv_shortcut=True, nam
 
 # VISUAL ENCODING
 
-def _build_openai_encoder(shape, batch_size=None, name="visual_component"):
-    """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory."""
+def _build_openai_encoder(shape, out_shape, name="visual_component", batch_size=None):
+    """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory.
+
+    Args:
+        out_shape:
+    """
     inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(shape))
 
     # first layer
@@ -75,7 +79,43 @@ def _build_openai_encoder(shape, batch_size=None, name="visual_component"):
     x = tf.keras.layers.Activation("relu")(x)
 
     # output
-    x = tf.keras.layers.Dense(7)(x)
+    x = tf.keras.layers.Dense(out_shape)(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
+
+
+def _build_openai_small_encoder(shape, out_shape, name="visual_component", batch_size=None):
+    """Shallow AlexNet Version. Original number of channels are too large for normal GPU memory.
+
+    Args:
+        out_shape:
+    """
+    inputs = tf.keras.Input(shape=shape, batch_size=batch_size, name=name + "_input")
+
+    # first layer
+    x = tf.keras.layers.Conv2D(32, 5, 1, padding="valid")(inputs)  # 96 x 96
+    x = tf.keras.layers.Activation("relu")(x)
+
+    # second layer
+    x = tf.keras.layers.Conv2D(32, 3, 1, padding="valid")(x)  # 94 x 94
+    x = tf.keras.layers.Activation("relu")(x)
+
+    # pooling
+    x = tf.keras.layers.MaxPool2D(3, 3)(x)  # 31 x 31
+
+    # resnet
+    x = _residual_block(x, 16, 3, 3, name="res1")
+    x = _residual_block(x, 32, 3, 3, name="res2")
+    x = _residual_block(x, 64, 3, 3, name="res3")
+
+    # fully connected
+    x = tf.keras.layers.Activation("softmax")(x)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128, kernel_regularizer=tf.keras.regularizers.L2(l2=0.001))(x)
+    x = tf.keras.layers.Activation("relu")(x)
+
+    # output
+    x = tf.keras.layers.Dense(out_shape)(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
@@ -141,5 +181,10 @@ def _build_visual_decoder(input_dim):
 
 
 if __name__ == "__main__":
-    conv_comp = _build_openai_encoder((200, 200, 3))
+    conv_comp = _build_openai_small_encoder((100, 100, 3), 7)
+    print(conv_comp(tf.random.normal((1, 100, 100, 3))).shape)
     conv_comp.summary()
+    #
+    # print("\n\n\n")
+    # conv_comp = _build_openai_encoder((200, 200, 3), 7)
+    # conv_comp.summary()
