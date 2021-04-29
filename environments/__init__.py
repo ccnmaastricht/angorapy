@@ -2,12 +2,13 @@
 
 import gym
 
+from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
+from environments.nrp.reach import NRPReach
+from environments.nrp.shadowhand import BaseNRPShadowHandEnv
 from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential
-from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS
-
 
 # SHADOW HAND
 gym.envs.register(
@@ -47,7 +48,8 @@ for vision_mode in ["Visual", ""]:
                 gym.envs.register(
                     id=f'FreeReach{name}{init_mode}{control_mode}{vision_mode}-v0',
                     entry_point='environments:FreeReach',
-                    kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual", "force_finger": i,
+                    kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
+                            "force_finger": i,
                             **({"initial_qpos": init_mode.lower()} if init_mode else {})},
                     max_episode_steps=SHADOWHAND_MAX_STEPS,
                 )
@@ -70,6 +72,12 @@ for vision_mode in ["Visual", ""]:
                 max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
             )
 
+gym.envs.register(
+    id=f'NRPReachRelativeVisual-v0',
+    entry_point='environments:NRPReach',
+    kwargs={"relative_control": True, "vision": True},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
 
 # MANIPULATE
 

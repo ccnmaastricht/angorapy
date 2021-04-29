@@ -210,7 +210,7 @@ class Reach(BaseShadowHandEnv):
 
         # update memory
         i.update({"target_finger": self.current_target_finger})
-        self.state_memory_buffer.append(self.sim.get_state())
+        # self.state_memory_buffer.append(self.sim.get_state())
 
         return o, r, d, i
 

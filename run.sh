@@ -21,4 +21,4 @@ module load cuDNN/8.0.3.33
 # load virtual environment
 source ${HOME}/robovenv/bin/activate
 
-srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model rnn --architecture shadow
+srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru --architecture shadow

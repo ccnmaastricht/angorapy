@@ -168,9 +168,14 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
             self.update(o.dict())
 
         normed_o = {}
-        for sense_name, sense_value in filter(lambda a: len(a[1].shape) == 1, o.dict().items()):
-            normed_o[sense_name] = np.clip(
-                (sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
+        # for sense_name, sense_value in filter(lambda a: len(a[1].shape) == 1, o.dict().items()):
+        for sense_name, sense_value in o.dict().items():
+            if len(sense_value[1].shape) == 1:
+                normed_o[sense_name] = np.clip(
+                    (sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
+            else:
+                # assuming visual RGB values
+                normed_o[sense_name] = np.divide(sense_value, 255)
 
         normed_o = Sensation(**normed_o)
 
