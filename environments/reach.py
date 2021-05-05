@@ -20,8 +20,9 @@ class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
     def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False):
-        with HiddenPrints():
-            GlfwContext(offscreen=True)  # fix to "ERROR: GLEW initalization error: Missing GL version"
+        if vision:
+            with HiddenPrints():
+                GlfwContext(offscreen=True)  # fix to "ERROR: GLEW initalization error: Missing GL version"
 
         # reward function setup
         self._set_default_reward_function_and_config()
