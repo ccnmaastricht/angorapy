@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
+import gc
 from typing import Tuple, Any
 
 import numpy as np
@@ -22,12 +23,13 @@ class Gatherer:
     """Worker implementation for collecting experience by rolling out a policy."""
 
     def __init__(self, joint: tf.keras.Model, policy: tf.keras.Model, worker_id: int, exp_id: int):
-        self.joint = joint
+        self.joint: tf.keras.Model = joint
         self.policy = policy
         self.worker_id = worker_id
         self.exp_id = exp_id
 
     def set_weights(self, weights):
+        """Set the weights of the full model."""
         self.joint.set_weights(weights)
 
     def collect(self, env: BaseWrapper, distribution: BasePolicyDistribution, horizon: int, discount: float, lam: float,
@@ -55,6 +57,7 @@ class Gatherer:
         # reset states of potentially recurrent net
         if is_recurrent:
             self.joint.reset_states()
+            self.policy.reset_states()
 
         # buffer storing the experience and stats
         if is_recurrent:
@@ -73,8 +76,11 @@ class Gatherer:
             current_subseq_length += 1
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
-            prepared_state = state.with_leading_dims(time=is_recurrent).dict()
-            policy_out = flatten(self.joint.predict(prepared_state))
+            prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
+            policy_out = flatten((self.joint.predict_on_batch(prepared_state)))
+            gc.collect()
+            tf.keras.backend.clear_session()
+
             a_distr, value = policy_out[:-1], policy_out[-1]
 
             states.append(state)
@@ -123,6 +129,7 @@ class Gatherer:
 
                 if is_recurrent:
                     self.joint.reset_states()
+                    self.policy.reset_states()
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
@@ -139,7 +146,7 @@ class Gatherer:
         env.close()
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(self.joint.predict(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
+        values.append(np.squeeze(self.joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
@@ -168,9 +175,6 @@ class Gatherer:
         # normalize advantages
         buffer.normalize_advantages()
 
-        # if is_recurrent:
-        #     buffer.inject_batch_dimension()
-
         # convert buffer to dataset and save it to tf record
         dataset, stats = make_dataset_and_stats(buffer)
         dataset = dataset.map(tf_serialize_example)
@@ -193,7 +197,7 @@ class Gatherer:
         steps = 0
         while not done:
             probabilities = flatten(
-                self.policy.predict(add_state_dims(state, dims=2 if self.is_recurrent else 1)))
+                self.policy(add_state_dims(state, dims=2 if self.is_recurrent else 1)))
 
             action, _ = distribution.act(*probabilities)
             observation, reward, done, _ = env.step(action)

@@ -1,7 +1,8 @@
+import os
+
 import gym
 import numpy as np
 import tensorflow as tf
-import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -36,8 +37,26 @@ model = tf.keras.Model(inputs=[proprio_in, touch_in, vision_in, goal_in], output
 class NRPDummy:
     """Dummy class representing the role of the NRP/Gazebo simulation."""
 
+    def __init__(self, dt: float):
+        """Initialize simulator.
+
+        Args:
+            dt (object):    we should be able to control the temporal difference between timesteps; however it is not so
+                            important that we can do this in a continuous manner; for reference: MuJoCo has a predefined
+                            length of a timestep and we control how many of these timesteps correspond to a timestep
+                            from the perspective of our model. E.g.: If we say one timestep from the model's perspective
+                            corresponds to 20 steps in MuJoCo, then the same action provided to this class will be
+                            applied for 20 steps in MuJoCo.
+        """
+        self.dt = dt
+
     def apply_action(self, action: np.ndarray):
-        """Dummy method that acts in place of applying an action in the simulation."""
+        """Dummy method that acts in place of applying an action in the simulation. When we provide an action here, the
+        simulation should try to apply this action for the duration of a timestep. AFTER THAT the simulation should
+        pause and wait for the next action, no matter whether or not the action was finished. If for instance the model
+        gives a motor command that, in the timespan of a single timestep, cannot be achieved, then thats fine. The model
+        should then have learned to continue providing the same motor command in future timesteps until the desired
+        state is reached or until it desires to give a new target."""
         pass
 
     def get_state(self):
@@ -46,6 +65,10 @@ class NRPDummy:
                 "somatosensation": np.random.normal(size=(92,)),  # touch sensor readings
                 "proprioception": np.random.normal(size=(48,)),  # joint positions and velocities
                 }
+
+    def set_state(self):
+        """Dummy method to set the state of the simulation (hand position, velocities, etc.)"""
+        pass
 
     def reset(self):
         """Dummy method that acts in playe of a full reset of the simulation to initial conditions."""
@@ -58,7 +81,7 @@ class NRPEnv(gym.Env):
     openai gym standards"""
 
     def __init__(self):
-        self.sim = NRPDummy()
+        self.sim = NRPDummy(dt=0.002)
         self.goal = np.random.random((15,))
 
         self.action_space = gym.spaces.Box(-1, 1, shape=(20,), dtype=np.float32)

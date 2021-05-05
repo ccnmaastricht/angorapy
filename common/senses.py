@@ -2,6 +2,7 @@ from typing import List
 
 import numpy
 import numpy as np
+import tensorflow as tf
 
 
 class Sensation:
@@ -108,6 +109,10 @@ class Sensation:
     def dict(self):
         """Return a dict of the senses and their values."""
         return {k: self.__dict__[k] for k in Sensation.sense_names if self.__dict__[k] is not None}
+
+    def dict_as_tf(self):
+        """Return dict as tf tensor."""
+        return {k: tf.convert_to_tensor(self.__dict__[k]) for k in Sensation.sense_names if self.__dict__[k] is not None}
 
 
 def stack_sensations(sensations: List[Sensation]):
