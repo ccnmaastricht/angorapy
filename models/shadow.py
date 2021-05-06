@@ -40,7 +40,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
     encoder_sub_model = _build_encoding_sub_model(
         proprio_touch_masked.shape[-1],
-        None,
+        bs * sequence_length,
         layer_sizes=[128, 64, 64, 32],
         name="proprio_touch_encoder")
 
@@ -56,7 +56,8 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         visual_masked = tf.keras.layers.Masking(
             batch_input_shape=(bs, sequence_length,) + state_dimensionality["vision"])(visual_in)
 
-        visual_encoder = _build_openai_small_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=7, batch_size=bs)
+        visual_encoder = _build_openai_small_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=7,
+                                                     batch_size=bs * sequence_length)
         visual_latent = TD(visual_encoder)(visual_masked)
         visual_latent.set_shape([bs] + visual_latent.shape[1:])
 

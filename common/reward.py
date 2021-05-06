@@ -45,7 +45,8 @@ def reach(env, achieved_goal, goal, info: dict):
 
 
 def free_reach(env, achieved_goal, goal, info: dict):
-    """Reward the relative join of the thumb'serialization and a target'serialization fingertip while punishing close other fingertips."""
+    """Reward the relative join of the thumb'serialization and a target'serialization fingertip while punishing close
+    other fingertips."""
 
     thumb_position = env.get_thumb_position()
 

@@ -58,7 +58,7 @@ else:
         tf.config.experimental.set_memory_growth(gpus[0], True)
 
 optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
-n_optimizers = mpi_comm.allreduce(is_optimization_process, op=MPI.SUM)
+n_optimizers = int(mpi_comm.allreduce(is_optimization_process, op=MPI.SUM))
 
 
 class PPOAgent:
@@ -158,8 +158,8 @@ class PPOAgent:
         self.model_builder = model_builder
         self.builder_function_name = model_builder.__name__
         self.policy, self.value, self.joint = model_builder(
-            self.env,
-            self.distribution,
+            env=self.env,
+            distribution=self.distribution,
             **({"bs": 1} if requires_batch_size(model_builder) else {}),
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {}))
         validate_env_model_compatibility(self.env, self.joint)
@@ -381,17 +381,10 @@ class PPOAgent:
             batch_size = self.n_workers
 
         # rebuild model with desired batch size
-        weights = self.joint.get_weights()
-        self.policy, self.value, self.joint = self.model_builder(
-            self.env, self.distribution,
-            **({"bs": batch_size // n_optimizers} if requires_batch_size(self.model_builder) else {}),
-            **({"sequence_length": self.tbptt_length} if requires_sequence_length(self.model_builder) else {}))
-        self.joint.set_weights(weights)
-
-        # tf.keras.utils.plot_model(self.joint)
+        self.policy, self.value, self.joint = \
+            self.build_models(batch_size=batch_size // n_optimizers, sequence_length=self.tbptt_length)
 
         actor = self._make_actor()
-        actor.set_weights(weights)
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -533,12 +526,10 @@ class PPOAgent:
         self.underflow_history.append(stats.tbptt_underflow)
 
     def _make_actor(self) -> Gatherer:
-        # rebuild network with batch size 1
-        policy, value, joint = self.model_builder(
-            self.env, self.distribution,
-            **({"bs": 1} if requires_batch_size(self.model_builder) else {}),
-            **({"sequence_length": 1} if requires_sequence_length(self.model_builder) else {}))
+        # rebuild network for gatherer
+        policy, _, joint = self.build_models(1, 1)
 
+        # create the Gatherer
         return Gatherer(joint, policy, MPI.COMM_WORLD.rank, self.agent_id)
 
     @tf.function
@@ -863,3 +854,15 @@ class PPOAgent:
 
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)
+
+    def build_models(self, batch_size, sequence_length=1):
+        """(Re-)build the models (policy, value, joint) with the same weights but potentially different batch size and
+        sequence length."""
+        weights = self.joint.get_weights()
+        policy, value, joint = self.model_builder(
+            self.env, self.distribution,
+            **({"bs": batch_size} if requires_batch_size(self.model_builder) else {}),
+            **({"sequence_length": sequence_length} if requires_sequence_length(self.model_builder) else {}))
+        joint.set_weights(weights)
+
+        return policy, value, joint

@@ -70,7 +70,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
     # make statistics object
     underflow = None
     if isinstance(buffer, TimeSequenceExperienceBuffer):
-        underflow = round(1 - buffer.true_number_of_transitions / buffer.capacity, 2)
+        underflow = round(1 - (buffer.true_number_of_transitions / buffer.capacity), 2)
 
     stats = StatBundle(
         completed_episodes,

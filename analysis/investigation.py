@@ -31,6 +31,7 @@ class Investigator:
     @staticmethod
     def from_agent(agent: PPOAgent):
         """Instantiate an investigator from an agent object."""
+        agent.build_models(batch_size=1, sequence_length=1)
         return Investigator(agent.policy, agent.distribution)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:

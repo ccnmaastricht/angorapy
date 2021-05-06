@@ -1,4 +1,5 @@
 import os
+import pprint
 import traceback
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -94,7 +95,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
               f"Distribution: {settings['distribution']}\n"
               f"-----------------------------------------\n")
 
-        print(f"{wn}HyperParameters{ec}: {settings}\n")
+        print(f"{wn}HyperParameters{ec}: {pprint.pformat(settings)}\n")
 
     if settings["load_from"] is not None:
         if verbose and is_root:

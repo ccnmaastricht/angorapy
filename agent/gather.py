@@ -78,8 +78,6 @@ class Gatherer:
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
             policy_out = flatten((self.joint.predict_on_batch(prepared_state)))
-            gc.collect()
-            tf.keras.backend.clear_session()
 
             a_distr, value = policy_out[:-1], policy_out[-1]
 

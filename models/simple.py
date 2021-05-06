@@ -67,7 +67,8 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     # policy network; stateful, so batch size needs to be known
     encoder_sub_model = _build_encoding_sub_model(
         state_dimensionality["proprioception"],
-        None,
+        # since we are distributing the encoder over all timesteps, we need to blow up the bs here
+        bs * sequence_length,
         layer_sizes=layer_sizes,
         name="policy_encoder")
 
@@ -86,7 +87,8 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     # value network
     if not shared:
         x = TimeDistributed(
-            _build_encoding_sub_model(state_dimensionality["proprioception"], bs, layer_sizes=layer_sizes, name="value_encoder"),
+            _build_encoding_sub_model(state_dimensionality["proprioception"], bs * sequence_length,
+                                      layer_sizes=layer_sizes, name="value_encoder"),
             name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
 
