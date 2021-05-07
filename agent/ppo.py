@@ -271,6 +271,7 @@ class PPOAgent:
         if self.is_recurrent:
             # build and apply a mask over the probabilities (recurrent)
             mask = tf.not_equal(old_action_prob, 0)
+            tf.print(mask)
             clipped_masked = tf.where(mask, clipped, 0)
             return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
         else:
