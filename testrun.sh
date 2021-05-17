@@ -21,4 +21,4 @@ module load cuDNN/8.0.3.33
 # load virtual environment
 source ${HOME}/robovenv/bin/activate
 
-srun python3 -u testrun.py
+srun python3 -u test_glfw.py
