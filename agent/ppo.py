@@ -248,6 +248,7 @@ class PPOAgent:
         self.device = "GPU:0" if activated else "CPU:0"
         pass
 
+    @tf.function
     def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
         """Clipped objective as given in the PPO paper. Original objective is to be maximized, but this is the negated
         objective to be minimized! In the recurrent version a mask is calculated based on 0 values in the
@@ -271,12 +272,12 @@ class PPOAgent:
         if self.is_recurrent:
             # build and apply a mask over the probabilities (recurrent)
             mask = tf.not_equal(old_action_prob, 0)
-            tf.print(mask)
             clipped_masked = tf.where(mask, clipped, 0)
             return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
         else:
             return tf.reduce_mean(clipped)
 
+    @tf.function
     def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
                    old_action_prob: tf.Tensor, clip: bool = True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return. In the
@@ -309,6 +310,7 @@ class PPOAgent:
         else:
             return tf.reduce_mean(error) * 0.5
 
+    @tf.function
     def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
         """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
         entropy, the less probability mass lies on a single action, which would hinder exploration. We hence reduce

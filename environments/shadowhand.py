@@ -90,8 +90,8 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         model = mujoco_py.load_model_from_path(MODEL_PATH)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
-        self.viewer = None
         self._viewers = {}
+        self.viewer = self._get_viewer(mode="rgb_array")
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -190,6 +190,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
                 self.viewer = mujoco_py.MjViewer(self.sim)
             elif mode == 'rgb_array':
                 self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
+
             self._viewer_setup()
             self._viewers[mode] = self.viewer
         return self.viewer

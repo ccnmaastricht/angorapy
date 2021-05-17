@@ -2,10 +2,10 @@ import collections
 import random
 from typing import Union, Callable
 
+import mujoco_py
 import numpy as np
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance
 from gym.envs.robotics.utils import robot_get_obs
-from mujoco_py import GlfwContext
 
 from common import reward
 from common.reward import sequential_free_reach, free_reach, reach, sequential_reach
@@ -20,9 +20,10 @@ class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
     def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False):
-        if vision:
-            with HiddenPrints():
-                GlfwContext(offscreen=True)  # fix to "ERROR: GLEW initalization error: Missing GL version"
+        # if vision:
+        #     with HiddenPrints():
+        #         # fix to "ERROR: GLEW initalization error: Missing GL version"
+        #         mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
 
         # reward function setup
         self._set_default_reward_function_and_config()
