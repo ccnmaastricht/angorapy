@@ -98,7 +98,11 @@ class Gatherer:
 
             # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
             if is_recurrent and (current_subseq_length == subseq_length or done):
-                buffer.push_seq_to_buffer(states, actions, action_probabilities, values[-current_subseq_length:])
+                buffer.push_seq_to_buffer(states=states,
+                                          actions=actions,
+                                          action_probabilities=action_probabilities,
+                                          values=values[-current_subseq_length:],
+                                          episode_ended=done)
 
                 # clear the buffered information
                 states, actions, action_probabilities = [], [], []

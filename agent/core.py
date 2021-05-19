@@ -22,8 +22,8 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
     Using the raw discounted future reward suffers from high variance and hence could hinder learning. Using a k-step
     return estimator introduces some bias but reduces variance, yielding a beneficial trade-off.
 
-    :param rewards:             list of rewards where r[t] is the reward from taking a[t] in state serialization[t], transitioning
-                                to serialization[t + 1]
+    :param rewards:             list of rewards where r[t] is the reward from taking a[t] in state serialization[t],
+                                transitioning to serialization[t + 1]
     :param values:              value estimations for state trajectory. Requires a value for last state not covered in
                                 rewards, too, as this might be non-terminal
     :param t_is_terminal        boolean indicator list of false for non-terminal and true for terminal states. A
@@ -31,7 +31,8 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
                                 Hence if t is terminal, this is not the last state observed but the last in which
                                 experience can be collected through taking an step_tuple.
     :param gamma:               a discount factor weighting the importance of future rewards
-    :param lam:                 GAE'serialization lambda parameter compromising between bias and variance. High lambda results in
+    :param lam:                 GAE'serialization lambda parameter compromising between bias and variance. High lambda
+                                results in
                                 less bias but more variance. 0 < Lambda < 1
 
     :return:                    the estimations about the returns of a trajectory
@@ -57,10 +58,12 @@ def estimate_advantage(rewards: List, values: List, t_is_terminal: List, gamma: 
     return return_estimations
 
 
-def estimate_episode_advantages(rewards, values, gamma, lam):
-    """Estimate advantage of a single episode (or part of it), taken from Open AI'serialization spinning up repository."""
-    deltas = np.array(rewards) + gamma * np.array(values[1:]) - np.array(values[:-1])
-    return lfilter([1], [1, float(-(gamma * lam))], deltas[::-1], axis=0)[::-1].astype(NP_FLOAT_PREC)
+def estimate_episode_advantages(rewards, values, discount, lam):
+    """Estimate advantage of a single episode (or part of it).
+
+    Taken from Open AI'serialization spinning up repository."""
+    deltas = np.array(rewards) + discount * np.array(values[1:]) - np.array(values[:-1])
+    return lfilter([1], [1, float(-(discount * lam))], deltas[::-1], axis=0)[::-1].astype(NP_FLOAT_PREC)
 
 
 @tf.function

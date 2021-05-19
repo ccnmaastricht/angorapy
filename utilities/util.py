@@ -112,16 +112,14 @@ def insert_unknown_shape_dimensions(shape, none_replacer: int = 1):
     return tuple(map(lambda s: none_replacer if s is None else s, shape))
 
 
-def detect_finished_episodes(action_log_probabilities: tf.Tensor):
-    """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the step_tuple
-    log probabilities and return a 1D boolean tensor.
+def detect_finished_episodes(dones: tf.Tensor):
+    """Detect which samples in the batch connect to a episode that finished during the subsequence, based on the dones
+     and return a 1D boolean tensor.
 
     Input Shape:
-        action_probabilities: (B, S)
+        dones: (B, S)
     """
-    # TODO wont work for episodes that finish exactly at end of sequence
-    # need to check only last one, as checking any might catch (albeit unlikely) true 0 in the sequence
-    finished = action_log_probabilities[:, -1] == 0
+    finished = tf.math.reduce_any(dones, axis=-1)
     return finished
 
 

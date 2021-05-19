@@ -17,12 +17,16 @@ class ExperienceBuffer:
         Individual buffers include a leading batch dimension."""
 
         # data buffers
-        self.states = {sense: np.empty((1, capacity, *shape,), dtype=np.float32) for sense, shape in state_dim.items()}
-        self.actions = np.empty((1, capacity, action_dim,), dtype=np.float32)
-        self.action_probabilities = np.empty((1, capacity,), dtype=np.float32)
-        self.returns = np.empty((1, capacity,), dtype=np.float32)
-        self.advantages = np.empty((1, capacity,), dtype=np.float32)
-        self.values = np.empty((1, capacity,), dtype=np.float32)
+        self.states = {sense: np.empty((capacity, *shape,), dtype=np.float32) for sense, shape in state_dim.items()}
+        self.actions = np.empty((capacity, action_dim,), dtype=np.float32)
+        self.action_probabilities = np.empty((capacity,), dtype=np.float32)
+        self.returns = np.empty((capacity,), dtype=np.float32)
+        self.advantages = np.empty((capacity,), dtype=np.float32)
+        self.values = np.empty((capacity,), dtype=np.float32)
+
+        # only here to be compatible with TimeDistributed, no functionality in this implementation
+        self.dones = np.zeros((capacity,), dtype=np.bool)
+        self.mask = np.zeros((capacity,), dtype=np.bool)
 
         # secondary data
         self.episode_lengths = []
@@ -61,15 +65,6 @@ class ExperienceBuffer:
         std = np.maximum(np.std(self.advantages), 1e-6)
         self.advantages = (self.advantages - mean) / std
 
-    # def inject_batch_dimension(self):
-    #     """Add a batch dimension to the buffered experience."""
-    #     self.states = [s.with_leading_dims() for s in self.states]
-    #     self.actions = np.expand_dims(self.actions, axis=0)
-    #     self.action_probabilities = np.expand_dims(self.action_probabilities, axis=0)
-    #     self.returns = np.expand_dims(self.returns, axis=0)
-    #     self.values = np.expand_dims(self.values, axis=0)
-    #     self.advantages = np.expand_dims(self.advantages, axis=0)
-
 
 class TimeSequenceExperienceBuffer(ExperienceBuffer):
     """Experience Buffer for TimeSequence Data
@@ -94,7 +89,9 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
 
         self.true_number_of_transitions = 0
         self.number_of_subsequences_pushed = 0
-        self.advantage_mask = np.ones(self.advantages.shape)
+
+        self.dones = np.zeros((1, capacity, self.seq_length,), dtype=np.bool)
+        self.mask = np.zeros(self.advantages.shape, dtype=np.bool)
 
         self.last_advantage_stop = 0
 
@@ -102,12 +99,20 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         return f"{self.__class__.__name__}[{self.filled}/{self.capacity} - {self.seq_length}]"
 
     def push_seq_to_buffer(self, states: List[Sensation], actions: List[arr], action_probabilities: List[arr],
-                           values: List[arr]):
-        """Push a sequence to the buffer, constructed from given lists of values."""
+                           values: List[arr], episode_ended: bool = False):
+        """Push a sequence to the buffer, constructed from given lists of values.
+
+
+        """
         assert np.all(np.array([len(states), len(actions), len(action_probabilities), len(values)]) == len(states)), \
             "Inconsistent input sizes."
 
         seq_length = len(actions)
+
+        if seq_length < self.seq_length and not episode_ended:
+            raise Exception("An incomplete subsequence has been pushed to the buffer without flagging the episode"
+                            "as finished during the subsequence.")
+
         states = stack_sensations(states)
         for sense, sense_buffer in self.states.items():
             sense_buffer[0, self.number_of_subsequences_pushed, :seq_length, ...] = states[sense]
@@ -115,6 +120,9 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         self.actions[0, self.number_of_subsequences_pushed, :seq_length, ...] = np.stack(actions)
         self.action_probabilities[0, self.number_of_subsequences_pushed, :seq_length] = action_probabilities
         self.values[0, self.number_of_subsequences_pushed, :seq_length] = values
+
+        if episode_ended:
+            self.dones[0, self.number_of_subsequences_pushed, seq_length - 1] = 1
 
         self.number_of_subsequences_pushed += 1
         self.filled += self.actions.shape[1]
@@ -141,7 +149,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         for adv_sub_seq, ret_sub_seq in zip(advantage_chunks, return_chunks):
             seq_length = len(adv_sub_seq)
             self.advantages[0, self.last_advantage_stop, :seq_length] = adv_sub_seq
-            self.advantage_mask[0, self.last_advantage_stop, :seq_length] = np.zeros(adv_sub_seq.shape)
+            self.mask[0, self.last_advantage_stop, :seq_length] = np.ones(adv_sub_seq.shape)
             self.returns[0, self.last_advantage_stop, :seq_length] = ret_sub_seq
 
             self.last_advantage_stop += 1
@@ -152,7 +160,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         assert rank in [1, 2, 3], f"Illegal rank of advantage tensor, should be 1 or 2 but is {rank}."
 
         # TODO could better keep track of already masked array in self.advantages?
-        masked_advantages = np.ma.masked_array(self.advantages, self.advantage_mask)
+        masked_advantages = np.ma.masked_array(self.advantages, 1 - self.mask)
         mean = masked_advantages.mean()
         std = np.maximum(masked_advantages.std(), 1e-6)
         self.advantages = (self.advantages - mean) / std

@@ -249,7 +249,8 @@ class PPOAgent:
         pass
 
     @tf.function
-    def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor) -> tf.Tensor:
+    def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor,
+                    mask: tf.Tensor) -> tf.Tensor:
         """Clipped objective as given in the PPO paper. Original objective is to be maximized, but this is the negated
         objective to be minimized! In the recurrent version a mask is calculated based on 0 values in the
         old_action_prob tensor. The mask is then applied in the mean operation of the loss.
@@ -271,15 +272,14 @@ class PPOAgent:
 
         if self.is_recurrent:
             # build and apply a mask over the probabilities (recurrent)
-            mask = tf.not_equal(old_action_prob, 0)
-            clipped_masked = tf.where(mask, clipped, 0)
+            clipped_masked = tf.where(mask, clipped, 1)
             return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
         else:
             return tf.reduce_mean(clipped)
 
     @tf.function
     def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
-                   old_action_prob: tf.Tensor, clip: bool = True) -> tf.Tensor:
+                   mask: tf.Tensor, clip: bool = True) -> tf.Tensor:
         """Loss of the critic network as squared error between the prediction and the sampled future return. In the
         recurrent case a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied
         in the mean operation of the loss.
@@ -304,8 +304,7 @@ class PPOAgent:
 
         if self.is_recurrent:
             # build and apply a mask over the old values (recurrent)
-            mask = tf.not_equal(old_action_prob, 0)
-            error_masked = tf.where(mask, error, 0)  # masking with tf.where because inf * 0 = nan...
+            error_masked = tf.where(mask, error, 1)  # masking with tf.where because inf * 0 = nan...
             return (tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))) * 0.5
         else:
             return tf.reduce_mean(error) * 0.5
@@ -553,10 +552,9 @@ class PPOAgent:
 
             # calculate the clipped loss
             policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
-                                           advantage=batch["advantage"])
+                                           advantage=batch["advantage"], mask=batch["mask"])
             value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
-                                         returns=batch["return"], old_action_prob=batch["action_prob"],
-                                         clip=self.clip_values)
+                                         returns=batch["return"], mask=batch["mask"], clip=self.clip_values)
             entropy = self.entropy_bonus(policy_output)
             total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
@@ -567,16 +565,7 @@ class PPOAgent:
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        info = {
-            "policy_output": policy_output,
-            # "actions": batch["action"],
-            # "action_probabilities": action_probabilities,
-            # "old_action_probabilities": batch["action_prob"],
-            # "value_output": value_output,
-            # "gradients": gradients
-        }
-
-        return gradients, tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss), info
+        return gradients, tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -611,7 +600,7 @@ class PPOAgent:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss, info = self._learn_on_batch(b)
+                        grad, ent, pi_loss, v_loss = self._learn_on_batch(b)
                         self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
@@ -624,11 +613,11 @@ class PPOAgent:
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
                             # find and apply the gradients
-                            grad, ent, pi_loss, v_loss, info = self._learn_on_batch(partial_batch)
+                            grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
                             self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
-                            reset_mask = detect_finished_episodes(partial_batch["action_prob"])
+                            reset_mask = detect_finished_episodes(partial_batch["done"])
                             reset_states_masked(self.joint, reset_mask)
 
                 entropies.append(ent)

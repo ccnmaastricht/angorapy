@@ -41,7 +41,7 @@ def serialize_sample(*args, feature_names):
 def tf_serialize_example(sample):
     """TF wrapper for serialization function."""
     feature_names = ([sense for sense in ["vision", "somatosensation", "proprioception", "goal"] if sense in sample]
-                     + ["action", "action_prob", "return", "advantage", "value"])
+                     + ["action", "action_prob", "return", "advantage", "value", "done", "mask"])
 
     inputs = [sample[f] for f in feature_names]
 
@@ -61,6 +61,8 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
         "return": buffer.returns,
         "advantage": buffer.advantages,
         "value": buffer.values,
+        "done": buffer.dones,
+        "mask": buffer.mask
     }
 
     tensor_slices.update(buffer.states)
@@ -102,6 +104,8 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
         "return": tf.io.FixedLenFeature([], tf.string),
         "advantage": tf.io.FixedLenFeature([], tf.string),
         "value": tf.io.FixedLenFeature([], tf.string),
+        "done": tf.io.FixedLenFeature([], tf.string),
+        "mask": tf.io.FixedLenFeature([], tf.string),
 
         # STATES
         **{sense: tf.io.FixedLenFeature([], tf.string) for sense in responsive_senses}
@@ -116,6 +120,8 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
         parsed["return"] = tf.io.parse_tensor(parsed["return"], out_type=tf.float32)
         parsed["advantage"] = tf.io.parse_tensor(parsed["advantage"], out_type=tf.float32)
         parsed["value"] = tf.io.parse_tensor(parsed["value"], out_type=tf.float32)
+        parsed["done"] = tf.io.parse_tensor(parsed["done"], out_type=tf.bool)
+        parsed["mask"] = tf.io.parse_tensor(parsed["mask"], out_type=tf.bool)
 
         for sense in responsive_senses:
             parsed[sense] = tf.io.parse_tensor(parsed[sense], out_type=tf.float32)
