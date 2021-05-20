@@ -26,7 +26,7 @@ class ExperienceBuffer:
 
         # only here to be compatible with TimeDistributed, no functionality in this implementation
         self.dones = np.zeros((capacity,), dtype=np.bool)
-        self.mask = np.zeros((capacity,), dtype=np.bool)
+        self.mask = np.ones((capacity,), dtype=np.bool)
 
         # secondary data
         self.episode_lengths = []
@@ -71,8 +71,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
 
     Attributes:
         states:         dims (B,
-        advantage_mask: vector providing 0 for all timesteps to be considered and 1 for all those to be filtered out
-        """
+    """
 
     def __init__(self, capacity: int, state_dim: Dict[str, Tuple[int]], action_dim: int, is_continuous: bool,
                  seq_length: int):

@@ -123,3 +123,5 @@ if __name__ == "__main__":
         "somatosensation": tf.random.normal((batch_size, sequence_length, 92)),
         "goal": tf.random.normal((batch_size, sequence_length, 15)),
     })
+
+    joint.summary()

@@ -27,6 +27,7 @@ class Gatherer:
         self.policy = policy
         self.worker_id = worker_id
         self.exp_id = exp_id
+        self.iteration = 0
 
     def set_weights(self, weights):
         """Set the weights of the full model."""
@@ -45,6 +46,8 @@ class Gatherer:
             subseq_length:  the length of connected subsequences for TBPTT
             collector_id:   the ID of this gathering, different from the worker's ID
         """
+        self.iteration += 1
+
         state: Sensation
 
         is_recurrent = is_recurrent_model(self.joint)
@@ -77,7 +80,7 @@ class Gatherer:
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = flatten((self.joint.predict_on_batch(prepared_state)))
+            policy_out = flatten(self.joint(prepared_state))
 
             a_distr, value = policy_out[:-1], policy_out[-1]
 

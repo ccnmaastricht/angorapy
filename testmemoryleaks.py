@@ -28,15 +28,17 @@ _, _, model = model_builder(
 
 optimizer = tf.keras.optimizers.SGD()
 
-sample_batch = {
-    "vision": tf.random.normal([16, sequence_length, VISION_WH, VISION_WH, 3]),
-    "proprioception": tf.random.normal([16, sequence_length, 48]),
-    "somatosensation": tf.random.normal([16, sequence_length, 92]),
-    "goal": tf.random.normal([16, sequence_length, 15])
-}
 
-dataset = tf.data.Dataset.from_tensor_slices(sample_batch)
-dataset = dataset.repeat(2048 * 64).batch(batch_size)
+def _get_data():
+    sample_batch = {
+        "vision": tf.random.normal([16, sequence_length, VISION_WH, VISION_WH, 3]),
+        "proprioception": tf.random.normal([16, sequence_length, 48]),
+        "somatosensation": tf.random.normal([16, sequence_length, 92]),
+        "goal": tf.random.normal([16, sequence_length, 15])
+    }
+
+    dataset = tf.data.Dataset.from_tensor_slices(sample_batch)
+    return dataset.repeat(128).batch(batch_size)
 
 
 @tf.function
@@ -53,10 +55,13 @@ def _get_grads(batch):
 def _train():
     start_time = time.time()
 
-    for epoch in range(10):
+    for epoch in range(100):
+        dataset = _get_data()
         for batch in dataset:
             grads = _get_grads(batch)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        print(f"Finished Epoch {epoch}.")
 
     print(f"Execution Time: {time.time() - start_time}")
 

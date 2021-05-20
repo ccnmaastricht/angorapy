@@ -20,10 +20,10 @@ class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
     def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False):
-        # if vision:
-        #     with HiddenPrints():
-        #         # fix to "ERROR: GLEW initalization error: Missing GL version"
-        #         mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
+        if vision:
+            with HiddenPrints():
+                # fix to "ERROR: GLEW initalization error: Missing GL version"
+                mujoco_py.GlfwContext(offscreen=True)
 
         # reward function setup
         self._set_default_reward_function_and_config()

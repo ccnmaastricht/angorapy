@@ -402,16 +402,17 @@ class PPOAgent:
             actor.set_weights(joint_weights)
 
             # run simulations in parallel
-            worker_stats = []
-            for i in worker_collection_ids:
-                stats = actor.collect(self.env, self.distribution, self.horizon,
-                                      self.discount, self.lam,
-                                      self.tbptt_length, collector_id=i)
-                worker_stats.append(stats)
+            with tf.profiler.experimental.Trace("collect", iteration=self.iteration):
+                worker_stats = []
+                for i in worker_collection_ids:
+                    stats = actor.collect(self.env, self.distribution, self.horizon,
+                                          self.discount, self.lam,
+                                          self.tbptt_length, collector_id=i)
+                    worker_stats.append(stats)
 
-            # merge gatherings from all workers
-            stats = mpi_condense_stats(worker_stats)
-            stats = mpi_comm.bcast(stats, root=0)
+                # merge gatherings from all workers
+                stats = mpi_condense_stats(worker_stats)
+                stats = mpi_comm.bcast(stats, root=0)
 
             # sync the environments to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -587,50 +588,54 @@ class PPOAgent:
         """
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
-            # for each epoch, dataset first should be shuffled to break correlation
-            if not self.is_recurrent:
-                dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+            with tf.profiler.experimental.Trace("optimize", epoch=epoch):
 
-            # then divide into batches
-            batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+                # for each epoch, dataset first should be shuffled to break correlation
+                if not self.is_recurrent:
+                    dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            # and iterate over it while accumulating losses
-            policy_epoch_losses, value_epoch_losses, entropies = [], [], []
-            for b in batched_dataset:
-                # use the dataset to optimize the model
-                with tf.device(self.device):
-                    if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss = self._learn_on_batch(b)
-                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
-                    else:
-                        # truncated back propagation through time
-                        # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                        # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
-                        # fed into the model chronologically to adhere to statefulness
-                        split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
-                        for i in range(len(split_batch["advantage"])):
-                            # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
-                            partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
+                # then divide into batches
+                batched_dataset = dataset.batch(batch_size, drop_remainder=True)
 
-                            # find and apply the gradients
-                            grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                # and iterate over it while accumulating losses
+                policy_epoch_losses, value_epoch_losses, entropies = [], [], []
+                for b in batched_dataset:
+                    # use the dataset to optimize the model
+                    with tf.device(self.device):
+                        if not self.is_recurrent:
+                            grad, ent, pi_loss, v_loss = self._learn_on_batch(b)
                             self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        else:
+                            # truncated back propagation through time
+                            # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
+                            # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
+                            # fed into the model chronologically to adhere to statefulness
+                            # if the following line throws a CPU to GPU error this is most likely due to too little memory
+                            # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                            split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
+                            for i in range(len(split_batch["advantage"])):
+                                # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
+                                partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
-                            # make partial RNN state resets
-                            reset_mask = detect_finished_episodes(partial_batch["done"])
-                            reset_states_masked(self.joint, reset_mask)
+                                # find and apply the gradients
+                                grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                                self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
-                entropies.append(ent)
-                policy_epoch_losses.append(pi_loss)
-                value_epoch_losses.append(v_loss)
+                                # make partial RNN state resets
+                                reset_mask = detect_finished_episodes(partial_batch["done"])
+                                reset_states_masked(self.joint, reset_mask)
 
-                # reset RNN states after each outer batch
-                self.joint.reset_states()
+                    entropies.append(ent)
+                    policy_epoch_losses.append(pi_loss)
+                    value_epoch_losses.append(v_loss)
 
-            # remember some statistics
-            policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
-            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+                    # reset RNN states after each outer batch
+                    self.joint.reset_states()
+
+                # remember some statistics
+                policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
+                value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+                entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         optimization_comm.Barrier()
 
