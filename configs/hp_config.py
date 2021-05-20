@@ -174,7 +174,7 @@ roboschool_beta = derive_config(roboschool, {"distribution": "beta"})
 # HAND ENVS
 
 hand = make_config(
-    iterations=5000,
+    iterations=50000,
     workers=24,
     batch_size=256,
     horizon=512,
