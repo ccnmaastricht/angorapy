@@ -173,7 +173,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             self._viewers = {}
 
     def render(self, mode='human', width=500, height=500):
-        self._render_callback()
+        self._render_callback(render_targets=(mode == "human"))
         if mode == 'rgb_array':
             self._get_viewer(mode).render(width, height)
             # window size used for old mujoco-py:
@@ -247,7 +247,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _render_callback(self):
+    def _render_callback(self, render_targets=False):
         """A custom callback that is called before rendering. Can be used to implement custom visualizations."""
         pass
 

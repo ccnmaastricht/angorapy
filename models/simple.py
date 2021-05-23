@@ -11,25 +11,34 @@ from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution
+from common.wrappers import BaseWrapper
 from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False,
+def build_ffn_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False,
                      layer_sizes: Tuple = (64, 64)):
     """Build a simple fully connected feed-forward model model."""
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    # input preprocessing
-    inputs = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
+    if all(x in state_dimensionality.keys() for x in ["proprioception", "somatosensation", "goal"]):
+        proprio = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
+        somato = tf.keras.Input(shape=state_dimensionality["somatosensation"], name="somatosensation")
+        goal = tf.keras.Input(shape=state_dimensionality["goal"], name="goal")
+        input_list = [proprio, somato, goal]
+
+        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
+    else:
+        inputs = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
+        input_list = inputs
 
     # policy network
     latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="policy_encoder")(inputs)
     out_policy = distribution.build_action_head(n_actions, (layer_sizes[-1],), None)(latent)
 
-    policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="policy")
+    policy = tf.keras.Model(inputs=input_list, outputs=out_policy, name="policy")
 
     # value network
     if not shared:
@@ -42,12 +51,12 @@ def build_ffn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(latent)
 
-    value = tf.keras.Model(inputs=inputs, outputs=value_out, name="value")
+    value = tf.keras.Model(inputs=input_list, outputs=value_out, name="value")
 
-    return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, value_out], name="policy_value")
+    return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, value_out], name="policy_value")
 
 
-def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
                      model_type: str = "rnn", layer_sizes: Tuple = (64,), sequence_length=1):
     """Build simple policy and value models having a recurrent layer before their heads.
 
@@ -57,16 +66,23 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
     # TODO: remove current workaround: solve issue with stateful masked RNNs by fixing the models sequence length
 
     state_dimensionality, n_actions = env_extract_dims(env)
-    rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
-                  "lstm": tf.keras.layers.LSTM,
-                  "gru": tf.keras.layers.GRU}[model_type]
 
-    inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
-    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + state_dimensionality["proprioception"])(inputs)
+    if all(x in state_dimensionality.keys() for x in ["proprioception", "somatosensation", "goal"]):
+        proprio = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
+        somato = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["somatosensation"], name="somatosensation")
+        goal = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["goal"], name="goal")
+        input_list = [proprio, somato, goal]
+
+        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
+    else:
+        inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
+        input_list = inputs
+
+    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (inputs.shape[-1], ))(inputs)
 
     # policy network; stateful, so batch size needs to be known
     encoder_sub_model = _build_encoding_sub_model(
-        state_dimensionality["proprioception"],
+        inputs.shape[-1],
         # since we are distributing the encoder over all timesteps, we need to blow up the bs here
         bs * sequence_length,
         layer_sizes=layer_sizes,
@@ -74,6 +90,10 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
 
     x = TimeDistributed(encoder_sub_model, name="TD_policy")(masked)
     x.set_shape([bs] + x.shape[1:])
+
+    rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
+                  "lstm": tf.keras.layers.LSTM,
+                  "gru": tf.keras.layers.GRU}[model_type]
 
     x, *_ = rnn_choice(layer_sizes[-1],
                        stateful=True,
@@ -83,11 +103,13 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
                        name="policy_recurrent_layer")(x)
 
     out_policy = distribution.build_action_head(n_actions, x.shape[1:], bs)(x)
+    policy = tf.keras.Model(inputs=input_list, outputs=out_policy, name="simple_rnn_policy")
 
     # value network
     if not shared:
         x = TimeDistributed(
-            _build_encoding_sub_model(state_dimensionality["proprioception"], bs * sequence_length,
+            _build_encoding_sub_model(inputs.shape[-1],
+                                      bs * sequence_length,
                                       layer_sizes=layer_sizes, name="value_encoder"),
             name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
@@ -101,13 +123,12 @@ def build_rnn_models(env: gym.Env, distribution: BasePolicyDistribution, shared:
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(x)
 
-    policy = tf.keras.Model(inputs=inputs, outputs=out_policy, name="simple_rnn_policy")
-    value = tf.keras.Model(inputs=inputs, outputs=out_value, name="simple_rnn_value")
+    value = tf.keras.Model(inputs=input_list, outputs=out_value, name="simple_rnn_value")
 
-    return policy, value, tf.keras.Model(inputs=inputs, outputs=[out_policy, out_value], name="simple_rnn")
+    return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, out_value], name="simple_rnn")
 
 
-def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+def build_simple_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
                         sequence_length: int = None, model_type: str = "rnn", **kwargs):
     """Build simple networks (policy, value, joint) for given parameter settings."""
 
@@ -118,7 +139,7 @@ def build_simple_models(env: gym.Env, distribution: BasePolicyDistribution, shar
         return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length, model_type=model_type)
 
 
-def build_deeper_models(env: gym.Env, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+def build_deeper_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
                         sequence_length: int = 1, model_type: str = "rnn", **kwargs):
     """Build deeper simple networks (policy, value, joint) for given parameter settings."""
 

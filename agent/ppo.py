@@ -388,6 +388,9 @@ class PPOAgent:
 
         actor = self._make_actor()
 
+        if is_root:
+            tf.profiler.experimental.start(logdir="profiling")
+
         cycle_start = None
         full_drill_start_time = time.time()
         for self.iteration in range(self.iteration, n):
@@ -502,6 +505,7 @@ class PPOAgent:
 
         if is_root:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
+            tf.profiler.experimental.stop()
 
         return self
 
