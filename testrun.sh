@@ -10,6 +10,8 @@
 #SBATCH --constraint=gpu
 #SBATCH --hint=nomultithread
 
+export DISPLAY=:0
+
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export CRAY_CUDA_MPS=1
 
