@@ -10,6 +10,8 @@
 #SBATCH --constraint=gpu
 #SBATCH --hint=nomultithread
 
+export DISPLAY=:0
+
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export CRAY_CUDA_MPS=1
 
@@ -21,4 +23,4 @@ module load cuDNN/8.0.3.33
 # load virtual environment
 source ${HOME}/robovenv/bin/activate
 
-srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru --architecture deeper
+srun python3 -u train.py ReachAbsoluteVisual-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru

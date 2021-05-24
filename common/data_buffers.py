@@ -1,11 +1,9 @@
-from typing import Union, List, Tuple, Dict
+from typing import List, Tuple, Dict
 
-import gym
 import numpy as np
 from numpy.core._multiarray_umath import ndarray as arr
 
 from common.senses import Sensation, stack_sensations
-from utilities.util import env_extract_dims
 
 
 class ExperienceBuffer:
@@ -79,7 +77,8 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         super().__init__(capacity, state_dim, action_dim, is_continuous)
         self.seq_length = seq_length
 
-        self.states = {sense: np.zeros((1, capacity, self.seq_length, *shape,), dtype=np.float32) for sense, shape in state_dim.items()}
+        self.states = {sense: np.zeros((1, capacity, self.seq_length, *shape,), dtype=np.float32) for sense, shape in
+                       state_dim.items()}
         self.actions = np.zeros((1, capacity, self.seq_length, action_dim,), dtype=np.float32)
         self.action_probabilities = np.zeros((1, capacity, self.seq_length,), dtype=np.float32)
         self.returns = np.zeros((1, capacity, self.seq_length,), dtype=np.float32)

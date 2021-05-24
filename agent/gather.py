@@ -29,7 +29,7 @@ class Gatherer:
         self.exp_id = exp_id
         self.iteration = 0
 
-    def set_weights(self, weights):
+    def set_weights(self, weights: np.ndarray):
         """Set the weights of the full model."""
         self.joint.set_weights(weights)
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
+import gc
 import json
 import logging
 import os
@@ -407,15 +408,17 @@ class PPOAgent:
             # run simulations in parallel
             with tf.profiler.experimental.Trace("collect", iteration=self.iteration):
                 worker_stats = []
-                for i in worker_collection_ids:
-                    stats = actor.collect(self.env, self.distribution, self.horizon,
-                                          self.discount, self.lam,
-                                          self.tbptt_length, collector_id=i)
-                    worker_stats.append(stats)
 
-                # merge gatherings from all workers
-                stats = mpi_condense_stats(worker_stats)
-                stats = mpi_comm.bcast(stats, root=0)
+                if not self.iteration > 0:
+                    for i in worker_collection_ids:
+                        stats = actor.collect(self.env, self.distribution, self.horizon,
+                                              self.discount, self.lam,
+                                              self.tbptt_length, collector_id=i)
+                        worker_stats.append(stats)
+
+                    # merge gatherings from all workers
+                    stats = mpi_condense_stats(worker_stats)
+                    stats = mpi_comm.bcast(stats, root=0)
 
             # sync the environments to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -445,16 +448,16 @@ class PPOAgent:
 
             if is_root:
                 # record stats and transformers in the agent
-                self.record_wrapper_stats()
-                self.record_stats(stats_with_evaluation)
+                # self.record_wrapper_stats()
+                # self.record_stats(stats_with_evaluation)
 
                 time_dict["evaluating"] = time.time() - subprocess_start
                 subprocess_start = time.time()
 
                 # save if best
-                if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
-                                                                                                              self.cycle_reward_history):
-                    self.save_agent_state(name="best")
+                # if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
+                #                                                                                               self.cycle_reward_history):
+                #     self.save_agent_state(name="best")
 
             # early stopping  TODO check how this goes with MPI
             if self.env.spec.reward_threshold is not None and stop_early:
@@ -465,7 +468,8 @@ class PPOAgent:
             if is_root:
                 if cycle_start is not None:
                     self.cycle_timings.append(round(time.time() - cycle_start, 2))
-                self.report(total_iterations=n)
+                print(f"Iteration {self.iteration}.")
+                # self.report(total_iterations=n)
                 cycle_start = time.time()
 
             # PARALLELIZED OPTIMIZATION
@@ -475,6 +479,7 @@ class PPOAgent:
                                                 responsive_senses=self.policy.input_names)
 
             self.optimize(dataset, epochs, batch_size // n_optimizers)
+            gc.collect()
 
             if is_root:
                 time_dict["optimizing"] = time.time() - subprocess_start
@@ -484,13 +489,13 @@ class PPOAgent:
                 self.total_episodes_seen += stats.numb_completed_episodes
 
                 # update monitor logs
-                if monitor is not None:
-                    if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                        print("Creating Episode GIFs for current state of policy...")
-                        monitor.create_episode_gif(n=1)
-
-                    if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                        monitor.update()
+                # if monitor is not None:
+                #     if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                #         print("Creating Episode GIFs for current state of policy...")
+                #         monitor.create_episode_gif(n=1)
+                #
+                #     if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                #         monitor.update()
 
                 # save the current state of the agent
                 if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
@@ -539,38 +544,41 @@ class PPOAgent:
         # create the Gatherer
         return Gatherer(joint, policy, MPI.COMM_WORLD.rank, self.agent_id)
 
-    @tf.function
     def _learn_on_batch(self, batch):
         # optimize policy and value network simultaneously
-        with tf.GradientTape() as tape:
-            state_batch = {fname: f for fname, f in batch.items() if
-                           fname in ["vision", "proprioception", "somatosensation", "goal"]}
-            policy_output, value_output = self.joint(state_batch, training=True)
-            old_values = batch["value"]
+        # with tf.GradientTape() as tape:
+            # state_batch = {fname: f for fname, f in batch.items() if
+            #                fname in ["vision", "proprioception", "somatosensation", "goal"]}
+            # policy_output, value_output = ((tf.random.normal((batch["action"].shape[0], 20)),
+            #                                 tf.random.normal((batch["action"].shape[0], 20))),
+            #                                tf.random.normal((batch["action"].shape[0], 1)))  # TODO remove
+            # # policy_output, value_output = self.joint(state_batch, training=True)
+            # old_values = batch["value"]
 
-            if self.continuous_control:
-                # if action space is continuous, calculate PDF at chosen action value
-                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
-            else:
-                # if the action space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
+            # if self.continuous_control:
+            #     # if action space is continuous, calculate PDF at chosen action value
+            #     action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
+            # else:
+            #     # if the action space is discrete, extract the probabilities of actions actually chosen
+            #     action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
             # calculate the clipped loss
-            policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
-                                           advantage=batch["advantage"], mask=batch["mask"])
-            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
-                                         returns=batch["return"], mask=batch["mask"], clip=self.clip_values)
-            entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+            # policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
+            #                                advantage=batch["advantage"], mask=batch["mask"])
+            # value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
+            #                              returns=batch["return"], mask=batch["mask"], clip=self.clip_values)
+            # entropy = self.entropy_bonus(policy_output)
+            # total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
         # calculate the gradient of the joint model based on total loss
-        gradients = tape.gradient(total_loss, self.joint.trainable_variables)
+        # gradients = tape.gradient(total_loss, self.joint.trainable_variables)
+        gradients = [tf.random.normal(g.shape) for g in self.joint.trainable_variables]  # TODO remove
 
         # clip gradients to avoid gradient explosion and stabilize learning
-        if self.gradient_clipping is not None:
-            gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
+        # if self.gradient_clipping is not None:
+        #     gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        return gradients, tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        return gradients, 0, 0, 0  #tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -592,54 +600,54 @@ class PPOAgent:
         """
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
-            with tf.profiler.experimental.Trace("optimize", epoch=epoch):
+            # for each epoch, dataset first should be shuffled to break correlation
+            # if not self.is_recurrent:
+            #     dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-                # for each epoch, dataset first should be shuffled to break correlation
-                if not self.is_recurrent:
-                    dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+            # then divide into batches
+            batched_dataset = dataset.batch(batch_size, drop_remainder=True)
 
-                # then divide into batches
-                batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+            # and iterate over it while accumulating losses
+            policy_epoch_losses, value_epoch_losses, entropies = [], [], []
+            for b in batched_dataset:
+                continue
 
-                # and iterate over it while accumulating losses
-                policy_epoch_losses, value_epoch_losses, entropies = [], [], []
-                for b in batched_dataset:
-                    # use the dataset to optimize the model
-                    with tf.device(self.device):
-                        if not self.is_recurrent:
-                            grad, ent, pi_loss, v_loss = self._learn_on_batch(b)
-                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
-                        else:
-                            # truncated back propagation through time
-                            # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                            # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
-                            # fed into the model chronologically to adhere to statefulness
-                            # if the following line throws a CPU to GPU error this is most likely due to too little memory
-                            # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
-                            split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
-                            for i in range(len(split_batch["advantage"])):
-                                # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
-                                partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
+                # use the dataset to optimize the model
+                with tf.device(self.device):
+                    if not self.is_recurrent:
+                        _, ent, pi_loss, v_loss = self._learn_on_batch(b)
+                        # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                    else:
+                        # truncated back propagation through time
+                        # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
+                        # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
+                        # fed into the model chronologically to adhere to statefulness
+                        # if the following line throws a CPU to GPU error this is most likely due to too little memory
+                        # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                        split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
+                        for i in range(len(split_batch["advantage"])):
+                            # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
+                            partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
-                                # find and apply the gradients
-                                grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
-                                self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                            # find and apply the gradients
+                            grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
+                            # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
-                                # make partial RNN state resets
-                                reset_mask = detect_finished_episodes(partial_batch["done"])
-                                reset_states_masked(self.joint, reset_mask)
+                            # make partial RNN state resets
+                            # reset_mask = detect_finished_episodes(partial_batch["done"])
+                            # reset_states_masked(self.joint, reset_mask)
 
-                    entropies.append(ent)
-                    policy_epoch_losses.append(pi_loss)
-                    value_epoch_losses.append(v_loss)
+                entropies.append(ent)
+                policy_epoch_losses.append(pi_loss)
+                value_epoch_losses.append(v_loss)
 
-                    # reset RNN states after each outer batch
-                    self.joint.reset_states()
+                # reset RNN states after each outer batch
+                self.joint.reset_states()
 
-                # remember some statistics
-                policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
-                value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-                entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+            # remember some statistics
+            policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
+            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         optimization_comm.Barrier()
 
