@@ -7,10 +7,8 @@
 #SBATCH --ntasks-per-node=12
 #SBATCH --cpus-per-task=1
 #SBATCH --partition=normal
-#SBATCH --constraint=gpu
+#SBATCH --constraint=gpu&startx
 #SBATCH --hint=nomultithread
-
-export DISPLAY=:0
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export CRAY_CUDA_MPS=1
@@ -23,4 +21,5 @@ module load cuDNN/8.0.3.33
 # load virtual environment
 source ${HOME}/robovenv/bin/activate
 
+export DISPLAY=:0
 srun python3 -u test_glfw.py
