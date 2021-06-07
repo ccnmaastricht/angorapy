@@ -22,18 +22,12 @@ from utilities.util import add_state_dims, flatten, env_extract_dims
 class Gatherer:
     """Worker implementation for collecting experience by rolling out a policy."""
 
-    def __init__(self, joint: tf.keras.Model, policy: tf.keras.Model, worker_id: int, exp_id: int):
-        self.joint: tf.keras.Model = joint
-        self.policy = policy
+    def __init__(self, worker_id: int, exp_id: int):
         self.worker_id = worker_id
         self.exp_id = exp_id
         self.iteration = 0
 
-    def set_weights(self, weights: np.ndarray):
-        """Set the weights of the full model."""
-        self.joint.set_weights(weights)
-
-    def collect(self, env: BaseWrapper, distribution: BasePolicyDistribution, horizon: int, discount: float, lam: float,
+    def collect(self, joint: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution, horizon: int, discount: float, lam: float,
                 subseq_length: int, collector_id: int) -> StatBundle:
         """Collect a batch shard of experience for a given number of timesteps.
 
@@ -50,7 +44,7 @@ class Gatherer:
 
         state: Sensation
 
-        is_recurrent = is_recurrent_model(self.joint)
+        is_recurrent = is_recurrent_model(joint)
         is_continuous = isinstance(env.action_space, Box)
         state_dim, action_dim = env_extract_dims(env)
 
@@ -59,8 +53,7 @@ class Gatherer:
 
         # reset states of potentially recurrent net
         if is_recurrent:
-            self.joint.reset_states()
-            self.policy.reset_states()
+            joint.reset_states()
 
         # buffer storing the experience and stats
         if is_recurrent:
@@ -80,7 +73,7 @@ class Gatherer:
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = flatten(self.joint(prepared_state))
+            policy_out = flatten(joint(prepared_state))
 
             a_distr, value = policy_out[:-1], policy_out[-1]
 
@@ -133,8 +126,7 @@ class Gatherer:
                 state = env.reset()
 
                 if is_recurrent:
-                    self.joint.reset_states()
-                    self.policy.reset_states()
+                    joint.reset_states()
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
@@ -151,7 +143,7 @@ class Gatherer:
         env.close()
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(self.joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
+        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
@@ -189,12 +181,12 @@ class Gatherer:
 
         return stats
 
-    def evaluate(self, env: BaseWrapper, distribution: BasePolicyDistribution) -> \
+    def evaluate(self, policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution) -> \
             Tuple[int, int, Any]:
         """Evaluate one episode of the given environment following the given policy. Remote implementation."""
 
         # reset policy states as it might be recurrent
-        self.policy.reset_states()
+        policy.reset_states()
 
         done = False
         state = env.reset()
@@ -202,7 +194,7 @@ class Gatherer:
         steps = 0
         while not done:
             probabilities = flatten(
-                self.policy(add_state_dims(state, dims=2 if self.is_recurrent else 1)))
+                policy(add_state_dims(state, dims=2 if self.is_recurrent else 1)))
 
             action, _ = distribution.act(*probabilities)
             observation, reward, done, _ = env.step(action)

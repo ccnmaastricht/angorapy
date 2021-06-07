@@ -1,11 +1,14 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+import tqdm
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import time
 
 import tensorflow as tf
 
+from agent.dataio import read_dataset_from_storage
 from common.const import VISION_WH
 from common.policies import BetaPolicyDistribution
 from common.wrappers import make_env
@@ -13,10 +16,10 @@ from models import get_model_builder
 
 # tf.config.run_functions_eagerly(False)
 
-sequence_length = 8
-batch_size = 128
+sequence_length = 2
+batch_size = 2
 
-model_builder = get_model_builder(model="shadow", model_type="gru", shared=False, blind=False)
+model_builder = get_model_builder(model="shadow", model_type="rnn", shared=False, blind=False)
 
 env = make_env("ReachAbsoluteVisual-v0")
 distribution = BetaPolicyDistribution(env)
@@ -30,15 +33,11 @@ optimizer = tf.keras.optimizers.SGD()
 
 
 def _get_data():
-    sample_batch = {
-        "vision": tf.random.normal([16, sequence_length, VISION_WH, VISION_WH, 3]),
-        "proprioception": tf.random.normal([16, sequence_length, 48]),
-        "somatosensation": tf.random.normal([16, sequence_length, 92]),
-        "goal": tf.random.normal([16, sequence_length, 15])
-    }
-
-    dataset = tf.data.Dataset.from_tensor_slices(sample_batch)
-    return dataset.repeat(128).batch(batch_size)
+    dataset = read_dataset_from_storage(dtype_actions=tf.float32,
+                                        id_prefix=1623091094,
+                                        worker_ids=[0],
+                                        responsive_senses=["proprioception", "vision", "somatosensation", "goal"])
+    return dataset.repeat(128)
 
 
 @tf.function
@@ -55,13 +54,17 @@ def _get_grads(batch):
 def _train():
     start_time = time.time()
 
-    for epoch in range(100):
+    for cycle in range(100):
         dataset = _get_data()
-        for batch in dataset:
-            grads = _get_grads(batch)
-            optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        print(f"Finished Epoch {epoch}.")
+        for epoch in range(3):
+            batched_dataset = dataset.batch(batch_size)
+
+            for batch in tqdm.tqdm(batched_dataset, desc=f"Cylce {cycle} Epoch {epoch}"):
+                grads = _get_grads(batch)
+                optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+            print(f"Finished Epoch {epoch}.")
 
     print(f"Execution Time: {time.time() - start_time}")
 

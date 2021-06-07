@@ -23,13 +23,13 @@ from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
 from common import policies, const
+from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
+from common.const import MIN_STAT_EPS
 from common.mpi_optim import MpiAdam
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
 from common.validators import validate_env_model_compatibility
 from common.wrappers import BaseWrapper, make_env
-from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
-from common.const import MIN_STAT_EPS
 from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
@@ -384,13 +384,14 @@ class PPOAgent:
             batch_size = self.n_workers
 
         # rebuild model with desired batch size
-        self.policy, self.value, self.joint = \
-            self.build_models(batch_size=batch_size // n_optimizers, sequence_length=self.tbptt_length)
+        joint_weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.build_models(
+            weights=joint_weights,
+            batch_size=batch_size // n_optimizers,
+            sequence_length=self.tbptt_length
+        )
 
         actor = self._make_actor()
-
-        if is_root:
-            tf.profiler.experimental.start(logdir="profiling")
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -401,24 +402,24 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # distribute parameters from rank 0 to all goal ranks
-            joint_weights = mpi_comm.bcast(self.joint.get_weights(), root=0)
-            self.joint.set_weights(joint_weights)
-            actor.set_weights(joint_weights)
+            joint_weights = mpi_comm.bcast(joint_weights, root=0)
+            self.policy, self.value, self.joint = self.build_models(
+                weights=joint_weights, batch_size=batch_size // n_optimizers, sequence_length=self.tbptt_length)
 
             # run simulations in parallel
-            with tf.profiler.experimental.Trace("collect", iteration=self.iteration):
-                worker_stats = []
+            worker_stats = []
 
-                if not self.iteration > 0:
-                    for i in worker_collection_ids:
-                        stats = actor.collect(self.env, self.distribution, self.horizon,
-                                              self.discount, self.lam,
-                                              self.tbptt_length, collector_id=i)
-                        worker_stats.append(stats)
+            _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
-                    # merge gatherings from all workers
-                    stats = mpi_condense_stats(worker_stats)
-                    stats = mpi_comm.bcast(stats, root=0)
+            for i in worker_collection_ids:
+                stats = actor.collect(actor_joint, self.env, self.distribution, self.horizon,
+                                      self.discount, self.lam,
+                                      self.tbptt_length, collector_id=i)
+                worker_stats.append(stats)
+
+            # merge gatherings from all workers
+            stats = mpi_condense_stats(worker_stats)
+            stats = mpi_comm.bcast(stats, root=0)
 
             # sync the environments to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -448,16 +449,16 @@ class PPOAgent:
 
             if is_root:
                 # record stats and transformers in the agent
-                # self.record_wrapper_stats()
-                # self.record_stats(stats_with_evaluation)
+                self.record_wrapper_stats()
+                self.record_stats(stats_with_evaluation)
 
                 time_dict["evaluating"] = time.time() - subprocess_start
                 subprocess_start = time.time()
 
                 # save if best
-                # if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
-                #                                                                                               self.cycle_reward_history):
-                #     self.save_agent_state(name="best")
+                if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
+                                                                                                              self.cycle_reward_history):
+                    self.save_agent_state(name="best")
 
             # early stopping  TODO check how this goes with MPI
             if self.env.spec.reward_threshold is not None and stop_early:
@@ -468,8 +469,7 @@ class PPOAgent:
             if is_root:
                 if cycle_start is not None:
                     self.cycle_timings.append(round(time.time() - cycle_start, 2))
-                print(f"Iteration {self.iteration}.")
-                # self.report(total_iterations=n)
+                self.report(total_iterations=n)
                 cycle_start = time.time()
 
             # PARALLELIZED OPTIMIZATION
@@ -508,6 +508,17 @@ class PPOAgent:
                 self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
                 self.time_dicts.append(time_dict)
 
+            # we have to clear all memory and rebuild networks to avoid leaks
+            joint_weights = self.joint.get_weights()
+
+            del actor_joint
+            del self.joint
+            del self.value
+            del self.policy
+            del dataset
+            tf.keras.backend.clear_session()
+            gc.collect()
+
         if is_root:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
             tf.profiler.experimental.stop()
@@ -538,47 +549,44 @@ class PPOAgent:
         self.underflow_history.append(stats.tbptt_underflow)
 
     def _make_actor(self) -> Gatherer:
-        # rebuild network for gatherer
-        policy, _, joint = self.build_models(1, 1)
-
         # create the Gatherer
-        return Gatherer(joint, policy, MPI.COMM_WORLD.rank, self.agent_id)
+        return Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
 
     def _learn_on_batch(self, batch):
         # optimize policy and value network simultaneously
-        # with tf.GradientTape() as tape:
-            # state_batch = {fname: f for fname, f in batch.items() if
-            #                fname in ["vision", "proprioception", "somatosensation", "goal"]}
+        with tf.GradientTape() as tape:
+            state_batch = {fname: f for fname, f in batch.items() if
+                           fname in ["vision", "proprioception", "somatosensation", "goal"]}
             # policy_output, value_output = ((tf.random.normal((batch["action"].shape[0], 20)),
             #                                 tf.random.normal((batch["action"].shape[0], 20))),
             #                                tf.random.normal((batch["action"].shape[0], 1)))  # TODO remove
-            # # policy_output, value_output = self.joint(state_batch, training=True)
-            # old_values = batch["value"]
+            policy_output, value_output = self.joint(state_batch, training=True)
+            old_values = batch["value"]
 
-            # if self.continuous_control:
-            #     # if action space is continuous, calculate PDF at chosen action value
-            #     action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
-            # else:
-            #     # if the action space is discrete, extract the probabilities of actions actually chosen
-            #     action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
+            if self.continuous_control:
+                # if action space is continuous, calculate PDF at chosen action value
+                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
+            else:
+                # if the action space is discrete, extract the probabilities of actions actually chosen
+                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
             # calculate the clipped loss
-            # policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
-            #                                advantage=batch["advantage"], mask=batch["mask"])
-            # value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
-            #                              returns=batch["return"], mask=batch["mask"], clip=self.clip_values)
-            # entropy = self.entropy_bonus(policy_output)
-            # total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+            policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
+                                           advantage=batch["advantage"], mask=batch["mask"])
+            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
+                                         returns=batch["return"], mask=batch["mask"], clip=self.clip_values)
+            entropy = self.entropy_bonus(policy_output)
+            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
 
         # calculate the gradient of the joint model based on total loss
-        # gradients = tape.gradient(total_loss, self.joint.trainable_variables)
-        gradients = [tf.random.normal(g.shape) for g in self.joint.trainable_variables]  # TODO remove
+        gradients = tape.gradient(total_loss, self.joint.trainable_variables)
+        # gradients = [tf.random.normal(g.shape) for g in self.joint.trainable_variables]  # TODO remove
 
         # clip gradients to avoid gradient explosion and stabilize learning
-        # if self.gradient_clipping is not None:
-        #     gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
+        if self.gradient_clipping is not None:
+            gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        return gradients, 0, 0, 0  #tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        return gradients, 0, 0, 0  # tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -610,8 +618,6 @@ class PPOAgent:
             # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
-                continue
-
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
@@ -631,11 +637,11 @@ class PPOAgent:
 
                             # find and apply the gradients
                             grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
-                            # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
-                            # reset_mask = detect_finished_episodes(partial_batch["done"])
-                            # reset_states_masked(self.joint, reset_mask)
+                            reset_mask = detect_finished_episodes(partial_batch["done"])
+                            reset_states_masked(self.joint, reset_mask)
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -864,10 +870,9 @@ class PPOAgent:
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)
 
-    def build_models(self, batch_size, sequence_length=1):
+    def build_models(self, weights, batch_size, sequence_length=1):
         """(Re-)build the models (policy, value, joint) with the same weights but potentially different batch size and
         sequence length."""
-        weights = self.joint.get_weights()
         policy, value, joint = self.model_builder(
             self.env, self.distribution,
             **({"bs": batch_size} if requires_batch_size(self.model_builder) else {}),
