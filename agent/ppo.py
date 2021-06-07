@@ -489,13 +489,13 @@ class PPOAgent:
                 self.total_episodes_seen += stats.numb_completed_episodes
 
                 # update monitor logs
-                # if monitor is not None:
-                #     if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                #         print("Creating Episode GIFs for current state of policy...")
-                #         monitor.create_episode_gif(n=1)
-                #
-                #     if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                #         monitor.update()
+                if monitor is not None:
+                    if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                        print("Creating Episode GIFs for current state of policy...")
+                        monitor.create_episode_gif(n=1)
+
+                    if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                        monitor.update()
 
                 # save the current state of the agent
                 if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
@@ -557,9 +557,6 @@ class PPOAgent:
         with tf.GradientTape() as tape:
             state_batch = {fname: f for fname, f in batch.items() if
                            fname in ["vision", "proprioception", "somatosensation", "goal"]}
-            # policy_output, value_output = ((tf.random.normal((batch["action"].shape[0], 20)),
-            #                                 tf.random.normal((batch["action"].shape[0], 20))),
-            #                                tf.random.normal((batch["action"].shape[0], 1)))  # TODO remove
             policy_output, value_output = self.joint(state_batch, training=True)
             old_values = batch["value"]
 
@@ -580,7 +577,6 @@ class PPOAgent:
 
         # calculate the gradient of the joint model based on total loss
         gradients = tape.gradient(total_loss, self.joint.trainable_variables)
-        # gradients = [tf.random.normal(g.shape) for g in self.joint.trainable_variables]  # TODO remove
 
         # clip gradients to avoid gradient explosion and stabilize learning
         if self.gradient_clipping is not None:
@@ -609,8 +605,8 @@ class PPOAgent:
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation
-            # if not self.is_recurrent:
-            #     dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+            if not self.is_recurrent:
+                dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
@@ -622,7 +618,7 @@ class PPOAgent:
                 with tf.device(self.device):
                     if not self.is_recurrent:
                         _, ent, pi_loss, v_loss = self._learn_on_batch(b)
-                        # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
                         # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
