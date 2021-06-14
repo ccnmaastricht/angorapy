@@ -37,6 +37,14 @@ for vision_mode in ["Visual", ""]:
             )
 
             gym.envs.register(
+                id=f'Reach{init_mode}{control_mode}{vision_mode}NoTouch-v0',
+                entry_point='environments:Reach',
+                kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
+                        **({"initial_qpos": init_mode.lower()} if init_mode else {}), "touch": False},
+                max_episode_steps=SHADOWHAND_MAX_STEPS,
+            )
+
+            gym.envs.register(
                 id=f'FreeReach{init_mode}{control_mode}{vision_mode}-v0',
                 entry_point='environments:FreeReach',
                 kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",

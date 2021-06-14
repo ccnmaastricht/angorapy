@@ -28,6 +28,7 @@ from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STO
 from common.const import MIN_STAT_EPS
 from common.mpi_optim import MpiAdam
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from common.senses import Sensation
 from common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
 from common.validators import validate_env_model_compatibility
 from common.wrappers import BaseWrapper, make_env
@@ -478,6 +479,7 @@ class PPOAgent:
                                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
                                                     responsive_senses=self.policy.input_names)
                 self.optimize(dataset, epochs, batch_size // n_optimizers)
+
                 del dataset
                 gc.collect()
 
@@ -574,8 +576,7 @@ class PPOAgent:
             gradients, mean_entropym , mean_policy_loss, mean_value_loss
         """
         with tf.GradientTape() as tape:
-            state_batch = {fname: f for fname, f in batch.items() if
-                           fname in ["vision", "proprioception", "somatosensation", "goal"]}
+            state_batch = {fname: f for fname, f in batch.items() if fname in Sensation.sense_names}
             old_values = batch["value"]
 
             policy_output, value_output = joint(state_batch, training=True)
@@ -607,7 +608,8 @@ class PPOAgent:
         if self.gradient_clipping is not None:
             gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        return gradients, tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        entropy, policy_loss, value_loss = tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        return gradients, entropy, policy_loss, value_loss
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -642,7 +644,6 @@ class PPOAgent:
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
-
                     if not self.is_recurrent:
                         grad, ent, pi_loss, v_loss = self._learn_on_batch(b, self.joint)
                         self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
@@ -666,6 +667,7 @@ class PPOAgent:
                             reset_mask = detect_finished_episodes(partial_batch["done"])
                             reset_states_masked(self.joint, reset_mask)
 
+                # todo makes no sense with the split batches, need to average over them
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
                 value_epoch_losses.append(v_loss)
@@ -680,17 +682,17 @@ class PPOAgent:
 
         optimization_comm.Barrier()
 
+        # store statistics in agent history
+        self.policy_loss_history.append(statistics.mean(policy_loss_history))
+        self.value_loss_history.append(statistics.mean(value_loss_history))
+        self.entropy_history.append(statistics.mean(entropy_history))
+
         del dataset
         del batched_dataset
 
         tf.keras.backend.clear_session()
         tf.compat.v1.reset_default_graph()
         gc.collect()
-
-        # store statistics in agent history
-        self.policy_loss_history.append(statistics.mean(policy_loss_history))
-        self.value_loss_history.append(statistics.mean(value_loss_history))
-        self.entropy_history.append(statistics.mean(entropy_history))
 
     def evaluate(self, n: int, actor: Gatherer = None, save: bool = False) -> Tuple[StatBundle, Any]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
@@ -792,7 +794,7 @@ class PPOAgent:
                 f"{underflow}"
                 f"times: {time_string} {time_distribution_string}; "
                 f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
-                f"mem: {round(psutil.virtual_memory()[3] / 1e9, 2)};\n")
+                f"mem: {round(psutil.virtual_memory()[3] / 1e9, 2)}/{round(psutil.virtual_memory()[0] / 1e9)}GB;\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""

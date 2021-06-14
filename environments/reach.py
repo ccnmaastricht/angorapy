@@ -19,7 +19,8 @@ from utilities.util import HiddenPrints
 class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
-    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False):
+    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False,
+                 touch=True):
         if vision:
             with HiddenPrints():
                 # fix to "ERROR: GLEW initalization error: Missing GL version"
@@ -28,6 +29,7 @@ class Reach(BaseShadowHandEnv):
         # reward function setup
         self._set_default_reward_function_and_config()
         self.vision = vision
+        self.touch = touch
 
         self.current_target_finger = 3
         self.thumb_name = 'robot0:S_thtip'
@@ -140,7 +142,7 @@ class Reach(BaseShadowHandEnv):
         return {
             'observation': Sensation(
                 proprioception=proprioception,
-                somatosensation=touch,
+                somatosensation=touch if self.touch else None,
                 vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else None,
                 goal=self.goal.copy()
             ),

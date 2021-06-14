@@ -67,16 +67,21 @@ def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
 
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    if all(x in state_dimensionality.keys() for x in ["proprioception", "somatosensation", "goal"]):
-        proprio = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
-        somato = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["somatosensation"], name="somatosensation")
-        goal = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["goal"], name="goal")
-        input_list = [proprio, somato, goal]
+    input_list = []
+    proprio = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
+    input_list.append(proprio)
 
+    if "somatosensation" in state_dimensionality.keys():
+        somato = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["somatosensation"], name="somatosensation")
+        input_list.append(somato)
+    if "goal" in state_dimensionality.keys():
+        goal = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["goal"], name="goal")
+        input_list.append(goal)
+
+    if len(input_list) > 1:
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
     else:
-        inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
-        input_list = inputs
+        inputs = input_list[0]
 
     masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (inputs.shape[-1], ))(inputs)
 
