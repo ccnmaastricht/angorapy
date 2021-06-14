@@ -178,9 +178,7 @@ class Gatherer:
         buffer.normalize_advantages()
 
         # convert buffer to dataset and save it to tf record
-        stats = None
         dataset, stats = make_dataset_and_stats(buffer)
-
         with tf.io.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord") as file_writer:
             feature_names = ([sense for sense in Sensation.sense_names if sense in observation]
                              + ["action", "action_prob", "return", "advantage", "value", "done", "mask"])
@@ -192,7 +190,6 @@ class Gatherer:
                 file_writer.write(record)
 
         del dataset
-
         del buffer
         del states
         del advantages

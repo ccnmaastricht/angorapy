@@ -419,8 +419,8 @@ class PPOAgent:
                 worker_stats.append(stats)
 
             # merge gatherings from all workers
-            # stats = mpi_condense_stats(worker_stats)
-            # stats = mpi_comm.bcast(stats, root=0)
+            stats = mpi_condense_stats(worker_stats)
+            stats = mpi_comm.bcast(stats, root=0)
 
             # sync the environments to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -485,8 +485,8 @@ class PPOAgent:
                     time_dict["optimizing"] = time.time() - subprocess_start
 
                     mpi_flat_print("Finalizing...")
-                    # self.total_frames_seen += stats.numb_processed_frames
-                    # self.total_episodes_seen += stats.numb_completed_episodes
+                    self.total_frames_seen += stats.numb_processed_frames
+                    self.total_episodes_seen += stats.numb_completed_episodes
 
                     # update monitor logs
                     if monitor is not None:
@@ -502,11 +502,11 @@ class PPOAgent:
                         self.save_agent_state()
 
                     # calculate processing speed in fps
-                    # self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-                    # self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
-                    #     time_dict["gathering"])
-                    # self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
-                    # self.time_dicts.append(time_dict)
+                    self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+                    self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
+                        time_dict["gathering"])
+                    self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
+                    self.time_dicts.append(time_dict)
 
                 joint_weights = self.joint.get_weights()
 
