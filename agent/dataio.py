@@ -9,6 +9,7 @@ from typing import Union, Tuple, List
 import tensorflow as tf
 
 from common.const import STORAGE_DIR
+from common.senses import Sensation
 from utilities.datatypes import StatBundle
 from common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 
@@ -96,7 +97,7 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
                             "goal"]) that the agent utilizes
         shuffle:            whether or not to shuffle the datafiles
     """
-    assert all(r in ["proprioception", "vision", "somatosensation", "goal"] for r in responsive_senses)
+    assert all(r in Sensation.sense_names for r in responsive_senses)
 
     feature_description = {
         "action": tf.io.FixedLenFeature([], tf.string),
