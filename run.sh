@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name="dexterity"
 #SBATCH --account="ich020"
-#SBATCH --time=24:00:00
+#SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=12
@@ -22,4 +22,4 @@ module load cuDNN/8.0.3.33
 source ${HOME}/robovenv/bin/activate
 
 export DISPLAY=:0
-srun python3 -u train.py ReachAbsoluteVisual-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru
+srun python3 -u train.py ReachAbsolute-v0 --pcon hand_beta_no_ent --rcon reach.default --model gru
