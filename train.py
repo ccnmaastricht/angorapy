@@ -176,7 +176,8 @@ if __name__ == "__main__":
     parser.add_argument("--save-every", type=int, default=0, help=f"save agent every given number of iterations")
     parser.add_argument("--monitor-frequency", type=int, default=1, help=f"update the monitor every n iterations.")
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
-    parser.add_argument("--debug", action="store_true", help=f"run in debug mode")
+    parser.add_argument("--debug", action="store_true", help=f"run in debug mode (eager mode)")
+    parser.add_argument("--no-monitor", action="store_true", help="dont use a monitor")
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
@@ -219,12 +220,12 @@ if __name__ == "__main__":
             raise ImportError("Cannot find config under given name. Does it exist in utilities/hp_config.py?")
 
     if args.debug:
-        tf.config.experimental_run_functions_eagerly(True)
+        tf.config.run_functions_eagerly(True)
         if is_root:
             logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
 
     try:
-        run_experiment(args.env, vars(args), use_monitor=True)
+        run_experiment(args.env, vars(args), use_monitor=not args.no_monitor)
     except Exception as e:
         if rank == 0:
             traceback.print_exc()

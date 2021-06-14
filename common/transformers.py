@@ -18,13 +18,13 @@ TransformerSerialization = namedtuple("TransformerSerialization", ["class_name",
 class BaseTransformer(abc.ABC):
     """Abstract base class for preprocessors."""
 
-    def __init__(self, env):
+    def __init__(self, env_name: str, state_dim, n_actions):
         self.n = 1e-4  # make this at least epsilon so that first measure is not all zeros
         self.previous_n = self.n
 
         # extract env info
-        self.env_name = env.unwrapped.spec.id
-        self.state_dim, self.number_of_actions = env_extract_dims(env)
+        self.env_name = env_name
+        self.state_dim, self.number_of_actions = state_dim, n_actions
 
     @abc.abstractmethod
     def __add__(self, other):
@@ -89,7 +89,7 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
     variance: Dict[str, np.ndarray]
 
     def __add__(self, other) -> "BaseRunningMeanTransformer":
-        nt = self.__class__(gym.make(self.env_name))
+        nt = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
         nt.n = self.n + other.n
 
         for name in self.mean.keys():
@@ -148,9 +148,9 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
 class StateNormalizationTransformer(BaseRunningMeanTransformer):
     """Transformer for state normalization using running mean and variance estimations."""
 
-    def __init__(self, env):
+    def __init__(self, env_name: str, state_dim, n_actions):
         # parse input types into normed shape format
-        super().__init__(env)
+        super().__init__(env_name, state_dim, n_actions)
 
         self.shapes = self.state_dim
 
@@ -191,8 +191,8 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 class RewardNormalizationTransformer(BaseRunningMeanTransformer):
     """Transformer for reward normalization using running mean and variance estimations."""
 
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env_name: str, state_dim, n_action):
+        super().__init__(env_name, state_dim, n_action)
 
         self.mean = {"reward": np.array(0, NP_FLOAT_PREC)}
         self.variance = {"reward": np.array(1, NP_FLOAT_PREC)}

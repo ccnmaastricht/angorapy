@@ -15,7 +15,7 @@ from matplotlib import animation
 
 from agent.ppo import PPOAgent
 from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from common.wrappers import TransformationWrapper
+from common.wrappers import TransformationWrapper, BaseWrapper
 from models import get_model_type
 from common import const
 from common.const import PATH_TO_EXPERIMENTS
@@ -33,9 +33,8 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: TransformationWrapper, frequency: int, gif_every: int, id=None,
-                 iterations=None,
-                 config_name: str = "unknown"):
+    def __init__(self, agent: PPOAgent, env: BaseWrapper, frequency: int, gif_every: int, id=None,
+                 iterations=None, config_name: str = "unknown"):
         self.agent = agent
         self.env = env
         self.iterations = iterations

@@ -1,6 +1,6 @@
 """Wrappers encapsulating environments to modulate n_steps, rewards, and control state initialization."""
 import abc
-from typing import Union, List, Type
+from typing import Union, List, Type, OrderedDict
 
 import gym
 import numpy
@@ -8,6 +8,7 @@ from mpi4py import MPI
 
 from common.senses import Sensation
 from common.transformers import BaseTransformer, merge_transformers
+from utilities.util import env_extract_dims
 
 
 class BaseWrapper(gym.ObservationWrapper, abc.ABC):
@@ -30,13 +31,15 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         """Process an observation to be of type 'Sensation'."""
         if isinstance(observation, Sensation):
             return observation
-        elif isinstance(observation, dict):
+        elif isinstance(observation, (dict, OrderedDict)):
             assert "observation" in observation.keys(), "Unknown dict type of state couldnt be resolved to Sensation."
 
             if isinstance(observation["observation"], Sensation):
                 return observation["observation"]
             elif isinstance(observation["observation"], numpy.ndarray):
                 return Sensation(proprioception=observation["observation"])
+            elif isinstance(observation["observation"], dict) and all([k in observation["observation"].keys() for k in Sensation.sense_names]):
+                return Sensation(**observation["observation"])
 
         return Sensation(proprioception=observation)
 
@@ -119,13 +122,14 @@ def make_env(env_name, reward_config: Union[str, dict] = None,
              transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = None) -> BaseWrapper:
     """Make environment, including a possible reward config and transformers."""
     base_env = gym.make(env_name)
+    state_dim, n_actions = env_extract_dims(base_env)
 
     if transformers is None:
         transformers = []
     elif all(isinstance(t, BaseTransformer) for t in transformers):
         transformers = transformers
     elif all(callable(t) for t in transformers):
-        transformers = [t(base_env) for t in transformers]
+        transformers = [t(env_name, state_dim, n_actions) for t in transformers]
 
     env = TransformationWrapper(base_env, transformers=transformers)
 

@@ -35,7 +35,6 @@ class Reach(BaseShadowHandEnv):
         # STATE INITIALIZATION
         assert initial_qpos in ["random", "buffered"] or isinstance(initial_qpos, dict), "Illegal state initialization."
 
-        self.state_memory_buffer = collections.deque(maxlen=1000)
         self.state_initialization = initial_qpos
         if self.state_initialization == "random":
             initial_qpos = generate_random_sim_qpos(DEFAULT_INITIAL_QPOS)
@@ -121,11 +120,11 @@ class Reach(BaseShadowHandEnv):
             for name, value in initial_qpos.items():
                 self.sim.data.set_joint_qpos(name, value)
                 self.sim.data.set_joint_qvel(name, 0)
-        elif self.state_initialization == "buffered":
-            # pull state from buffer as initial state for the environment
-            if len(self.state_memory_buffer) > 100:  # TODO as variable in config?
-                sampled_initial_state = random.choice(self.state_memory_buffer)
-                self.sim.set_state(sampled_initial_state)
+        # elif self.state_initialization == "buffered":
+        #     # pull state from buffer as initial state for the environment
+        #     if len(self.state_memory_buffer) > 100:  # TODO as variable in config?
+        #         sampled_initial_state = random.choice(self.state_memory_buffer)
+        #         self.sim.set_state(sampled_initial_state)
 
         self.sim.forward()
         return True

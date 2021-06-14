@@ -8,11 +8,11 @@ import tensorflow as tf
 from gym.spaces import Box
 
 from agent.core import estimate_episode_advantages
-from agent.dataio import tf_serialize_example, make_dataset_and_stats
+from agent.dataio import tf_serialize_example, make_dataset_and_stats, serialize_sample
 from common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 from common.policies import BasePolicyDistribution
 from common.senses import Sensation
-from common.wrappers import BaseWrapper
+from common.wrappers import BaseWrapper, make_env
 from common.const import STORAGE_DIR, DETERMINISTIC
 from utilities.datatypes import StatBundle
 from utilities.model_utils import is_recurrent_model
@@ -42,6 +42,8 @@ class Gatherer:
         """
         self.iteration += 1
 
+
+
         state: Sensation
 
         is_recurrent = is_recurrent_model(joint)
@@ -68,12 +70,16 @@ class Gatherer:
         states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
         episode_endpoints = []
         state = env.reset()
+
         while t < horizon:
             current_subseq_length += 1
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = flatten(joint(prepared_state))
+            policy_out = np.float32(np.random.random(joint.output_shape[0][0])), \
+                         np.float32(np.random.random(joint.output_shape[0][1])), \
+                         np.float32(np.random.random(joint.output_shape[1]))  # TODO REMOVE
+            # policy_out = flatten(joint(prepared_state))
 
             a_distr, value = policy_out[:-1], policy_out[-1]
 
@@ -88,7 +94,8 @@ class Gatherer:
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
             # make a step based on the chosen action and collect the reward for this state
-            observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            # observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            observation, reward, done, info = fake_env_step(env)  # TODO REMOVE
             current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
             rewards.append(reward)
 
@@ -140,8 +147,6 @@ class Gatherer:
 
             t += 1
 
-        env.close()
-
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
         values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
 
@@ -173,11 +178,32 @@ class Gatherer:
         buffer.normalize_advantages()
 
         # convert buffer to dataset and save it to tf record
+        stats = None
         dataset, stats = make_dataset_and_stats(buffer)
-        dataset = dataset.map(tf_serialize_example)
 
-        writer = tf.data.experimental.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord")
-        writer.write(dataset)
+        with tf.io.TFRecordWriter(f"{STORAGE_DIR}/{self.exp_id}_data_{collector_id}.tfrecord") as file_writer:
+            feature_names = ([sense for sense in Sensation.sense_names if sense in observation]
+                             + ["action", "action_prob", "return", "advantage", "value", "done", "mask"])
+
+            for batch in dataset:
+                inputs = [batch[f] for f in feature_names]
+                record = serialize_sample(*inputs, feature_names=feature_names)
+
+                file_writer.write(record)
+
+        del dataset
+
+        del buffer
+        del states
+        del advantages
+        del values
+        del actions
+        del action_probabilities
+        del joint
+
+        tf.keras.backend.clear_session()
+        tf.compat.v1.reset_default_graph()
+        gc.collect()
 
         return stats
 
@@ -207,3 +233,23 @@ class Gatherer:
         eps_class = env.unwrapped.current_target_finger if hasattr(env.unwrapped, "current_target_finger") else None
 
         return steps, cumulative_reward, eps_class
+
+
+def fake_env_step(env: BaseWrapper):
+    """Return a random step imitating the given environment wihtout actually stepping the environment.
+
+    For testing purposes."""
+
+    observation = env.observation_space.sample()
+
+    return (
+        env.observation(observation),
+        1,
+        False,
+        {}
+    )
+
+
+if __name__ == '__main__':
+    env = make_env("ReachAbsoluteVisual-v0")
+    fake_env_step(env)

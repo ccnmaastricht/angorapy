@@ -13,6 +13,7 @@ from typing import Union, Tuple, Any, Callable
 
 import gym
 import numpy as np
+import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 from mpi4py import MPI
@@ -418,8 +419,8 @@ class PPOAgent:
                 worker_stats.append(stats)
 
             # merge gatherings from all workers
-            stats = mpi_condense_stats(worker_stats)
-            stats = mpi_comm.bcast(stats, root=0)
+            # stats = mpi_condense_stats(worker_stats)
+            # stats = mpi_comm.bcast(stats, root=0)
 
             # sync the environments to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -439,89 +440,98 @@ class PPOAgent:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
-            elif MPI.COMM_WORLD.rank == 0 and stats.numb_completed_episodes == 0:
-                print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
-                      "Consider activating separate evaluation in drill() to get meaningful statistics.")
+            # elif MPI.COMM_WORLD.rank == 0 and stats.numb_completed_episodes == 0:
+            #     print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
+            #           "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
-            if not is_optimization_process:
+            if is_optimization_process:
                 # only optimizers go for the rest
-                continue
 
-            if is_root:
-                # record stats and transformers in the agent
-                self.record_wrapper_stats()
-                self.record_stats(stats_with_evaluation)
+                if is_root:
+                    # record stats and transformers in the agent
+                    # self.record_wrapper_stats()
+                    # self.record_stats(stats_with_evaluation)
 
-                time_dict["evaluating"] = time.time() - subprocess_start
-                subprocess_start = time.time()
+                    time_dict["evaluating"] = time.time() - subprocess_start
+                    subprocess_start = time.time()
 
-                # save if best
-                if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
-                                                                                                              self.cycle_reward_history):
-                    self.save_agent_state(name="best")
+                    # save if best
+                    # if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
+                    #                                                                                               self.cycle_reward_history):
+                    #     self.save_agent_state(name="best")
 
-            # early stopping  TODO check how this goes with MPI
-            if self.env.spec.reward_threshold is not None and stop_early:
-                if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
-                    print("\rAll catch a breath, we stop the drill early due to the formidable result!")
-                    break
+                # early stopping  TODO check how this goes with MPI
+                if self.env.spec.reward_threshold is not None and stop_early:
+                    if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
+                        print("\rAll catch a breath, we stop the drill early due to the formidable result!")
+                        break
 
-            if is_root:
-                if cycle_start is not None:
-                    self.cycle_timings.append(round(time.time() - cycle_start, 2))
-                self.report(total_iterations=n)
-                cycle_start = time.time()
+                if is_root:
+                    if cycle_start is not None:
+                        self.cycle_timings.append(round(time.time() - cycle_start, 2))
+                    # self.report(total_iterations=n)
+                    cycle_start = time.time()
 
-            # PARALLELIZED OPTIMIZATION
-            mpi_flat_print("Optimizing...")
-            dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
-                                                responsive_senses=self.policy.input_names)
+                # PARALLELIZED OPTIMIZATION
+                mpi_flat_print("Optimizing...")
+                # dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                #                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
+                #                                     responsive_senses=self.policy.input_names)
 
-            self.optimize(dataset, epochs, batch_size // n_optimizers)
-            gc.collect()
+                # self.optimize(dataset, epochs, batch_size // n_optimizers)
+                gc.collect()
 
-            if is_root:
-                time_dict["optimizing"] = time.time() - subprocess_start
+                if is_root:
+                    time_dict["optimizing"] = time.time() - subprocess_start
 
-                mpi_flat_print("Finalizing...")
-                self.total_frames_seen += stats.numb_processed_frames
-                self.total_episodes_seen += stats.numb_completed_episodes
+                    mpi_flat_print("Finalizing...")
+                    # self.total_frames_seen += stats.numb_processed_frames
+                    # self.total_episodes_seen += stats.numb_completed_episodes
 
-                # update monitor logs
-                if monitor is not None:
-                    if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
-                        print("Creating Episode GIFs for current state of policy...")
-                        monitor.create_episode_gif(n=1)
+                    # update monitor logs
+                    if monitor is not None:
+                        if monitor.gif_every != 0 and (self.iteration + 1) % monitor.gif_every == 0:
+                            print("Creating Episode GIFs for current state of policy...")
+                            monitor.create_episode_gif(n=1)
 
-                    if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
-                        monitor.update()
+                        if monitor.frequency != 0 and (self.iteration + 1) % monitor.frequency == 0:
+                            monitor.update()
 
-                # save the current state of the agent
-                if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
-                    self.save_agent_state()
+                    # save the current state of the agent
+                    if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                        self.save_agent_state()
 
-                # calculate processing speed in fps
-                self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
-                self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
-                    time_dict["gathering"])
-                self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
-                self.time_dicts.append(time_dict)
+                    # calculate processing speed in fps
+                    # self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+                    # self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
+                    #     time_dict["gathering"])
+                    # self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
+                    # self.time_dicts.append(time_dict)
 
-            # we have to clear all memory and rebuild networks to avoid leaks
-            joint_weights = self.joint.get_weights()
+                joint_weights = self.joint.get_weights()
 
+                # del dataset
+
+            # cleanup to counteract memory leaks
             del actor_joint
             del self.joint
             del self.value
             del self.policy
-            del dataset
+            del stats
+
             tf.keras.backend.clear_session()
+            tf.compat.v1.reset_default_graph()
             gc.collect()
+
+            mpi_flat_print(f"CPU MEM USAGE: {round(psutil.virtual_memory()[3] / 1e9, 2)}\n")
+
+        # after training rebuild the network so that it is available to the agent
+        self.policy, self.value, self.joint = self.build_models(
+            weights=joint_weights, batch_size=batch_size // n_optimizers, sequence_length=self.tbptt_length
+        )
 
         if is_root:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
-            tf.profiler.experimental.stop()
 
         return self
 
@@ -552,37 +562,58 @@ class PPOAgent:
         # create the Gatherer
         return Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
 
-    def _learn_on_batch(self, batch):
+    @tf.function()
+    def _learn_on_batch(self, batch, joint):
+        """Optimize a given network on the given batch.
+
+        Note:
+            - the model must be given as a parameter because otherwise the tf.function wrapper will permanently
+            associate the network variables with the graph, preventing us from clearing the memory
+
+        Args:
+            batch:      the batch of data to learn on
+            joint:      the network (with both a policy and a value head
+
+        Returns:
+            gradients, mean_entropym , mean_policy_loss, mean_value_loss
+        """
         # optimize policy and value network simultaneously
-        with tf.GradientTape() as tape:
-            state_batch = {fname: f for fname, f in batch.items() if
-                           fname in ["vision", "proprioception", "somatosensation", "goal"]}
-            policy_output, value_output = self.joint(state_batch, training=True)
-            old_values = batch["value"]
-
-            if self.continuous_control:
-                # if action space is continuous, calculate PDF at chosen action value
-                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
-            else:
-                # if the action space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
-
-            # calculate the clipped loss
-            policy_loss = self.policy_loss(action_prob=action_probabilities, old_action_prob=batch["action_prob"],
-                                           advantage=batch["advantage"], mask=batch["mask"])
-            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1), old_values=old_values,
-                                         returns=batch["return"], mask=batch["mask"], clip=self.clip_values)
-            entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
-
-        # calculate the gradient of the joint model based on total loss
-        gradients = tape.gradient(total_loss, self.joint.trainable_variables)
+        # with tf.GradientTape() as tape:
+        #     state_batch = {fname: f for fname, f in batch.items() if
+        #                    fname in ["vision", "proprioception", "somatosensation", "goal"]}
+        #     old_values = batch["value"]
+        #
+        #     policy_output, value_output = joint(state_batch, training=True)
+        #
+        #     if self.continuous_control:
+        #         # if action space is continuous, calculate PDF at chosen action value
+        #         action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
+        #     else:
+        #         # if the action space is discrete, extract the probabilities of actions actually chosen
+        #         action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
+        #
+        #     # calculate the clipped loss
+        #     policy_loss = self.policy_loss(action_prob=action_probabilities,
+        #                                    old_action_prob=batch["action_prob"],
+        #                                    advantage=batch["advantage"],
+        #                                    mask=batch["mask"])
+        #     value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1),
+        #                                  old_values=old_values,
+        #                                  returns=batch["return"],
+        #                                  mask=batch["mask"],
+        #                                  clip=self.clip_values)
+        #     entropy = self.entropy_bonus(policy_output)
+        #     total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+        #
+        # # calculate the gradient of the joint model based on total loss
+        # gradients = tape.gradient(total_loss, joint.trainable_variables)
+        gradients = [tf.random.normal(g.shape) for g in self.joint.trainable_variables]  # TODO remove
 
         # clip gradients to avoid gradient explosion and stabilize learning
-        if self.gradient_clipping is not None:
-            gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
+        # if self.gradient_clipping is not None:
+        #     gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        return gradients, 0, 0, 0  # tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        return gradients, 0,0,0  # tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -602,6 +633,8 @@ class PPOAgent:
         Returns:
             None
         """
+        return None
+
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
             # for each epoch, dataset first should be shuffled to break correlation
@@ -616,9 +649,10 @@ class PPOAgent:
             for b in batched_dataset:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
+
                     if not self.is_recurrent:
-                        _, ent, pi_loss, v_loss = self._learn_on_batch(b)
-                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        grad, ent, pi_loss, v_loss = self._learn_on_batch(b, self.joint)
+                        # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
                         # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
@@ -632,12 +666,20 @@ class PPOAgent:
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
                             # find and apply the gradients
-                            grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch)
-                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                            grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch, self.joint)
+                            # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
-                            reset_mask = detect_finished_episodes(partial_batch["done"])
-                            reset_states_masked(self.joint, reset_mask)
+                            # reset_mask = detect_finished_episodes(partial_batch["done"])
+                            # reset_states_masked(self.joint, reset_mask)
+
+                            del partial_batch
+                            del grad
+
+                            gc.collect()
+
+                        del split_batch
+                        gc.collect()
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -652,6 +694,13 @@ class PPOAgent:
             entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         optimization_comm.Barrier()
+
+        del dataset
+        del batched_dataset
+
+        tf.keras.backend.clear_session()
+        tf.compat.v1.reset_default_graph()
+        gc.collect()
 
         # store statistics in agent history
         self.policy_loss_history.append(statistics.mean(policy_loss_history))
@@ -867,8 +916,7 @@ class PPOAgent:
             os.remove(file)
 
     def build_models(self, weights, batch_size, sequence_length=1):
-        """(Re-)build the models (policy, value, joint) with the same weights but potentially different batch size and
-        sequence length."""
+        """Build the models (policy, value, joint) with the provided weights."""
         policy, value, joint = self.model_builder(
             self.env, self.distribution,
             **({"bs": batch_size} if requires_batch_size(self.model_builder) else {}),
