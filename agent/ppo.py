@@ -440,25 +440,25 @@ class PPOAgent:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
-            # elif MPI.COMM_WORLD.rank == 0 and stats.numb_completed_episodes == 0:
-            #     print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
-            #           "Consider activating separate evaluation in drill() to get meaningful statistics.")
+            elif MPI.COMM_WORLD.rank == 0 and stats.numb_completed_episodes == 0:
+                print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
+                      "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
             if is_optimization_process:
                 # only optimizers go for the rest
 
                 if is_root:
                     # record stats and transformers in the agent
-                    # self.record_wrapper_stats()
-                    # self.record_stats(stats_with_evaluation)
+                    self.record_wrapper_stats()
+                    self.record_stats(stats_with_evaluation)
 
                     time_dict["evaluating"] = time.time() - subprocess_start
                     subprocess_start = time.time()
 
                     # save if best
-                    # if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
-                    #                                                                                               self.cycle_reward_history):
-                    #     self.save_agent_state(name="best")
+                    if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
+                                                                                                                  self.cycle_reward_history):
+                        self.save_agent_state(name="best")
 
                 # early stopping  TODO check how this goes with MPI
                 if self.env.spec.reward_threshold is not None and stop_early:
@@ -469,16 +469,16 @@ class PPOAgent:
                 if is_root:
                     if cycle_start is not None:
                         self.cycle_timings.append(round(time.time() - cycle_start, 2))
-                    # self.report(total_iterations=n)
+                    self.report(total_iterations=n)
                     cycle_start = time.time()
 
                 # PARALLELIZED OPTIMIZATION
                 mpi_flat_print("Optimizing...")
-                # dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                #                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
-                #                                     responsive_senses=self.policy.input_names)
-
-                # self.optimize(dataset, epochs, batch_size // n_optimizers)
+                dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                                                    id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
+                                                    responsive_senses=self.policy.input_names)
+                self.optimize(dataset, epochs, batch_size // n_optimizers)
+                del dataset
                 gc.collect()
 
                 if is_root:
@@ -510,8 +510,6 @@ class PPOAgent:
 
                 joint_weights = self.joint.get_weights()
 
-                # del dataset
-
             # cleanup to counteract memory leaks
             del actor_joint
             del self.joint
@@ -522,8 +520,6 @@ class PPOAgent:
             tf.keras.backend.clear_session()
             tf.compat.v1.reset_default_graph()
             gc.collect()
-
-            mpi_flat_print(f"CPU MEM USAGE: {round(psutil.virtual_memory()[3] / 1e9, 2)}\n")
 
         # after training rebuild the network so that it is available to the agent
         self.policy, self.value, self.joint = self.build_models(
@@ -577,43 +573,41 @@ class PPOAgent:
         Returns:
             gradients, mean_entropym , mean_policy_loss, mean_value_loss
         """
-        # optimize policy and value network simultaneously
-        # with tf.GradientTape() as tape:
-        #     state_batch = {fname: f for fname, f in batch.items() if
-        #                    fname in ["vision", "proprioception", "somatosensation", "goal"]}
-        #     old_values = batch["value"]
-        #
-        #     policy_output, value_output = joint(state_batch, training=True)
-        #
-        #     if self.continuous_control:
-        #         # if action space is continuous, calculate PDF at chosen action value
-        #         action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
-        #     else:
-        #         # if the action space is discrete, extract the probabilities of actions actually chosen
-        #         action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
-        #
-        #     # calculate the clipped loss
-        #     policy_loss = self.policy_loss(action_prob=action_probabilities,
-        #                                    old_action_prob=batch["action_prob"],
-        #                                    advantage=batch["advantage"],
-        #                                    mask=batch["mask"])
-        #     value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1),
-        #                                  old_values=old_values,
-        #                                  returns=batch["return"],
-        #                                  mask=batch["mask"],
-        #                                  clip=self.clip_values)
-        #     entropy = self.entropy_bonus(policy_output)
-        #     total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
-        #
-        # # calculate the gradient of the joint model based on total loss
-        # gradients = tape.gradient(total_loss, joint.trainable_variables)
-        gradients = [tf.random.normal(g.shape) for g in self.joint.trainable_variables]  # TODO remove
+        with tf.GradientTape() as tape:
+            state_batch = {fname: f for fname, f in batch.items() if
+                           fname in ["vision", "proprioception", "somatosensation", "goal"]}
+            old_values = batch["value"]
+
+            policy_output, value_output = joint(state_batch, training=True)
+
+            if self.continuous_control:
+                # if action space is continuous, calculate PDF at chosen action value
+                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
+            else:
+                # if the action space is discrete, extract the probabilities of actions actually chosen
+                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
+
+            # calculate the clipped loss
+            policy_loss = self.policy_loss(action_prob=action_probabilities,
+                                           old_action_prob=batch["action_prob"],
+                                           advantage=batch["advantage"],
+                                           mask=batch["mask"])
+            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1),
+                                         old_values=old_values,
+                                         returns=batch["return"],
+                                         mask=batch["mask"],
+                                         clip=self.clip_values)
+            entropy = self.entropy_bonus(policy_output)
+            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
+
+        # calculate the gradient of the joint model based on total loss
+        gradients = tape.gradient(total_loss, joint.trainable_variables)
 
         # clip gradients to avoid gradient explosion and stabilize learning
-        # if self.gradient_clipping is not None:
-        #     gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
+        if self.gradient_clipping is not None:
+            gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
 
-        return gradients, 0,0,0  # tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
+        return gradients, tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
 
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -633,7 +627,6 @@ class PPOAgent:
         Returns:
             None
         """
-        return None
 
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
@@ -652,7 +645,7 @@ class PPOAgent:
 
                     if not self.is_recurrent:
                         grad, ent, pi_loss, v_loss = self._learn_on_batch(b, self.joint)
-                        # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
                         # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
@@ -667,19 +660,11 @@ class PPOAgent:
 
                             # find and apply the gradients
                             grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch, self.joint)
-                            # self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
-                            # reset_mask = detect_finished_episodes(partial_batch["done"])
-                            # reset_states_masked(self.joint, reset_mask)
-
-                            del partial_batch
-                            del grad
-
-                            gc.collect()
-
-                        del split_batch
-                        gc.collect()
+                            reset_mask = detect_finished_episodes(partial_batch["done"])
+                            reset_states_masked(self.joint, reset_mask)
 
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -806,7 +791,8 @@ class PPOAgent:
                 f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
                 f"{underflow}"
                 f"times: {time_string} {time_distribution_string}; "
-                f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]\n")
+                f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
+                f"mem: {round(psutil.virtual_memory()[3] / 1e9, 2)};\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""

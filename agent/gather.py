@@ -76,10 +76,7 @@ class Gatherer:
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = np.float32(np.random.random(joint.output_shape[0][0])), \
-                         np.float32(np.random.random(joint.output_shape[0][1])), \
-                         np.float32(np.random.random(joint.output_shape[1]))  # TODO REMOVE
-            # policy_out = flatten(joint(prepared_state))
+            policy_out = flatten(joint(prepared_state))
 
             a_distr, value = policy_out[:-1], policy_out[-1]
 
@@ -94,8 +91,8 @@ class Gatherer:
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
             # make a step based on the chosen action and collect the reward for this state
-            # observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
-            observation, reward, done, info = fake_env_step(env)  # TODO REMOVE
+            observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            # observation, reward, done, info = fake_env_step(env)  # TODO REMOVE
             current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
             rewards.append(reward)
 
@@ -245,6 +242,13 @@ def fake_env_step(env: BaseWrapper):
         False,
         {}
     )
+
+
+def fake_joint_output(joint):
+    """Return a random output of a network without calling the network."""
+    return np.float32(np.random.random(joint.output_shape[0][0])), \
+           np.float32(np.random.random(joint.output_shape[0][1])), \
+           np.float32(np.random.random(joint.output_shape[1]))
 
 
 if __name__ == '__main__':
