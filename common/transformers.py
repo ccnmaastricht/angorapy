@@ -62,7 +62,7 @@ class BaseTransformer(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def recover(cls, env_id, serialization_data: list):
+    def recover(cls, env_id, state_dim, n_actions, serialization_data: list):
         """Recover from serialization."""
         pass
 
@@ -123,9 +123,9 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
                                          {n: v.tolist() for n, v in self.variance.items()}])
 
     @classmethod
-    def recover(cls, env_id, data: TransformerSerialization):
+    def recover(cls, env_id, state_dim, n_actions, data: TransformerSerialization):
         """Recover a running mean transformer from its serialization"""
-        transformer = cls(gym.make(env_id))
+        transformer = cls(env_id, state_dim, n_actions)
         transformer.n = np.array(data[0])
         transformer.mean = {name: np.array(l) for name, l in data[1].items()}
         transformer.variance = {name: np.array(l) for name, l in data[1].items()}
@@ -253,10 +253,13 @@ def merge_transformers(transformers: List[BaseTransformer]) -> BaseTransformer:
 def transformers_from_serializations(list_of_serializations: List[TransformerSerialization]) -> List[BaseTransformer]:
     """From a list of TransformerSerializations recover the respective transformers."""
     transformers = []
+    reference_env = gym.make(TransformerSerialization(*list_of_serializations[0]).env_id)  # todo could leak memory
+    state_dim, n_actions = env_extract_dims(reference_env)
+
     for cereal in list_of_serializations:
         cereal = TransformerSerialization(*cereal)
         transformers.append(
-            getattr(sys.modules[__name__], cereal.class_name).recover(cereal.env_id, cereal.data)
+            getattr(sys.modules[__name__], cereal.class_name).recover(cereal.env_id, state_dim, n_actions, cereal.data)
         )
 
     return transformers

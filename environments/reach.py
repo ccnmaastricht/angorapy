@@ -134,10 +134,11 @@ class Reach(BaseShadowHandEnv):
     def _get_obs(self):
         touch = self.sim.data.sensordata[self._touch_sensor_id]
 
-        robot_qpos, robot_qvel = robot_get_obs(self.sim)
-        proprioception = np.concatenate([robot_qpos, robot_qvel])
-
         achieved_goal = self._get_achieved_goal().ravel()
+
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        proprioception = np.concatenate([robot_qpos, robot_qvel, achieved_goal.copy()])  # todo remove achieved goal?
+
 
         return {
             'observation': Sensation(
