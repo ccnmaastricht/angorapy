@@ -173,7 +173,7 @@ class Investigator:
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
-    def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False) -> None:
+    def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False, substeps_per_step=1) -> None:
         """Render an episode in the given environment."""
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()

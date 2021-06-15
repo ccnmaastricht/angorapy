@@ -22,6 +22,8 @@ parser.add_argument("--rcon", type=str, help="reward configuration", default=Non
 
 args = parser.parse_args()
 
+scale_the_substeps = True
+
 if args.state not in ["b", "best"]:
     args.state = int(args.state)
 
@@ -37,12 +39,17 @@ investigator = Investigator.from_agent(agent)
 env = agent.env
 if args.env != "":
     env = make_env(args.env, args.rcon)
+elif scale_the_substeps:
+    parts = env.env.unwrapped.spec.id.split("-")
+    new_name = parts[0] + "Fine" + "-" + parts[1]
+    print(new_name)
+    env = make_env(new_name, args.rcon)
 
 print(f"Evaluating on {env.unwrapped.spec.id}")
 
 if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachRelative-v0"):
     for i in range(100):
-        investigator.render_episode(env, slow_down=False)
+        investigator.render_episode(env, slow_down=False, substeps_per_step=20 if scale_the_substeps else 1)
 else:
     env = gym.make("FreeReachFFRelative-v0")
     for i in range(100):

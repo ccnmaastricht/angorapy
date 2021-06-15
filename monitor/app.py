@@ -175,8 +175,6 @@ def show_experiment(exp_id):
         info.update(dict(
             statistics=stats
         ))
-    else:
-        info.update(dict(statistics={}))
 
     return flask.render_template("experiment.html", info=info)
 
