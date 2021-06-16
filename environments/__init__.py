@@ -32,6 +32,13 @@ gym.envs.register(
     max_episode_steps=100,
 )
 
+gym.envs.register(
+    id='HandReachDenseAbsoluteFine-v1',
+    entry_point='environments:OldShadowHandReach',
+    kwargs={"reward_type": "dense", "n_substeps": 1, "relative_control": False, "success_multiplier": 0.1},
+    max_episode_steps=100,
+)
+
 for step_granularity in ["Fine", ""]:
     for vision_mode in ["Visual", ""]:
         for control_mode in ["Relative", "Absolute"]:

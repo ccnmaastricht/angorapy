@@ -8,8 +8,9 @@ import gym
 
 from agent.ppo_agent import PPOAgent
 from analysis.investigation import Investigator
-from common.const import BASE_SAVE_PATH
+from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 from common.wrappers import make_env
+import tensorflow as tf
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -22,7 +23,7 @@ parser.add_argument("--rcon", type=str, help="reward configuration", default=Non
 
 args = parser.parse_args()
 
-scale_the_substeps = True
+scale_the_substeps = False
 
 if args.state not in ["b", "best"]:
     args.state = int(args.state)
@@ -34,6 +35,12 @@ if args.id is None:
 start = time.time()
 agent = PPOAgent.from_agent_state(args.id, args.state, force_env_name=None if not args.env else args.env)
 print(f"Agent {args.id} successfully loaded.")
+
+try:
+    tf.keras.utils.plot_model(agent.joint, to_file=f"{PATH_TO_EXPERIMENTS}/{args.id}/model.png", expand_nested=True,
+                              show_shapes=True, dpi=300)
+except:
+    print("Could not create model plot.")
 
 investigator = Investigator.from_agent(agent)
 env = agent.env

@@ -25,8 +25,16 @@ def learn_on_batch(batch,
         associate the network variables with the graph, preventing us from clearing the memory
 
     Args:
-        batch:      the batch of data to learn on
-        joint:      the network (with both a policy and a value head
+        batch:                  the batch of data to learn on
+        joint:                  the network (with both a policy and a value head
+        distribution:           the distribution the network predicts
+        continuous_control:     whether the distribution is continuous
+        clip_values:            whether the value function should be clipped
+        clipping_bound:         the bounds of the clipping
+        gradient_clipping:      the clipping bound of the gradients, if None, no clipping is performed
+        c_value:                the weight of the value functions loss
+        c_entropy:              the weight of the entropy regularization
+        is_recurrent:           whether the network is recurrent
 
     Returns:
         gradients, mean_entropym , mean_policy_loss, mean_value_loss
@@ -44,7 +52,7 @@ def learn_on_batch(batch,
             # if the action space is discrete, extract the probabilities of actions actually chosen
             action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
 
-        # calculate the clipped loss
+        # calculate the three loss components
         policy_loss = loss.policy_loss(action_prob=action_probabilities,
                                        old_action_prob=batch["action_prob"],
                                        advantage=batch["advantage"],
@@ -60,6 +68,8 @@ def learn_on_batch(batch,
                                      is_recurrent=is_recurrent)
         entropy = loss.entropy_bonus(policy_output=policy_output,
                                      distribution=distribution)
+
+        # combine weighted losses
         total_loss = policy_loss + tf.multiply(c_value, value_loss) - tf.multiply(c_entropy, entropy)
 
     # calculate the gradient of the joint model based on total loss

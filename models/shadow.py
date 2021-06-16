@@ -28,9 +28,9 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         model_type]
 
     # inputs
-    proprio_in = tf.keras.Input(batch_shape=(bs, sequence_length, 48,), name="proprioception")
-    touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, 92,), name="somatosensation")
-    goal_in = tf.keras.Input(batch_shape=(bs, sequence_length, 15,), name="goal")
+    proprio_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["proprioception"],), name="proprioception")
+    touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["somatosensation"],), name="somatosensation")
+    goal_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["goal"],), name="goal")
     input_list = [proprio_in, touch_in, goal_in]
 
     # concatenation of touch and proprioception

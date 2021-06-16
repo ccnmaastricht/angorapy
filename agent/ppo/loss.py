@@ -51,7 +51,6 @@ def value_loss(value_predictions: tf.Tensor,
       value_predictions (tf.Tensor): value prediction by the current critic network
       old_values (tf.Tensor): value prediction by the old critic network during gathering
       returns (tf.Tensor): discounted return estimation
-      old_action_prob (tf.Tensor): probabilities from old policy, used to determine mask
       clip (object): (Default value = True) value loss can be clipped by same range as policy loss
 
     Returns:
@@ -66,7 +65,7 @@ def value_loss(value_predictions: tf.Tensor,
         error = tf.maximum(clipped_error, error)
 
     if is_recurrent:
-        # build and apply a mask over the old values (recurrent)
+        # apply mask over the old values
         error_masked = tf.where(mask, error, 1)  # masking with tf.where because inf * 0 = nan...
         return (tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))) * 0.5
     else:

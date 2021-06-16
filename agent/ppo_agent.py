@@ -524,16 +524,11 @@ class PPOAgent:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss = _learn_on_batch(batch=b,
-                                                                     joint=self.joint,
-                                                                     distribution=self.distribution,
-                                                                     continuous_control=self.continuous_control,
-                                                                     clip_values=self.clip_values,
-                                                                     gradient_clipping=self.gradient_clipping,
-                                                                     clipping_bound=self.clip,
-                                                                     c_value=self.c_value,
-                                                                     c_entropy=self.c_entropy,
-                                                                     is_recurrent=self.is_recurrent)
+                        grad, ent, pi_loss, v_loss = _learn_on_batch(
+                            batch=b, joint=self.joint, distribution=self.distribution,
+                            continuous_control=self.continuous_control, clip_values=self.clip_values,
+                            gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
+                            c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
                         self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
@@ -548,16 +543,12 @@ class PPOAgent:
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
                             # find and apply the gradients
-                            grad, ent, pi_loss, v_loss = _learn_on_batch(batch=partial_batch,
-                                                                         joint=self.joint,
-                                                                         distribution=self.distribution,
-                                                                         continuous_control=self.continuous_control,
-                                                                         clip_values=self.clip_values,
-                                                                         gradient_clipping=self.gradient_clipping,
-                                                                         clipping_bound=self.clip,
-                                                                         c_value=self.c_value,
-                                                                         c_entropy=self.c_entropy,
-                                                                         is_recurrent=self.is_recurrent)
+                            grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                batch=partial_batch, joint=self.joint, distribution=self.distribution,
+                                continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
+                                c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent
+                            )
                             self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
