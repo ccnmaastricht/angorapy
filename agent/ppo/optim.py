@@ -8,17 +8,16 @@ from common.policies import BasePolicyDistribution
 from common.senses import Sensation
 
 
-@tf.function()
-def _learn_on_batch(batch,
-                    joint: tf.keras.Model,
-                    distribution: BasePolicyDistribution,
-                    continuous_control: bool,
-                    clip_values: bool,
-                    clipping_bound: tf.Tensor,
-                    gradient_clipping: Union[tf.Tensor, None],
-                    c_value: tf.Tensor,
-                    c_entropy: tf.Tensor,
-                    is_recurrent: bool):
+def learn_on_batch(batch,
+                   joint: tf.keras.Model,
+                   distribution: BasePolicyDistribution,
+                   continuous_control: bool,
+                   clip_values: bool,
+                   clipping_bound: tf.Tensor,
+                   gradient_clipping: Union[tf.Tensor, None],
+                   c_value: tf.Tensor,
+                   c_entropy: tf.Tensor,
+                   is_recurrent: bool):
     """Optimize a given network on the given batch.
 
     Note:

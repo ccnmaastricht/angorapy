@@ -22,7 +22,7 @@ from tensorflow.keras.optimizers import Optimizer
 import models
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
-from agent.ppo.optim import _learn_on_batch
+from agent.ppo.optim import learn_on_batch
 from common import policies, const
 from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
 from common.const import MIN_STAT_EPS
@@ -437,6 +437,9 @@ class PPOAgent:
 
                 joint_weights = self.joint.get_weights()
 
+            # if is_optimization_process:
+            #     pprint([cf._garbage_collectors for cf in _learn_on_batch._list_all_concrete_functions()])
+
             # cleanup to counteract memory leaks
             del actor_joint
             del self.joint
@@ -503,6 +506,8 @@ class PPOAgent:
         Returns:
             None
         """
+
+        _learn_on_batch = tf.function(learn_on_batch)
 
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
@@ -587,6 +592,7 @@ class PPOAgent:
 
         del dataset
         del batched_dataset
+        del _learn_on_batch
 
         tf.keras.backend.clear_session()
         tf.compat.v1.reset_default_graph()
