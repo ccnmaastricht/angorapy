@@ -9,7 +9,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from scipy.signal import savgol_filter
 
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 from common.const import QUALITATIVE_COLOR_PALETTE, PATH_TO_EXPERIMENTS
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

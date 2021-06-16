@@ -1,7 +1,7 @@
 """Predefined configurations for different (groups of) environments."""
 
 
-def make_config(batch_size=64, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, debug=False, discount=0.99,
+def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, debug=False, discount=0.99,
                 env='CartPole-v1', epochs=3, eval=False, export_file=None, grad_norm=0.5, horizon=2024,
                 iterations=100, lam=0.97, load_from=None, lr_pi=0.001, clip_values=False, save_every=0,
                 workers=8, tbptt: int = 16, lr_schedule=None, no_state_norming=False, no_reward_norming=False,
@@ -175,7 +175,7 @@ roboschool_beta = derive_config(roboschool, {"distribution": "beta"})
 
 hand = make_config(
     iterations=50000,
-    workers=24,
+    workers=16,
     batch_size=256,
     horizon=512,
     c_entropy=0.001,
@@ -187,18 +187,17 @@ hand = make_config(
     discount=0.998,
     grad_norm=0.5,
     clip_values=False,
+    distribution="beta",
     architecture="shadow",
     model="gru"
 )
+
 
 hand_beta = derive_config(hand, {"distribution": "beta"})
 hand_beta_static_lr = derive_config(hand_beta, {"lr_schedule": None})
 
 hand_beta_no_ent = derive_config(hand_beta, {"c_entropy": 0.0})
 hand_beta_no_ent_static_lr = derive_config(hand_beta_no_ent, {"lr_schedule": None})
-
-hand_shadow = derive_config(hand, {"architecture": "shadow"})
-hand_shadow_beta = derive_config(hand_shadow, {"distribution": "beta"})
 
 # RECOMMENDED CONFIGS FOR ENVs
 

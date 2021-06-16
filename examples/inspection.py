@@ -2,7 +2,7 @@
 """Example script on loading and inspecting an agent."""
 import os
 
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 from analysis.investigation import Investigator
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

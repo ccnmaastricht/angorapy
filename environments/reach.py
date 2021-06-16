@@ -4,7 +4,7 @@ from typing import Union, Callable
 
 import mujoco_py
 import numpy as np
-from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance
+from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance, HandReachEnv
 from gym.envs.robotics.utils import robot_get_obs
 
 from common import reward
@@ -60,7 +60,7 @@ class Reach(BaseShadowHandEnv):
         return np.array(goal).flatten()
 
     def _is_success(self, achieved_goal, desired_goal):
-        d = goal_distance(achieved_goal, desired_goal)
+        d = get_fingertip_distance(achieved_goal, desired_goal)
         return (d < self.distance_threshold).astype(np.float32)
 
     def get_thumb_position(self) -> np.ndarray:
@@ -467,3 +467,27 @@ class FreeReachSequential(FreeReach):
             self.goal = self._sample_goal()
 
         return observation, reward, done, info
+
+
+class OldShadowHandReach(HandReachEnv):
+    """Simpler Reaching task."""
+
+    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
+        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
+        self.success_multiplier = success_multiplier
+
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute reward with additional success bonus."""
+        return super().compute_reward(achieved_goal, goal, info) + info["is_success"] * self.success_multiplier
+
+    def _get_obs(self):
+        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        achieved_goal = self._get_achieved_goal().ravel()
+        observation = np.concatenate([robot_qpos, robot_qvel, achieved_goal, self.goal.copy()])
+
+        return {
+            'observation': observation.copy(),
+            'achieved_goal': achieved_goal.copy(),
+            'desired_goal': self.goal.copy(),
+        }

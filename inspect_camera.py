@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 from environments import *
 
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 from common.wrappers import make_env
 from models import get_model_builder
 

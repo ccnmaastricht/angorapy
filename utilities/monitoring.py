@@ -13,13 +13,14 @@ import simplejson as json
 from gym.spaces import Box
 from matplotlib import animation
 
-from agent.ppo import PPOAgent
-from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from common.wrappers import TransformationWrapper, BaseWrapper
-from models import get_model_type
+from agent.ppo_agent import PPOAgent
 from common import const
 from common.const import PATH_TO_EXPERIMENTS
+from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from common.wrappers import BaseWrapper
+from models import get_model_type
 from utilities.util import add_state_dims, flatten
+import tensorflow as tf
 
 matplotlib.use('Agg')
 
@@ -55,8 +56,11 @@ class Monitor:
             if not os.path.isdir(self.story_directory):
                 raise ValueError("Given ID not found in experiments.")
 
-        # tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
-        #                           show_shapes=True, dpi=300)
+        try:
+            tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
+                                      show_shapes=True, dpi=300)
+        except:
+            print("Could not create model plot.")
 
         self.make_metadata()
         self.write_progress()
@@ -171,7 +175,8 @@ class Monitor:
             training=dict(
                 avg_seconds_per_cycle=str(numpy.mean(self.agent.cycle_timings)) if self.agent.cycle_timings else "N/A",
                 total_train_time=str(numpy.sum(self.agent.cycle_timings)) if self.agent.cycle_timings else "0",
-            )
+            ),
+            used_memory=self.agent.used_memory
         )
 
         with open(f"{self.story_directory}/statistics.json", "w") as f:

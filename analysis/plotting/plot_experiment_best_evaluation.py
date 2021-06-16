@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 
 AGENT_ID = 1582658038
 

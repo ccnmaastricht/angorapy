@@ -20,15 +20,14 @@ from mpi4py import MPI
 from tensorflow.keras.optimizers import Optimizer
 
 import models
-from agent.core import extract_discrete_action_probabilities
 from agent.dataio import read_dataset_from_storage
 from agent.gather import Gatherer
+from agent.ppo.optim import _learn_on_batch
 from common import policies, const
 from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
 from common.const import MIN_STAT_EPS
 from common.mpi_optim import MpiAdam
 from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
-from common.senses import Sensation
 from common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
 from common.validators import validate_env_model_compatibility
 from common.wrappers import BaseWrapper, make_env
@@ -130,7 +129,7 @@ class PPOAgent:
         self.n_workers = workers
         self.discount = discount
         self.learning_rate = learning_rate
-        self.clip = clip
+        self.clip = tf.constant(clip, dtype=tf.float32)
         self.c_entropy = tf.constant(c_entropy, dtype=tf.float32)
         self.c_value = tf.constant(c_value, dtype=tf.float32)
         self.lam = lam
@@ -226,6 +225,7 @@ class PPOAgent:
         self.time_dicts = []
         self.cycle_timings = []
         self.underflow_history = []
+        self.used_memory = []
 
         self.wrapper_stat_history = {}
         for transformer in self.env.transformers:
@@ -250,82 +250,6 @@ class PPOAgent:
         """Set GPU usage mode."""
         self.device = "GPU:0" if activated else "CPU:0"
         pass
-
-    @tf.function
-    def policy_loss(self, action_prob: tf.Tensor, old_action_prob: tf.Tensor, advantage: tf.Tensor,
-                    mask: tf.Tensor) -> tf.Tensor:
-        """Clipped objective as given in the PPO paper. Original objective is to be maximized, but this is the negated
-        objective to be minimized! In the recurrent version a mask is calculated based on 0 values in the
-        old_action_prob tensor. The mask is then applied in the mean operation of the loss.
-
-        Args:
-          action_prob (tf.Tensor): the probability of the action for the state under the current policy
-          old_action_prob (tf.Tensor): the probability of the action taken given by the old policy during the episode
-          advantage (tf.Tensor): the advantage that taking the action gives over the estimated state value
-
-        Returns:
-          the value of the objective function
-
-        """
-        r = tf.exp(action_prob - old_action_prob)
-        clipped = tf.maximum(
-            tf.math.multiply(r, -advantage),
-            tf.math.multiply(tf.clip_by_value(r, 1 - self.clip, 1 + self.clip), -advantage)
-        )
-
-        if self.is_recurrent:
-            # build and apply a mask over the probabilities (recurrent)
-            clipped_masked = tf.where(mask, clipped, 1)
-            return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
-        else:
-            return tf.reduce_mean(clipped)
-
-    @tf.function
-    def value_loss(self, value_predictions: tf.Tensor, old_values: tf.Tensor, returns: tf.Tensor,
-                   mask: tf.Tensor, clip: bool = True) -> tf.Tensor:
-        """Loss of the critic network as squared error between the prediction and the sampled future return. In the
-        recurrent case a mask is calculated based on 0 values in the old_action_prob tensor. This mask is then applied
-        in the mean operation of the loss.
-
-        Args:
-          value_predictions (tf.Tensor): value prediction by the current critic network
-          old_values (tf.Tensor): value prediction by the old critic network during gathering
-          returns (tf.Tensor): discounted return estimation
-          old_action_prob (tf.Tensor): probabilities from old policy, used to determine mask
-          clip (object): (Default value = True) value loss can be clipped by same range as policy loss
-
-        Returns:
-          squared error between prediction and return
-        """
-        error = tf.square(value_predictions - returns)
-
-        if clip:
-            # clips value error to reduce variance
-            clipped_values = old_values + tf.clip_by_value(value_predictions - old_values, -self.clip, self.clip)
-            clipped_error = tf.square(clipped_values - returns)
-            error = tf.maximum(clipped_error, error)
-
-        if self.is_recurrent:
-            # build and apply a mask over the old values (recurrent)
-            error_masked = tf.where(mask, error, 1)  # masking with tf.where because inf * 0 = nan...
-            return (tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))) * 0.5
-        else:
-            return tf.reduce_mean(error) * 0.5
-
-    @tf.function
-    def entropy_bonus(self, policy_output: tf.Tensor) -> tf.Tensor:
-        """Entropy of policy output acting as regularization by preventing dominance of one action. The higher the
-        entropy, the less probability mass lies on a single action, which would hinder exploration. We hence reduce
-        the loss by the (scaled by c_entropy) entropy to encourage a certain degree of exploration.
-
-        Args:
-          policy_output (tf.Tensor): a tensor containing (batches of) probabilities for actions in the case of discrete
-            actions or (batches of) means and standard deviations for continuous control.
-
-        Returns:
-          entropy bonus
-        """
-        return tf.reduce_mean(self.distribution.entropy(policy_output))
 
     def drill(self, n: int, epochs: int, batch_size: int, monitor=None, save_every: int = 0,
               separate_eval: bool = False, stop_early: bool = True, radical_evaluation=False) -> "PPOAgent":
@@ -445,35 +369,34 @@ class PPOAgent:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
+            # RECORD STATS, SAVE MODEL AND REPORT
+            if is_root:
+                self.record_wrapper_stats()
+                self.record_stats(stats_with_evaluation)
+
+                time_dict["evaluating"] = time.time() - subprocess_start
+                subprocess_start = time.time()
+
+                # save if best
+                last_score = self.cycle_reward_history[-1]
+                if last_score is not None and last_score == ignore_none(max, self.cycle_reward_history):
+                    self.save_agent_state(name="best")
+
+                if cycle_start is not None:
+                    self.cycle_timings.append(round(time.time() - cycle_start, 2))
+
+                self.used_memory.append(round(psutil.virtual_memory()[3] / 1e9, 2))
+                self.report(total_iterations=n)
+                cycle_start = time.time()
+
+            # EARLY STOPPING  TODO check how this goes with MPI
+            if self.env.spec.reward_threshold is not None and stop_early:
+                if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
+                    print("\rAll catch a breath, we stop the drill early due to the formidable result!")
+                    break
+
+            # OPTIMIZATION PHASE
             if is_optimization_process:
-                # only optimizers go for the rest
-
-                if is_root:
-                    # record stats and transformers in the agent
-                    self.record_wrapper_stats()
-                    self.record_stats(stats_with_evaluation)
-
-                    time_dict["evaluating"] = time.time() - subprocess_start
-                    subprocess_start = time.time()
-
-                    # save if best
-                    if self.cycle_reward_history[-1] is not None and self.cycle_reward_history[-1] == ignore_none(max,
-                                                                                                                  self.cycle_reward_history):
-                        self.save_agent_state(name="best")
-
-                # early stopping  TODO check how this goes with MPI
-                if self.env.spec.reward_threshold is not None and stop_early:
-                    if np.all(np.greater_equal(self.cycle_reward_history[-5:], self.env.spec.reward_threshold)):
-                        print("\rAll catch a breath, we stop the drill early due to the formidable result!")
-                        break
-
-                if is_root:
-                    if cycle_start is not None:
-                        self.cycle_timings.append(round(time.time() - cycle_start, 2))
-                    self.report(total_iterations=n)
-                    cycle_start = time.time()
-
-                # PARALLELIZED OPTIMIZATION
                 mpi_flat_print("Optimizing...")
                 dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
@@ -483,6 +406,7 @@ class PPOAgent:
                 del dataset
                 gc.collect()
 
+                # FINALIZE
                 if is_root:
                     time_dict["optimizing"] = time.time() - subprocess_start
 
@@ -504,7 +428,8 @@ class PPOAgent:
                         self.save_agent_state()
 
                     # calculate processing speed in fps
-                    self.current_fps = stats.numb_processed_frames / (sum([v for v in time_dict.values() if v is not None]))
+                    self.current_fps = stats.numb_processed_frames / (
+                        sum([v for v in time_dict.values() if v is not None]))
                     self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
                         time_dict["gathering"])
                     self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
@@ -519,9 +444,9 @@ class PPOAgent:
             del self.policy
             del stats
 
-            tf.keras.backend.clear_session()
-            tf.compat.v1.reset_default_graph()
             gc.collect()
+            tf.compat.v1.reset_default_graph()
+            tf.keras.backend.clear_session()
 
         # after training rebuild the network so that it is available to the agent
         self.policy, self.value, self.joint = self.build_models(
@@ -560,57 +485,6 @@ class PPOAgent:
         # create the Gatherer
         return Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
 
-    @tf.function()
-    def _learn_on_batch(self, batch, joint):
-        """Optimize a given network on the given batch.
-
-        Note:
-            - the model must be given as a parameter because otherwise the tf.function wrapper will permanently
-            associate the network variables with the graph, preventing us from clearing the memory
-
-        Args:
-            batch:      the batch of data to learn on
-            joint:      the network (with both a policy and a value head
-
-        Returns:
-            gradients, mean_entropym , mean_policy_loss, mean_value_loss
-        """
-        with tf.GradientTape() as tape:
-            state_batch = {fname: f for fname, f in batch.items() if fname in Sensation.sense_names}
-            old_values = batch["value"]
-
-            policy_output, value_output = joint(state_batch, training=True)
-
-            if self.continuous_control:
-                # if action space is continuous, calculate PDF at chosen action value
-                action_probabilities = self.distribution.log_probability(batch["action"], *policy_output)
-            else:
-                # if the action space is discrete, extract the probabilities of actions actually chosen
-                action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
-
-            # calculate the clipped loss
-            policy_loss = self.policy_loss(action_prob=action_probabilities,
-                                           old_action_prob=batch["action_prob"],
-                                           advantage=batch["advantage"],
-                                           mask=batch["mask"])
-            value_loss = self.value_loss(value_predictions=tf.squeeze(value_output, axis=-1),
-                                         old_values=old_values,
-                                         returns=batch["return"],
-                                         mask=batch["mask"],
-                                         clip=self.clip_values)
-            entropy = self.entropy_bonus(policy_output)
-            total_loss = policy_loss + tf.multiply(self.c_value, value_loss) - tf.multiply(self.c_entropy, entropy)
-
-        # calculate the gradient of the joint model based on total loss
-        gradients = tape.gradient(total_loss, joint.trainable_variables)
-
-        # clip gradients to avoid gradient explosion and stabilize learning
-        if self.gradient_clipping is not None:
-            gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clipping)
-
-        entropy, policy_loss, value_loss = tf.reduce_mean(entropy), tf.reduce_mean(policy_loss), tf.reduce_mean(value_loss)
-        return gradients, entropy, policy_loss, value_loss
-
     def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
         
@@ -645,7 +519,16 @@ class PPOAgent:
                 # use the dataset to optimize the model
                 with tf.device(self.device):
                     if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss = self._learn_on_batch(b, self.joint)
+                        grad, ent, pi_loss, v_loss = _learn_on_batch(batch=b,
+                                                                     joint=self.joint,
+                                                                     distribution=self.distribution,
+                                                                     continuous_control=self.continuous_control,
+                                                                     clip_values=self.clip_values,
+                                                                     gradient_clipping=self.gradient_clipping,
+                                                                     clipping_bound=self.clip,
+                                                                     c_value=self.c_value,
+                                                                     c_entropy=self.c_entropy,
+                                                                     is_recurrent=self.is_recurrent)
                         self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
                     else:
                         # truncated back propagation through time
@@ -660,12 +543,27 @@ class PPOAgent:
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
                             # find and apply the gradients
-                            grad, ent, pi_loss, v_loss = self._learn_on_batch(partial_batch, self.joint)
+                            grad, ent, pi_loss, v_loss = _learn_on_batch(batch=partial_batch,
+                                                                         joint=self.joint,
+                                                                         distribution=self.distribution,
+                                                                         continuous_control=self.continuous_control,
+                                                                         clip_values=self.clip_values,
+                                                                         gradient_clipping=self.gradient_clipping,
+                                                                         clipping_bound=self.clip,
+                                                                         c_value=self.c_value,
+                                                                         c_entropy=self.c_entropy,
+                                                                         is_recurrent=self.is_recurrent)
                             self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["done"])
                             reset_states_masked(self.joint, reset_mask)
+
+                            del grad
+                            del partial_batch
+                            gc.collect()
+                        del split_batch
+                        gc.collect()
 
                 # todo makes no sense with the split batches, need to average over them
                 entropies.append(ent)
@@ -794,7 +692,7 @@ class PPOAgent:
                 f"{underflow}"
                 f"times: {time_string} {time_distribution_string}; "
                 f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
-                f"mem: {round(psutil.virtual_memory()[3] / 1e9, 2)}/{round(psutil.virtual_memory()[0] / 1e9)}GB;\n")
+                f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}GB;\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
@@ -814,6 +712,7 @@ class PPOAgent:
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
+        parameters["clip"] = parameters["clip"].numpy().item()
         parameters["distribution"] = self.distribution.__class__.__name__
         parameters["transformers"] = self.env.serialize()
 

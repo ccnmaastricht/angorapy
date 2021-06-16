@@ -23,16 +23,21 @@ def build_ffn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    if all(x in state_dimensionality.keys() for x in ["proprioception", "somatosensation", "goal"]):
-        proprio = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
-        somato = tf.keras.Input(shape=state_dimensionality["somatosensation"], name="somatosensation")
-        goal = tf.keras.Input(shape=state_dimensionality["goal"], name="goal")
-        input_list = [proprio, somato, goal]
+    input_list = []
+    proprio = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
+    input_list.append(proprio)
 
+    if "somatosensation" in state_dimensionality.keys():
+        somato = tf.keras.Input(shape=state_dimensionality["somatosensation"], name="somatosensation")
+        input_list.append(somato)
+    if "goal" in state_dimensionality.keys():
+        goal = tf.keras.Input(shape=state_dimensionality["goal"], name="goal")
+        input_list.append(goal)
+
+    if len(input_list) > 1:
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
     else:
-        inputs = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
-        input_list = inputs
+        inputs = input_list[0]
 
     # policy network
     latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="policy_encoder")(inputs)

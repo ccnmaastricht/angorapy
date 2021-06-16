@@ -62,7 +62,7 @@ class BasePolicyDistribution(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def log_probability(self, **kwargs):
+    def log_probability(self, *args, **kwargs):
         """Get the logarithmic probability of given sample with given distribution parameters. For continuous
         distributions this is the probability density function.
 
@@ -211,8 +211,9 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         pdf = (tf.exp(-(tf.pow(samples_transformed, 2) / 2)) / tf.sqrt(2 * math.pi)) / stdevs
         return tf.math.reduce_prod(pdf, axis=-1)
 
+    @staticmethod
     @tf.function
-    def log_probability(self, samples: tf.Tensor, means: tf.Tensor, log_stdevs: tf.Tensor):
+    def log_probability(samples: tf.Tensor, means: tf.Tensor, log_stdevs: tf.Tensor):
         """Calculate log probability density for a given batch of potentially joint Gaussian PDF.
 
         Input Shapes:

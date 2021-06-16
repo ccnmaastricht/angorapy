@@ -58,4 +58,4 @@ sequential_free_reach = dict(
 )
 
 if __name__ == '__main__':
-    print(resolve_config_name("free_reach.force_punished"))
+    print(resolve_config_name("reach.default"))

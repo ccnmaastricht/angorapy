@@ -6,7 +6,7 @@ import time
 
 import gym
 
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 from analysis.investigation import Investigator
 from common.const import BASE_SAVE_PATH
 from common.wrappers import make_env

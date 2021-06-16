@@ -191,9 +191,9 @@ class Gatherer:
         del action_probabilities
         del joint
 
+        gc.collect()
         tf.keras.backend.clear_session()
         tf.compat.v1.reset_default_graph()
-        gc.collect()
 
         return stats
 

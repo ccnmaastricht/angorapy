@@ -8,7 +8,7 @@ from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, Half
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
 from environments.nrp.reach import NRPReach
 from environments.nrp.shadowhand import BaseNRPShadowHandEnv
-from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential
+from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
 
 # SHADOW HAND
 gym.envs.register(
@@ -24,6 +24,13 @@ gym.envs.register(
 )
 
 # REACHING
+
+gym.envs.register(
+    id='HandReachDenseAbsolute-v1',
+    entry_point='environments:OldShadowHandReach',
+    kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
+    max_episode_steps=100,
+)
 
 for step_granularity in ["Fine", ""]:
     for vision_mode in ["Visual", ""]:

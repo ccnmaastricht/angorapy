@@ -161,10 +161,9 @@
                 </tbody>
             </table>
 
-
+            {% if "statistics" in info %}
             <h4 align="center" class="sub-title">Training Statistics</h4>
 
-            {% if "statistics" in info %}
                 <table class="table table-striped" title="Training Statistics">
                     <thead>
                     <tr>
@@ -181,6 +180,10 @@
                     {% endfor %}
                     </tbody>
                 </table>
+
+                {% if "used_memory" in info.statistics %}
+                    HERE GOES THE MEMORY PLOT
+                {% endif %}
             {% endif %}
         </div>
     </div>

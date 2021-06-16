@@ -7,7 +7,7 @@ import flask
 from flask import request, Blueprint, send_from_directory
 from flask_jsglue import JSGlue
 
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
 from utilities.statistics import ignore_none
 

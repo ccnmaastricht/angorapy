@@ -9,7 +9,7 @@ import sklearn
 
 from rnn_dynamical_systems.fixedpointfinder.FixedPointFinder import Adamfixedpointfinder
 from rnn_dynamical_systems.fixedpointfinder.plot_utils import plot_fixed_points
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 from analysis.investigation import Investigator
 from common.wrappers_old import CombiWrapper, StateNormalizationWrapper, RewardNormalizationWrapper
 from utilities.util import flatten

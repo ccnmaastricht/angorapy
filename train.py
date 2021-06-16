@@ -19,7 +19,7 @@ from utilities.monitoring import Monitor
 from utilities.util import env_extract_dims
 from common.wrappers import make_env
 from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
-from agent.ppo import PPOAgent
+from agent.ppo_agent import PPOAgent
 
 from environments import *
 
