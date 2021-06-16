@@ -85,7 +85,7 @@ def extract_discrete_action_probabilities(predictions: tf.Tensor, actions: tf.Te
 
         indices = tf.concat((batch_indices, sequence_indices, tf.reshape(actions, [-1, 1])), axis=-1)
 
-        choices = tf.gather_nd(predictions, indices)  #, batch_dims=1)
+        choices = tf.gather_nd(predictions, indices)
         choices = tf.reshape(choices, actions.shape)
 
     return choices

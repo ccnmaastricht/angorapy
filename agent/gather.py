@@ -25,7 +25,6 @@ class Gatherer:
     def __init__(self, worker_id: int, exp_id: int):
         self.worker_id = worker_id
         self.exp_id = exp_id
-        self.iteration = 0
 
     def collect(self, joint: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution, horizon: int, discount: float, lam: float,
                 subseq_length: int, collector_id: int) -> StatBundle:
@@ -40,8 +39,6 @@ class Gatherer:
             subseq_length:  the length of connected subsequences for TBPTT
             collector_id:   the ID of this gathering, different from the worker's ID
         """
-        self.iteration += 1
-
         state: Sensation
 
         is_recurrent = is_recurrent_model(joint)
@@ -197,42 +194,35 @@ class Gatherer:
 
         return stats
 
-    def evaluate(self, policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution) -> \
-            Tuple[int, int, Any]:
-        """Evaluate one episode of the given environment following the given policy. Remote implementation."""
 
-        # reset policy states as it might be recurrent
-        policy.reset_states()
+def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution) -> Tuple[int, int, Any]:
+    """Evaluate one episode of the given environment following the given policy."""
+    policy.reset_states()
+    is_recurrent = is_recurrent_model(policy)
 
-        done = False
-        state = env.reset()
-        cumulative_reward = 0
-        steps = 0
-        while not done:
-            probabilities = flatten(
-                policy(add_state_dims(state, dims=2 if self.is_recurrent else 1)))
+    done = False
+    state = env.reset()
+    cumulative_reward = 0
+    steps = 0
+    while not done:
+        probabilities = flatten(policy(add_state_dims(state, dims=2 if is_recurrent else 1)))
 
-            action, _ = distribution.act(*probabilities)
-            observation, reward, done, _ = env.step(action)
-            cumulative_reward += reward
-            observation = observation
+        action, _ = distribution.act(*probabilities)
+        observation, reward, done, _ = env.step(action)
+        cumulative_reward += reward
+        observation = observation
 
-            state = observation
-            steps += 1
+        state = observation
+        steps += 1
 
-        eps_class = env.unwrapped.current_target_finger if hasattr(env.unwrapped, "current_target_finger") else None
+    eps_class = env.unwrapped.current_target_finger if hasattr(env.unwrapped, "current_target_finger") else None
 
-        return steps, cumulative_reward, eps_class
+    return steps, cumulative_reward, eps_class
 
 
 def fake_env_step(env: BaseWrapper):
-    """Return a random step imitating the given environment wihtout actually stepping the environment.
-
-    For testing purposes."""
-
-    observation = env.observation_space.sample()
-
-    return env.observation(observation), 1, False, {}
+    """Return a random step imitating the given environment without actually stepping the environment."""
+    return env.observation(env.observation_space.sample()), 1, False, {}
 
 
 def fake_joint_output(joint):
@@ -247,5 +237,5 @@ def fake_joint_output(joint):
 
 
 if __name__ == '__main__':
-    env = make_env("ReachAbsoluteVisual-v0")
-    fake_env_step(env)
+    environment = make_env("ReachAbsoluteVisual-v0")
+    fake_env_step(environment)

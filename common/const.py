@@ -3,6 +3,9 @@
 import numpy as np
 
 # MISC
+from matplotlib.colors import ListedColormap
+import seaborn as sns
+
 COLORS = dict(
     HEADER='\033[95m',
     OKBLUE='\033[94m',
@@ -55,3 +58,7 @@ VISION_WH = 100
 # DEBUGGING
 DETERMINISTIC = False
 DEBUG = False
+
+# OTHER STUFF
+COLORMAP = list(ListedColormap(sns.color_palette("deep")).colors)
+COLORMAP_HEX = ['#%02x%02x%02x' % tuple(int(c * 255) for c in color) for color in COLORMAP]

@@ -9,6 +9,7 @@ from flask_jsglue import JSGlue
 
 from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
+from utilities.monitor.training_plots import plot_memory_usage
 from utilities.statistics import ignore_none
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -148,8 +149,8 @@ def show_experiment(exp_id):
     current_index = experiment_paths.index(exp_id)
 
     path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
-    # with open(os.path.join(path, "progress.json"), "r") as f:
-    #     progress = json.load(f)
+    with open(os.path.join(path, "progress.json"), "r") as f:
+        progress = json.load(f)
 
     with open(os.path.join(path, "meta.json"), "r") as f:
         meta = json.load(f)
@@ -167,6 +168,8 @@ def show_experiment(exp_id):
         iterations=meta["iterations"] if "iterations" in meta else None
     )
 
+    plots = {}
+
     stats_path = os.path.join(path, "statistics.json")
     if os.path.isfile(stats_path):
         with open(stats_path, "r") as f:
@@ -175,6 +178,12 @@ def show_experiment(exp_id):
         info.update(dict(
             statistics=stats
         ))
+
+        plots["mem_usage"] = plot_memory_usage(stats["used_memory"])
+
+    info.update(dict(
+        plots=plots
+    ))
 
     return flask.render_template("experiment.html", info=info)
 

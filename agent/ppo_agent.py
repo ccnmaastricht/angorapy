@@ -21,7 +21,7 @@ from tensorflow.keras.optimizers import Optimizer
 
 import models
 from agent.dataio import read_dataset_from_storage
-from agent.gather import Gatherer
+from agent.gather import Gatherer, evaluate
 from agent.ppo.optim import learn_on_batch
 from common import policies, const
 from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
@@ -359,7 +359,7 @@ class PPOAgent:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
                     mpi_flat_print("Evaluating...")
                     n_evaluations = MIN_STAT_EPS if radical_evaluation else MIN_STAT_EPS - stats.numb_completed_episodes
-                    evaluation_stats, _ = self.evaluate(n_evaluations, actor=actor)
+                    evaluation_stats, _ = self.evaluate(n_evaluations)
 
                     if radical_evaluation:
                         stats_with_evaluation = evaluation_stats
@@ -589,24 +589,21 @@ class PPOAgent:
         tf.compat.v1.reset_default_graph()
         gc.collect()
 
-    def evaluate(self, n: int, actor: Gatherer = None, save: bool = False) -> Tuple[StatBundle, Any]:
+    def evaluate(self, n: int, save: bool = False) -> Tuple[StatBundle, Any]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
-            actor (Gatherer): actor object to be used for evaluation
             save (bool): whether to save the evaluation to the monitor directory
 
         Returns:
             StatBundle with evaluation results
         """
-        actor = actor if actor is not None else self._make_actor()
-
         values = mpi_comm.bcast(self.joint.get_weights(), root=0)
         self.joint.set_weights(values)
 
-        evaluation_result = actor.evaluate(self.env, self.distribution)
+        evaluation_result = evaluate(self.policy, self.env, self.distribution)
         gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
         stats, classes = None, None

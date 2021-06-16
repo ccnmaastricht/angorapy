@@ -181,8 +181,9 @@
                     </tbody>
                 </table>
 
-                {% if "used_memory" in info.statistics %}
-                    HERE GOES THE MEMORY PLOT
+                {% if "mem_usage" in info.plots %}
+                    {{ info.plots.mem_usage[0]|safe }}
+                    {{ info.plots.mem_usage[1]|safe }}
                 {% endif %}
             {% endif %}
         </div>

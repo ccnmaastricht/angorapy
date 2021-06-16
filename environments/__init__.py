@@ -6,7 +6,7 @@ from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
-from environments.nrp.reach import NRPReach
+from environments.nrp.reach import NRPShadowHandReach
 from environments.nrp.shadowhand import BaseNRPShadowHandEnv
 from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
 
@@ -103,10 +103,18 @@ for step_granularity in ["Fine", ""]:
 
 gym.envs.register(
     id=f'NRPReachRelativeVisual-v0',
-    entry_point='environments:NRPReach',
+    entry_point='environments:NRPShadowHandReach',
     kwargs={"relative_control": True, "vision": True},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
+
+gym.envs.register(
+    id=f'NRPReachAbsoluteVisual-v0',
+    entry_point='environments:NRPShadowHandReach',
+    kwargs={"relative_control": False, "vision": True},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
+
 
 # MANIPULATE
 
