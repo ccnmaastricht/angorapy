@@ -9,7 +9,7 @@ from flask_jsglue import JSGlue
 
 from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
-from utilities.monitor.training_plots import plot_memory_usage
+from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times
 from utilities.statistics import ignore_none
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -179,7 +179,13 @@ def show_experiment(exp_id):
             statistics=stats
         ))
 
-        plots["mem_usage"] = plot_memory_usage(stats["used_memory"])
+        if "used_memory" in stats:
+            plots["mem_usage"] = plot_memory_usage(stats["used_memory"])
+
+        if "cycle_timings" in stats:
+            plots["timings"] = plot_execution_times(stats["cycle_timings"],
+                                                    stats.get("optimization_timings"),
+                                                    stats.get("gathering_timings"))
 
     info.update(dict(
         plots=plots

@@ -42,11 +42,9 @@ def style_plot(p):
     p.title.text_font_size = "14pt"
     p.title.text_font = "Fira Sans"
 
-    # p.y_range.start = 0
-
 
 def plot_memory_usage(memory_trace: List):
-    print((min(memory_trace), max(memory_trace)))
+    """Plot the development of memory used by the training."""
     x = list(range(len(memory_trace)))
     y = memory_trace
 
@@ -56,7 +54,29 @@ def plot_memory_usage(memory_trace: List):
                y_range=(min(memory_trace), max(memory_trace)),
                **plot_styling)
 
-    p.line(x, y, legend_label="RAM", line_width=2)
+    p.line(x, y, legend_label="RAM", line_width=2, color=palette[0])
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_execution_times(cycle_timings, optimization_timings=None, gathering_timings=None):
+    """Plot the execution times of a full cycle and optionally bot sub phases."""
+    x = list(range(len(cycle_timings)))
+
+    p = figure(title="Execution Times",
+               x_axis_label='Cycle',
+               y_axis_label='Seconds',
+               y_range=(0, max(cycle_timings)),
+               **plot_styling)
+
+    p.line(x, cycle_timings, legend_label="Full Cycle", line_width=2, color=palette[0])
+    if optimization_timings is not None:
+        p.line(x, optimization_timings, legend_label="Optimization Phase", line_width=2, color=palette[1])
+    if gathering_timings is not None:
+        p.line(x, gathering_timings, legend_label="Gathering Phase", line_width=2, color=palette[2])
 
     p.legend.location = "bottom_right"
     style_plot(p)

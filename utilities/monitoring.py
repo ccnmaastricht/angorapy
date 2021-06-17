@@ -176,7 +176,10 @@ class Monitor:
                 avg_seconds_per_cycle=str(numpy.mean(self.agent.cycle_timings)) if self.agent.cycle_timings else "N/A",
                 total_train_time=str(numpy.sum(self.agent.cycle_timings)) if self.agent.cycle_timings else "0",
             ),
-            used_memory=self.agent.used_memory
+            used_memory=self.agent.used_memory,
+            cycle_timings=self.agent.cycle_timings,
+            optimization_timings=self.agent.optimization_timings,
+            gathering_timings=self.agent.gathering_timings,
         )
 
         with open(f"{self.story_directory}/statistics.json", "w") as f:

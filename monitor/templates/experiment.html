@@ -185,6 +185,11 @@
                     {{ info.plots.mem_usage[0]|safe }}
                     {{ info.plots.mem_usage[1]|safe }}
                 {% endif %}
+
+                {% if "timings" in info.plots %}
+                    {{ info.plots.timings[0]|safe }}
+                    {{ info.plots.timings[1]|safe }}
+                {% endif %}
             {% endif %}
         </div>
     </div>

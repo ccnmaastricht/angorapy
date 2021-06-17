@@ -223,8 +223,12 @@ class PPOAgent:
         self.policy_loss_history = []
         self.value_loss_history = []
         self.time_dicts = []
-        self.cycle_timings = []
         self.underflow_history = []
+
+        # training statistics
+        self.cycle_timings = []
+        self.optimization_timings = []
+        self.gathering_timings = []
         self.used_memory = []
 
         self.wrapper_stat_history = {}
@@ -434,6 +438,9 @@ class PPOAgent:
                         time_dict["gathering"])
                     self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
                     self.time_dicts.append(time_dict)
+
+                    self.optimization_timings.append(time_dict["optimizing"])
+                    self.gathering_timings.append(time_dict["gathering"])
 
                 joint_weights = self.joint.get_weights()
 
