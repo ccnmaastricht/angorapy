@@ -1,7 +1,7 @@
 from typing import List
 
 from bokeh import embed, colors
-from bokeh.plotting import figure, show
+from bokeh.plotting import figure
 
 from common.const import COLORMAP
 
@@ -66,10 +66,14 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
     """Plot the execution times of a full cycle and optionally bot sub phases."""
     x = list(range(len(cycle_timings)))
 
+    all_times = (cycle_timings
+                 + (optimization_timings if optimization_timings is not None else [])
+                 + (gathering_timings if gathering_timings is not None else []))
+
     p = figure(title="Execution Times",
                x_axis_label='Cycle',
                y_axis_label='Seconds',
-               y_range=(0, max(cycle_timings)),
+               y_range=(min(all_times), max(all_times)),
                **plot_styling)
 
     p.line(x, cycle_timings, legend_label="Full Cycle", line_width=2, color=palette[0])

@@ -87,8 +87,8 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         model = mujoco_py.load_model_from_path(MODEL_PATH)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
-        self.viewer = None
         self._viewers = {}
+        self.viewer = None
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -170,7 +170,7 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
             self._viewers = {}
 
     def render(self, mode='human', width=500, height=500):
-        self._render_callback()
+        self._render_callback(render_targets=(mode == "human"))
         if mode == 'rgb_array':
             self._get_viewer(mode).render(width, height)
             # window size used for old mujoco-py:
@@ -187,6 +187,7 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
                 self.viewer = mujoco_py.MjViewer(self.sim)
             elif mode == 'rgb_array':
                 self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
+
             self._viewer_setup()
             self._viewers[mode] = self.viewer
         return self.viewer
@@ -243,7 +244,7 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _render_callback(self):
+    def _render_callback(self, render_targets=False):
         """A custom callback that is called before rendering. Can be used to implement custom visualizations."""
         pass
 

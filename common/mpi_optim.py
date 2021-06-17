@@ -1,7 +1,7 @@
 from typing import List, Tuple
-from mpi4py import MPI
 
 import tensorflow as tf
+from mpi4py import MPI
 
 
 class AdamSynchronizationError(Exception):
@@ -17,7 +17,8 @@ class MpiAdam(tf.keras.optimizers.Adam):
 
         ranks = self.comm.gather(MPI.COMM_WORLD.rank)
         if MPI.COMM_WORLD.rank == 0:
-            print(f"An MPI Optimizer with {self.comm.size} ranks has been created; the following ranks optimize: {ranks}")
+            print(
+                f"An MPI Optimizer with {self.comm.size} ranks has been created; the following ranks optimize: {ranks}")
 
     def _sync_parameters(self):
         root_variables = self.comm.bcast(self.weights(), int_root=0)
@@ -25,9 +26,11 @@ class MpiAdam(tf.keras.optimizers.Adam):
 
     def apply_gradients(self, grads_and_vars: List[Tuple[tf.Tensor, tf.Variable]], name=None, **kwargs):
         """ Apply the gradients after averaging over processes."""
-        reduced_grads_and_vars = [(tf.divide(self.comm.allreduce(g, op=MPI.SUM), self.comm.Get_size()), v)
-                                  for g, v in grads_and_vars]
-        super().apply_gradients(reduced_grads_and_vars)
+        if self.comm.size > 1:
+            grads_and_vars = [(tf.divide(self.comm.allreduce(g, op=MPI.SUM), self.comm.Get_size()), v)
+                              for g, v in grads_and_vars]
+
+        super().apply_gradients(grads_and_vars)
 
         # wait for all processes before continueing
         self.comm.Barrier()

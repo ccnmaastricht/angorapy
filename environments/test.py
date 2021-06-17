@@ -4,7 +4,7 @@ from common.wrappers import make_env
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    env = make_env("NRPReachRelativeVisual-v0", transformers=[StateNormalizationTransformer])
+    env = make_env("NRPReachAbsolute-v0", transformers=[StateNormalizationTransformer])
 
     state = env.reset()
     done = False

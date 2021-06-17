@@ -52,7 +52,7 @@ elif scale_the_substeps:
     print(new_name)
     env = make_env(new_name, args.rcon)
 
-print(f"Evaluating on {env.unwrapped.spec.id}")
+print(f"Evaluating on {env.unwrapped.spec.id} with {env.unwrapped.sim.nsubsteps} substeps.")
 
 if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachRelative-v0"):
     for i in range(100):

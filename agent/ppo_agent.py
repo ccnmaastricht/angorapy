@@ -389,7 +389,12 @@ class PPOAgent:
                 if cycle_start is not None:
                     self.cycle_timings.append(round(time.time() - cycle_start, 2))
 
-                self.used_memory.append(round(psutil.virtual_memory()[3] / 1e9, 2))
+                used_memory = 0
+                for pid in psutil.pids():
+                    p = psutil.Process(pid)
+                    if "python" in p.name():
+                        used_memory += p.memory_info()[0]
+                self.used_memory.append(round(used_memory / 1e9, 2))
                 self.report(total_iterations=n)
                 cycle_start = time.time()
 
@@ -407,8 +412,8 @@ class PPOAgent:
                                                     responsive_senses=self.policy.input_names)
                 self.optimize(dataset, epochs, batch_size // n_optimizers)
 
-                del dataset
-                gc.collect()
+                # del dataset
+                # gc.collect()
 
                 # FINALIZE
                 if is_root:

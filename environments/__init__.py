@@ -6,7 +6,7 @@ from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
 from environments.manipulate import ManipulateBlock, ManipulateBlockVector
-from environments.nrp.reach import NRPShadowHandReach
+from environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
 from environments.nrp.shadowhand import BaseNRPShadowHandEnv
 from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
 
@@ -48,7 +48,7 @@ for step_granularity in ["Fine", ""]:
                     entry_point='environments:Reach',
                     kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                             **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                            "n_substeps": 1 if "Fine" else N_SUBSTEPS},
+                            "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                     max_episode_steps=SHADOWHAND_MAX_STEPS,
                 )
 
@@ -57,7 +57,7 @@ for step_granularity in ["Fine", ""]:
                     entry_point='environments:Reach',
                     kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                             **({"initial_qpos": init_mode.lower()} if init_mode else {}), "touch": False,
-                            "n_substeps": 1 if "Fine" else N_SUBSTEPS},
+                            "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                     max_episode_steps=SHADOWHAND_MAX_STEPS,
                 )
 
@@ -66,7 +66,7 @@ for step_granularity in ["Fine", ""]:
                     entry_point='environments:FreeReach',
                     kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                             **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                            "n_substeps": 1 if "Fine" else N_SUBSTEPS},
+                            "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                     max_episode_steps=SHADOWHAND_MAX_STEPS,
                 )
 
@@ -77,7 +77,7 @@ for step_granularity in ["Fine", ""]:
                         kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                                 "force_finger": i,
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                                "n_substeps": 1 if "Fine" else N_SUBSTEPS},
+                                "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                         max_episode_steps=SHADOWHAND_MAX_STEPS,
                     )
 
@@ -88,7 +88,7 @@ for step_granularity in ["Fine", ""]:
                     entry_point='environments:FreeReachSequential',
                     kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                             **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                            "n_substeps": 1 if "Fine" else N_SUBSTEPS},
+                            "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                     max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
                 )
 
@@ -97,21 +97,44 @@ for step_granularity in ["Fine", ""]:
                     entry_point='environments:ReachSequential',
                     kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                             **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                            "n_substeps": 1 if "Fine" else N_SUBSTEPS},
+                            "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                     max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
                 )
 
 gym.envs.register(
     id=f'NRPReachRelativeVisual-v0',
-    entry_point='environments:NRPShadowHandReach',
+    entry_point='environments:NRPShadowHandReachSimple',
     kwargs={"relative_control": True, "vision": True},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
 gym.envs.register(
-    id=f'NRPReachAbsoluteVisual-v0',
+    id=f'NRPHandReachDenseAbsolute-v1',
+    entry_point='environments:NRPShadowHandReachSimple',
+    kwargs={"relative_control": False},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
+
+gym.envs.register(
+    id=f'NRPReachAbsolute-v0',
     entry_point='environments:NRPShadowHandReach',
     kwargs={"relative_control": False, "vision": True},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
+
+
+gym.envs.register(
+    id=f'NRPReachAbsoluteNoTouch-v0',
+    entry_point='environments:NRPShadowHandReach',
+    kwargs={"relative_control": False, "vision": False, "touch": False},
+    max_episode_steps=SHADOWHAND_MAX_STEPS,
+)
+
+
+gym.envs.register(
+    id=f'NRPReachRelative-v0',
+    entry_point='environments:NRPShadowHandReach',
+    kwargs={"relative_control": True, "vision": True},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 

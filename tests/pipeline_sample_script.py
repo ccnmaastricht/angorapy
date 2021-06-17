@@ -3,6 +3,16 @@ import os
 import gym
 import numpy as np
 import tensorflow as tf
+import rospy
+
+from gazebo_msgs.srv import SetJointStates, SpawnEntity, DeleteModel
+from sensor_msgs.msg import Image
+from shadow_hand_contact_sensor.msg import shadow_hand_contact_force
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64
+from std_srvs.srv import Empty
+
+import random, time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -50,6 +60,25 @@ class NRPDummy:
         """
         self.dt = dt
 
+        # Shadow Hand Joint names
+        self.shadow_hand_joint_dic = {
+            "wrist": ["rh_WRJ1", "rh_WRJ0"],
+            "index": ["rh_FFJ3", "rh_FFJ2", "rh_FFJ1", "rh_FFJ0"],
+            "middle": ["rh_MFJ3", "rh_MFJ2", "rh_MFJ1", "rh_MFJ0"],
+            "ring": ["rh_RFJ3", "rh_RFJ2", "rh_RFJ1", "rh_RFJ0"],
+            "pinky": ["rh_LFJ4", "rh_LFJ3", "rh_LFJ2", "rh_LFJ1", "rh_LFJ0"],
+            "thumb": ["rh_THJ4", "rh_THJ3", "rh_THJ2", "rh_THJ1", "rh_THJ0"]
+        }
+
+        # self.finger_control_ros_service = [rospy.ServiceProxy("/shadowhand_motor/" + joint_name + "/set_target", SetJointStates) for finger_name in self.shadow_hand_joint_dic.keys() for joint_name in self.shadow_hand_joint_dic[finger_name]]
+        self.finger_control_ros_service = [
+            rospy.Publisher("/shadowhand_motor/" + joint_name + "/cmd_pos", Float64, queue_size=10) for finger_name in
+            self.shadow_hand_joint_dic.keys() for joint_name in self.shadow_hand_joint_dic[finger_name]]
+
+        self.test_counter = 0
+
+        self.vision = []
+
     def apply_action(self, action: np.ndarray):
         """Dummy method that acts in place of applying an action in the simulation. When we provide an action here, the
         simulation should try to apply this action for the duration of a timestep. AFTER THAT the simulation should
@@ -57,13 +86,65 @@ class NRPDummy:
         gives a motor command that, in the timespan of a single timestep, cannot be achieved, then thats fine. The model
         should then have learned to continue providing the same motor command in future timesteps until the desired
         state is reached or until it desires to give a new target."""
-        pass
+
+        """ Adapted behaviour from Mujoco:
+            The first finger joint 1 and joint 0 are coupled 
+            The middle finger joint 1 and joint 0 are coupled 
+            The ring finger joint 1 and joint 0 are coupled 
+            The little finger joint 1 and joint 0 are coupled 
+
+        'robot0:A_WRJ1', 'robot0:A_WRJ0', 'robot0:A_FFJ3', 'robot0:A_FFJ2', 'robot0:A_FFJ1', 'robot0:A_MFJ3', 'robot0:A_MFJ2', 'robot0:A_MFJ1', 'robot0:A_RFJ3', 'robot0:A_RFJ2', 'robot0:A_RFJ1', 'robot0:A_LFJ4', 'robot0:A_LFJ3', 'robot0:A_LFJ2', 'robot0:A_LFJ1', 'robot0:A_THJ4', 'robot0:A_THJ3', 'robot0:A_THJ2', 'robot0:A_THJ1', 'robot0:A_THJ0'
+       """
+        rate = rospy.Rate(100)
+        action = np.insert(action, 5, action[4])
+        action = np.insert(action, 9, action[8])
+        action = np.insert(action, 13, action[12])
+        action = np.insert(action, 18, action[17])
+
+        # Erdi test starts here
+        # action = np.zeros(24)
+        # action[2:] = np.random.uniform(0, 1.57,size=action[2:].shape)
+        # self.test_counter +=1
+        # print(self.test_counter)
+
+        # if (self.test_counter == 1) :
+        #     action[7] = 0.5
+        # elif (self.test_counter == 2) :
+        #     action[7] = 1.57
+        # elif (self.test_counter ==3):
+        #     action[7] = 0
+        # else:
+        #     print("There is nothing to test counter")
+
+        # Erdi test ends here
+
+        for i, act in enumerate(self.finger_control_ros_service):
+            act.publish(action[i])
+            while (act.get_num_connections() == 0):
+                rate.sleep()
 
     def get_state(self):
         """Dummy method that acts in place of reading the actual data from the NRP."""
-        return {"vision": np.random.normal(size=(200, 200, 3)),
-                "somatosensation": np.random.normal(size=(92,)),  # touch sensor readings
-                "proprioception": np.random.normal(size=(48,)),  # joint positions and velocities
+        # print("Get state")
+        # time.sleep(0.3)
+        # rospy.Subscriber("/shadow_hand/camera/image_raw", Image, self.camera_callback)
+        camera_pixels = rospy.wait_for_message('/shadow_hand/camera/image_raw', Image)
+        self.vision = np.frombuffer(np.array(camera_pixels.data), np.uint8).reshape(200, 200, 3)
+
+        shadow_hand_contact_data = rospy.wait_for_message('/shadow_hand_visual_tag_contact_sensor',
+                                                          shadow_hand_contact_force)
+        touch_sensor_values = np.array([contact_force.z for contact_force in shadow_hand_contact_data.force_array])
+        self.somatosensation = touch_sensor_values
+
+        joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
+
+        joint_pos = np.array(joint_state_data.position[0:-1])
+        joint_vel = np.array(joint_state_data.velocity[0:-1])
+        self.proprioception = np.concatenate((joint_pos, joint_vel), axis=0)
+
+        return {"vision": self.vision,
+                "somatosensation": self.somatosensation,  # touch sensor readings
+                "proprioception": self.proprioception,  # joint positions and velocities
                 }
 
     def set_state(self):
@@ -72,7 +153,12 @@ class NRPDummy:
 
     def reset(self):
         """Dummy method that acts in playe of a full reset of the simulation to initial conditions."""
-        pass
+        # initial_positions = [-0.16514339750464327, -0.31973286565062153,0.14340512546557435,0.32028208333591573,0.7126053607727917,0.6705281001412586,0.000246444303701037,0.3152655251085491,0.7659800313729842,0.7323156897425923,0.00038520700007378114,0.36743546201985233,0.7119514095008576,0.6699446327514138,0.0525442258033891,-0.13615534724474673,0.39872030433433003,0.7415570009679252,0.704096378652974,0.003673823825070126,0.5506291436028695, -0.014515151997119306,-0.0015229223564485414,-0.7894883021600622]
+        # self.apply_action(initial_positions)
+        gazebo_reset_world = rospy.ServiceProxy("/gazebo/reset_world", Empty)
+        gazebo_reset_world()
+        gazebo_reset_sim = rospy.ServiceProxy("/gazebo/reset_sim", Empty)
+        gazebo_reset_sim()
 
 
 # DUMMY ENVIRONMENT
@@ -95,7 +181,7 @@ class NRPEnv(gym.Env):
         return observation
 
     def step(self, action: np.ndarray):
-        print(action.shape)
+        # print(action.shape)
         assert len(action) == 20, "Actions must be 20-dimensional vectors."
 
         # restrict action based on allowed range
@@ -128,9 +214,12 @@ def inject_leading_dims(state):
         if value is None:
             continue
 
-        state[sense] = np.expand_dims(value, axis=(0, 1))
+        state[sense] = np.expand_dims(value, axis=0)
+        state[sense] = np.expand_dims(state[sense], axis=1)
+        # state[sense] = value.reshape(1,1,200,200,3)
 
 
+rospy.init_node('pipe', anonymous=True)
 # THE LOOP
 env = NRPEnv()
 state = env.reset()
@@ -139,5 +228,13 @@ while not done:
     inject_leading_dims(state)
     next_action = np.squeeze(model(state))
     state, _, done, _ = env.step(next_action)
+    print(state['proprioception'].reshape(-1)[11])
 
-    print(state)
+# for i in range(100):
+
+#     inject_leading_dims(state)
+#     next_action = np.squeeze(model(state))
+#     state, _, done, _ = env.step(next_action)
+#     print(state['proprioception'].reshape(-1)[11])
+
+
