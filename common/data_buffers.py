@@ -36,6 +36,8 @@ class ExperienceBuffer:
         self.capacity = capacity
         self.filled = 0
 
+        self.seq_length = 1
+
     def __repr__(self):
         return f"{self.__class__.__name__}[{self.filled}/{self.capacity}]"
 

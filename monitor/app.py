@@ -3,6 +3,9 @@ import os
 import re
 import shutil
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 import flask
 from flask import request, Blueprint, send_from_directory
 from flask_jsglue import JSGlue
@@ -12,8 +15,6 @@ from common.const import PATH_TO_EXPERIMENTS
 from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times
 from utilities.statistics import ignore_none
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 agents = Blueprint("agents", __name__, static_folder="../storage/saved_models/states")
 exps = Blueprint("exps", __name__, static_folder="../storage/experiments")

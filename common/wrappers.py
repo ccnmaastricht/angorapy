@@ -1,5 +1,6 @@
 """Wrappers encapsulating environments to modulate n_steps, rewards, and control state initialization."""
 import abc
+from pprint import pprint
 from typing import Union, List, Type, OrderedDict
 
 import gym
@@ -83,9 +84,9 @@ class TransformationWrapper(BaseWrapper):
             for transformer in self.transformers:
                 o, r, done, i = transformer.transform(step_tuple)
 
-            # include original reward in info
-            i["original_reward"] = step_tuple[1]
-            step_tuple = o, r, done, i
+                # include original reward in info
+                i["original_reward"] = step_tuple[1]
+                step_tuple = o, r, done, i
 
         return step_tuple
 
