@@ -80,13 +80,12 @@ class TransformationWrapper(BaseWrapper):
     def step(self, action):
         """PErform a step and transform the results."""
         step_tuple = super().step(action)
+        # include original reward in info
+        step_tuple[-1]["original_reward"] = step_tuple[1]
+
         if len(self.transformers) != 0:
             for transformer in self.transformers:
-                o, r, done, i = transformer.transform(step_tuple)
-
-                # include original reward in info
-                i["original_reward"] = step_tuple[1]
-                step_tuple = o, r, done, i
+                step_tuple = transformer.transform(step_tuple, update=True)
 
         return step_tuple
 

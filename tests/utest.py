@@ -1,4 +1,9 @@
 import os
+
+from common.wrappers import make_env
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import random
 import unittest
 
@@ -10,10 +15,11 @@ from scipy.stats import norm, entropy, beta
 from agent.core import extract_discrete_action_probabilities
 from common.policies import GaussianPolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
 from common.const import NP_FLOAT_PREC
+from common.senses import Sensation
+from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer, merge_transformers
 from utilities.model_utils import reset_states_masked
-from common.wrappers_old import StateNormalizationWrapper, RewardNormalizationWrapper
+from utilities.util import env_extract_dims
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class CoreTest(unittest.TestCase):
@@ -147,61 +153,77 @@ class UtilTest(unittest.TestCase):
 class WrapperTest(unittest.TestCase):
 
     def test_state_normalization(self):
-        normalizer = StateNormalizationWrapper(10)
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 
-        inputs = [tf.random.normal([10]) for _ in range(15)]
+        inputs = [env.observation_space.sample() for _ in range(15)]
         true_mean = np.mean(inputs, axis=0)
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
-            o, _, _, _ = normalizer.modulate((sample, 1, 1, 1))
+            o, _, _, _ = normalizer.transform((Sensation(proprioception=sample), 1.0, False, {}))
 
-        self.assertTrue(np.allclose(true_mean, normalizer.mean))
-        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))
+        self.assertTrue(np.allclose(true_mean, normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["proprioception"])))
 
     def test_reward_normalization(self):
-        normalizer = RewardNormalizationWrapper()
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
 
         inputs = [random.random() * 10 for _ in range(1000)]
         true_mean = np.mean(inputs, axis=0)
         true_std = np.std(inputs, axis=0)
 
         for sample in inputs:
-            o, _, _, _ = normalizer.modulate((1, sample, 1, 1))
+            o, _, _, _ = normalizer.transform((1, sample, 1, 1))
 
-        self.assertTrue(np.allclose(true_mean, normalizer.mean))
-        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance)))
+        self.assertTrue(np.allclose(true_mean, normalizer.mean["reward"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["reward"])))
 
     def test_state_normalization_adding(self):
-        normalizer_a = StateNormalizationWrapper(10)
-        normalizer_b = StateNormalizationWrapper(10)
-        normalizer_c = StateNormalizationWrapper(10)
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer_a = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_b = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_c = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 
-        inputs_a = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
-        inputs_b = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
-        inputs_c = [tf.random.normal([10], dtype=NP_FLOAT_PREC) for _ in range(10)]
+        inputs_a = [env.observation_space.sample() for _ in range(100)]
+        inputs_b = [env.observation_space.sample() for _ in range(100)]
+        inputs_c = [env.observation_space.sample() for _ in range(100)]
 
         true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
         true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
 
         for sample in inputs_a:
-            normalizer_a.update(sample)
+            normalizer_a.update({"proprioception": sample})
 
         for sample in inputs_b:
-            normalizer_b.update(sample)
+            normalizer_b.update({"proprioception": sample})
 
         for sample in inputs_c:
-            normalizer_c.update(sample)
+            normalizer_c.update({"proprioception": sample})
 
         combined_normalizer = normalizer_a + normalizer_b + normalizer_c
+        merged_normalizer = merge_transformers([normalizer_a, normalizer_b, normalizer_c])
 
-        self.assertTrue(np.allclose(true_mean, combined_normalizer.mean))
-        self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance)))
+        # print(normalizer_a.mean["proprioception"])
+        # print(normalizer_b.mean["proprioception"])
+        # print(normalizer_c.mean["proprioception"])
+        # print(true_mean)
+        # print(combined_normalizer.mean["proprioception"])
+
+        self.assertTrue(np.allclose(true_mean, combined_normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_mean, merged_normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance["proprioception"])))
 
     def test_reward_normalization_adding(self):
-        normalizer_a = RewardNormalizationWrapper()
-        normalizer_b = RewardNormalizationWrapper()
-        normalizer_c = RewardNormalizationWrapper()
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer_a = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_b = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_c = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
 
         inputs_a = [random.random() * 10 for _ in range(1000)]
         inputs_b = [random.random() * 20 for _ in range(1000)]
@@ -211,18 +233,18 @@ class WrapperTest(unittest.TestCase):
         true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
 
         for sample in inputs_a:
-            normalizer_a.update(sample)
+            normalizer_a.update({"reward": sample})
 
         for sample in inputs_b:
-            normalizer_b.update(sample)
+            normalizer_b.update({"reward": sample})
 
         for sample in inputs_c:
-            normalizer_c.update(sample)
+            normalizer_c.update({"reward": sample})
 
         combined_normalizer = normalizer_a + normalizer_b + normalizer_c
 
-        self.assertTrue(np.allclose(true_mean, combined_normalizer.mean))
-        self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance)))
+        self.assertTrue(np.allclose(true_mean, combined_normalizer.mean["reward"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance["reward"])))
 
 
 if __name__ == '__main__':

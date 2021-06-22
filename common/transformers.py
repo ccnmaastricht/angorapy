@@ -92,7 +92,7 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
         nt = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
         nt.n = self.n + other.n
 
-        for name in self.mean.keys():
+        for name in nt.mean.keys():
             nt.mean[name] = (self.n / nt.n) * self.mean[name] + (other.n / nt.n) * other.mean[name]
             nt.variance[name] = (self.n * (self.variance[name] + (self.mean[name] - nt.mean[name]) ** 2)
                                  + other.n * (other.variance[name] + (other.mean[name] - nt.mean[name]) ** 2)) / nt.n
@@ -170,7 +170,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
         normed_o = {}
         # for sense_name, sense_value in filter(lambda a: len(a[1].shape) == 1, o.dict().items()):
         for sense_name, sense_value in o.dict().items():
-            if len(sense_value[1].shape) == 1:
+            if len(sense_value.shape) == 1:
                 normed_o[sense_name] = np.clip(
                     (sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
             else:
@@ -183,6 +183,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
     def warmup(self, env: "BaseWrapper", n_steps=10):
         """Warmup the transformer by sampling the observation space."""
+        return  # todo we cannot do this like this, the update will be based on a transformed input this way
         env.reset()
         for i in range(n_steps):
             self.update(env.step(env.action_space.sample())[0].dict())

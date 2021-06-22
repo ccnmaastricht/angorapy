@@ -17,6 +17,7 @@ import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box
 from mpi4py import MPI
+from psutil import NoSuchProcess
 from tensorflow.keras.optimizers import Optimizer
 
 import models
@@ -391,9 +392,12 @@ class PPOAgent:
 
                 used_memory = 0
                 for pid in psutil.pids():
-                    p = psutil.Process(pid)
-                    if "python" in p.name():
-                        used_memory += p.memory_info()[0]
+                    try:
+                        p = psutil.Process(pid)
+                        if "python" in p.name():
+                            used_memory += p.memory_info()[0]
+                    except NoSuchProcess:
+                        pass
                 self.used_memory.append(round(used_memory / 1e9, 2))
                 self.report(total_iterations=n)
                 cycle_start = time.time()
