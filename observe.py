@@ -2,9 +2,12 @@
 """Evaluate a loaded agent on a task."""
 import argparse
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import time
 
 import gym
+import numpy as np
 
 from agent.ppo_agent import PPOAgent
 from analysis.investigation import Investigator
@@ -12,7 +15,6 @@ from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 from common.wrappers import make_env
 import tensorflow as tf
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=None)
@@ -44,15 +46,18 @@ except:
 
 investigator = Investigator.from_agent(agent)
 env = agent.env
-if args.env != "":
-    env = make_env(args.env, args.rcon)
-elif scale_the_substeps:
-    parts = env.env.unwrapped.spec.id.split("-")
-    new_name = parts[0] + "Fine" + "-" + parts[1]
-    print(new_name)
-    env = make_env(new_name, args.rcon)
 
 print(f"Evaluating on {env.unwrapped.spec.id} with {env.unwrapped.sim.nsubsteps} substeps.")
+print(f"Environment has the following transformers: {env.transformers}")
+
+# if args.env != "":
+#     env = make_env(args.env, args.rcon)
+# elif scale_the_substeps:
+#     parts = env.env.unwrapped.spec.id.split("-")
+#     new_name = parts[0] + "Fine" + "-" + parts[1]
+#     print(new_name)
+#     env = make_env(new_name, args.rcon)
+
 
 if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachRelative-v0"):
     for i in range(100):

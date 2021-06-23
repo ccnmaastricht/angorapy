@@ -128,7 +128,7 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
         transformer = cls(env_id, state_dim, n_actions)
         transformer.n = np.array(data[0])
         transformer.mean = {name: np.array(l) for name, l in data[1].items()}
-        transformer.variance = {name: np.array(l) for name, l in data[1].items()}
+        transformer.variance = {name: np.array(l) for name, l in data[2].items()}
 
         return transformer
 
