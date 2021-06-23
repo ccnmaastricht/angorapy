@@ -1,8 +1,8 @@
 #!/bin/bash -l
 #SBATCH --job-name="dexterity"
 #SBATCH --account="ich020"
-#SBATCH --time=24:00:00
-#SBATCH --nodes=2
+#SBATCH --time=12:00:00
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=12
 #SBATCH --cpus-per-task=1
