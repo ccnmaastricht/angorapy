@@ -77,12 +77,26 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
-    def __init__(self, model_builder: Callable, environment: BaseWrapper, horizon: int, workers: int,
-                 learning_rate: float = 0.001, discount: float = 0.99, lam: float = 0.95, clip: float = 0.2,
-                 c_entropy: float = 0.01, c_value: float = 0.5, gradient_clipping: float = None,
-                 clip_values: bool = True, tbptt_length: int = 16, lr_schedule: str = None,
-                 distribution: BasePolicyDistribution = None, reward_configuration: str = None, _make_dirs=True,
-                 debug: bool = False, pretrained_components: list = None):
+    def __init__(self,
+                 model_builder: Callable,
+                 environment: BaseWrapper,
+                 horizon: int,
+                 workers: int,
+                 learning_rate: float = 0.001,
+                 discount: float = 0.99,
+                 lam: float = 0.95,
+                 clip: float = 0.2,
+                 c_entropy: float = 0.01,
+                 c_value: float = 0.5,
+                 gradient_clipping: float = None,
+                 clip_values: bool = True,
+                 tbptt_length: int = 16,
+                 lr_schedule: str = None,
+                 distribution: BasePolicyDistribution = None,
+                 reward_configuration: str = None,
+                 _make_dirs=True,
+                 debug: bool = False,
+                 pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Args:
@@ -256,8 +270,15 @@ class PPOAgent:
         self.device = "GPU:0" if activated else "CPU:0"
         pass
 
-    def drill(self, n: int, epochs: int, batch_size: int, monitor=None, save_every: int = 0,
-              separate_eval: bool = False, stop_early: bool = True, radical_evaluation=False) -> "PPOAgent":
+    def drill(self,
+              n: int,
+              epochs: int,
+              batch_size: int,
+              monitor=None,
+              save_every: int = 0,
+              separate_eval: bool = False,
+              stop_early: bool = True,
+              radical_evaluation=False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -380,7 +401,6 @@ class PPOAgent:
                 self.record_stats(stats_with_evaluation)
 
                 time_dict["evaluating"] = time.time() - subprocess_start
-                subprocess_start = time.time()
 
                 # save if best
                 last_score = self.cycle_reward_history[-1]
@@ -410,19 +430,18 @@ class PPOAgent:
 
             # OPTIMIZATION PHASE
             if is_optimization_process:
+                subprocess_start = time.time()
+
                 mpi_flat_print("Optimizing...")
                 dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
                                                     responsive_senses=self.policy.input_names)
                 self.optimize(dataset, epochs, batch_size // n_optimizers)
 
-                # del dataset
-                # gc.collect()
+                time_dict["optimizing"] = time.time() - subprocess_start
 
                 # FINALIZE
                 if is_root:
-                    time_dict["optimizing"] = time.time() - subprocess_start
-
                     mpi_flat_print("Finalizing...")
                     self.total_frames_seen += stats.numb_processed_frames
                     self.total_episodes_seen += stats.numb_completed_episodes
@@ -452,9 +471,6 @@ class PPOAgent:
                     self.gathering_timings.append(time_dict["gathering"])
 
                 joint_weights = self.joint.get_weights()
-
-            # if is_optimization_process:
-            #     pprint([cf._garbage_collectors for cf in _learn_on_batch._list_all_concrete_functions()])
 
             # cleanup to counteract memory leaks
             del actor_joint
@@ -563,8 +579,7 @@ class PPOAgent:
                                 batch=partial_batch, joint=self.joint, distribution=self.distribution,
                                 continuous_control=self.continuous_control, clip_values=self.clip_values,
                                 gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
-                                c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent
-                            )
+                                c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
                             self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
 
                             # make partial RNN state resets
