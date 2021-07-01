@@ -179,7 +179,7 @@ class NRPEnv(gym.Env):
         observation = self._get_obs()
         reward = np.random.normal(0, 1)
         done = False
-        info = None
+        info = {}
 
         return observation, reward, done, info
 
@@ -200,7 +200,7 @@ state = env.reset()
 done = False
 while not done:
     state.inject_leading_dims(time=True)
-    probabilities = np.squeeze(model(state.dict()))
+    probabilities = np.squeeze(model(state.dict(), training=False))
     action = agent.distribution.act_deterministic(*probabilities)
 
     state, _, done, _ = env.step(action)
