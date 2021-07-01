@@ -14,33 +14,20 @@ from std_srvs.srv import Empty
 
 import random, time
 
+from agent.ppo_agent import PPOAgent
+from common.wrappers import TransformationWrapper
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 gpus = tf.config.experimental.list_physical_devices("GPU")
 
 if gpus:
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
+
 # BUILD DUMMY MODEL
-# inputs
-proprio_in = tf.keras.Input(batch_shape=(1, 1, 48,), name="proprioception")
-touch_in = tf.keras.Input(batch_shape=(1, 1, 92,), name="somatosensation")
-vision_in = tf.keras.Input(batch_shape=(1, 1, 200, 200, 3,), name="vision")
-goal_in = tf.keras.Input(batch_shape=(1, 1, 15,), name="goal")
-
-# dummy CNN
-vmodel = tf.keras.Sequential([
-    tf.keras.layers.Conv2D(16, 3, 6),
-    tf.keras.layers.Conv2D(16, 3, 6),
-    tf.keras.layers.Flatten(),
-])
-
-vx = tf.keras.layers.TimeDistributed(vmodel)(vision_in)
-
-# concatenate and condense
-x = tf.keras.layers.Concatenate()([vx, proprio_in, touch_in, goal_in])
-x = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(20, activation=None))(x)
-
-model = tf.keras.Model(inputs=[proprio_in, touch_in, vision_in, goal_in], outputs=[x])
+agent = PPOAgent.from_agent_state(1624884304, "best")
+print(f"Agent {agent.agent_id} successfully loaded.")
+model = agent.policy
 
 
 # SIMULATION DUMMY
@@ -145,7 +132,7 @@ class NRPDummy:
         return {"vision": self.vision,
                 "somatosensation": self.somatosensation,  # touch sensor readings
                 "proprioception": self.proprioception,  # joint positions and velocities
-                }
+        }
 
     def set_state(self):
         """Dummy method to set the state of the simulation (hand position, velocities, etc.)"""
@@ -220,15 +207,15 @@ def inject_leading_dims(state):
 
 
 rospy.init_node('pipe', anonymous=True)
+
 # THE LOOP
-env = NRPEnv()
+env = TransformationWrapper(NRPEnv(), transformers=agent.env.transformers)
 state = env.reset()
 done = False
 while not done:
     inject_leading_dims(state)
     next_action = np.squeeze(model(state))
     state, _, done, _ = env.step(next_action)
-    print(state['proprioception'].reshape(-1)[11])
 
 # for i in range(100):
 
