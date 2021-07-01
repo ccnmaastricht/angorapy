@@ -191,18 +191,6 @@ class NRPEnv(gym.Env):
         pass
 
 
-# HELPER METHODS
-def inject_leading_dims(state):
-    """Expand state (inplace) to have a batch and time dimension."""
-    for sense, value in state.items():
-        if value is None:
-            continue
-
-        state[sense] = np.expand_dims(value, axis=0)
-        state[sense] = np.expand_dims(state[sense], axis=1)
-        # state[sense] = value.reshape(1,1,200,200,3)
-
-
 rospy.init_node('pipe', anonymous=True)
 
 # THE LOOP
@@ -210,7 +198,7 @@ env = TransformationWrapper(NRPEnv(), transformers=agent.env.transformers)
 state = env.reset()
 done = False
 while not done:
-    inject_leading_dims(state)
+    state.inject_leading_dims(time=True)
     next_action = np.squeeze(model(state))
     state, _, done, _ = env.step(next_action)
 
