@@ -123,7 +123,7 @@ class NRPDummy:
 
         joint_pos = np.array(joint_state_data.position[0:-1])
         joint_vel = np.array(joint_state_data.velocity[0:-1])
-        fingertip_position = np.random.randn((15,))
+        fingertip_position = np.random.randn(15)
         proprioception = np.concatenate((joint_pos, joint_vel, fingertip_position), axis=0)
 
         return {"observation": Sensation(**{
