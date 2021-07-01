@@ -575,6 +575,7 @@ class PPOAgent:
                             partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
 
                             # find and apply the gradients
+                            # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape) for v in self.joint.trainable_variables], 0, 0, 0
                             grad, ent, pi_loss, v_loss = _learn_on_batch(
                                 batch=partial_batch, joint=self.joint, distribution=self.distribution,
                                 continuous_control=self.continuous_control, clip_values=self.clip_values,
