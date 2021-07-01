@@ -2,17 +2,13 @@ import os
 
 import gym
 import numpy as np
-import tensorflow as tf
 import rospy
-
-from gazebo_msgs.srv import SetJointStates, SpawnEntity, DeleteModel
+import tensorflow as tf
 from sensor_msgs.msg import Image
-from shadow_hand_contact_sensor.msg import shadow_hand_contact_force
 from sensor_msgs.msg import JointState
+from shadow_hand_contact_sensor.msg import shadow_hand_contact_force
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty
-
-import random, time
 
 from agent.ppo_agent import PPOAgent
 from common.wrappers import TransformationWrapper
@@ -22,7 +18,6 @@ gpus = tf.config.experimental.list_physical_devices("GPU")
 
 if gpus:
     tf.config.experimental.set_memory_growth(gpus[0], True)
-
 
 # BUILD DUMMY MODEL
 agent = PPOAgent.from_agent_state(1624884304, "best")
@@ -129,10 +124,11 @@ class NRPDummy:
         joint_vel = np.array(joint_state_data.velocity[0:-1])
         self.proprioception = np.concatenate((joint_pos, joint_vel), axis=0)
 
-        return {"vision": self.vision,
-                "somatosensation": self.somatosensation,  # touch sensor readings
-                "proprioception": self.proprioception,  # joint positions and velocities
-        }
+        return {"observation": {
+            "vision": self.vision,
+            "somatosensation": self.somatosensation,  # touch sensor readings
+            "proprioception": self.proprioception,  # joint positions and velocities
+        }}
 
     def set_state(self):
         """Dummy method to set the state of the simulation (hand position, velocities, etc.)"""
@@ -223,5 +219,3 @@ while not done:
 #     next_action = np.squeeze(model(state))
 #     state, _, done, _ = env.step(next_action)
 #     print(state['proprioception'].reshape(-1)[11])
-
-
