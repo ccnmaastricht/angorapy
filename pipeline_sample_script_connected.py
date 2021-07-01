@@ -23,7 +23,7 @@ if gpus:
 # BUILD DUMMY MODEL
 agent = PPOAgent.from_agent_state(1624884304, "best")
 print(f"Agent {agent.agent_id} successfully loaded.")
-model = agent.policy
+model, _, _ = agent.build_models(agent.joint.get_weights(), batch_size=1, sequence_length=1)
 
 
 # SIMULATION DUMMY
