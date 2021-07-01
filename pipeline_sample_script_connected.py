@@ -126,7 +126,7 @@ class NRPDummy:
         self.proprioception = np.concatenate((joint_pos, joint_vel), axis=0)
 
         return {"observation": Sensation(**{
-            "vision": self.vision,
+            "vision": None,
             "somatosensation": self.somatosensation,  # touch sensor readings
             "proprioception": self.proprioception,  # joint positions and velocities
         })}
