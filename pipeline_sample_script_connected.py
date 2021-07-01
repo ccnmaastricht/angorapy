@@ -160,7 +160,7 @@ class NRPEnv(gym.Env):
         sim_state = self.sim.get_state()
 
         observation = sim_state.copy()
-        observation["goal"] = self.goal
+        observation["observation"]["goal"] = self.goal
 
         return observation
 
