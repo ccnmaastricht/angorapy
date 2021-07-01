@@ -11,6 +11,7 @@ from std_msgs.msg import Float64
 from std_srvs.srv import Empty
 
 from agent.ppo_agent import PPOAgent
+from common.senses import Sensation
 from common.wrappers import TransformationWrapper
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -124,11 +125,11 @@ class NRPDummy:
         joint_vel = np.array(joint_state_data.velocity[0:-1])
         self.proprioception = np.concatenate((joint_pos, joint_vel), axis=0)
 
-        return {"observation": {
+        return {"observation": Sensation(**{
             "vision": self.vision,
             "somatosensation": self.somatosensation,  # touch sensor readings
             "proprioception": self.proprioception,  # joint positions and velocities
-        }}
+        })}
 
     def set_state(self):
         """Dummy method to set the state of the simulation (hand position, velocities, etc.)"""
