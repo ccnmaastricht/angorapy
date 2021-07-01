@@ -200,8 +200,10 @@ state = env.reset()
 done = False
 while not done:
     state.inject_leading_dims(time=True)
-    next_action = np.squeeze(model(state.dict()))
-    state, _, done, _ = env.step(next_action)
+    probabilities = np.squeeze(model(state.dict()))
+    action = agent.distribution.act_deterministic(*probabilities)
+
+    state, _, done, _ = env.step(action)
 
 # for i in range(100):
 
