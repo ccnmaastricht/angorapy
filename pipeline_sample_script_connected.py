@@ -199,7 +199,7 @@ state = env.reset()
 done = False
 while not done:
     state.inject_leading_dims(time=True)
-    next_action = np.squeeze(model(state))
+    next_action = np.squeeze(model(state.dict()))
     state, _, done, _ = env.step(next_action)
 
 # for i in range(100):
