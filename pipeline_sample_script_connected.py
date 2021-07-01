@@ -112,23 +112,24 @@ class NRPDummy:
         # time.sleep(0.3)
         # rospy.Subscriber("/shadow_hand/camera/image_raw", Image, self.camera_callback)
         camera_pixels = rospy.wait_for_message('/shadow_hand/camera/image_raw', Image)
-        self.vision = np.frombuffer(np.array(camera_pixels.data), np.uint8).reshape(200, 200, 3)
+        vision = np.frombuffer(np.array(camera_pixels.data), np.uint8).reshape(200, 200, 3)
 
         shadow_hand_contact_data = rospy.wait_for_message('/shadow_hand_visual_tag_contact_sensor',
                                                           shadow_hand_contact_force)
         touch_sensor_values = np.array([contact_force.z for contact_force in shadow_hand_contact_data.force_array])
-        self.somatosensation = touch_sensor_values
+        somatosensation = touch_sensor_values
 
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
 
         joint_pos = np.array(joint_state_data.position[0:-1])
         joint_vel = np.array(joint_state_data.velocity[0:-1])
-        self.proprioception = np.concatenate((joint_pos, joint_vel), axis=0)
+        fingertip_position = np.random.randn((15,))
+        proprioception = np.concatenate((joint_pos, joint_vel, fingertip_position), axis=0)
 
         return {"observation": Sensation(**{
             "vision": None,
-            "somatosensation": self.somatosensation,  # touch sensor readings
-            "proprioception": self.proprioception,  # joint positions and velocities
+            "somatosensation": somatosensation,  # touch sensor readings
+            "proprioception": proprioception,  # joint positions and velocities
         })}
 
     def set_state(self):
