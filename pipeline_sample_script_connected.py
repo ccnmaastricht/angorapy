@@ -255,6 +255,7 @@ class NRPEnv(gym.Env):
         """Reset simulation and get initial state/observation."""
         self.sim.reset()
         self.goal = self._sample_goal().copy()
+        self.step_i = 0
 
         return self._get_obs()
 
