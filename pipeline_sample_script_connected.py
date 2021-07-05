@@ -1,3 +1,4 @@
+import itertools
 import os
 
 import gym
@@ -136,14 +137,9 @@ class NRPDummy:
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
         fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
 
-        print(fingertip_position_data.pose_array.poses[0].position)
-        print(type(fingertip_position_data.pose_array.poses[0].position))
-        print(dir(fingertip_position_data.pose_array.poses[0].position))
-        print("\n")
-
         joint_pos = np.array(joint_state_data.position[0:-1])
         joint_vel = np.array(joint_state_data.velocity[0:-1])
-        fingertip_position = np.random.randn(15)
+        fingertip_position = itertools.chain(*[(p.position.x, p.position.y, p.position.z) for p in fingertip_position_data.pose_array.poses])
         proprioception = np.concatenate((joint_pos, joint_vel, fingertip_position), axis=0)
 
         return {
