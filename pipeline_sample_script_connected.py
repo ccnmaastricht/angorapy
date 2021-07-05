@@ -7,6 +7,7 @@ import tensorflow as tf
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import JointState
 from shadow_hand_contact_sensor.msg import shadow_hand_contact_force
+from shadow_hand_contact_sensor.msg import shadowhand_link_pose
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty
 
@@ -133,8 +134,7 @@ class NRPDummy:
         somatosensation = touch_sensor_values
 
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
-        print("Starting the wait")
-        fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", JointState)
+        fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
 
         print(fingertip_position_data.position)
         print(fingertip_position_data.position.shape)
