@@ -270,6 +270,7 @@ state = env.reset()
 done = False
 
 while True:
+
     while not done:
         state.inject_leading_dims(time=True)
         probabilities = np.squeeze(model(state.dict(), training=False))
@@ -278,10 +279,4 @@ while True:
         state, _, done, _ = env.step(action)
 
     state = env.reset()
-
-# for i in range(100):
-
-#     inject_leading_dims(state)
-#     next_action = np.squeeze(model(state))
-#     state, _, done, _ = env.step(next_action)
-#     print(state['proprioception'].reshape(-1)[11])
+    done = False
