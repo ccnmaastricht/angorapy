@@ -122,6 +122,19 @@ class NRPDummy:
             while (act.get_num_connections() == 0):
                 rate.sleep()
 
+    def _get_fingertip_positions(self):
+        fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
+        poses = fingertip_position_data.pose_array.poses
+        pose_indices = [fingertip_position_data.link_name.index(i) for i in FINGERTIP_SITE_NAMES]
+        return np.array(list(itertools.chain(
+            *[(p.position.x, p.position.y, p.position.z) for i, p in enumerate(poses) if i in pose_indices]
+        )))
+
+    def _get_palm_position(self):
+        fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
+        pose = fingertip_position_data.pose_array.poses[fingertip_position_data.link_name.index("rh_palm")]
+        return np.array([pose.x, pose.y, pose.z])
+
     def get_state(self):
         """Dummy method that acts in place of reading the actual data from the NRP."""
         # print("Get state")
@@ -135,16 +148,11 @@ class NRPDummy:
         somatosensation = touch_sensor_values
 
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
-        fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
 
         joint_pos = np.array(joint_state_data.position[0:-1])
         joint_vel = np.array(joint_state_data.velocity[0:-1])
-        poses = fingertip_position_data.pose_array.poses
-        pose_indices = [fingertip_position_data.link_name.index(i) for i in FINGERTIP_SITE_NAMES]
-        fingertip_position = np.array(
-            list(itertools.chain(*[(p.position.x, p.position.y, p.position.z) for i, p in enumerate(poses) if i in pose_indices]))
-        )
-        proprioception = np.concatenate((joint_pos, joint_vel, fingertip_position), axis=0)
+
+        proprioception = np.concatenate((joint_pos, joint_vel, self._get_fingertip_positions()), axis=0)
 
         return {
             "vision": None,
@@ -173,7 +181,8 @@ class NRPEnv(gym.Env):
 
     def __init__(self):
         self.sim = NRPDummy(dt=0.002)
-        self.goal = np.random.random((15,))
+        self._env_setup()
+        self.goal = self._sample_goal()
 
         self.action_space = gym.spaces.Box(-1, 1, shape=(20,), dtype=np.float32)
 
@@ -188,14 +197,12 @@ class NRPEnv(gym.Env):
 
         return observation
 
-    def get_fingertip_positions(self):
-        """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
-        as such the output is a 15-D numpy array."""
-        goal = [self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
-        return np.array(goal).flatten()
+    def _env_setup(self):
+        self.initial_goal = self.sim._get_fingertip_positions().copy()
+        self.palm_xpos = self.sim._get_palm_position().copy()
 
     def _sample_goal(self):
-        thumb_name = 'robot0:S_thtip'
+        thumb_name = 'rh_thdistal'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
         finger_name = np.random.choice(finger_names)
 
