@@ -207,6 +207,7 @@ class NRPEnv(gym.Env):
         thumb_name = 'rh_thdistal'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
         finger_name = np.random.choice(finger_names)
+        print(f"Target finger: {finger_name[3:5]}")
 
         thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
         finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
@@ -275,6 +276,8 @@ while True:
         action = agent.distribution.act_deterministic(*probabilities)
 
         state, _, done, _ = env.step(action)
+
+    state = env.reset()
 
 # for i in range(100):
 
