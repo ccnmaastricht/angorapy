@@ -133,6 +133,7 @@ class NRPDummy:
         somatosensation = touch_sensor_values
 
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
+        print("Starting the wait")
         fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", JointState)
 
         print(fingertip_position_data.position)
