@@ -133,7 +133,7 @@ class NRPDummy:
     def _get_palm_position(self):
         fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
         pose = fingertip_position_data.pose_array.poses[fingertip_position_data.link_name.index("rh_palm")]
-        return np.array([pose.x, pose.y, pose.z])
+        return np.array([pose.position.x, pose.position.y, pose.position.z])
 
     def get_state(self):
         """Dummy method that acts in place of reading the actual data from the NRP."""
