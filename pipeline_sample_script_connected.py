@@ -138,7 +138,7 @@ class NRPDummy:
 
         print(fingertip_position_data)
         print(type(fingertip_position_data))
-        print(fingertip_position_data.position.shape)
+        print(dir(fingertip_position_data))
         print("\n")
 
         joint_pos = np.array(joint_state_data.position[0:-1])
