@@ -27,6 +27,16 @@ model, _, _ = agent.build_models(agent.joint.get_weights(), batch_size=1, sequen
 
 
 # SIMULATION DUMMY
+
+FINGERTIP_SITE_NAMES = [  # rostopic names of distal bones (in place of the fingertips)
+    'rh_ffdistal',
+    'rh_mfdistal',
+    'rh_rfdistal',
+    'rh_lfdistal',
+    'rh_thdistal',
+]
+
+
 class NRPDummy:
     """Dummy class representing the role of the NRP/Gazebo simulation."""
 
@@ -76,7 +86,11 @@ class NRPDummy:
             The ring finger joint 1 and joint 0 are coupled 
             The little finger joint 1 and joint 0 are coupled 
 
-        'robot0:A_WRJ1', 'robot0:A_WRJ0', 'robot0:A_FFJ3', 'robot0:A_FFJ2', 'robot0:A_FFJ1', 'robot0:A_MFJ3', 'robot0:A_MFJ2', 'robot0:A_MFJ1', 'robot0:A_RFJ3', 'robot0:A_RFJ2', 'robot0:A_RFJ1', 'robot0:A_LFJ4', 'robot0:A_LFJ3', 'robot0:A_LFJ2', 'robot0:A_LFJ1', 'robot0:A_THJ4', 'robot0:A_THJ3', 'robot0:A_THJ2', 'robot0:A_THJ1', 'robot0:A_THJ0'
+        'robot0:A_WRJ1', 'robot0:A_WRJ0', 'robot0:A_FFJ3', 'robot0:A_FFJ2', 'robot0:A_FFJ1', 
+        'robot0:A_MFJ3', 'robot0:A_MFJ2', 'robot0:A_MFJ1', 
+        'robot0:A_RFJ3', 'robot0:A_RFJ2', 'robot0:A_RFJ1', 
+        'robot0:A_LFJ4', 'robot0:A_LFJ3', 'robot0:A_LFJ2', 'robot0:A_LFJ1', 
+        'robot0:A_THJ4', 'robot0:A_THJ3', 'robot0:A_THJ2', 'robot0:A_THJ1', 'robot0:A_THJ0'
        """
         rate = rospy.Rate(100)
         action = np.insert(action, 5, action[4])
@@ -114,23 +128,27 @@ class NRPDummy:
         camera_pixels = rospy.wait_for_message('/shadow_hand/camera/image_raw', Image)
         vision = np.frombuffer(np.array(camera_pixels.data), np.uint8).reshape(200, 200, 3)
 
-        shadow_hand_contact_data = rospy.wait_for_message('/shadow_hand_visual_tag_contact_sensor',
-                                                          shadow_hand_contact_force)
+        shadow_hand_contact_data = rospy.wait_for_message('/shadow_hand_visual_tag_contact_sensor', shadow_hand_contact_force)
         touch_sensor_values = np.array([contact_force.z for contact_force in shadow_hand_contact_data.force_array])
         somatosensation = touch_sensor_values
 
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
+        fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", JointState)
+
+        print(fingertip_position_data.position)
+        print(fingertip_position_data.position.shape)
+        print("\n")
 
         joint_pos = np.array(joint_state_data.position[0:-1])
         joint_vel = np.array(joint_state_data.velocity[0:-1])
         fingertip_position = np.random.randn(15)
         proprioception = np.concatenate((joint_pos, joint_vel, fingertip_position), axis=0)
 
-        return {"observation": Sensation(**{
+        return {
             "vision": None,
             "somatosensation": somatosensation,  # touch sensor readings
             "proprioception": proprioception,  # joint positions and velocities
-        })}
+        }
 
     def set_state(self):
         """Dummy method to set the state of the simulation (hand position, velocities, etc.)"""
@@ -160,10 +178,46 @@ class NRPEnv(gym.Env):
     def _get_obs(self):
         sim_state = self.sim.get_state()
 
-        observation = sim_state.copy()
-        observation["observation"]["goal"] = self.goal
+        observation = {
+            "observation": Sensation(
+                **sim_state.copy(),
+                goal=self.goal)
+        }
 
         return observation
+
+    def get_fingertip_positions(self):
+        """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
+        as such the output is a 15-D numpy array."""
+        goal = [self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        return np.array(goal).flatten()
+
+    def _sample_goal(self):
+        thumb_name = 'robot0:S_thtip'
+        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
+        finger_name = np.random.choice(finger_names)
+
+        thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
+        finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
+        self.current_target_finger = finger_idx
+
+        assert thumb_idx != finger_idx
+
+        # Pick a meeting point above the hand.
+        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
+        meeting_pos += np.random.normal(scale=0.005, size=meeting_pos.shape)
+
+        # Slightly move meeting goal towards the respective finger to avoid that they overlap.
+        goal = self.initial_goal.copy().reshape(-1, 3)
+        for idx in [thumb_idx, finger_idx]:
+            offset_direction = (meeting_pos - goal[idx])
+            offset_direction /= np.linalg.norm(offset_direction)
+            goal[idx] = meeting_pos - 0.005 * offset_direction
+
+        if np.random.uniform() < 0.1:
+            goal = self.initial_goal.copy()
+
+        return goal.flatten()
 
     def step(self, action: np.ndarray):
         # print(action.shape)
