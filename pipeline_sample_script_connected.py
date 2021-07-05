@@ -186,6 +186,8 @@ class NRPEnv(gym.Env):
 
         self.action_space = gym.spaces.Box(-1, 1, shape=(20,), dtype=np.float32)
 
+        self.step_i = 0
+
     def _get_obs(self):
         sim_state = self.sim.get_state()
 
@@ -241,14 +243,18 @@ class NRPEnv(gym.Env):
         # after applying the action in simulation, we can read the current state, calculate rewards, etc.
         observation = self._get_obs()
         reward = np.random.normal(0, 1)
-        done = False
+        done = self.step_i > 100
         info = {}
+
+        self.step_i += 1
 
         return observation, reward, done, info
 
     def reset(self):
         """Reset simulation and get initial state/observation."""
         self.sim.reset()
+        self.goal = self._sample_goal().copy()
+
         return self._get_obs()
 
     def render(self, mode='human'):
@@ -261,12 +267,14 @@ rospy.init_node('pipe', anonymous=True)
 env = TransformationWrapper(NRPEnv(), transformers=agent.env.transformers)
 state = env.reset()
 done = False
-while not done:
-    state.inject_leading_dims(time=True)
-    probabilities = np.squeeze(model(state.dict(), training=False))
-    action = agent.distribution.act_deterministic(*probabilities)
 
-    state, _, done, _ = env.step(action)
+while True:
+    while not done:
+        state.inject_leading_dims(time=True)
+        probabilities = np.squeeze(model(state.dict(), training=False))
+        action = agent.distribution.act_deterministic(*probabilities)
+
+        state, _, done, _ = env.step(action)
 
 # for i in range(100):
 
