@@ -137,7 +137,7 @@ class NRPDummy:
         fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
 
         print(fingertip_position_data)
-        print(fingertip_position_data.position)
+        print(type(fingertip_position_data))
         print(fingertip_position_data.position.shape)
         print("\n")
 
