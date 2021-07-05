@@ -136,6 +136,7 @@ class NRPDummy:
         joint_state_data = rospy.wait_for_message("/shadowhand_motor/joint_states", JointState)
         fingertip_position_data = rospy.wait_for_message("/shadowhand_motor/link_positions", shadowhand_link_pose)
 
+        print(fingertip_position_data)
         print(fingertip_position_data.position)
         print(fingertip_position_data.position.shape)
         print("\n")
