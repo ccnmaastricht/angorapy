@@ -139,8 +139,11 @@ class NRPDummy:
 
         joint_pos = np.array(joint_state_data.position[0:-1])
         joint_vel = np.array(joint_state_data.velocity[0:-1])
-        fingertip_position = np.array(list(itertools.chain(*[(p.position.x, p.position.y, p.position.z) for p in fingertip_position_data.pose_array.poses])))
-        print(fingertip_position.shape)
+        poses = fingertip_position_data.pose_array.poses
+        pose_indices = [fingertip_position_data.link_name.index(i) for i in FINGERTIP_SITE_NAMES]
+        fingertip_position = np.array(
+            list(itertools.chain(*[(p.position.x, p.position.y, p.position.z) for i, p in enumerate(poses) if i in pose_indices]))
+        )
         proprioception = np.concatenate((joint_pos, joint_vel, fingertip_position), axis=0)
 
         return {
