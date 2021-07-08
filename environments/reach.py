@@ -35,6 +35,7 @@ class Reach(BaseShadowHandEnv):
         self.thumb_name = 'robot0:S_thtip'
 
         # STATE INITIALIZATION
+        print(initial_qpos)
         assert initial_qpos in ["random", "buffered"] or isinstance(initial_qpos, dict), "Illegal state initialization."
 
         self.state_initialization = initial_qpos
@@ -330,12 +331,12 @@ class FreeReach(Reach):
 
     The goal is represented as a one-hot vector of size 4."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False,
-                 force_finger=None):
+    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False,
+                 touch=True, force_finger=None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
         self.forced_finger = force_finger
-        super().__init__(n_substeps, relative_control, initial_qpos, vision)
+        super().__init__(initial_qpos, n_substeps, relative_control, vision, touch)
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = free_reach

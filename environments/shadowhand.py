@@ -173,7 +173,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             self._viewers = {}
 
     def render(self, mode='human', width=500, height=500):
-        self._render_callback(render_targets=(mode == "human"))
+        self._render_callback()
         if mode == 'rgb_array':
             self._get_viewer(mode).render(width, height)
             # window size used for old mujoco-py:
