@@ -26,7 +26,8 @@ REACH_BASE = dict(
 
 # REACH
 reach = dict(
-    default=dict(REACH_BASE)
+    default=dict(REACH_BASE),
+    force_punished=dict(REACH_BASE, FORCE_MULTIPLIER=0.05),
 )
 
 sequential_reach = dict(
