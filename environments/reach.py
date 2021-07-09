@@ -35,7 +35,6 @@ class Reach(BaseShadowHandEnv):
         self.thumb_name = 'robot0:S_thtip'
 
         # STATE INITIALIZATION
-        print(initial_qpos)
         assert initial_qpos in ["random", "buffered"] or isinstance(initial_qpos, dict), "Illegal state initialization."
 
         self.state_initialization = initial_qpos

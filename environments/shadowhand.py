@@ -51,6 +51,8 @@ DEFAULT_INITIAL_QPOS = {
 }
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
+# MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
+MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'manipulate_block_touch_sensors.xml')
 
 
 def generate_random_sim_qpos(base: dict) -> dict:
@@ -79,7 +81,7 @@ def get_fingertip_distance(ft_a, ft_b):
 class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
 
-    def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True):
+    def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True, model=MODEL_PATH):
         gym.utils.EzPickle.__init__(**locals())
 
         self.relative_control = relative_control
@@ -88,7 +90,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
 
-        model = mujoco_py.load_model_from_path(MODEL_PATH)
+        model = mujoco_py.load_model_from_path(model)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
         self._viewers = {}
         self.viewer = None
@@ -294,8 +296,8 @@ if __name__ == "__main__":
     # env = gym.make("HandTappingAbsolute-v1")
     # env = gym.make("HandFreeReachLFAbsolute-v0")
     # env = gym.make("BaseShadowHandEnv-v0")
-    # env = gym.make("HandManipulateBlock-v0")
-    env = gym.make("HandReachDenseRelative-v0")
+    env = gym.make("ManipulateBlock-v0")
+    # env = gym.make("HandReachDenseRelative-v0")
     d, s = False, env.reset()
     while True:
         env.render()
