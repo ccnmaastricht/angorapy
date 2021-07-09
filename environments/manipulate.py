@@ -117,19 +117,6 @@ class ManipulateEnv(BaseShadowHandEnv):
         assert d_pos.shape == d_rot.shape
         return d_pos, d_rot
 
-    # GoalEnv methods
-    # ----------------------------
-
-    def compute_reward(self, achieved_goal, goal, info):
-        if self.reward_type == 'sparse':
-            success = self._is_success(achieved_goal, goal).astype(np.float32)
-            return (success - 1.)
-        else:
-            d_pos, d_rot = self._goal_distance(achieved_goal, goal)
-            # We weigh the difference in position to avoid that `d_pos` (in meters) is completely
-            # dominated by `d_rot` (in radians).
-            return -(10. * d_pos + d_rot)
-
     # RobotEnv methods
     # ----------------------------
 
@@ -423,7 +410,7 @@ class BaseManipulate(ManipulateEnv):
         return (- d_rot  # convergence to goal reward
                 - 1  # constant punishment to encourage fast solutions
                 + success * 5  # reward for finishing
-                + 20 * self._is_dropped())  # dropping penalty
+                - 20 * self._is_dropped())  # dropping penalty
 
     def reset(self):
         """Reset the environment."""
