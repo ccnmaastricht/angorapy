@@ -2,6 +2,9 @@ import os
 import pprint
 import traceback
 
+import distance
+import numpy as np
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
@@ -151,8 +154,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     # general parameters
-    parser.add_argument("env", nargs='?', type=str, default="ShadowHandBlind-v0", choices=all_envs,
-                        help="the target environment")
+    parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target environment")
     parser.add_argument("--architecture", choices=["simple", "deeper", "shadow"], default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
@@ -208,6 +210,12 @@ if __name__ == "__main__":
     # read arguments
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
+
+    if args.env not in all_envs:
+        if is_root:
+            indices = np.argsort([distance.levenshtein(w, args.env) for w in all_envs])[:3]
+            print(f"Unknown environment {args.env}. Did you mean one of {[all_envs[i] for i in indices]}")
+        exit()
 
     # if config is given load it as default, then overwrite with any goal given parameters
     if args.pcon is not None:
