@@ -29,10 +29,19 @@ def quat_from_angle_and_axis(angle, axis):
 
 class ManipulateEnv(BaseShadowHandEnv):
     def __init__(
-            self, model_path, target_position, target_rotation,
-            target_position_range, reward_type, initial_qpos=None,
-            randomize_initial_position=True, randomize_initial_rotation=True,
-            distance_threshold=0.01, rotation_threshold=0.1, n_substeps=20, relative_control=False,
+            self,
+            model_path,
+            target_position,
+            target_rotation,
+            target_position_range,
+            reward_type,
+            initial_qpos=None,
+            randomize_initial_position=True,
+            randomize_initial_rotation=True,
+            distance_threshold=0.01,
+            rotation_threshold=0.1,
+            n_substeps=20,
+            relative_control=False,
             ignore_z_target_rotation=False,
     ):
         """Initializes a new Hand manipulation environment.
@@ -85,7 +94,7 @@ class ManipulateEnv(BaseShadowHandEnv):
         # Object position and rotation.
         object_qpos = self.sim.data.get_joint_qpos('object:joint')
         assert object_qpos.shape == (7,)
-        return object_qpos
+        return object_qpos.copy()
 
     def _goal_distance(self, goal_a, goal_b):
         assert goal_a.shape == goal_b.shape
@@ -93,6 +102,7 @@ class ManipulateEnv(BaseShadowHandEnv):
 
         d_pos = np.zeros_like(goal_a[..., 0])
         d_rot = np.zeros_like(goal_b[..., 0])
+
         if self.target_position != 'ignore':
             delta_pos = goal_a[..., :3] - goal_b[..., :3]
             d_pos = np.linalg.norm(delta_pos, axis=-1)
@@ -114,17 +124,17 @@ class ManipulateEnv(BaseShadowHandEnv):
             quat_diff = rotations.quat_mul(quat_a, rotations.quat_conjugate(quat_b))
             angle_diff = 2 * np.arccos(np.clip(quat_diff[..., 0], -1., 1.))
             d_rot = angle_diff
+
         assert d_pos.shape == d_rot.shape
         return d_pos, d_rot
-
-    # RobotEnv methods
-    # ----------------------------
 
     def _is_success(self, achieved_goal, desired_goal):
         d_pos, d_rot = self._goal_distance(achieved_goal, desired_goal)
         achieved_pos = (d_pos < self.distance_threshold).astype(np.float32)
         achieved_rot = (d_rot < self.rotation_threshold).astype(np.float32)
         achieved_both = achieved_pos * achieved_rot
+        if achieved_both:
+            print("IS SUCCESS")
         return achieved_both
 
     def _env_setup(self, initial_qpos):
@@ -250,17 +260,6 @@ class ManipulateEnv(BaseShadowHandEnv):
             self.sim.model.geom_rgba[hidden_id, 3] = 1.
         self.sim.forward()
 
-    def _get_obs(self):
-        robot_qpos, robot_qvel = robot_get_obs(self.sim)
-        object_qvel = self.sim.data.get_joint_qvel('object:joint')
-        achieved_goal = self._get_achieved_goal().ravel()  # this contains the object position + rotation
-        observation = np.concatenate([robot_qpos, robot_qvel, object_qvel, achieved_goal])
-        return {
-            'observation': observation.copy(),
-            'achieved_goal': achieved_goal.copy(),
-            'desired_goal': self.goal.ravel().copy(),
-        }
-
 
 class BaseManipulate(ManipulateEnv):
     """Base class for in-hand manipulation tasks."""
@@ -269,7 +268,7 @@ class BaseManipulate(ManipulateEnv):
                  initial_qpos={}, randomize_initial_position=True, randomize_initial_rotation=True,
                  distance_threshold=0.01, rotation_threshold=0.1, n_substeps=N_SUBSTEPS, relative_control=True,
                  ignore_z_target_rotation=False, touch_visualisation="off", touch_get_obs="sensordata",
-                 visual_input: bool = False, max_steps=200):
+                 visual_input: bool = False):
         """Initializes a new Hand manipulation environment with touch sensors.
 
         Args:
@@ -284,7 +283,6 @@ class BaseManipulate(ManipulateEnv):
                 - "off" or else: does not add touch sensor readings to the observation
             visual_input (bool): indicator whether the environment should return frames (True) or the exact object
                 position (False)
-            max_steps (int): maximum number of steps before episode is ended
         """
 
         if visual_input:
@@ -297,8 +295,6 @@ class BaseManipulate(ManipulateEnv):
         self.visual_input = visual_input
         self.touch_color = [1, 0, 0, 0.5]
         self.notouch_color = [0, 0.5, 0, 0.2]
-        self.total_steps = 0
-        self.max_steps = max_steps
 
         super().__init__(model_path=model_path,
                          target_position=target_position,
@@ -332,6 +328,8 @@ class BaseManipulate(ManipulateEnv):
 
         # set hand and background colors
         self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
+
+        self.previous_achieved_goal = self._get_achieved_goal()
 
     def _render_callback(self):
         super()._render_callback()
@@ -370,15 +368,10 @@ class BaseManipulate(ManipulateEnv):
             "desired_goal": self.goal.ravel().copy(),
         }
 
-    def _is_success(self, achieved_goal, desired_goal):
-        """We determine success only by means of rotational goals."""
-        _, d_rot = self._goal_distance(achieved_goal, desired_goal)
-        return (d_rot < self.rotation_threshold).astype(np.float32)
-
     def _is_dropped(self) -> bool:
         """Heuristically determine whether the object still is in the hand."""
 
-        # determin object center position
+        # determine object center position
         obj_center_idx = self.sim.model.site_name2id('object:center')
         obj_center_pos = self.sim.data.site_xpos[obj_center_idx]
 
@@ -393,36 +386,36 @@ class BaseManipulate(ManipulateEnv):
 
         return dropped
 
+    def _goal_progress(self):
+        return (sum(self._goal_distance(self.goal, self._get_achieved_goal()))
+                - sum(self._goal_distance(self.goal, self._get_achieved_goal())))
+
     def step(self, action):
         """Make step in environment."""
-        self.total_steps += 1
         obs, reward, done, info = super().step(action)
         dropped = self._is_dropped()
-        done = done or dropped or self.total_steps >= self.max_steps
+        done = done or dropped
+
+        self.previous_achieved_goal = self._get_achieved_goal().copy()
 
         return obs, reward, done, info
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute the reward."""
         success = self._is_success(achieved_goal, goal).astype(np.float32)
-        _, d_rot = self._goal_distance(achieved_goal, goal)
+        d_pos, d_rot = self._goal_distance(achieved_goal, goal)
+        d_progress = self._goal_progress()
 
-        return (- d_rot  # convergence to goal reward
-                - 1  # constant punishment to encourage fast solutions
+        return (+ d_progress  # convergence to goal reward
                 + success * 5  # reward for finishing
                 - 20 * self._is_dropped())  # dropping penalty
-
-    def reset(self):
-        """Reset the environment."""
-        self.total_steps = 0
-        return super().reset()
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with a Block as an object."""
 
     def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
-                 visual_input: bool = False, max_steps=200):
+                 visual_input: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -430,15 +423,14 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_rotation=target_rotation,
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                visual_input=visual_input,
-                                max_steps=max_steps)
+                                visual_input=visual_input)
 
 
 class ManipulateEgg(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with an Egg as an object."""
 
     def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='dense', visual_input: bool = False, max_steps=200):
+                 reward_type='dense', visual_input: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
         BaseManipulate.__init__(self,
                                 model_path=MANIPULATE_EGG_XML,
@@ -446,6 +438,4 @@ class ManipulateEgg(BaseManipulate, utils.EzPickle):
                                 target_rotation=target_rotation,
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                reward_type=reward_type,
-                                visual_input=visual_input,
-                                max_steps=max_steps)
+                                visual_input=visual_input,)

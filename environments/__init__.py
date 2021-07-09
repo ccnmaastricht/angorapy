@@ -144,7 +144,7 @@ gym.envs.register(
 gym.envs.register(
     id='ManipulateBlock-v0',
     entry_point='environments:ManipulateBlock',
-    kwargs={'target_position': 'ignore', 'target_rotation': 'xyz'},
+    kwargs={'target_position': 'fixed', 'target_rotation': 'xyz'},
     max_episode_steps=SHADOWHAND_MAX_STEPS,
 )
 
