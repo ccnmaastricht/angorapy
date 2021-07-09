@@ -387,14 +387,15 @@ class BaseManipulate(ManipulateEnv):
         return dropped
 
     def _goal_progress(self):
-        return (sum(self._goal_distance(self.goal, self._get_achieved_goal()))
+        return (sum(self._goal_distance(self.goal, self.previous_achieved_goal))
                 - sum(self._goal_distance(self.goal, self._get_achieved_goal())))
 
     def step(self, action):
         """Make step in environment."""
         obs, reward, done, info = super().step(action)
         dropped = self._is_dropped()
-        done = done or dropped
+        success = self._is_success(self._get_achieved_goal(), self.goal)
+        done = done or dropped or success
 
         self.previous_achieved_goal = self._get_achieved_goal().copy()
 
