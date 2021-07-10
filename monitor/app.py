@@ -244,7 +244,7 @@ def clear_all_short():
                     deleted += 1
                     continue
 
-                if "rewards" in progress and len(progress["rewards"]["mean"]) <= 10:
+                if "rewards" in progress and len(progress["rewards"]["mean"]) <= 30:
                     shutil.rmtree(path)
                     deleted += 1
 

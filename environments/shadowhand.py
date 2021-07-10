@@ -52,7 +52,7 @@ DEFAULT_INITIAL_QPOS = {
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
 # MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
-MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'manipulate_block_touch_sensors.xml')
+MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand_manipulate.xml')
 
 
 def generate_random_sim_qpos(base: dict) -> dict:
@@ -267,9 +267,9 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             self.viewer.cam.lookat[idx] = value
 
         # set colors
-        self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255  # hand
+        self.sim.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
         # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
-        self.sim.model.mat_rgba[4] = np.array([71, 116, 144, 255]) / 255  # background
+        self.sim.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
         self.viewpoint = "topdown"

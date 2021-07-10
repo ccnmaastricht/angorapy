@@ -140,20 +140,20 @@ gym.envs.register(
 
 
 # MANIPULATE
+for control_mode in ["Relative", "Absolute"]:
+    gym.envs.register(
+        id=f'ManipulateBlock{control_mode}-v0',
+        entry_point='environments:ManipulateBlock',
+        kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "relative_control": control_mode == "Relative"},
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
+    )
 
-gym.envs.register(
-    id='ManipulateBlock-v0',
-    entry_point='environments:ManipulateBlock',
-    kwargs={'target_position': 'fixed', 'target_rotation': 'xyz'},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
-
-gym.envs.register(
-    id='ManipulateEgg-v0',
-    entry_point='environments:ManipulateEgg',
-    kwargs={'target_position': 'fixed', 'target_rotation': 'xyz'},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
-)
+    gym.envs.register(
+        id=f'ManipulateEgg{control_mode}-v0',
+        entry_point='environments:ManipulateEgg',
+        kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "relative_control": control_mode == "Relative"},
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
+    )
 
 # MODIFIED ENVIRONMENTS
 

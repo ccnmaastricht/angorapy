@@ -44,7 +44,6 @@ class BaseManipulate(BaseShadowHandEnv):
             relative_control=False,
             ignore_z_target_rotation=False,
             n_substeps=N_SUBSTEPS,
-            touch_visualisation="off",
             touch_get_obs="sensordata",
             vision=False,
             touch=True
@@ -72,10 +71,6 @@ class BaseManipulate(BaseShadowHandEnv):
             rotation_threshold (float, in radians): the threshold after which the rotation of a goal is considered achieved
             n_substeps (int): number of substeps the simulation runs on every call to step
             relative_control (boolean): whether or not the hand is actuated in absolute joint positions or relative to the current state
-            touch_visualisation (string): how touch sensor sites are visualised
-                - "on_touch": shows touch sensor sites only when touch values > 0
-                - "always": always shows touch sensor sites
-                - "off" or else: does not show touch sensor sites
             touch_get_obs (string): touch sensor readings
                 - "boolean": returns 1 if touch sensor reading != 0.0 else 0
                 - "sensordata": returns original touch sensor readings from self.sim.data.sensordata[id]
@@ -89,7 +84,6 @@ class BaseManipulate(BaseShadowHandEnv):
             from mujoco_py import GlfwContext
             GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
 
-        self.touch_visualisation = touch_visualisation
         self.touch_get_obs = touch_get_obs
         self.vision = vision
         self.touch_color = [1, 0, 0, 0.5]
@@ -108,7 +102,6 @@ class BaseManipulate(BaseShadowHandEnv):
         assert self.target_position in ['ignore', 'fixed', 'random']
         assert self.target_rotation in ['ignore', 'fixed', 'xyz', 'z', 'parallel']
         initial_qpos = initial_qpos or {}
-        print(initial_qpos)
 
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,
@@ -127,14 +120,8 @@ class BaseManipulate(BaseShadowHandEnv):
                 self._touch_sensor_id.append(v)
 
         # set touch sensors rgba values
-        if self.touch_visualisation == 'off':
-            for _, site_id in self._touch_sensor_id_site_id:
-                self.sim.model.site_rgba[site_id][3] = 0.0
-        elif self.touch_visualisation == 'always':
-            pass
-
-        # set hand and background colors
-        self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
+        for _, site_id in self._touch_sensor_id_site_id:
+            self.sim.model.site_rgba[site_id][3] = 0.0
 
         self.previous_achieved_goal = self._get_achieved_goal()
 
@@ -181,8 +168,7 @@ class BaseManipulate(BaseShadowHandEnv):
         achieved_pos = (d_pos < self.distance_threshold).astype(np.float32)
         achieved_rot = (d_rot < self.rotation_threshold).astype(np.float32)
         achieved_both = achieved_pos * achieved_rot
-        if achieved_both:
-            print("IS SUCCESS")
+
         return achieved_both
 
     def _env_setup(self, initial_qpos):
@@ -308,13 +294,6 @@ class BaseManipulate(BaseShadowHandEnv):
             self.sim.model.geom_rgba[hidden_id, 3] = 1.
         self.sim.forward()
 
-        if self.touch_visualisation == 'on_touch':
-            for touch_sensor_id, site_id in self._touch_sensor_id_site_id:
-                if self.sim.data.sensordata[touch_sensor_id] != 0.0:
-                    self.sim.model.site_rgba[site_id] = self.touch_color
-                else:
-                    self.sim.model.site_rgba[site_id] = self.notouch_color
-
     def _get_obs(self):
         # "primary" information, either this is the visual frame or the object position and velocity
         achieved_goal = self._get_achieved_goal().ravel()
@@ -390,7 +369,7 @@ class BaseManipulate(BaseShadowHandEnv):
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with a Block as an object."""
 
-    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata', relative_control=True,
                  vision: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
@@ -399,13 +378,15 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_rotation=target_rotation,
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                vision=vision)
+                                vision=vision,
+                                relative_control=relative_control
+                                )
 
 
 class ManipulateEgg(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with an Egg as an object."""
 
-    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata', relative_control=True,
                  vision: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
@@ -414,4 +395,6 @@ class ManipulateEgg(BaseManipulate, utils.EzPickle):
                                 target_rotation=target_rotation,
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                vision=vision,)
+                                vision=vision,
+                                relative_control=relative_control
+                                )
