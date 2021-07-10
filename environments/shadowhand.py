@@ -249,7 +249,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _render_callback(self, render_targets=False):
+    def _render_callback(self):
         """A custom callback that is called before rendering. Can be used to implement custom visualizations."""
         pass
 

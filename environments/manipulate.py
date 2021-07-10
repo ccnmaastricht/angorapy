@@ -27,22 +27,27 @@ def quat_from_angle_and_axis(angle, axis):
     return quat
 
 
-class ManipulateEnv(BaseShadowHandEnv):
+class BaseManipulate(BaseShadowHandEnv):
+    """Base class for in-hand object manipulation tasks."""
+
     def __init__(
             self,
             model_path,
             target_position,
             target_rotation,
             target_position_range,
-            reward_type,
             initial_qpos=None,
             randomize_initial_position=True,
             randomize_initial_rotation=True,
             distance_threshold=0.01,
             rotation_threshold=0.1,
-            n_substeps=20,
             relative_control=False,
             ignore_z_target_rotation=False,
+            n_substeps=N_SUBSTEPS,
+            touch_visualisation="off",
+            touch_get_obs="sensordata",
+            vision=False,
+            touch=True
     ):
         """Initializes a new Hand manipulation environment.
 
@@ -60,7 +65,6 @@ class ManipulateEnv(BaseShadowHandEnv):
                 - parallel: fully randomized target rotation around Z and axis-aligned rotation around X, Y
             ignore_z_target_rotation (boolean): whether or not the Z axis of the target rotation is ignored
             target_position_range (np.array of shape (3, 2)): range of the target_position randomization
-            reward_type ('sparse' or 'dense'): the reward type, i.e. sparse or dense
             initial_qpos (dict): a dictionary of joint names and values that define the initial configuration
             randomize_initial_position (boolean): whether or not to randomize the initial position of the object
             randomize_initial_rotation (boolean): whether or not to randomize the initial rotation of the object
@@ -68,7 +72,29 @@ class ManipulateEnv(BaseShadowHandEnv):
             rotation_threshold (float, in radians): the threshold after which the rotation of a goal is considered achieved
             n_substeps (int): number of substeps the simulation runs on every call to step
             relative_control (boolean): whether or not the hand is actuated in absolute joint positions or relative to the current state
+            touch_visualisation (string): how touch sensor sites are visualised
+                - "on_touch": shows touch sensor sites only when touch values > 0
+                - "always": always shows touch sensor sites
+                - "off" or else: does not show touch sensor sites
+            touch_get_obs (string): touch sensor readings
+                - "boolean": returns 1 if touch sensor reading != 0.0 else 0
+                - "sensordata": returns original touch sensor readings from self.sim.data.sensordata[id]
+                - "log": returns log(x+1) touch sensor readings from self.sim.data.sensordata[id]
+                - "off" or else: does not add touch sensor readings to the observation
+            vision (bool): indicator whether the environment should return frames (True) or the exact object
+                position (False)
         """
+        if vision:
+            # init rendering [IMPORTANT]
+            from mujoco_py import GlfwContext
+            GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
+
+        self.touch_visualisation = touch_visualisation
+        self.touch_get_obs = touch_get_obs
+        self.vision = vision
+        self.touch_color = [1, 0, 0, 0.5]
+        self.notouch_color = [0, 0.5, 0, 0.2]
+
         self.target_position = target_position
         self.target_rotation = target_rotation
         self.target_position_range = target_position_range
@@ -77,18 +103,40 @@ class ManipulateEnv(BaseShadowHandEnv):
         self.randomize_initial_position = randomize_initial_position
         self.distance_threshold = distance_threshold
         self.rotation_threshold = rotation_threshold
-        self.reward_type = reward_type
         self.ignore_z_target_rotation = ignore_z_target_rotation
 
         assert self.target_position in ['ignore', 'fixed', 'random']
         assert self.target_rotation in ['ignore', 'fixed', 'xyz', 'z', 'parallel']
         initial_qpos = initial_qpos or {}
+        print(initial_qpos)
 
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,
                          n_substeps=n_substeps,
                          relative_control=relative_control,
                          model=model_path)
+
+        self._touch_sensor_id_site_id = []
+        self._touch_sensor_id = []
+
+        # get touch sensor site names and their ids
+        for k, v in self.sim.model._sensor_name2id.items():
+            if 'robot0:TS_' in k:
+                self._touch_sensor_id_site_id.append(
+                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
+                self._touch_sensor_id.append(v)
+
+        # set touch sensors rgba values
+        if self.touch_visualisation == 'off':
+            for _, site_id in self._touch_sensor_id_site_id:
+                self.sim.model.site_rgba[site_id][3] = 0.0
+        elif self.touch_visualisation == 'always':
+            pass
+
+        # set hand and background colors
+        self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
+
+        self.previous_achieved_goal = self._get_achieved_goal()
 
     def _get_achieved_goal(self):
         # Object position and rotation.
@@ -260,79 +308,6 @@ class ManipulateEnv(BaseShadowHandEnv):
             self.sim.model.geom_rgba[hidden_id, 3] = 1.
         self.sim.forward()
 
-
-class BaseManipulate(ManipulateEnv):
-    """Base class for in-hand manipulation tasks."""
-
-    def __init__(self, model_path, target_position, target_rotation, target_position_range,
-                 initial_qpos={}, randomize_initial_position=True, randomize_initial_rotation=True,
-                 distance_threshold=0.01, rotation_threshold=0.1, n_substeps=N_SUBSTEPS, relative_control=True,
-                 ignore_z_target_rotation=False, touch_visualisation="off", touch_get_obs="sensordata",
-                 visual_input: bool = False):
-        """Initializes a new Hand manipulation environment with touch sensors.
-
-        Args:
-            touch_visualisation (string): how touch sensor sites are visualised
-                - "on_touch": shows touch sensor sites only when touch values > 0
-                - "always": always shows touch sensor sites
-                - "off" or else: does not show touch sensor sites
-            touch_get_obs (string): touch sensor readings
-                - "boolean": returns 1 if touch sensor reading != 0.0 else 0
-                - "sensordata": returns original touch sensor readings from self.sim.data.sensordata[id]
-                - "log": returns log(x+1) touch sensor readings from self.sim.data.sensordata[id]
-                - "off" or else: does not add touch sensor readings to the observation
-            visual_input (bool): indicator whether the environment should return frames (True) or the exact object
-                position (False)
-        """
-
-        if visual_input:
-            # init rendering [IMPORTANT]
-            from mujoco_py import GlfwContext
-            GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
-
-        self.touch_visualisation = touch_visualisation
-        self.touch_get_obs = touch_get_obs
-        self.visual_input = visual_input
-        self.touch_color = [1, 0, 0, 0.5]
-        self.notouch_color = [0, 0.5, 0, 0.2]
-
-        super().__init__(model_path=model_path,
-                         target_position=target_position,
-                         target_rotation=target_rotation,
-                         target_position_range=target_position_range,
-                         reward_type="dense",
-                         initial_qpos=initial_qpos,
-                         randomize_initial_position=randomize_initial_position,
-                         randomize_initial_rotation=randomize_initial_rotation,
-                         distance_threshold=distance_threshold, rotation_threshold=rotation_threshold,
-                         n_substeps=n_substeps,
-                         relative_control=relative_control,
-                         ignore_z_target_rotation=ignore_z_target_rotation)
-
-        self._touch_sensor_id_site_id = []
-        self._touch_sensor_id = []
-
-        # get touch sensor site names and their ids
-        for k, v in self.sim.model._sensor_name2id.items():
-            if 'robot0:TS_' in k:
-                self._touch_sensor_id_site_id.append(
-                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
-                self._touch_sensor_id.append(v)
-
-        # set touch sensors rgba values
-        if self.touch_visualisation == 'off':
-            for _, site_id in self._touch_sensor_id_site_id:
-                self.sim.model.site_rgba[site_id][3] = 0.0
-        elif self.touch_visualisation == 'always':
-            pass
-
-        # set hand and background colors
-        self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
-
-        self.previous_achieved_goal = self._get_achieved_goal()
-
-    def _render_callback(self):
-        super()._render_callback()
         if self.touch_visualisation == 'on_touch':
             for touch_sensor_id, site_id in self._touch_sensor_id_site_id:
                 if self.sim.data.sensordata[touch_sensor_id] != 0.0:
@@ -348,7 +323,7 @@ class BaseManipulate(ManipulateEnv):
         robot_pos, robot_vel = manipulate.robot_get_obs(self.sim)
         proprioception = np.concatenate([robot_pos, robot_vel])
 
-        if self.visual_input:
+        if self.vision:
             primary = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
@@ -360,7 +335,7 @@ class BaseManipulate(ManipulateEnv):
 
         return {
             "observation": Sensation(
-                vision=primary if self.visual_input else None,
+                vision=primary if self.vision else None,
                 proprioception=proprioception.copy(),
                 somatosensation=touch.copy(),
                 goal=self.goal.ravel().copy()),
@@ -416,7 +391,7 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with a Block as an object."""
 
     def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
-                 visual_input: bool = False):
+                 vision: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -424,19 +399,19 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_rotation=target_rotation,
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                visual_input=visual_input)
+                                vision=vision)
 
 
 class ManipulateEgg(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with an Egg as an object."""
 
     def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
-                 reward_type='dense', visual_input: bool = False):
-        utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, reward_type)
+                 vision: bool = False):
+        utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MANIPULATE_EGG_XML,
                                 touch_get_obs=touch_get_obs,
                                 target_rotation=target_rotation,
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                visual_input=visual_input,)
+                                vision=vision,)
