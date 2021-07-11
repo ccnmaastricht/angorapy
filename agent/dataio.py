@@ -7,6 +7,7 @@ from functools import partial
 from typing import Union, Tuple, List
 
 import tensorflow as tf
+from mpi4py import MPI
 
 from common.const import STORAGE_DIR
 from common.senses import Sensation
@@ -137,6 +138,7 @@ def read_dataset_from_storage(dtype_actions: tf.dtypes.DType, id_prefix: Union[s
              re.match(f"{id_prefix}_data_{worker_id_regex}\.tfrecord", name)]
 
     random.shuffle(files) if shuffle else None
+    print(f"{MPI.COMM_WORLD.rank} has files:\n {files}\n\n")
 
     serialized_dataset = tf.data.TFRecordDataset(files)
     serialized_dataset = serialized_dataset.map(_parse_function)

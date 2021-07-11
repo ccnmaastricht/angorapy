@@ -30,10 +30,11 @@ class MpiAdam(tf.keras.optimizers.Adam):
             grads_and_vars = [(tf.divide(self.comm.allreduce(g, op=MPI.SUM), self.comm.Get_size()), v)
                               for g, v in grads_and_vars]
 
-        super().apply_gradients(grads_and_vars)
+        context = super().apply_gradients(grads_and_vars)
 
         # wait for all processes before continueing
         self.comm.Barrier()
+        return context
 
     def validate_synced_parameters(self):
         """Validate if all optimization processes share the same Adam parameters (moments)."""
