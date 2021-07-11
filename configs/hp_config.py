@@ -193,11 +193,11 @@ hand = make_config(
 )
 
 
-hand_beta = derive_config(hand, {"distribution": "beta"})
-hand_beta_static_lr = derive_config(hand_beta, {"lr_schedule": None})
-
-hand_beta_no_ent = derive_config(hand_beta, {"c_entropy": 0.0})
-hand_beta_no_ent_static_lr = derive_config(hand_beta_no_ent, {"lr_schedule": None})
+hand_no_ent = derive_config(hand, {"c_entropy": 0.0})
+hand_manipulate = derive_config(hand, {
+    "c_entropy": 0.01,
+    "epochs": 1
+})
 
 # RECOMMENDED CONFIGS FOR ENVs
 

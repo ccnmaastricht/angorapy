@@ -40,7 +40,7 @@ class BaseManipulate(BaseShadowHandEnv):
             randomize_initial_position=True,
             randomize_initial_rotation=True,
             distance_threshold=0.01,
-            rotation_threshold=0.1,
+            rotation_threshold=0.4,
             relative_control=False,
             ignore_z_target_rotation=False,
             n_substeps=N_SUBSTEPS,
@@ -303,18 +303,18 @@ class BaseManipulate(BaseShadowHandEnv):
         proprioception = np.concatenate([robot_pos, robot_vel])
 
         if self.vision:
-            primary = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
+            vision = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
         else:
             object_vel = self.sim.data.get_joint_qvel('object:joint')
-            primary = np.concatenate([achieved_goal, object_vel])
-            proprioception = np.concatenate([proprioception, primary])
+            object_pose = np.concatenate([achieved_goal, object_vel])
+            proprioception = np.concatenate([proprioception, object_pose])
 
         # touch sensor information
         touch = self.sim.data.sensordata[self._touch_sensor_id]
 
         return {
             "observation": Sensation(
-                vision=primary if self.vision else None,
+                vision=vision if self.vision else None,
                 proprioception=proprioception.copy(),
                 somatosensation=touch.copy(),
                 goal=self.goal.ravel().copy()),
@@ -344,18 +344,7 @@ class BaseManipulate(BaseShadowHandEnv):
         return (sum(self._goal_distance(self.goal, self.previous_achieved_goal))
                 - sum(self._goal_distance(self.goal, self._get_achieved_goal())))
 
-    def step(self, action):
-        """Make step in environment."""
-        obs, reward, done, info = super().step(action)
-        dropped = self._is_dropped()
-        success = self._is_success(self._get_achieved_goal(), self.goal)
-        done = done or dropped or success
-
-        self.previous_achieved_goal = self._get_achieved_goal().copy()
-
-        return obs, reward, done, info
-
-    def compute_reward(self, achieved_goal, goal, info):
+    def compute_reward(self, achieved_goal: np.ndarray, goal, info):
         """Compute the reward."""
         success = self._is_success(achieved_goal, goal).astype(np.float32)
         d_pos, d_rot = self._goal_distance(achieved_goal, goal)
@@ -364,6 +353,21 @@ class BaseManipulate(BaseShadowHandEnv):
         return (+ d_progress  # convergence to goal reward
                 + success * 5  # reward for finishing
                 - 20 * self._is_dropped())  # dropping penalty
+
+    def step(self, action):
+        """Make step in environment."""
+        obs, reward, done, info = super().step(action)
+        dropped = self._is_dropped()
+        success = self._is_success(self._get_achieved_goal(), self.goal)
+        done = done or dropped
+
+        if not success:
+            self.previous_achieved_goal = self._get_achieved_goal().copy()
+        else:
+            self.goal = self._sample_goal()
+            obs = self._get_obs()
+
+        return obs, reward, done, info
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
