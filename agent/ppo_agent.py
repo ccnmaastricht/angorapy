@@ -436,7 +436,6 @@ class PPOAgent:
                 dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
                                                     responsive_senses=self.policy.input_names)
-                print(f"{mpi_comm.rank} was able to load a dataset")
                 self.optimize(dataset, epochs, batch_size // n_optimizers)
 
                 time_dict["optimizing"] = time.time() - subprocess_start
@@ -544,7 +543,6 @@ class PPOAgent:
 
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
-            print(f"{mpi_comm.rank} was able to start an epoch")
 
             # for each epoch, dataset first should be shuffled to break correlation
             if not self.is_recurrent:
@@ -552,12 +550,10 @@ class PPOAgent:
 
             # then divide into batches
             batched_dataset = dataset.batch(batch_size, drop_remainder=True)
-            print(f"{mpi_comm.rank} was able to batch its dataset")
 
             # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
             for b in batched_dataset:
-                print(f"{mpi_comm.rank} was able to jump into its dataset")
 
                 # use the dataset to optimize the model
                 with tf.device(self.device):
@@ -582,7 +578,6 @@ class PPOAgent:
 
                             # find and apply the gradients
                             # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape) for v in self.joint.trainable_variables], 0, 0, 0
-                            print(f"{mpi_comm.rank} was able to send a batch")
                             grad, ent, pi_loss, v_loss = _learn_on_batch(
                                 batch=partial_batch, joint=self.joint, distribution=self.distribution,
                                 continuous_control=self.continuous_control, clip_values=self.clip_values,
