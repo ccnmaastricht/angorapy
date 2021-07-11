@@ -310,10 +310,10 @@ class PPOAgent:
         optimizer_base, optimizer_extra = divmod(self.n_workers, n_optimizers)
         optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(n_optimizers)]
         optimizer_collection_ids = list(range(self.n_workers))[
-                                   sum(optimizer_split[:mpi_comm.rank]):sum(optimizer_split[:mpi_comm.rank + 1])]
+                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(optimizer_split[:self.optimizer.comm.rank + 1])]
 
         list_of_worker_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
-        list_of_optimizer_collection_id_lists = mpi_comm.gather(optimizer_collection_ids, root=0)
+        list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
 
         if is_root:
             print(
