@@ -4,10 +4,12 @@ import mujoco_py
 import numpy as np
 from gym import utils, spaces
 from gym.envs.robotics import HandBlockEnv, rotations
-from gym.envs.robotics.hand import manipulate
+from gym.envs.robotics.hand.manipulate import robot_get_obs
 from gym.envs.robotics.utils import robot_get_obs
 
+from common.reward import manipulate
 from common.senses import Sensation
+from configs.reward_config import MANIPULATE_BASE
 from environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE
 from common.const import VISION_WH, N_SUBSTEPS
 
@@ -124,6 +126,15 @@ class BaseManipulate(BaseShadowHandEnv):
             self.sim.model.site_rgba[site_id][3] = 0.0
 
         self.previous_achieved_goal = self._get_achieved_goal()
+        self._set_default_reward_function_and_config()
+
+    def _set_default_reward_function_and_config(self):
+        self.reward_function = manipulate
+        self.reward_config = MANIPULATE_BASE
+
+    def assert_reward_setup(self):
+        """Assert whether the reward config fits the environment. """
+        assert set(MANIPULATE_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete manipulate reward configuration."
 
     def _get_achieved_goal(self):
         # Object position and rotation.
@@ -278,20 +289,23 @@ class BaseManipulate(BaseShadowHandEnv):
         goal = np.concatenate([target_pos, target_quat])
         return goal
 
-    def _render_callback(self):
+    def _render_callback(self, render_targets=False):
         # Assign current state to target object but offset a bit so that the actual object
         # is not obscured.
-        goal = self.goal.copy()
-        assert goal.shape == (7,)
-        if self.target_position == 'ignore':
-            # Move the object to the side since we do not care about it's position.
-            goal[0] += 0.15
-        self.sim.data.set_joint_qpos('target:joint', goal)
-        self.sim.data.set_joint_qvel('target:joint', np.zeros(6))
 
-        if 'object_hidden' in self.sim.model.geom_names:
-            hidden_id = self.sim.model.geom_name2id('object_hidden')
-            self.sim.model.geom_rgba[hidden_id, 3] = 1.
+        if render_targets:
+            goal = self.goal.copy()
+            assert goal.shape == (7,)
+            if self.target_position == 'ignore':
+                # Move the object to the side since we do not care about it's position.
+                goal[0] += 0.15
+            self.sim.data.set_joint_qpos('target:joint', goal)
+            self.sim.data.set_joint_qvel('target:joint', np.zeros(6))
+
+            if 'object_hidden' in self.sim.model.geom_names:
+                hidden_id = self.sim.model.geom_name2id('object_hidden')
+                self.sim.model.geom_rgba[hidden_id, 3] = 1.
+
         self.sim.forward()
 
     def _get_obs(self):
@@ -299,7 +313,7 @@ class BaseManipulate(BaseShadowHandEnv):
         achieved_goal = self._get_achieved_goal().ravel()
 
         # get proprioceptive information (positions of joints)
-        robot_pos, robot_vel = manipulate.robot_get_obs(self.sim)
+        robot_pos, robot_vel = robot_get_obs(self.sim)
         proprioception = np.concatenate([robot_pos, robot_vel])
 
         if self.vision:
@@ -343,16 +357,6 @@ class BaseManipulate(BaseShadowHandEnv):
     def _goal_progress(self):
         return (sum(self._goal_distance(self.goal, self.previous_achieved_goal))
                 - sum(self._goal_distance(self.goal, self._get_achieved_goal())))
-
-    def compute_reward(self, achieved_goal: np.ndarray, goal, info):
-        """Compute the reward."""
-        success = self._is_success(achieved_goal, goal).astype(np.float32)
-        d_pos, d_rot = self._goal_distance(achieved_goal, goal)
-        d_progress = self._goal_progress()
-
-        return (+ d_progress  # convergence to goal reward
-                + success * 5  # reward for finishing
-                - 20 * self._is_dropped())  # dropping penalty
 
     def step(self, action):
         """Make step in environment."""

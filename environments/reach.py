@@ -87,30 +87,6 @@ class Reach(BaseShadowHandEnv):
         """Get position of the specified finger in space."""
         return self.sim.data.get_site_xpos(finger_name).flatten()
 
-    def compute_reward(self, achieved_goal, goal, info):
-        """Compute reward with additional success bonus."""
-        return self.reward_function(self, achieved_goal, goal, info)
-
-    def set_reward_function(self, function: Union[str, Callable]):
-        """Set the environment reward function by its config identifier or a callable."""
-        if isinstance(function, str):
-            try:
-                function = getattr(reward, function.split(".")[0])
-            except AttributeError:
-                raise AttributeError("Reward function unknown.")
-
-        self.reward_function = function
-
-    def set_reward_config(self, new_config: Union[str, dict]):
-        """Set the environment'serialization reward configuration by its identifier or a dict."""
-        if isinstance(new_config, str):
-            new_config: dict = resolve_config_name(new_config)
-
-        self.reward_config = new_config
-        self.distance_threshold = self.reward_config["SUCCESS_DISTANCE"]
-
-        self.assert_reward_setup()
-
     def _reset_sim(self):
         """Resets a simulation and indicates whether or not it was successful."""
         self.sim.set_state(self.initial_state)  # reset everything

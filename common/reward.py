@@ -106,3 +106,16 @@ def sequential_free_reach(env, achieved_goal, goal, info: dict):
                          - calculate_auxiliary_finger_penalty(env, exclude=exclusions))
 
     return reinforcement_reward + punishment_reward
+
+
+# MANIPULATE
+
+def manipulate(env, achieved_goal, goal, info: dict):
+    """Reward function fo object manipulation tasks."""
+    success = env._is_success(achieved_goal, goal).astype(np.float32)
+    d_pos, d_rot = env._goal_distance(achieved_goal, goal)
+    d_progress = env._goal_progress()
+
+    return (+ d_progress  # convergence to goal reward
+            + success * env.reward_config["SUCCESS_BONUS"]  # reward for finishing
+            - env._is_dropped() * env.reward_config["DROPPING_PENALTY"])  # dropping penalty

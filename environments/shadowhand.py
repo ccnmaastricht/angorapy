@@ -4,6 +4,7 @@ import abc
 import copy
 import os
 import random
+from typing import Callable, Union
 
 import gym
 import mujoco_py
@@ -14,6 +15,9 @@ from gym.envs.robotics import hand_env
 from gym.envs.robotics.hand import manipulate
 from gym.envs.robotics.utils import robot_get_obs
 from gym.utils import seeding
+
+from common import reward
+from configs.reward_config import resolve_config_name
 
 FINGERTIP_SITE_NAMES = [
     'robot0:S_fftip',
@@ -127,6 +131,35 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     def dt(self):
         return self.sim.model.opt.timestep * self.sim.nsubsteps
 
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute reward with additional success bonus."""
+        return self.reward_function(self, achieved_goal, goal, info)
+
+    @abc.abstractmethod
+    def assert_reward_setup(self):
+        pass
+
+    def set_reward_function(self, function: Union[str, Callable]):
+        """Set the environment reward function by its config identifier or a callable."""
+        if isinstance(function, str):
+            try:
+                function = getattr(reward, function.split(".")[0])
+            except AttributeError:
+                raise AttributeError("Reward function unknown.")
+
+        self.reward_function = function
+
+    def set_reward_config(self, new_config: Union[str, dict]):
+        """Set the environment'serialization reward configuration by its identifier or a dict."""
+        if isinstance(new_config, str):
+            new_config: dict = resolve_config_name(new_config)
+
+        self.reward_config = new_config
+        if "SUCCESS_DISTANCE" in self.reward_config.keys():
+            self.distance_threshold = self.reward_config["SUCCESS_DISTANCE"]
+
+        self.assert_reward_setup()
+
     # INFROMATION METHODS
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
@@ -175,7 +208,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             self._viewers = {}
 
     def render(self, mode='human', width=500, height=500):
-        self._render_callback()
+        self._render_callback(render_targets=True)
         if mode == 'rgb_array':
             self._get_viewer(mode).render(width, height)
             # window size used for old mujoco-py:
@@ -249,7 +282,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _render_callback(self):
+    def _render_callback(self, render_targets=False):
         """A custom callback that is called before rendering. Can be used to implement custom visualizations."""
         pass
 

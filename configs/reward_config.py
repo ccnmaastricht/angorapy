@@ -23,6 +23,11 @@ REACH_BASE = dict(
     AUXILIARY_PENALTY_MULTIPLIER=0.01
 )
 
+MANIPULATE_BASE = dict(
+    SUCCESS_BONUS = 5,
+    DROPPING_PENALTY = 20
+)
+
 
 # REACH
 reach = dict(
@@ -59,7 +64,9 @@ sequential_free_reach = dict(
 )
 
 # MANIPULATE
-# todo
+manipulate = dict(
+    default=MANIPULATE_BASE
+)
 
 if __name__ == '__main__':
     print(resolve_config_name("reach.default"))
