@@ -62,7 +62,7 @@ def build_ffn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
 
 
 def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                     model_type: str = "rnn", layer_sizes: Tuple = (64,), sequence_length=1):
+                     model_type: str = "rnn", layer_sizes: Tuple = (64, 64), sequence_length=1):
     """Build simple policy and value models having a recurrent layer before their heads.
 
     Args:
@@ -95,7 +95,7 @@ def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
         inputs.shape[-1],
         # since we are distributing the encoder over all timesteps, we need to blow up the bs here
         bs * sequence_length,
-        layer_sizes=layer_sizes,
+        layer_sizes=layer_sizes[:-1],
         name="policy_encoder")
 
     x = TimeDistributed(encoder_sub_model, name="TD_policy")(masked)
@@ -120,7 +120,7 @@ def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
         x = TimeDistributed(
             _build_encoding_sub_model(inputs.shape[-1],
                                       bs * sequence_length,
-                                      layer_sizes=layer_sizes,
+                                      layer_sizes=layer_sizes[:-1],
                                       name="value_encoder"),
             name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
@@ -171,7 +171,7 @@ def build_wider_models(env: BaseWrapper, distribution: BasePolicyDistribution, s
         return build_ffn_models(env, distribution, shared, layer_sizes=(1024, 512))
     else:
         return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length,
-                                model_type=model_type, layer_sizes=(1024,))
+                                model_type=model_type, layer_sizes=(1024, 512))
 
 
 if __name__ == '__main__':
