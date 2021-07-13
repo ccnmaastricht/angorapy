@@ -196,7 +196,7 @@ hand = make_config(
 hand_no_ent = derive_config(hand, {"c_entropy": 0.0})
 hand_manipulate = derive_config(hand, {
     "c_entropy": 0.01,
-    "epochs": 1
+    "epochs": 3
 })
 
 # RECOMMENDED CONFIGS FOR ENVs

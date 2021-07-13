@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution
+from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution
 from common.wrappers import BaseWrapper
 from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
@@ -120,7 +120,8 @@ def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
         x = TimeDistributed(
             _build_encoding_sub_model(inputs.shape[-1],
                                       bs * sequence_length,
-                                      layer_sizes=layer_sizes, name="value_encoder"),
+                                      layer_sizes=layer_sizes,
+                                      name="value_encoder"),
             name="TD_value")(masked)
         x.set_shape([bs] + x.shape[1:])
 
@@ -161,22 +162,28 @@ def build_deeper_models(env: BaseWrapper, distribution: BasePolicyDistribution, 
                                 model_type=model_type, layer_sizes=(64, 64, 64, 32))
 
 
+def build_wider_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
+                        sequence_length: int = 1, model_type: str = "rnn", **kwargs):
+    """Build deeper simple networks (policy, value, joint) for given parameter settings."""
+
+    # this function is just a wrapper routing the requests for ffn and rnns
+    if model_type == "ffn":
+        return build_ffn_models(env, distribution, shared, layer_sizes=(1024, 512))
+    else:
+        return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length,
+                                model_type=model_type, layer_sizes=(1024,))
+
+
 if __name__ == '__main__':
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     cont_env = gym.make("LunarLanderContinuous-v2")
     disc_env = gym.make("LunarLander-v2")
 
-    # _, _, ffn_distinct = build_ffn_models(cont_env, GaussianPolicyDistribution(cont_env), False)
-    # _, _, ffn_shared = build_ffn_models(cont_env, BetaPolicyDistribution(cont_env), True)
-    _, _, ffn_distinct_discrete = build_ffn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
-    # _, _, rnn_distinct = build_rnn_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, "lstm")
-    # _, _, rnn_shared = build_rnn_models(cont_env, GaussianPolicyDistribution(cont_env), True, 1, "gru")
-    # _, _, rnn_shared_discrete = build_rnn_models(disc_env, CategoricalPolicyDistribution(disc_env), True)
+    model = build_deeper_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
+    print(f"Deeper model has {model[0].count_params()} parameters.")
+    plot_model(model[2], show_shapes=True, to_file="model_graph_deeper.png", expand_nested=True)
 
-    # plot_model(ffn_distinct, "ffn_distinct.png", expand_nested=True)
-    plot_model(ffn_distinct_discrete, "ffn_distinct_discrete.png", expand_nested=True)
-    # plot_model(ffn_shared, "ffn_shared.png", expand_nested=True)
-    # plot_model(rnn_distinct, "rnn_distinct.png", expand_nested=True)
-    # plot_model(rnn_shared, "rnn_shared.png", expand_nested=True)
-    # plot_model(rnn_shared_discrete, "rnn_shared_discrete.png", expand_nested=True)
+    model = build_wider_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
+    print(f"Wider model has {model[0].count_params()} parameters.")
+    plot_model(model[2], show_shapes=True, to_file="model_graph_wider.png", expand_nested=True)
