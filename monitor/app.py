@@ -66,6 +66,7 @@ def overview():
                         "is_success": is_success,
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,
                         "config_name": meta["config"] if "config" in meta else "unknown",
+                        "reward": meta["reward_function"] if "reward_function" in meta else "None"
                     }
                 })
 

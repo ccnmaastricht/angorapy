@@ -16,7 +16,9 @@ from models.components import _build_encoding_sub_model
 from utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False,
+def build_ffn_models(env: BaseWrapper,
+                     distribution: BasePolicyDistribution,
+                     shared: bool = False,
                      layer_sizes: Tuple = (64, 64)):
     """Build a simple fully connected feed-forward model model."""
 
@@ -61,8 +63,13 @@ def build_ffn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, value_out], name="policy_value")
 
 
-def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                     model_type: str = "rnn", layer_sizes: Tuple = (64, 64), sequence_length=1):
+def build_rnn_models(env: BaseWrapper,
+                     distribution: BasePolicyDistribution,
+                     shared: bool = False,
+                     bs: int = 1,
+                     model_type: str = "rnn",
+                     layer_sizes: Tuple = (64, 64),
+                     sequence_length=1):
     """Build simple policy and value models having a recurrent layer before their heads.
 
     Args:
@@ -139,8 +146,13 @@ def build_rnn_models(env: BaseWrapper, distribution: BasePolicyDistribution, sha
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, out_value], name="simple_rnn")
 
 
-def build_simple_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                        sequence_length: int = None, model_type: str = "rnn", **kwargs):
+def build_simple_models(env: BaseWrapper,
+                        distribution: BasePolicyDistribution,
+                        shared: bool = False,
+                        bs: int = 1,
+                        sequence_length: int = None,
+                        model_type: str = "rnn",
+                        **kwargs):
     """Build simple networks (policy, value, joint) for given parameter settings."""
 
     # this function is just a wrapper routing the requests for ffn and rnns
@@ -150,8 +162,13 @@ def build_simple_models(env: BaseWrapper, distribution: BasePolicyDistribution, 
         return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length, model_type=model_type)
 
 
-def build_deeper_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                        sequence_length: int = 1, model_type: str = "rnn", **kwargs):
+def build_deeper_models(env: BaseWrapper,
+                        distribution: BasePolicyDistribution,
+                        shared: bool = False,
+                        bs: int = 1,
+                        sequence_length: int = 1,
+                        model_type: str = "rnn",
+                        **kwargs):
     """Build deeper simple networks (policy, value, joint) for given parameter settings."""
 
     # this function is just a wrapper routing the requests for ffn and rnns
@@ -159,11 +176,16 @@ def build_deeper_models(env: BaseWrapper, distribution: BasePolicyDistribution, 
         return build_ffn_models(env, distribution, shared, layer_sizes=(64, 64, 64, 32))
     else:
         return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length,
-                                model_type=model_type, layer_sizes=(64, 64, 64, 32))
+                                model_type=model_type, layer_sizes=(64, 64, 64, 32, 32))
 
 
-def build_wider_models(env: BaseWrapper, distribution: BasePolicyDistribution, shared: bool = False, bs: int = 1,
-                        sequence_length: int = 1, model_type: str = "rnn", **kwargs):
+def build_wider_models(env: BaseWrapper,
+                       distribution: BasePolicyDistribution,
+                       shared: bool = False,
+                       bs: int = 1,
+                       sequence_length: int = 1,
+                       model_type: str = "rnn",
+                       **kwargs):
     """Build deeper simple networks (policy, value, joint) for given parameter settings."""
 
     # this function is just a wrapper routing the requests for ffn and rnns

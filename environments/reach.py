@@ -333,7 +333,7 @@ class FreeReach(Reach):
 
         # make one hot encoding
         goal = np.zeros(len(FINGERTIP_SITE_NAMES))
-        goal[f_id] = 1
+        goal[self.current_target_finger] = 1
 
         return goal
 
@@ -345,22 +345,23 @@ class FreeReach(Reach):
         d = get_fingertip_distance(self.get_thumb_position(), self.get_target_finger_position())
         return (d < self.distance_threshold).astype(np.float32)
 
-    def _render_callback(self):
-        sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
+    def _render_callback(self, render_targets=False):
+        if render_targets:
+            sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
 
-        # Visualize finger positions.
-        achieved_goal = self._get_achieved_goal().reshape(5, 3)
-        for finger_idx in range(5):
-            site_name = 'finger{}'.format(finger_idx)
-            site_id = self.sim.model.site_name2id(site_name)
+            # Visualize finger positions.
+            achieved_goal = self._get_achieved_goal().reshape(5, 3)
+            for finger_idx in range(5):
+                site_name = 'finger{}'.format(finger_idx)
+                site_id = self.sim.model.site_name2id(site_name)
 
-            fname = FINGERTIP_SITE_NAMES[finger_idx]
-            if not (fname == self.thumb_name or finger_idx == np.where(self.goal == 1)[0].item()):
-                self.sim.model.site_rgba[site_id][-1] = 0
-                continue
+                fname = FINGERTIP_SITE_NAMES[finger_idx]
+                if not (fname == self.thumb_name or finger_idx == np.where(self.goal == 1)[0].item()):
+                    self.sim.model.site_rgba[site_id][-1] = 0
+                    continue
 
-            self.sim.model.site_rgba[site_id][-1] = 0.2
-            self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
+                self.sim.model.site_rgba[site_id][-1] = 0.2
+                self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
 
         self.sim.forward()
 

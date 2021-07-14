@@ -59,11 +59,12 @@ print(f"Environment has the following transformers: {env.transformers}")
 #     env = make_env(new_name, args.rcon)
 
 
-if not args.force_case_circulation or (env.unwrapped.spec.id != "FreeReachRelative-v0"):
+if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(100):
         investigator.render_episode(env, slow_down=False, substeps_per_step=20 if scale_the_substeps else 1)
 else:
-    env = gym.make("FreeReachFFRelative-v0")
+    env = make_env("FreeReachFFAbsolute-v0", transformers=agent.env.transformers)
+    env.env.toggle_wrist_freezing()
     for i in range(100):
         env.forced_finger = i % 4
         env.env.forced_finger = i % 4

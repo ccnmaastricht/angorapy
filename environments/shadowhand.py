@@ -127,9 +127,16 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             ),
         ))
 
+        self._freeze_wrist = False
+
     @property
     def dt(self):
         return self.sim.model.opt.timestep * self.sim.nsubsteps
+
+    def toggle_wrist_freezing(self):
+        """Toggle flag preventing the wrist from moving."""
+        self._freeze_wrist = not self._freeze_wrist
+        print("Wrist movements are now frozen.")
 
     def compute_reward(self, achieved_goal, goal, info):
         """Compute reward with additional success bonus."""
@@ -175,6 +182,9 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
     def step(self, action):
         action = np.clip(action, self.action_space.low, self.action_space.high)
+        if self._freeze_wrist:
+            action[:2] = 0
+
         self._set_action(action)
         self.sim.step()
         self._step_callback()
@@ -184,6 +194,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         info = {
             'is_success': self._is_success(obs['achieved_goal'], self.goal),
         }
+
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
         return obs, reward, done, info
 
@@ -309,7 +320,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.32  # zoom in
+            self.viewer.cam.distance = 0.4  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[1] -= 0.07  # slightly move forward

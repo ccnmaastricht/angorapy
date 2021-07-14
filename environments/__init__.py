@@ -74,7 +74,8 @@ for step_granularity in ["Fine", ""]:
                     gym.envs.register(
                         id=f'FreeReach{name}{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
                         entry_point='environments:FreeReach',
-                        kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
+                        kwargs={"relative_control": control_mode == "Relative",
+                                "vision": vision_mode == "Visual",
                                 "force_finger": i,
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}),
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
