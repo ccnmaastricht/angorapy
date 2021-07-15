@@ -13,6 +13,7 @@ from typing import Union, Tuple, Any, Callable
 
 import gym
 import numpy as np
+import nvidia_smi
 import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box
@@ -245,6 +246,7 @@ class PPOAgent:
         self.optimization_timings = []
         self.gathering_timings = []
         self.used_memory = []
+        self.used_gpu_memory = []
 
         self.wrapper_stat_history = {}
         for transformer in self.env.transformers:
@@ -340,8 +342,8 @@ class PPOAgent:
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size // n_optimizers,
-            sequence_length=self.tbptt_length
-        )
+            sequence_length=self.tbptt_length)
+        _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
         actor = self._make_actor()
 
@@ -355,13 +357,11 @@ class PPOAgent:
 
             # distribute parameters from rank 0 to all goal ranks
             joint_weights = mpi_comm.bcast(joint_weights, root=0)
-            self.policy, self.value, self.joint = self.build_models(
-                weights=joint_weights, batch_size=batch_size // n_optimizers, sequence_length=self.tbptt_length)
+            self.joint.set_weights(joint_weights)
+            actor_joint.set_weights(joint_weights)
 
             # run simulations in parallel
             worker_stats = []
-
-            _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
             for i in worker_collection_ids:
                 stats = actor.collect(actor_joint, self.env, self.distribution, self.horizon,
@@ -418,7 +418,20 @@ class PPOAgent:
                             used_memory += p.memory_info()[0]
                     except NoSuchProcess:
                         pass
+
+                nvidia_smi.nvmlInit()
+                nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+                procs = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(nvidia_handle)
+                used_gpu_memory = 0
+                for p in procs:
+                    try:
+                        if "python" in psutil.Process(p.pid).name():
+                            used_gpu_memory += p.usedGpuMemory
+                    except NoSuchProcess:
+                        pass
+
                 self.used_memory.append(round(used_memory / 1e9, 2))
+                self.used_gpu_memory.append(round(used_gpu_memory / 1e9, 2))
                 self.report(total_iterations=n)
                 cycle_start = time.time()
 
@@ -471,13 +484,6 @@ class PPOAgent:
                     self.gathering_timings.append(time_dict["gathering"])
 
                 joint_weights = self.joint.get_weights()
-
-            # cleanup to counteract memory leaks
-            del actor_joint
-            del self.joint
-            del self.value
-            del self.policy
-            del stats
 
             gc.collect()
             tf.compat.v1.reset_default_graph()
@@ -705,22 +711,26 @@ class PPOAgent:
         if len(self.cycle_timings) > 0:
             time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
 
+        nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+        nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
+
         # print the report
         if is_root:
-            mpi_flat_print(
-                f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
-                f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
-                f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
-                f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
-                f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
-                f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
-                f"lr: {nc}{current_lr:.2e}{ec}; "
-                f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
-                f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
-                f"{underflow}"
-                f"times: {time_string} {time_distribution_string}; "
-                f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
-                f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}GB;\n")
+            pass
+        mpi_flat_print(
+            f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
+            f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
+            f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
+            f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
+            f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
+            f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
+            f"lr: {nc}{current_lr:.2e}{ec}; "
+            f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
+            f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+            f"{underflow}"
+            f"times: {time_string} {time_distribution_string}; "
+            f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
+            f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}|{self.used_gpu_memory[-1]}/{round(nvidia_info.total / 1e9, 2)};\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""

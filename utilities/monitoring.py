@@ -177,6 +177,7 @@ class Monitor:
                 total_train_time=str(numpy.sum(self.agent.cycle_timings)) if self.agent.cycle_timings else "0",
             ),
             used_memory=self.agent.used_memory,
+            used_gpu_memory=self.agent.used_gpu_memory,
             cycle_timings=self.agent.cycle_timings,
             optimization_timings=self.agent.optimization_timings,
             gathering_timings=self.agent.gathering_timings,
