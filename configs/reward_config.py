@@ -38,7 +38,7 @@ reach = dict(
 sequential_reach = dict(
     default=dict(REACH_BASE),
     great_success=dict(REACH_BASE,
-                       SUCCESS_MULTIPLIER=20)
+                       SUCCESS_MULTIPLIER=5)
 )
 
 # FREE REACH

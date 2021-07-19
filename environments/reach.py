@@ -19,7 +19,11 @@ from utilities.util import HiddenPrints
 class Reach(BaseShadowHandEnv):
     """Simple Reaching task."""
 
-    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False,
+    def __init__(self,
+                 initial_qpos=DEFAULT_INITIAL_QPOS,
+                 n_substeps=N_SUBSTEPS,
+                 relative_control=True,
+                 vision=False,
                  touch=True):
         if vision:
             with HiddenPrints():
@@ -197,51 +201,19 @@ class Reach(BaseShadowHandEnv):
         return o, r, d, i
 
 
-class MultiReach(Reach):
-    """Reaching task where three fingers have to be joined."""
-
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False):
-        super().__init__(n_substeps, relative_control, initial_qpos, vision)
-
-    def _sample_goal(self):
-        thumb_name = 'robot0:S_thtip'
-        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
-
-        # choose the fingers to join with the thumb
-        finger_name_a, finger_name_b = self.np_random.choice(a=finger_names, size=2, replace=False)
-
-        # retrieve their indices
-        thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
-        finger_idx_a = FINGERTIP_SITE_NAMES.index(finger_name_a)
-        finger_idx_b = FINGERTIP_SITE_NAMES.index(finger_name_b)
-
-        # pick a meeting point above the hand.
-        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
-        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
-
-        # Slightly move meeting goal towards the respective finger to avoid that they overlap.
-        goal = self.initial_goal.copy().reshape(-1, 3)
-        for idx in [thumb_idx, finger_idx_a, finger_idx_b]:
-            offset_direction = (meeting_pos - goal[idx])
-            offset_direction /= np.linalg.norm(offset_direction)
-            goal[idx] = meeting_pos - 0.007 * offset_direction
-
-        if self.np_random.uniform() < 0.1:
-            # With some probability, ask all fingers to move back to the origin.
-            # This avoids that the thumb constantly stays near the goal position already.
-            goal = self.initial_goal.copy()
-
-        return goal.flatten()
-
-
 class ReachSequential(Reach):
     """Generate finger configurations in a sequence. Each new goal is randomly generated as the old goal is reached."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False):
+    def __init__(self,
+                 initial_qpos=DEFAULT_INITIAL_QPOS,
+                 n_substeps=N_SUBSTEPS,
+                 relative_control=True,
+                 vision=False,
+                 touch=True):
         self.current_target_finger = None
         self.goal_sequence = []
 
-        super().__init__(n_substeps, relative_control, initial_qpos, vision)
+        super().__init__(initial_qpos, n_substeps, relative_control, vision, touch)
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = sequential_reach

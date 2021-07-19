@@ -56,6 +56,9 @@ def overview():
                 elif max_performance is not None and max_performance > reward_threshold:
                     is_success = True
 
+                architecture = "Any" if "architecture" not in meta["hyperparameters"] else meta["hyperparameters"]["architecture"]
+                model = "Any" if "model" not in meta["hyperparameters"] else meta["hyperparameters"]["model"]
+
                 experiments.update({
                     eid: {
                         "env": meta["environment"]["name"],
@@ -66,7 +69,8 @@ def overview():
                         "is_success": is_success,
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,
                         "config_name": meta["config"] if "config" in meta else "unknown",
-                        "reward": meta["reward_function"] if "reward_function" in meta else "None"
+                        "reward": meta["reward_function"] if "reward_function" in meta else "None",
+                        "model": architecture + "[" + model + "]"
                     }
                 })
 

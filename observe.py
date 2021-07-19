@@ -2,6 +2,9 @@
 """Evaluate a loaded agent on a task."""
 import argparse
 import os
+
+from environments.shadowhand import FINGERTIP_SITE_NAMES
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import time
@@ -21,6 +24,7 @@ parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults t
 parser.add_argument("--env", type=str, nargs="?", help="force testing environment", default="")
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="b")
 parser.add_argument("--force-case-circulation", action="store_true", help="circle through goal definitions")
+parser.add_argument("--freeze-wrist", action="store_true", help="prevent wrist movements")
 parser.add_argument("--rcon", type=str, help="reward configuration", default=None)
 
 args = parser.parse_args()
@@ -46,6 +50,8 @@ except:
 
 investigator = Investigator.from_agent(agent)
 env = agent.env
+if args.freeze_wrist:
+    env.env.toggle_wrist_freezing()
 
 print(f"Evaluating on {env.unwrapped.spec.id} with {env.unwrapped.sim.nsubsteps} substeps.")
 print(f"Environment has the following transformers: {env.transformers}")
@@ -61,11 +67,14 @@ print(f"Environment has the following transformers: {env.transformers}")
 
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(100):
-        investigator.render_episode(env, slow_down=False, substeps_per_step=20 if scale_the_substeps else 1)
+        investigator.render_episode(env, slow_down=False, substeps_per_step=10 if scale_the_substeps else 1)
 else:
     env = make_env("FreeReachFFAbsolute-v0", transformers=agent.env.transformers)
-    env.env.toggle_wrist_freezing()
+    if args.freeze_wrist:
+        env.env.toggle_wrist_freezing()
+
     for i in range(100):
+        print(f"New Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
         env.forced_finger = i % 4
         env.env.forced_finger = i % 4
         env.unwrapped.forced_finger = i % 4

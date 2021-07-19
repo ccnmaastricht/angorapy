@@ -8,7 +8,7 @@ from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, Half
 from environments.manipulate import ManipulateBlock, ManipulateEgg
 from environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
 from environments.nrp.shadowhand import BaseNRPShadowHandEnv
-from environments.reach import Reach, MultiReach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
+from environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
 
 # SHADOW HAND
 gym.envs.register(
