@@ -199,6 +199,25 @@ hand_manipulate = derive_config(hand, {
     "epochs": 3
 })
 
+andrypulate = make_config(
+    iterations=50000,
+    workers=178,
+    batch_size=256,
+    horizon=512,
+    c_entropy=0.001,
+    lr_pi=5e-4,
+    lr_schedule="exponential",
+    epochs=10,
+    clip=0.2,
+    lam=0.95,
+    discount=0.998,
+    grad_norm=0.5,
+    clip_values=False,
+    distribution="beta",
+    architecture="wider",
+    model="lstm"
+)
+
 # RECOMMENDED CONFIGS FOR ENVs
 
 recommended_config = dict(
