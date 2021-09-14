@@ -22,4 +22,10 @@ module load cuDNN/8.0.3.33
 source ${HOME}/robovenv/bin/activate
 
 export DISPLAY=:0
-srun python3 -u train.py ManipulateBlockRelative-v0 --pcon hand_manipulate --model gru --architecture deeper --workers 96 --save-every 100
+
+if test -z "$SCRIPTCOMMAND"
+then
+  srun python3 -u train.py ManipulateBlockRelative-v0 --pcon hand_manipulate --model gru --architecture deeper --workers 96 --save-every 100
+else
+  eval $SCRIPTCOMMAND
+fi

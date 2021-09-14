@@ -82,8 +82,18 @@ for step_granularity in ["Fine", ""]:
                         max_episode_steps=SHADOWHAND_MAX_STEPS,
                     )
 
-                # REACH SEQUENCES
+                    gym.envs.register(
+                        id=f'Reach{name}{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
+                        entry_point='environments:Reach',
+                        kwargs={"relative_control": control_mode == "Relative",
+                                "vision": vision_mode == "Visual",
+                                "force_finger": i,
+                                **({"initial_qpos": init_mode.lower()} if init_mode else {}),
+                                "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
+                        max_episode_steps=SHADOWHAND_MAX_STEPS,
+                    )
 
+                # REACH SEQUENCES
                 gym.envs.register(
                     id=f'FreeReachSequential{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
                     entry_point='environments:FreeReachSequential',

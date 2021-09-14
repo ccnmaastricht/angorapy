@@ -25,6 +25,7 @@ parser.add_argument("--env", type=str, nargs="?", help="force testing environmen
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="b")
 parser.add_argument("--force-case-circulation", action="store_true", help="circle through goal definitions")
 parser.add_argument("--freeze-wrist", action="store_true", help="prevent wrist movements")
+parser.add_argument("--hide-targets", action="store_true", help="do not show visualization of targets")
 parser.add_argument("--rcon", type=str, help="reward configuration", default=None)
 
 args = parser.parse_args()
@@ -67,14 +68,15 @@ print(f"Environment has the following transformers: {env.transformers}")
 
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(100):
-        investigator.render_episode(env, slow_down=False, substeps_per_step=10 if scale_the_substeps else 1)
+        investigator.render_episode(env,
+                                    slow_down=False)
 else:
-    env = make_env("FreeReachFFAbsolute-v0", transformers=agent.env.transformers)
+    env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
     if args.freeze_wrist:
         env.env.toggle_wrist_freezing()
 
     for i in range(100):
-        print(f"New Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
+        print(f"\nNew Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
         env.forced_finger = i % 4
         env.env.forced_finger = i % 4
         env.unwrapped.forced_finger = i % 4

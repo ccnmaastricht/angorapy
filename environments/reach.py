@@ -24,7 +24,10 @@ class Reach(BaseShadowHandEnv):
                  n_substeps=N_SUBSTEPS,
                  relative_control=True,
                  vision=False,
-                 touch=True):
+                 touch=True,
+                 force_finger=None):
+        assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
+
         if vision:
             with HiddenPrints():
                 # fix to "ERROR: GLEW initalization error: Missing GL version"
@@ -35,7 +38,8 @@ class Reach(BaseShadowHandEnv):
         self.vision = vision
         self.touch = touch
 
-        self.current_target_finger = 3
+        self.forced_finger = force_finger
+        self.current_target_finger = self.forced_finger
         self.thumb_name = 'robot0:S_thtip'
 
         # STATE INITIALIZATION
@@ -134,7 +138,11 @@ class Reach(BaseShadowHandEnv):
     def _sample_goal(self):
         thumb_name = 'robot0:S_thtip'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
-        finger_name = self.np_random.choice(finger_names)
+
+        if self.forced_finger is None:
+            finger_name = self.np_random.choice(finger_names)
+        else:
+            finger_name = finger_names[self.forced_finger]
 
         thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
         finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
@@ -153,8 +161,9 @@ class Reach(BaseShadowHandEnv):
             offset_direction /= np.linalg.norm(offset_direction)
             goal[idx] = meeting_pos - 0.005 * offset_direction
 
-        if self.np_random.uniform() < 0.1:
-            goal = self.initial_goal.copy()
+        if self.forced_finger is None:
+            if self.np_random.uniform() < 0.1:
+                goal = self.initial_goal.copy()
 
         return goal.flatten()
 
@@ -220,8 +229,9 @@ class ReachSequential(Reach):
         self.reward_config = REACH_BASE
 
     def _sample_goal(self):
-        available_fingers = [0, 1, 2, 3, None]  # where None refers to not meeting any fingers
-        available_fingers.remove(self.current_target_finger)
+        available_fingers = [0, 1, 2, 3]  # where None refers to not meeting any fingers
+        if self.current_target_finger is not None:
+            available_fingers.remove(self.current_target_finger)
         self.current_target_finger = random.choice(available_fingers)
 
         goal = self.initial_goal.copy()
@@ -277,13 +287,6 @@ class FreeReach(Reach):
     punishing distance of the thumb to target fingers and rewarding the distance to non-target fingers.
 
     The goal is represented as a one-hot vector of size 4."""
-
-    def __init__(self, initial_qpos=DEFAULT_INITIAL_QPOS, n_substeps=N_SUBSTEPS, relative_control=True, vision=False,
-                 touch=True, force_finger=None):
-        assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
-
-        self.forced_finger = force_finger
-        super().__init__(initial_qpos, n_substeps, relative_control, vision, touch)
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = free_reach

@@ -807,7 +807,8 @@ class PPOAgent:
                                 c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
-                                lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
+                                lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False,
+                                reward_configuration=parameters["reward_configuration"])
 
         for p, v in parameters.items():
             if p in ["distribution", "transformers"]:

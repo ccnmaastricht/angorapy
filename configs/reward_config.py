@@ -36,7 +36,8 @@ reach = dict(
 )
 
 sequential_reach = dict(
-    default=dict(REACH_BASE),
+    default=dict(REACH_BASE,
+                 SUCCESS_DISTANCE=.5),
     great_success=dict(REACH_BASE,
                        SUCCESS_MULTIPLIER=5)
 )
@@ -46,7 +47,6 @@ free_reach = dict(
     default=REACH_BASE,
     force_punished=dict(REACH_BASE, FORCE_MULTIPLIER=0.05),
     force_punished_light=dict(REACH_BASE, FORCE_MULTIPLIER=0.001),
-    narrow_target_zone=dict(REACH_BASE, SUCCESS_DISTANCE=0.005, AUXILIARY_DISTANCE_THRESHOLD_RATIO=50)
 )
 
 free_reach_positive_reinforcement = dict(
