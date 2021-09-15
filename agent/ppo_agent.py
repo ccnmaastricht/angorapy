@@ -228,6 +228,7 @@ class PPOAgent:
         # statistics
         self.total_frames_seen = 0
         self.total_episodes_seen = 0
+        self.years_of_experience = 0
         self.episode_reward_history = []
         self.episode_length_history = []
         self.cycle_reward_history = []
@@ -458,6 +459,10 @@ class PPOAgent:
                     mpi_flat_print("Finalizing...")
                     self.total_frames_seen += stats.numb_processed_frames
                     self.total_episodes_seen += stats.numb_completed_episodes
+                    if hasattr(self.env, "dt"):
+                        self.years_of_experience += (stats.numb_processed_frames * self.env.dt * 3.171e-8)
+                    else:
+                        self.years_of_experience = None
 
                     # update monitor logs
                     if monitor is not None:
@@ -727,6 +732,7 @@ class PPOAgent:
             f"lr: {nc}{current_lr:.2e}{ec}; "
             f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
             f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+            f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
             f"{underflow}"
             f"times: {time_string} {time_distribution_string}; "
             f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
