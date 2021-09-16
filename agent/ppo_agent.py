@@ -470,7 +470,11 @@ class PPOAgent:
 
                     # save the current state of the agent
                     if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                        # every x iterations
                         self.save_agent_state()
+
+                    # and (overwrite) the latest version
+                    self.save_agent_state("last")
 
                     # calculate processing speed in fps
                     self.current_fps = stats.numb_processed_frames / (
@@ -786,8 +790,9 @@ class PPOAgent:
                 from_iteration = "best"
 
         if isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b"], "Unknown string identifier, can only be 'best'/'b' or int."
-            from_iteration = "best"
+            assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            if from_iteration == "b":
+                from_iteration = "best"
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 
@@ -810,7 +815,7 @@ class PPOAgent:
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
 
         for p, v in parameters.items():
-            if p in ["distribution", "transformers"]:
+            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip"]:
                 continue
 
             loaded_agent.__dict__[p] = v
@@ -836,7 +841,6 @@ class PPOAgent:
 
     def finalize(self):
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
-
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)
 

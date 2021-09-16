@@ -191,7 +191,8 @@ $.when(
 
     // REWARD LENGTH BOXPLOTS
 
-    let data = [{
+    if ((prog["rewards"]["last_cycle"].length < 100)) {
+        let data = [{
         y: prog["rewards"]["last_cycle"],
         boxpoints: 'all',
         jitter: 0.3,
@@ -217,6 +218,8 @@ $.when(
 
         },
         {responsive: true});
+    }
+
 
 
     // OBJECTIVE PLOTS
