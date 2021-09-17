@@ -3,12 +3,10 @@
 import argparse
 import os
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from environments.shadowhand import FINGERTIP_SITE_NAMES
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 import time
-
 import gym
 import numpy as np
 
@@ -18,11 +16,12 @@ from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 from common.wrappers import make_env
 import tensorflow as tf
 
+tf.get_logger().setLevel('INFO')
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=None)
 parser.add_argument("--env", type=str, nargs="?", help="force testing environment", default="")
-parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="b")
+parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="best")
 parser.add_argument("--force-case-circulation", action="store_true", help="circle through goal definitions")
 parser.add_argument("--freeze-wrist", action="store_true", help="prevent wrist movements")
 parser.add_argument("--rcon", type=str, help="reward configuration", default=None)

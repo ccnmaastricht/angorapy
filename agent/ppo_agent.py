@@ -757,6 +757,7 @@ class PPOAgent:
         parameters["clip"] = parameters["clip"].numpy().item()
         parameters["distribution"] = self.distribution.__class__.__name__
         parameters["transformers"] = self.env.serialize()
+        parameters["optimizer"] = self.optimizer.serialize()
 
         return parameters
 
@@ -782,14 +783,14 @@ class PPOAgent:
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
+        # determine loading point
         latest_matches = PPOAgent.get_saved_iterations(agent_id)
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
             else:
                 from_iteration = "best"
-
-        if isinstance(from_iteration, str):
+        elif isinstance(from_iteration, str):
             assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
@@ -797,7 +798,8 @@ class PPOAgent:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 
         print(f"Loading from iteration {from_iteration}.")
-        with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
+        loading_path = f"{agent_path}/{from_iteration}/"
+        with open(f"{loading_path}/parameters.json", "r") as f:
             parameters = json.load(f)
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
@@ -813,6 +815,10 @@ class PPOAgent:
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
+
+        if "optimizer" in parameters.keys():  # for backwards compatibility
+            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"])
+            print("Loaded optimizer.")
 
         for p, v in parameters.items():
             if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip"]:

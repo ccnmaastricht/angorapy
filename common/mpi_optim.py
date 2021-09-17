@@ -43,3 +43,31 @@ class MpiAdam(tf.keras.optimizers.Adam):
 
         if not is_in_sync:
             raise AdamSynchronizationError("Parameters of MPIAdam optimizers are out of sync.")
+
+    def serialize(self):
+        weights = self.get_weights()
+        if len(weights) > 0:
+            weights[0] = weights[0].item()
+            weights[1:] = [w.tolist() for w in weights[1:]]
+
+        config = self.get_config()
+        for n, e in config.items():
+            if hasattr(e, "item"):
+                config[n] = e.item()
+
+        return {
+            **config,
+            "weights": weights
+        }
+
+    @staticmethod
+    def from_serialization(comm, serialization) -> "MpiAdam":
+        adam = MpiAdam(
+            comm=comm,
+            learning_rate=serialization["learning_rate"],
+            epsilon=serialization["epsilon"]
+        )
+
+        adam.set_weights(serialization["weights"])
+
+        return adam
