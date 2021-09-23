@@ -35,7 +35,7 @@ function sqrtvector(a) {
 
 // PROGRESS PLOTS
 reward_plot_div = document.getElementById('reward-plot');
-reward_boxplot_div = document.getElementById('reward-boxplot');
+// reward_boxplot_div = document.getElementById('reward-boxplot');
 entropy_plot_div = document.getElementById('entropy-plot');
 
 vloss_plot_div = document.getElementById('vloss-plot');
@@ -190,33 +190,33 @@ $.when(
     Plotly.newPlot(reward_plot_div, traces, layout, {responsive: true});
 
     // REWARD LENGTH BOXPLOTS
-
-    let data = [{
-        y: prog["rewards"]["last_cycle"],
-        boxpoints: 'all',
-        jitter: 0.3,
-        pointpos: -1.8,
-        type: 'box',
-        name: "Reward",
-        marker: {color: "Red"}
-    }, {
-        y: prog["lengths"]["last_cycle"],
-        yaxis: 'y2',
-        boxpoints: 'all',
-        jitter: 0.3,
-        pointpos: -1.8,
-        type: 'box',
-        name: "Length",
-        marker: {color: "Orange"}
-    }];
-
-    Plotly.newPlot(reward_boxplot_div, data, {
-            ...standard_layout,
-            title: "Episode Reward and Length Distribution",
-            yaxis2: {title: "Episode Steps", side: "right", overlaying: 'y', showgrid: false},
-
-        },
-        {responsive: true});
+    //
+    // let data = [{
+    //     y: prog["rewards"]["last_cycle"],
+    //     boxpoints: 'all',
+    //     jitter: 0.3,
+    //     pointpos: -1.8,
+    //     type: 'box',
+    //     name: "Reward",
+    //     marker: {color: "Red"}
+    // }, {
+    //     y: prog["lengths"]["last_cycle"],
+    //     yaxis: 'y2',
+    //     boxpoints: 'all',
+    //     jitter: 0.3,
+    //     pointpos: -1.8,
+    //     type: 'box',
+    //     name: "Length",
+    //     marker: {color: "Orange"}
+    // }];
+    //
+    // Plotly.newPlot(reward_boxplot_div, data, {
+    //         ...standard_layout,
+    //         title: "Episode Reward and Length Distribution",
+    //         yaxis2: {title: "Episode Steps", side: "right", overlaying: 'y', showgrid: false},
+    //
+    //     },
+    //     {responsive: true});
 
 
     // OBJECTIVE PLOTS
@@ -270,67 +270,67 @@ $.when(
     }, objective_layout), {responsive: true});
 
     // NORMALIZATION PLOTS
-    let norm_plot_x = _.range(_.size(prog["preprocessors"]["RewardNormalizationTransformer"]["mean"]))
-    let rew_norm_traces = [];
-    for (let i = 0; i < prog["preprocessors"]["RewardNormalizationTransformer"]["mean"][0].length; i++) {
-        rew_norm_traces.push({
-            x: norm_plot_x,
-            y: prog["preprocessors"]["RewardNormalizationTransformer"]["mean"].map(x => x[i]),
-            mode: "lines",
-            name: "Running Mean Reward",
-            marker: {color: "Green"},
-        });
-    }
-
-    let weird_x = _.concat(
-        norm_plot_x,
-        _.reverse(_.range(_.size(prog["preprocessors"]["RewardNormalizationTransformer"]["mean"]))))
-
-    let upper_reward_bound = addvector(
-        prog["preprocessors"]["RewardNormalizationTransformer"]["mean"],
-        prog["preprocessors"]["RewardNormalizationTransformer"]["stdev"])
-
-    console.log(upper_reward_bound);
-
-    let lower_reward_bound = subtractvector(
-        prog["preprocessors"]["RewardNormalizationTransformer"]["mean"],
-        prog["preprocessors"]["RewardNormalizationTransformer"]["stdev"])
-
-    rew_norm_traces.push({
-        x: norm_plot_x,
-        y: lower_reward_bound,
-        line: {color: "transparent"},
-        showlegend: false,
-        type: "scatter"
-    })
-
-    rew_norm_traces.push({
-        x: norm_plot_x,
-        y: upper_reward_bound,
-        fill: "tonexty",
-        fillcolor: 'rgba(68, 68, 68, 0.1)',
-        line: {color: "transparent"},
-        showlegend: false,
-        type: "scatter"
-    })
-
-    Plotly.newPlot(rew_norm_plot_div, rew_norm_traces, _.merge({
-        title: "Reward Normalization",
-    }, standard_layout), {responsive: true});
-
-    let state_norm_traces = [];
-    for (let i = 0; i < prog["preprocessors"]["StateNormalizationTransformer"]["mean"][0].length; i++) {
-        state_norm_traces.push({
-            x: _.range(_.size(prog["preprocessors"]["StateNormalizationTransformer"]["mean"])),
-            y: prog["preprocessors"]["StateNormalizationTransformer"]["mean"].map(x => x[i]),
-            mode: "lines",
-            name: "Running Mean State",
-            marker: {color: "Green"},
-        });
-    }
-
-    Plotly.newPlot(state_norm_plot_div, state_norm_traces, _.merge({
-        title: "State Normalization",
-    }, standard_layout), {responsive: true});
+    // let norm_plot_x = _.range(_.size(prog["preprocessors"]["RewardNormalizationTransformer"]["mean"]))
+    // let rew_norm_traces = [];
+    // for (let i = 0; i < prog["preprocessors"]["RewardNormalizationTransformer"]["mean"][0].length; i++) {
+    //     rew_norm_traces.push({
+    //         x: norm_plot_x,
+    //         y: prog["preprocessors"]["RewardNormalizationTransformer"]["mean"].map(x => x[i]),
+    //         mode: "lines",
+    //         name: "Running Mean Reward",
+    //         marker: {color: "Green"},
+    //     });
+    // }
+    //
+    // let weird_x = _.concat(
+    //     norm_plot_x,
+    //     _.reverse(_.range(_.size(prog["preprocessors"]["RewardNormalizationTransformer"]["mean"]))))
+    //
+    // let upper_reward_bound = addvector(
+    //     prog["preprocessors"]["RewardNormalizationTransformer"]["mean"],
+    //     prog["preprocessors"]["RewardNormalizationTransformer"]["stdev"])
+    //
+    // console.log(upper_reward_bound);
+    //
+    // let lower_reward_bound = subtractvector(
+    //     prog["preprocessors"]["RewardNormalizationTransformer"]["mean"],
+    //     prog["preprocessors"]["RewardNormalizationTransformer"]["stdev"])
+    //
+    // rew_norm_traces.push({
+    //     x: norm_plot_x,
+    //     y: lower_reward_bound,
+    //     line: {color: "transparent"},
+    //     showlegend: false,
+    //     type: "scatter"
+    // })
+    //
+    // rew_norm_traces.push({
+    //     x: norm_plot_x,
+    //     y: upper_reward_bound,
+    //     fill: "tonexty",
+    //     fillcolor: 'rgba(68, 68, 68, 0.1)',
+    //     line: {color: "transparent"},
+    //     showlegend: false,
+    //     type: "scatter"
+    // })
+    //
+    // Plotly.newPlot(rew_norm_plot_div, rew_norm_traces, _.merge({
+    //     title: "Reward Normalization",
+    // }, standard_layout), {responsive: true});
+    //
+    // let state_norm_traces = [];
+    // for (let i = 0; i < prog["preprocessors"]["StateNormalizationTransformer"]["mean"][0].length; i++) {
+    //     state_norm_traces.push({
+    //         x: _.range(_.size(prog["preprocessors"]["StateNormalizationTransformer"]["mean"])),
+    //         y: prog["preprocessors"]["StateNormalizationTransformer"]["mean"].map(x => x[i]),
+    //         mode: "lines",
+    //         name: "Running Mean State",
+    //         marker: {color: "Green"},
+    //     });
+    // }
+    //
+    // Plotly.newPlot(state_norm_plot_div, state_norm_traces, _.merge({
+    //     title: "State Normalization",
+    // }, standard_layout), {responsive: true});
 });
 

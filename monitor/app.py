@@ -12,7 +12,7 @@ from flask_jsglue import JSGlue
 
 from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
-from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times
+from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor
 from utilities.statistics import ignore_none
 
 
@@ -174,7 +174,7 @@ def show_experiment(exp_id):
         iterations=meta["iterations"] if "iterations" in meta else None
     )
 
-    plots = {}
+    plots = {"normalization": {}}
 
     stats_path = os.path.join(path, "statistics.json")
     if os.path.isfile(stats_path):
@@ -192,6 +192,12 @@ def show_experiment(exp_id):
             plots["timings"] = plot_execution_times(stats["cycle_timings"],
                                                     stats.get("optimization_timings"),
                                                     stats.get("gathering_timings"))
+
+    if "RewardNormalizationTransformer" in progress["preprocessors"]:
+        plots["normalization"]["reward"] = plot_preprocessor(progress["preprocessors"]["RewardNormalizationTransformer"])
+
+    if "StateNormalizationTransformer" in progress["preprocessors"]:
+        plots["normalization"]["state"] = plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"])
 
     info.update(dict(
         plots=plots

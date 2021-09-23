@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 from bokeh import embed, colors
 from bokeh.plotting import figure
@@ -81,6 +81,29 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
         p.line(x, optimization_timings, legend_label="Optimization Phase", line_width=2, color=palette[1])
     if gathering_timings is not None:
         p.line(x, gathering_timings, legend_label="Gathering Phase", line_width=2, color=palette[2])
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
+    """Plot progression of preprocessor means."""
+    x = list(range(len(preprocessor_data["mean"])))
+
+    p = figure(title="Preprocessor Running Mean",
+               x_axis_label='Cycle',
+               y_axis_label='Running Mean',
+               # y_range=(min(all_times), max(all_times)),
+               **plot_styling)
+
+    for i, sense in enumerate(preprocessor_data["mean"][0].keys()):
+        trace = [point[sense] for point in preprocessor_data["mean"]]
+        if len(trace) > 1:
+            trace = trace[1:]
+
+        p.line(x, trace, legend_label=sense, line_width=2, color=palette[i])
 
     p.legend.location = "bottom_right"
     style_plot(p)
