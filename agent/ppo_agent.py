@@ -797,7 +797,8 @@ class PPOAgent:
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 
-        print(f"Loading from iteration {from_iteration}.")
+        if is_root:
+            print(f"Loading from iteration {from_iteration}.")
         with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
             parameters = json.load(f)
 

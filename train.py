@@ -103,7 +103,9 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     if settings["load_from"] is not None:
         if verbose and is_root:
             print(f"{wn}Loading{ec} from state {settings['load_from']}")
+
         agent = PPOAgent.from_agent_state(settings["load_from"])
+
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
@@ -124,8 +126,13 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     monitor = None
     if use_monitor and is_root:
-        monitor = Monitor(agent, agent.env, frequency=settings["monitor_frequency"], gif_every=settings["gif_every"],
-                          iterations=settings["iterations"], config_name=settings["pcon"])
+        monitor = Monitor(agent,
+                          agent.env,
+                          frequency=settings["monitor_frequency"],
+                          gif_every=settings["gif_every"],
+                          id=agent.agent_id,
+                          iterations=settings["iterations"],
+                          config_name=settings["pcon"])
 
     try:
         agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
