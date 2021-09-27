@@ -3,6 +3,8 @@ import os
 import re
 import shutil
 
+from utilities.monitor.statistical_plots import plot_episode_box_plots
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
@@ -198,6 +200,8 @@ def show_experiment(exp_id):
 
     if "StateNormalizationTransformer" in progress["preprocessors"]:
         plots["normalization"]["state"] = plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"])
+
+    plots["evaluation_boxplot"] = plot_episode_box_plots(progress["rewards"]["mean"], progress["lengths"]["mean"])
 
     info.update(dict(
         plots=plots

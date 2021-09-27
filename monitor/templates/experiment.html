@@ -49,7 +49,10 @@
             </div>
 
             <div class="col col-4">
-                <div id="reward-boxplot" style="width:100%; height:500px;"></div>
+                <div id="reward-boxplot" style="width:100%; height:500px;">
+                    {{ info.plots.evaluation_boxplot[0]|safe }}
+                    {{ info.plots.evaluation_boxplot[1]|safe }}
+                </div>
             </div>
         </div>
 
