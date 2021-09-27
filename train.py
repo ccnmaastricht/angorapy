@@ -103,9 +103,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     if settings["load_from"] is not None:
         if verbose and is_root:
             print(f"{wn}Loading{ec} from state {settings['load_from']}")
-
-        agent = PPOAgent.from_agent_state(settings["load_from"])
-
+        agent = PPOAgent.from_agent_state(settings["load_from"], from_iteration="last")
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],

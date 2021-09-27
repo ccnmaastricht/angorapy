@@ -475,7 +475,11 @@ class PPOAgent:
 
                     # save the current state of the agent
                     if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                        # every x iterations
                         self.save_agent_state()
+
+                    # and (overwrite) the latest version
+                    self.save_agent_state("last")
 
                     # calculate processing speed in fps
                     self.current_fps = stats.numb_processed_frames / (
@@ -759,6 +763,7 @@ class PPOAgent:
         parameters["clip"] = parameters["clip"].numpy().item()
         parameters["distribution"] = self.distribution.__class__.__name__
         parameters["transformers"] = self.env.serialize()
+        parameters["optimizer"] = self.optimizer.serialize()
 
         return parameters
 
@@ -784,22 +789,24 @@ class PPOAgent:
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
+        # determine loading point
         latest_matches = PPOAgent.get_saved_iterations(agent_id)
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
             else:
                 from_iteration = "best"
-
-        if isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b"], "Unknown string identifier, can only be 'best'/'b' or int."
-            from_iteration = "best"
+        elif isinstance(from_iteration, str):
+            assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            if from_iteration == "b":
+                from_iteration = "best"
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 
         if is_root:
             print(f"Loading from iteration {from_iteration}.")
-        with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
+        loading_path = f"{agent_path}/{from_iteration}/"
+        with open(f"{loading_path}/parameters.json", "r") as f:
             parameters = json.load(f)
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
@@ -817,8 +824,12 @@ class PPOAgent:
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False,
                                 reward_configuration=parameters["reward_configuration"])
 
+        if "optimizer" in parameters.keys():  # for backwards compatibility
+            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"])
+            print("Loaded optimizer.")
+
         for p, v in parameters.items():
-            if p in ["distribution", "transformers"]:
+            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip"]:
                 continue
 
             loaded_agent.__dict__[p] = v
@@ -844,7 +855,6 @@ class PPOAgent:
 
     def finalize(self):
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
-
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)
 
