@@ -237,6 +237,25 @@ akkaypulate = make_config(
     model="lstm"
 )
 
+manipulate = make_config(
+    iterations=50000,
+    workers=396,   # need divisibility by 12
+    batch_size=256,
+    horizon=2048,
+    c_entropy=0.01,
+    lr_pi=3e-4,
+    lr_schedule="exponential",
+    epochs=3,
+    clip=0.2,
+    lam=0.95,
+    discount=0.998,
+    grad_norm=0.5,
+    clip_values=False,
+    distribution="beta",
+    architecture="wider",
+    model="gru"
+)
+
 # RECOMMENDED CONFIGS FOR ENVs
 
 recommended_config = dict(

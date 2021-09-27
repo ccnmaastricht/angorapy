@@ -67,7 +67,7 @@ print(f"Environment has the following transformers: {env.transformers}")
 
 
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
-    for i in range(100):
+    for i in range(1000):
         investigator.render_episode(env,
                                     slow_down=False)
 else:
@@ -75,7 +75,7 @@ else:
     if args.freeze_wrist:
         env.env.toggle_wrist_freezing()
 
-    for i in range(100):
+    for i in range(1000):
         print(f"\nNew Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
         env.forced_finger = i % 4
         env.env.forced_finger = i % 4
