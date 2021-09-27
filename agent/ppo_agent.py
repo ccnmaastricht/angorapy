@@ -800,6 +800,8 @@ class PPOAgent:
             assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
+            if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):
+                from_iteration = "best"
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 

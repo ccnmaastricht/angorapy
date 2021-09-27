@@ -15,58 +15,55 @@ def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
                y_axis_label='Running Mean',
                **plot_styling)
 
-    # generate some synthetic time series for six different categories
-    cats = list("abcdef")
-    yy = np.random.randn(2000)
-    g = np.random.choice(cats, 2000)
-    for i, l in enumerate(cats):
-        yy[g == l] += i // 2
-    df = pd.DataFrame(dict(score=yy, group=g))
+    cats = ["reward"]
+    data = np.stack([rewards])
 
     # find the quartiles and IQR for each category
-    groups = df.groupby('group')
-    q1 = groups.quantile(q=0.25)
-    q2 = groups.quantile(q=0.5)
-    q3 = groups.quantile(q=0.75)
+    q1 = np.quantile(data, q=0.25, axis=-1)
+    q2 = np.quantile(data, q=0.5, axis=-1)
+    q3 = np.quantile(data, q=0.75, axis=-1)
     iqr = q3 - q1
     upper = q3 + 1.5 * iqr
     lower = q1 - 1.5 * iqr
 
     # find the outliers for each category
-    def outliers(group):
-        cat = group.name
-        return group[(group.score > upper.loc[cat]['score']) | (group.score < lower.loc[cat]['score'])]['score']
-
-    out = groups.apply(outliers).dropna()
+    # def outliers(group):
+    #     cat = group.name
+    #     return group[(group.score > upper.loc[cat]['score']) | (group.score < lower.loc[cat]['score'])]['score']
+    #
+    # out = groups.apply(outliers).dropna()
 
     # prepare outlier data for plotting, we need coordinates for every outlier.
-    if not out.empty:
-        outx = list(out.index.get_level_values(0))
-        outy = list(out.values)
+    # if not out.empty:
+    #     outx = list(out.index.get_level_values(0))
+    #     outy = list(out.values)
 
     p = figure(tools="", background_fill_color="#efefef", x_range=cats, toolbar_location=None)
 
     # if no outliers, shrink lengths of stems to be no longer than the minimums or maximums
-    qmin = groups.quantile(q=0.00)
-    qmax = groups.quantile(q=1.00)
-    upper.score = [min([x, y]) for (x, y) in zip(list(qmax.loc[:, 'score']), upper.score)]
-    lower.score = [max([x, y]) for (x, y) in zip(list(qmin.loc[:, 'score']), lower.score)]
+    # qmin = groups.quantile(q=0.00)
+    # qmax = groups.quantile(q=1.00)
+    # upper.score = [min([x, y]) for (x, y) in zip(list(qmax.loc[:, 'score']), upper.score)]
+    # lower.score = [max([x, y]) for (x, y) in zip(list(qmin.loc[:, 'score']), lower.score)]
 
     # stems
-    p.segment(cats, upper.score, cats, q3.score, line_color="black")
-    p.segment(cats, lower.score, cats, q1.score, line_color="black")
+    p.segment(cats, upper, cats, q3, line_color="black")
+    p.segment(cats, lower, cats, q1, line_color="black")
 
     # boxes
-    p.vbar(cats, 0.7, q2.score, q3.score, fill_color="#E08E79", line_color="black")
-    p.vbar(cats, 0.7, q1.score, q2.score, fill_color="#3B8686", line_color="black")
+    p.vbar(cats, 0.7, q2, q3, fill_color="#E08E79", line_color="black")
+    p.vbar(cats, 0.7, q1, q2, fill_color="#3B8686", line_color="black")
 
     # whiskers (almost-0 height rects simpler than segments)
-    p.rect(cats, lower.score, 0.2, 0.01, line_color="black")
-    p.rect(cats, upper.score, 0.2, 0.01, line_color="black")
+    p.rect(cats, lower, 0.2, 0.01, line_color="black")
+    p.rect(cats, upper, 0.2, 0.01, line_color="black")
 
     # outliers
-    if not out.empty:
-        p.circle(outx, outy, size=6, color="#F38630", fill_alpha=0.6)
+    # if not out.empty:
+    #     p.circle(outx, outy, size=6, color="#F38630", fill_alpha=0.6)
+
+    subsamplesize = 100
+    p.circle(cats * subsamplesize, np.random.choice(data[0], subsamplesize), size=6, color="#F38630", fill_alpha=0.6)
 
     p.xgrid.grid_line_color = None
     p.ygrid.grid_line_color = "white"
