@@ -53,8 +53,7 @@ class Monitor:
         else:
             self.story_id = id
             self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
-            if not os.path.isdir(self.story_directory):
-                raise ValueError("Given ID not found in experiments.")
+            os.makedirs(self.story_directory)
 
         try:
             tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
