@@ -845,7 +845,8 @@ class PPOAgent:
             loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
                                                                 parameters["optimizer"],
                                                                 loaded_agent.joint.trainable_variables)
-            print("Loaded optimizer.")
+            if is_root:
+                print("Loaded optimizer.")
 
         for p, v in parameters.items():
             if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
