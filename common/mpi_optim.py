@@ -45,6 +45,8 @@ class MpiAdam(tf.keras.optimizers.Adam):
             raise AdamSynchronizationError("Parameters of MPIAdam optimizers are out of sync.")
 
     def serialize(self):
+        """Convert the Optimizer into a JSON-compatible serialization for saving."""
+
         weights = self.get_weights()
         if len(weights) > 0:
             weights[0] = weights[0].item()
@@ -61,13 +63,24 @@ class MpiAdam(tf.keras.optimizers.Adam):
         }
 
     @staticmethod
-    def from_serialization(comm, serialization) -> "MpiAdam":
+    def from_serialization(comm, serialization, var_list) -> "MpiAdam":
+        if isinstance(serialization["learning_rate"], dict):
+            schedule_type = serialization["learning_rate"]["class_name"]
+            schedule_config = serialization["learning_rate"]["config"]
+            learning_rate = getattr(tf.keras.optimizers.schedules, schedule_type).from_config(schedule_config)
+        elif isinstance(serialization["learning_rate"], float):
+            learning_rate = serialization["learning_rate"]
+        else:
+            raise ValueError("Unknown learning rate/schedule format.")
+
         adam = MpiAdam(
             comm=comm,
-            learning_rate=serialization["learning_rate"],
+            learning_rate=learning_rate,
             epsilon=serialization["epsilon"]
         )
 
-        adam.set_weights(serialization["weights"])
+        zero_gradients = [tf.zeros_like(v) for v in var_list]
+        adam.apply_gradients(list(zip(zero_gradients, var_list)))
+        adam.set_weights([tf.convert_to_tensor(v) for v in serialization["weights"]])
 
         return adam

@@ -805,11 +805,26 @@ class PPOAgent:
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 
+        # make stack of fallbacks in case the targeted iteration is corrupted
+        fallback_stack = ["best", "last"]
+        if len(latest_matches) > 0:
+            fallback_stack.append(max(latest_matches))
+
+        can_load = False
+        while not can_load:
+            try:
+                loading_path = f"{agent_path}/{from_iteration}/"
+                with open(f"{loading_path}/parameters.json", "r") as f:
+                    parameters = json.load(f)
+
+                can_load = True
+            except json.decoder.JSONDecodeError as e:
+                print(f"The parameter file of {from_iteration} seems to be corrupted. "
+                      f"Falling back to {fallback_stack[0]}.")
+                from_iteration = fallback_stack.pop(0)
+
         if is_root:
             print(f"Loading from iteration {from_iteration}.")
-        loading_path = f"{agent_path}/{from_iteration}/"
-        with open(f"{loading_path}/parameters.json", "r") as f:
-            parameters = json.load(f)
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
                        reward_config=parameters.get("reward_configuration"),
@@ -827,11 +842,13 @@ class PPOAgent:
                                 reward_configuration=parameters["reward_configuration"])
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
-            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"])
+            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                parameters["optimizer"],
+                                                                loaded_agent.joint.trainable_variables)
             print("Loaded optimizer.")
 
         for p, v in parameters.items():
-            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip"]:
+            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
                 continue
 
             loaded_agent.__dict__[p] = v
