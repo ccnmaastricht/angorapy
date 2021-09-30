@@ -310,10 +310,13 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         for idx, value in enumerate(lookat):
             self.viewer.cam.lookat[idx] = value
 
-        # set colors
+        # hand color
         self.sim.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
-        # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
+        self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
+
+        # background color
         self.sim.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
         self.viewpoint = "topdown"
