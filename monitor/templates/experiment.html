@@ -49,7 +49,10 @@
             </div>
 
             <div class="col col-4">
-                <div id="reward-boxplot" style="width:100%; height:500px;"></div>
+                <div id="reward-boxplot" style="width:100%; height:500px;">
+                    {{ info.plots.evaluation_boxplot[0]|safe }}
+                    {{ info.plots.evaluation_boxplot[1]|safe }}
+                </div>
             </div>
         </div>
 
@@ -81,11 +84,21 @@
 
         <div class="row justify-content-center mt-3">
             <div class="col col-6">
-                <div id="state-norm-plot" style="width:100%; height:500px"></div>
+                <div id="state-norm-plot">
+                    {% if "state" in info.plots.normalization %}
+                        {{ info.plots.normalization.state[0]|safe }}
+                        {{ info.plots.normalization.state[1]|safe }}
+                    {% endif %}
+                </div>
             </div>
 
             <div class="col col-6">
-                <div id="rew-norm-plot" style="width:100%; height:500px"></div>
+                <div id="rew-norm-plot" style="width:100%; height:500px">
+                    {% if "reward" in info.plots.normalization %}
+                        {{ info.plots.normalization.reward[0]|safe }}
+                        {{ info.plots.normalization.reward[1]|safe }}
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>

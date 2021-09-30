@@ -1,46 +1,9 @@
-from typing import List
+from typing import List, Dict
 
-from bokeh import embed, colors
+from bokeh import embed
 from bokeh.plotting import figure
 
-from common.const import COLORMAP
-
-palette = [colors.RGB(*[int(c * 255) for c in color]) for color in COLORMAP]
-darker_palette = [c.darken(0.3) for c in palette]
-
-tooltip_css = """
-tooltip {
-    background-color: #212121;
-    color: white;
-    padding: 5px;
-    border-radius: 10px;
-    margin-left: 10px;
-}
-"""
-
-plot_styling = dict(
-    plot_height=500,
-    sizing_mode="stretch_width",
-    toolbar_location=None,
-)
-
-
-def style_plot(p):
-    p.xgrid.visible = False
-    p.ygrid.visible = False
-    p.outline_line_color = None
-
-    p.axis.axis_label_text_font = "times"
-    p.axis.axis_label_text_font_size = "12pt"
-    p.axis.axis_label_text_font_style = "bold"
-
-    p.legend.label_text_font = "times"
-    p.legend.label_text_font_size = "12pt"
-    p.legend.label_text_font_style = "normal"
-
-    p.title.align = "center"
-    p.title.text_font_size = "14pt"
-    p.title.text_font = "Fira Sans"
+from utilities.monitor.plotting_base import palette, plot_styling, style_plot
 
 
 def plot_memory_usage(memory_trace: List):
@@ -81,6 +44,29 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
         p.line(x, optimization_timings, legend_label="Optimization Phase", line_width=2, color=palette[1])
     if gathering_timings is not None:
         p.line(x, gathering_timings, legend_label="Gathering Phase", line_width=2, color=palette[2])
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
+    """Plot progression of preprocessor means."""
+    x = list(range(len(preprocessor_data["mean"])))
+
+    p = figure(title="Preprocessor Running Mean",
+               x_axis_label='Cycle',
+               y_axis_label='Running Mean',
+               # y_range=(min(all_times), max(all_times)),
+               **plot_styling)
+
+    for i, sense in enumerate(preprocessor_data["mean"][0].keys()):
+        trace = [point[sense] for point in preprocessor_data["mean"]]
+        if len(trace) > 1:
+            trace = trace[1:]
+
+        p.line(x, trace, legend_label=sense, line_width=2, color=palette[i])
 
     p.legend.location = "bottom_right"
     style_plot(p)

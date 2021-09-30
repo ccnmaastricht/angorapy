@@ -67,7 +67,7 @@ def build_rnn_models(env: BaseWrapper,
                      distribution: BasePolicyDistribution,
                      shared: bool = False,
                      bs: int = 1,
-                     model_type: str = "rnn",
+                     model_type: str = "gru",
                      layer_sizes: Tuple = (64, 64),
                      sequence_length=1):
     """Build simple policy and value models having a recurrent layer before their heads.
@@ -151,7 +151,7 @@ def build_simple_models(env: BaseWrapper,
                         shared: bool = False,
                         bs: int = 1,
                         sequence_length: int = None,
-                        model_type: str = "rnn",
+                        model_type: str = "gru",
                         **kwargs):
     """Build simple networks (policy, value, joint) for given parameter settings."""
 
@@ -167,7 +167,7 @@ def build_deeper_models(env: BaseWrapper,
                         shared: bool = False,
                         bs: int = 1,
                         sequence_length: int = 1,
-                        model_type: str = "rnn",
+                        model_type: str = "gru",
                         **kwargs):
     """Build deeper simple networks (policy, value, joint) for given parameter settings."""
 
@@ -184,7 +184,7 @@ def build_wider_models(env: BaseWrapper,
                        shared: bool = False,
                        bs: int = 1,
                        sequence_length: int = 1,
-                       model_type: str = "rnn",
+                       model_type: str = "gru",
                        **kwargs):
     """Build deeper simple networks (policy, value, joint) for given parameter settings."""
 

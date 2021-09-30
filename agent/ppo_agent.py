@@ -228,6 +228,7 @@ class PPOAgent:
         # statistics
         self.total_frames_seen = 0
         self.total_episodes_seen = 0
+        self.years_of_experience = 0
         self.episode_reward_history = []
         self.episode_length_history = []
         self.cycle_reward_history = []
@@ -458,6 +459,10 @@ class PPOAgent:
                     mpi_flat_print("Finalizing...")
                     self.total_frames_seen += stats.numb_processed_frames
                     self.total_episodes_seen += stats.numb_completed_episodes
+                    if hasattr(self.env, "dt"):
+                        self.years_of_experience += (stats.numb_processed_frames * self.env.dt * 3.171e-8)
+                    else:
+                        self.years_of_experience = None
 
                     # update monitor logs
                     if monitor is not None:
@@ -470,7 +475,11 @@ class PPOAgent:
 
                     # save the current state of the agent
                     if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
+                        # every x iterations
                         self.save_agent_state()
+
+                    # and (overwrite) the latest version
+                    self.save_agent_state("last")
 
                     # calculate processing speed in fps
                     self.current_fps = stats.numb_processed_frames / (
@@ -727,6 +736,7 @@ class PPOAgent:
             f"lr: {nc}{current_lr:.2e}{ec}; "
             f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
             f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
+            f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
             f"{underflow}"
             f"times: {time_string} {time_distribution_string}; "
             f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
@@ -753,6 +763,7 @@ class PPOAgent:
         parameters["clip"] = parameters["clip"].numpy().item()
         parameters["distribution"] = self.distribution.__class__.__name__
         parameters["transformers"] = self.env.serialize()
+        parameters["optimizer"] = self.optimizer.serialize()
 
         return parameters
 
@@ -778,22 +789,42 @@ class PPOAgent:
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
+        # determine loading point
         latest_matches = PPOAgent.get_saved_iterations(agent_id)
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
             else:
                 from_iteration = "best"
-
-        if isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b"], "Unknown string identifier, can only be 'best'/'b' or int."
-            from_iteration = "best"
+        elif isinstance(from_iteration, str):
+            assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            if from_iteration == "b":
+                from_iteration = "best"
+            if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):
+                from_iteration = "best"
         else:
             assert from_iteration in latest_matches, "There is no save at this iteration."
 
-        print(f"Loading from iteration {from_iteration}.")
-        with open(f"{agent_path}/{from_iteration}/parameters.json", "r") as f:
-            parameters = json.load(f)
+        # make stack of fallbacks in case the targeted iteration is corrupted
+        fallback_stack = ["best", "last"]
+        if len(latest_matches) > 0:
+            fallback_stack.append(max(latest_matches))
+
+        can_load = False
+        while not can_load:
+            try:
+                loading_path = f"{agent_path}/{from_iteration}/"
+                with open(f"{loading_path}/parameters.json", "r") as f:
+                    parameters = json.load(f)
+
+                can_load = True
+            except json.decoder.JSONDecodeError as e:
+                print(f"The parameter file of {from_iteration} seems to be corrupted. "
+                      f"Falling back to {fallback_stack[0]}.")
+                from_iteration = fallback_stack.pop(0)
+
+        if is_root:
+            print(f"Loading from iteration {from_iteration}.")
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
                        reward_config=parameters.get("reward_configuration"),
@@ -807,10 +838,18 @@ class PPOAgent:
                                 c_entropy=parameters["c_entropy"], c_value=parameters["c_value"],
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
-                                lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False)
+                                lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False,
+                                reward_configuration=parameters["reward_configuration"])
+
+        if "optimizer" in parameters.keys():  # for backwards compatibility
+            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                parameters["optimizer"],
+                                                                loaded_agent.joint.trainable_variables)
+            if is_root:
+                print("Loaded optimizer.")
 
         for p, v in parameters.items():
-            if p in ["distribution", "transformers"]:
+            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
                 continue
 
             loaded_agent.__dict__[p] = v
@@ -836,7 +875,6 @@ class PPOAgent:
 
     def finalize(self):
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
-
         for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)
 

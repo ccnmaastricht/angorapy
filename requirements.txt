@@ -3,6 +3,8 @@ tensorflow_datasets
 mujoco-py<1.50.2,>=1.50.1
 mpi4py~=3.0.3
 
+nvidia_smi
+nvidia-ml-py3
 tqdm~=4.59.0
 simplejson~=3.17.2
 pydot

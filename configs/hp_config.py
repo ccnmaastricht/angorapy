@@ -199,6 +199,63 @@ hand_manipulate = derive_config(hand, {
     "epochs": 3
 })
 
+andrypulate = make_config(
+    iterations=50000,
+    workers=384,
+    batch_size=256,
+    horizon=512,
+    c_entropy=0.001,
+    lr_pi=5e-4,
+    lr_schedule="exponential",
+    epochs=10,
+    clip=0.2,
+    lam=0.95,
+    discount=0.998,
+    grad_norm=0.5,
+    clip_values=False,
+    distribution="beta",
+    architecture="wider",
+    model="lstm"
+)
+
+akkaypulate = make_config(
+    iterations=50000,
+    workers=396,   # akkaya et al use 400 but that would not divide by 12; on cscs, this needs 33 gpu nodes
+    batch_size=256,
+    horizon=4096,
+    c_entropy=0.01,
+    lr_pi=3e-4,
+    lr_schedule="exponential",
+    epochs=3,
+    clip=0.2,
+    lam=0.95,
+    discount=0.998,
+    grad_norm=0.5,
+    clip_values=False,
+    distribution="beta",
+    architecture="wider",
+    model="lstm"
+)
+
+manipulate = make_config(
+    iterations=50000,
+    workers=396,   # need divisibility by 12
+    batch_size=256,
+    horizon=2048,
+    c_entropy=0.01,
+    lr_pi=3e-4,
+    lr_schedule="exponential",
+    epochs=3,
+    clip=0.2,
+    lam=0.95,
+    discount=0.998,
+    grad_norm=0.5,
+    clip_values=False,
+    distribution="beta",
+    architecture="wider",
+    model="gru"
+)
+
 # RECOMMENDED CONFIGS FOR ENVs
 
 recommended_config = dict(

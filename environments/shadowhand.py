@@ -4,16 +4,13 @@ import abc
 import copy
 import os
 import random
+from pprint import pprint
 from typing import Callable, Union
 
 import gym
 import mujoco_py
 import numpy as np
 from gym import spaces
-from gym.envs.mujoco.mujoco_env import DEFAULT_SIZE
-from gym.envs.robotics import hand_env
-from gym.envs.robotics.hand import manipulate
-from gym.envs.robotics.utils import robot_get_obs
 from gym.utils import seeding
 
 from common import reward
@@ -319,6 +316,8 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
+
+        pprint(self.sim.model.mat_rgba)
         self.viewpoint = "topdown"
 
         if self.viewpoint == "topdown":
@@ -335,20 +334,3 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
         else:
             raise NotImplementedError("Unknown Viewpoint.")
-
-
-if __name__ == "__main__":
-    from environments import *
-
-    # env = gym.make("HandTappingAbsolute-v1")
-    # env = gym.make("HandFreeReachLFAbsolute-v0")
-    # env = gym.make("BaseShadowHandEnv-v0")
-    env = gym.make("ManipulateBlock-v0")
-    # env = gym.make("HandReachDenseRelative-v0")
-    d, s = False, env.reset()
-    while True:
-        env.render()
-        action = env.action_space.sample()
-        s, r, d, i = env.step(action)
-        if d:
-            env.reset()
