@@ -53,7 +53,7 @@ class Monitor:
         else:
             self.story_id = id
             self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
-            os.makedirs(self.story_directory)
+            os.makedirs(self.story_directory, exist_ok=True)
 
         try:
             tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,

@@ -316,8 +316,6 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
-
-        pprint(self.sim.model.mat_rgba)
         self.viewpoint = "topdown"
 
         if self.viewpoint == "topdown":

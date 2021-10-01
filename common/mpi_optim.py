@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Iterable
 
 import tensorflow as tf
 from mpi4py import MPI
@@ -24,7 +24,7 @@ class MpiAdam(tf.keras.optimizers.Adam):
         root_variables = self.comm.bcast(self.weights(), int_root=0)
         self.set_weights(root_variables)
 
-    def apply_gradients(self, grads_and_vars: List[Tuple[tf.Tensor, tf.Variable]], name=None, **kwargs):
+    def apply_gradients(self, grads_and_vars: Iterable[Tuple[tf.Tensor, tf.Variable]], name=None, **kwargs):
         """ Apply the gradients after averaging over processes."""
         if self.comm.size > 1:
             grads_and_vars = [(tf.divide(self.comm.allreduce(g, op=MPI.SUM), self.comm.Get_size()), v)
@@ -48,6 +48,7 @@ class MpiAdam(tf.keras.optimizers.Adam):
         """Convert the Optimizer into a JSON-compatible serialization for saving."""
 
         weights = self.get_weights()
+        print(f"ADAM params before saving {len(weights)}")
         if len(weights) > 0:
             weights[0] = weights[0].item()
             weights[1:] = [w.tolist() for w in weights[1:]]
@@ -56,6 +57,7 @@ class MpiAdam(tf.keras.optimizers.Adam):
         for n, e in config.items():
             if hasattr(e, "item"):
                 config[n] = e.item()
+        print(f"ADAM variables at saving time: {len(weights)}")
 
         return {
             **config,
@@ -79,8 +81,8 @@ class MpiAdam(tf.keras.optimizers.Adam):
             epsilon=serialization["epsilon"]
         )
 
-        zero_gradients = [tf.zeros_like(v) for v in var_list]
-        adam.apply_gradients(list(zip(zero_gradients, var_list)))
-        adam.set_weights([tf.convert_to_tensor(v) for v in serialization["weights"]])
+        # adam._create_all_weights(var_list)
+        adam.apply_gradients(zip([tf.zeros_like(v) for v in var_list], var_list))
+        adam.set_weights([tf.convert_to_tensor(v) for v in serialization["weights"][:len(adam.variables())]])  # todo remove the slicing hack; only for backwards compatibility
 
         return adam

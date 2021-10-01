@@ -201,7 +201,7 @@ class PPOAgent:
                 else:
                     print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-        self.optimizer: Optimizer = MpiAdam(comm=optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.optimizer: MpiAdam = MpiAdam(comm=optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -340,11 +340,24 @@ class PPOAgent:
 
         # rebuild model with desired batch size
         joint_weights = self.joint.get_weights()
+        del self.policy, self.value, self.joint
+        tf.keras.backend.clear_session()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size // n_optimizers,
             sequence_length=self.tbptt_length)
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
+
+        # reset optimizer to not be confused by the newly build models
+        # todo maybe its better to maintain a class attribute with optimizer weights and always write it in here
+        optimizer_weights = self.optimizer.get_weights()
+        if len(optimizer_weights) > 0:
+            self.optimizer = MpiAdam(self.optimizer.comm,
+                                     self.optimizer.learning_rate,
+                                     self.optimizer.epsilon)
+            self.optimizer.apply_gradients(zip([tf.zeros_like(v) for v in self.joint.trainable_variables],
+                                               self.joint.trainable_variables))
+            self.optimizer.set_weights(optimizer_weights)
 
         actor = self._make_actor()
 
@@ -841,13 +854,6 @@ class PPOAgent:
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False,
                                 reward_configuration=parameters["reward_configuration"])
 
-        if "optimizer" in parameters.keys():  # for backwards compatibility
-            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
-                                                                parameters["optimizer"],
-                                                                loaded_agent.joint.trainable_variables)
-            if is_root:
-                print("Loaded optimizer.")
-
         for p, v in parameters.items():
             if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
                 continue
@@ -855,6 +861,13 @@ class PPOAgent:
             loaded_agent.__dict__[p] = v
 
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
+
+        if "optimizer" in parameters.keys():  # for backwards compatibility
+            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                parameters["optimizer"],
+                                                                loaded_agent.joint.trainable_variables)
+            if is_root:
+                print("Loaded optimizer.")
 
         return loaded_agent
 

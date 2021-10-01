@@ -235,8 +235,7 @@ class Visualizer(Investigator):
 
         return feature_maps
 
-    def saliency_map(self, reference: Union[numpy.ndarray, tf.Tensor], layer_name=None,
-                     neuron: int = None) -> None:
+    def saliency_map(self, reference: Union[numpy.ndarray, tf.Tensor], layer_name=None, neuron: int = None) -> None:
         """Create a saliency map indicating the importance of each input pixel for the output, based on gradients.
         Only works for fully connected layers!
 
