@@ -764,6 +764,8 @@ class PPOAgent:
         with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
 
+        np.savez(self.agent_directory + f"/{name}/optimizer_weights.npz", *self.optimizer.get_weights())
+
     def get_parameters(self):
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
@@ -863,9 +865,17 @@ class PPOAgent:
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
-            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
-                                                                parameters["optimizer"],
-                                                                loaded_agent.joint.trainable_variables)
+            if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
+                optimizer_weights = list(np.load(agent_path + f"/{from_iteration}/optimizer_weights.npz").values())
+                parameters["optimizer"]["weights"] = optimizer_weights
+
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
+                                                                    loaded_agent.joint.trainable_variables)
+            else:
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
+                                                                    loaded_agent.joint.trainable_variables)
             if is_root:
                 print("Loaded optimizer.")
 

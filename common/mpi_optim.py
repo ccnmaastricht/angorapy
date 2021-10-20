@@ -46,23 +46,12 @@ class MpiAdam(tf.keras.optimizers.Adam):
 
     def serialize(self):
         """Convert the Optimizer into a JSON-compatible serialization for saving."""
-
-        weights = self.get_weights()
-        print(f"ADAM params before saving {len(weights)}")
-        if len(weights) > 0:
-            weights[0] = weights[0].item()
-            weights[1:] = [w.tolist() for w in weights[1:]]
-
         config = self.get_config()
         for n, e in config.items():
             if hasattr(e, "item"):
                 config[n] = e.item()
-        print(f"ADAM variables at saving time: {len(weights)}")
 
-        return {
-            **config,
-            "weights": weights
-        }
+        return config
 
     @staticmethod
     def from_serialization(comm, serialization, var_list) -> "MpiAdam":
