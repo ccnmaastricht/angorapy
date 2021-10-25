@@ -340,8 +340,6 @@ class PPOAgent:
 
         # rebuild model with desired batch size
         joint_weights = self.joint.get_weights()
-        del self.policy, self.value, self.joint
-        tf.keras.backend.clear_session()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size // n_optimizers,
@@ -617,12 +615,6 @@ class PPOAgent:
                             reset_mask = detect_finished_episodes(partial_batch["done"])
                             reset_states_masked(self.joint, reset_mask)
 
-                            del grad
-                            del partial_batch
-                            gc.collect()
-                        del split_batch
-                        gc.collect()
-
                 # todo makes no sense with the split batches, need to average over them
                 entropies.append(ent)
                 policy_epoch_losses.append(pi_loss)
@@ -642,10 +634,6 @@ class PPOAgent:
         self.policy_loss_history.append(statistics.mean(policy_loss_history))
         self.value_loss_history.append(statistics.mean(value_loss_history))
         self.entropy_history.append(statistics.mean(entropy_history))
-
-        del dataset
-        del batched_dataset
-        del _learn_on_batch
 
         tf.keras.backend.clear_session()
         tf.compat.v1.reset_default_graph()
@@ -764,6 +752,8 @@ class PPOAgent:
         with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
 
+        np.savez(self.agent_directory + f"/{name}/optimizer_weights.npz", *self.optimizer.get_weights())
+
     def get_parameters(self):
         """Get the agents parameters necessary to reconstruct it."""
         parameters = self.__dict__.copy()
@@ -863,9 +853,17 @@ class PPOAgent:
         loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
-            loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
-                                                                parameters["optimizer"],
-                                                                loaded_agent.joint.trainable_variables)
+            if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
+                optimizer_weights = list(np.load(agent_path + f"/{from_iteration}/optimizer_weights.npz").values())
+                parameters["optimizer"]["weights"] = optimizer_weights
+
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
+                                                                    loaded_agent.joint.trainable_variables)
+            else:
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
+                                                                    loaded_agent.joint.trainable_variables)
             if is_root:
                 print("Loaded optimizer.")
 
