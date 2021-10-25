@@ -273,8 +273,8 @@ class ReachSequential(Reach):
 
         # set next subgoal if current one is achieved
         if info["is_success"]:
-            print(
-                f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
+            # print(
+            #     f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
             self.goal = self._sample_goal()
 
         return observation, reward, done, info
