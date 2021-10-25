@@ -88,106 +88,106 @@ $.when(
     let reward_means = prog["rewards"]["mean"];
 
     // rewards with slider for smoothing
-    let window_sizes = [0, 1, 2, 3, 4];
-
-    let reward_traces = [];
-    for (let ws in window_sizes) {
-        reward_traces.push({
-            x: _.range(_.size(reward_means)),
-            y: smooth(reward_means, window_sizes[ws]),
-            mode: "lines",
-            yaxis: 'y',
-            name: "Reward",
-            line: {
-                color: "red",
-                width: 2,
-                smoothing: 10
-            },
-            visible: ws === "0",
-        })
-    }
-
-
-    let reward_slider_steps = [];
-    let i = 0;
-    for (let ws in window_sizes) {
-        reward_slider_steps.push({
-            label: window_sizes[ws],
-            method: 'update',
-            args: [{
-                "visible": _.range(_.size(window_sizes)).map(x => x === i).concat([true])
-            }]
-        });
-        i++;
-    }
-
-    let length_trace = {
-        x: _.range(_.size(prog["lengths"]["mean"])),
-        y: prog["lengths"]["mean"],
-        mode: "lines",
-        name: "Episode Length",
-        yaxis: 'y2',
-        line: {
-            color: "Orange",
-            dash: "dash",
-            width: 2
-        }
-    };
-
-    let traces = [...reward_traces, length_trace];
-    let layout = _.merge({
-        title: "Average Rewards and Episode Lengths",
-        yaxis: {title: "Return"},
-        yaxis2: {title: "Steps", side: "right", overlaying: 'y', showgrid: false},
-        sliders: [{
-            pad: {
-                t: 30
-            },
-            currentvalue: {
-                xanchor: 'right',
-                prefix: 'Smoothing: ',
-                font: {
-                    color: '#888',
-                    size: 10
-                }
-            },
-            steps: reward_slider_steps
-        }],
-        update_menus: [{
-            buttons: [
-                {
-                    args: ['shapes', []],
-                    label: 'None',
-                    method: 'relayout'
-                },
-                {
-                    args: ['shapes', [{
-                        type: 'line',
-                        x0: 0, y0: meta["environment"]["reward_threshold"],
-                        x1: reward_means.length, y1: meta["environment"]["reward_threshold"],
-                        layer: "below",
-                        line: {
-                            color: 'grey',
-                            width: 2,
-                            dash: 'dashdot',
-                        }
-                    },]],
-                    label: 'Threshold Line',
-                    method: 'relayout'
-                },
-            ],
-            direction: 'left',
-            pad: {'r': 10, 't': 10},
-            showactive: true,
-            type: 'buttons',
-            x: 0,
-            xanchor: 'left',
-            y: 0,
-            yanchor: 'top'
-        },]
-    }, standard_layout);
-
-    Plotly.newPlot(reward_plot_div, traces, layout, {responsive: true});
+    // let window_sizes = [0, 1, 2, 3, 4];
+    //
+    // let reward_traces = [];
+    // for (let ws in window_sizes) {
+    //     reward_traces.push({
+    //         x: _.range(_.size(reward_means)),
+    //         y: smooth(reward_means, window_sizes[ws]),
+    //         mode: "lines",
+    //         yaxis: 'y',
+    //         name: "Reward",
+    //         line: {
+    //             color: "red",
+    //             width: 2,
+    //             smoothing: 10
+    //         },
+    //         visible: ws === "0",
+    //     })
+    // }
+    //
+    //
+    // let reward_slider_steps = [];
+    // let i = 0;
+    // for (let ws in window_sizes) {
+    //     reward_slider_steps.push({
+    //         label: window_sizes[ws],
+    //         method: 'update',
+    //         args: [{
+    //             "visible": _.range(_.size(window_sizes)).map(x => x === i).concat([true])
+    //         }]
+    //     });
+    //     i++;
+    // }
+    //
+    // let length_trace = {
+    //     x: _.range(_.size(prog["lengths"]["mean"])),
+    //     y: prog["lengths"]["mean"],
+    //     mode: "lines",
+    //     name: "Episode Length",
+    //     yaxis: 'y2',
+    //     line: {
+    //         color: "Orange",
+    //         dash: "dash",
+    //         width: 2
+    //     }
+    // };
+    //
+    // let traces = [...reward_traces, length_trace];
+    // let layout = _.merge({
+    //     title: "Average Rewards and Episode Lengths",
+    //     yaxis: {title: "Return"},
+    //     yaxis2: {title: "Steps", side: "right", overlaying: 'y', showgrid: false},
+    //     sliders: [{
+    //         pad: {
+    //             t: 30
+    //         },
+    //         currentvalue: {
+    //             xanchor: 'right',
+    //             prefix: 'Smoothing: ',
+    //             font: {
+    //                 color: '#888',
+    //                 size: 10
+    //             }
+    //         },
+    //         steps: reward_slider_steps
+    //     }],
+    //     update_menus: [{
+    //         buttons: [
+    //             {
+    //                 args: ['shapes', []],
+    //                 label: 'None',
+    //                 method: 'relayout'
+    //             },
+    //             {
+    //                 args: ['shapes', [{
+    //                     type: 'line',
+    //                     x0: 0, y0: meta["environment"]["reward_threshold"],
+    //                     x1: reward_means.length, y1: meta["environment"]["reward_threshold"],
+    //                     layer: "below",
+    //                     line: {
+    //                         color: 'grey',
+    //                         width: 2,
+    //                         dash: 'dashdot',
+    //                     }
+    //                 },]],
+    //                 label: 'Threshold Line',
+    //                 method: 'relayout'
+    //             },
+    //         ],
+    //         direction: 'left',
+    //         pad: {'r': 10, 't': 10},
+    //         showactive: true,
+    //         type: 'buttons',
+    //         x: 0,
+    //         xanchor: 'left',
+    //         y: 0,
+    //         yanchor: 'top'
+    //     },]
+    // }, standard_layout);
+    //
+    // Plotly.newPlot(reward_plot_div, traces, layout, {responsive: true});
 
     // REWARD LENGTH BOXPLOTS
     //

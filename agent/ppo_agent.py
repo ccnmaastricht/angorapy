@@ -241,6 +241,7 @@ class PPOAgent:
         self.value_loss_history = []
         self.time_dicts = []
         self.underflow_history = []
+        self.loading_history = []
 
         # training statistics
         self.cycle_timings = []
@@ -866,6 +867,9 @@ class PPOAgent:
                                                                     loaded_agent.joint.trainable_variables)
             if is_root:
                 print("Loaded optimizer.")
+
+        # mark the loading
+        loaded_agent.loading_history.append([loaded_agent.iteration])
 
         return loaded_agent
 

@@ -1,6 +1,8 @@
 from typing import List, Dict
 
+
 from bokeh import embed
+from bokeh.models import Span
 from bokeh.plotting import figure
 
 from utilities.monitor.plotting_base import palette, plot_styling, style_plot
@@ -44,6 +46,32 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
         p.line(x, optimization_timings, legend_label="Optimization Phase", line_width=2, color=palette[1])
     if gathering_timings is not None:
         p.line(x, gathering_timings, legend_label="Gathering Phase", line_width=2, color=palette[2])
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_reward_progress(rewards, cycles_loaded):
+    """Plot the execution times of a full cycle and optionally bot sub phases."""
+    x = list(range(len(rewards)))
+
+    p = figure(title="Average Rewards per Cycle",
+               x_axis_label='Cycle',
+               y_axis_label='Total Episode Return',
+               y_range=(min(rewards), max(rewards)),
+               **plot_styling)
+
+    p.line(x, rewards, legend_label="Reward", line_width=2, color=palette[0])
+
+    load_markings = []
+    for load_timing in cycles_loaded:
+        load_markings.append(
+            Span(location=load_timing[0], dimension="height", line_color="red", line_width=2, line_dash=[6, 3])
+        )
+
+    p.renderers.extend(load_markings)
 
     p.legend.location = "bottom_right"
     style_plot(p)

@@ -44,8 +44,11 @@
 
     <div class="topic-group" id="statistics-view">
         <div class="row justify-content-center">
-            <div class="col col-6">
-                <div id="reward-plot" style="width:100%; height:500px;"></div>
+            <div class="col col-8">
+                <div id="reward-plot">
+                    {{ info.plots.reward_progress[0]|safe }}
+                    {{ info.plots.reward_progress[1]|safe }}
+                </div>
             </div>
 
             <div class="col col-4">

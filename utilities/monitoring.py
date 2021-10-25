@@ -180,6 +180,7 @@ class Monitor:
             cycle_timings=self.agent.cycle_timings,
             optimization_timings=self.agent.optimization_timings,
             gathering_timings=self.agent.gathering_timings,
+            loaded_at=self.agent.loading_history,
         )
 
         with open(f"{self.story_directory}/statistics.json", "w") as f:

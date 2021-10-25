@@ -10,18 +10,13 @@ import pandas as pd
 
 def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
     """Boxplot of the rewards and lengths given."""
-    p = figure(title="Preprocessor Running Mean",
-               x_axis_label='Cycle',
-               y_axis_label='Running Mean',
-               **plot_styling)
-
     cats = ["reward"]
-    data = np.stack([rewards])
+    rewards = np.array(rewards, dtype=np.float)
 
     # find the quartiles and IQR for each category
-    q1 = np.quantile(data, q=0.25, axis=-1)
-    q2 = np.quantile(data, q=0.5, axis=-1)
-    q3 = np.quantile(data, q=0.75, axis=-1)
+    q1 = np.quantile(rewards, q=0.25, axis=-1)
+    q2 = np.quantile(rewards, q=0.5, axis=-1)
+    q3 = np.quantile(rewards, q=0.75, axis=-1)
     iqr = q3 - q1
     upper = q3 + 1.5 * iqr
     lower = q1 - 1.5 * iqr
@@ -33,12 +28,18 @@ def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
     #
     # out = groups.apply(outliers).dropna()
 
-    # prepare outlier data for plotting, we need coordinates for every outlier.
+    # prepare outlier rewards for plotting, we need coordinates for every outlier.
     # if not out.empty:
     #     outx = list(out.index.get_level_values(0))
     #     outy = list(out.values)
 
-    p = figure(tools="", background_fill_color="#efefef", x_range=cats, toolbar_location=None)
+    p = figure(title="Preprocessor Running Mean",
+               x_axis_label='Cycle',
+               y_axis_label='Running Mean',
+               **plot_styling,
+               tools="",
+               x_range=cats
+    )
 
     # if no outliers, shrink lengths of stems to be no longer than the minimums or maximums
     # qmin = groups.quantile(q=0.00)
@@ -63,7 +64,10 @@ def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
     #     p.circle(outx, outy, size=6, color="#F38630", fill_alpha=0.6)
 
     subsamplesize = 100
-    p.circle(cats * subsamplesize, np.random.choice(data[0], subsamplesize), size=6, color="#F38630", fill_alpha=0.6)
+    if len(rewards) > subsamplesize:
+        rewards = np.random.choice(rewards, subsamplesize)
+
+    p.circle(cats * len(rewards), rewards, size=6, color="#F38630", fill_alpha=0.6)
 
     p.xgrid.grid_line_color = None
     p.ygrid.grid_line_color = "white"
