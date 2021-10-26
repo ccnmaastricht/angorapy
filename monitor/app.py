@@ -15,7 +15,7 @@ from flask_jsglue import JSGlue
 from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
 from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
-    plot_reward_progress
+    plot_reward_progress, plot_loss
 from utilities.statistics import ignore_none
 
 
@@ -207,6 +207,9 @@ def show_experiment(exp_id):
     if "loaded_at" in stats.keys():
         cycles_loaded = stats["loaded_at"]
     plots["reward_progress"] = plot_reward_progress(progress["rewards"]["mean"], cycles_loaded)
+    plots["policy_loss"] = plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0)
+    plots["value_loss"] = plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1)
+    plots["entropies"] = plot_loss(progress["entropies"], progress["rewards"]["mean"], "Entropy", color_id=2)
 
     info.update(dict(
         plots=plots

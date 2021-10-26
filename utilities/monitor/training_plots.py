@@ -2,7 +2,7 @@ from typing import List, Dict
 
 
 from bokeh import embed
-from bokeh.models import Span
+from bokeh.models import Span, Range1d, LinearAxis
 from bokeh.plotting import figure
 
 from utilities.monitor.plotting_base import palette, plot_styling, style_plot
@@ -72,6 +72,28 @@ def plot_reward_progress(rewards, cycles_loaded):
         )
 
     p.renderers.extend(load_markings)
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_loss(loss, rewards, name, color_id=0):
+    """Plot a loss as it develops over cycles."""
+    x = list(range(len(loss)))
+
+    p = figure(title=name,
+               x_axis_label='Cycle',
+               y_axis_label='Loss',
+               y_range=(min(loss), max(loss)),
+               **plot_styling)
+
+    p.extra_y_ranges = {"Reward": Range1d(start=min(rewards), end=max(rewards))}
+    p.add_layout(LinearAxis(y_range_name="Reward"), "right")
+
+    p.line(x, rewards, legend_label="Reward", line_width=2, color="lightgrey", y_range_name="Reward")
+    p.line(x, loss, legend_label=name, line_width=2, color=palette[color_id])
 
     p.legend.location = "bottom_right"
     style_plot(p)
