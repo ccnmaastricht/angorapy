@@ -1,5 +1,6 @@
 from typing import List, Dict
 
+import bokeh.layouts
 from bokeh import embed
 from bokeh.plotting import figure
 
@@ -77,4 +78,24 @@ def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
     p.legend.location = "bottom_right"
     style_plot(p)
 
+    return embed.components(p)
+
+
+def plot_per_receptor_mean(per_receptor_mean: Dict[str, List]):
+    plots = []
+    for i, (sense, means) in enumerate(per_receptor_mean.items()):
+        p = figure(title=f"{sense.capitalize()} Distribution",
+                   x_axis_label='Receptor',
+                   y_axis_label='Mean',
+                   **plot_styling,
+                   )
+
+        p.vbar(range(len(means)), width=1, top=means, legend_label=sense, color=palette[i])
+        p.legend.location = "bottom_right"
+        style_plot(p)
+
+        plots.append(p)
+
+    p = bokeh.layouts.column(plots)
+    p.sizing_mode = "stretch_width"
     return embed.components(p)

@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 
-from utilities.monitor.statistical_plots import plot_episode_box_plots
+from utilities.monitor.statistical_plots import plot_episode_box_plots, plot_per_receptor_mean
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -210,6 +210,9 @@ def show_experiment(exp_id):
     plots["policy_loss"] = plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0)
     plots["value_loss"] = plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1)
     plots["entropies"] = plot_loss(progress["entropies"], progress["rewards"]["mean"], "Entropy", color_id=2)
+
+    if "per_receptor_mean" in stats.keys():
+        plots["per_receptor_mean"] = plot_per_receptor_mean(stats["per_receptor_mean"])
 
     info.update(dict(
         plots=plots

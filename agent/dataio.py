@@ -6,6 +6,7 @@ import re
 from functools import partial
 from typing import Union, Tuple, List
 
+import numpy as np
 import tensorflow as tf
 from mpi4py import MPI
 
@@ -81,7 +82,13 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
         numb_processed_frames,
         buffer.episode_rewards,
         buffer.episode_lengths,
-        tbptt_underflow=underflow
+        tbptt_underflow=underflow,
+        per_receptor_mean={
+            # mean over all buf the last dimension to mean per receptor (reducing batch and time dimensions)
+            # todo ignore empty masked states
+            sense: np.mean(buffer.states[sense], axis=tuple(range(len(buffer.states[sense].shape)))[:-1])
+            for sense in buffer.states.keys()
+        }
     )
 
     return dataset, stats

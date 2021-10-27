@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-import bokeh.io
+import bokeh
 from bokeh import embed
 from bokeh.models import Span, Range1d, LinearAxis
 from bokeh.plotting import figure
@@ -105,12 +105,13 @@ def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
     """Plot progression of preprocessor means."""
     x = list(range(len(preprocessor_data["mean"])))
 
-    p = figure(title="Preprocessor Running Mean",
-               x_axis_label='Cycle',
-               y_axis_label='Running Mean',
-               **plot_styling)
-
+    plots = []
     for i, sense in enumerate(preprocessor_data["mean"][0].keys()):
+        p = figure(title=f"{sense.capitalize()}",
+                   x_axis_label='Cycle',
+                   y_axis_label='Running Mean',
+                   **plot_styling)
+
         trace = [point[sense] for point in preprocessor_data["mean"]]
         if len(trace) > 1:
             trace = trace[1:]
@@ -118,12 +119,13 @@ def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
             if i == 0:
                 x = x[1:]
 
-        print(x)
-        print(trace)
         p.line(x, trace, legend_label=str(sense), line_width=2, color=palette[i])
 
-    p.legend.location = "bottom_right"
-    style_plot(p)
+        p.legend.location = "bottom_right"
+        style_plot(p)
 
-    bokeh.io.show(p)
+        plots.append(p)
+
+    p = bokeh.layouts.row(plots)
+    p.sizing_mode = "stretch_width"
     return embed.components(p)

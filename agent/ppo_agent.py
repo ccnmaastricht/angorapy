@@ -242,6 +242,7 @@ class PPOAgent:
         self.time_dicts = []
         self.underflow_history = []
         self.loading_history = []
+        self.current_per_receptor_mean = {}
 
         # training statistics
         self.cycle_timings = []
@@ -278,7 +279,7 @@ class PPOAgent:
               n: int,
               epochs: int,
               batch_size: int,
-              monitor=None,
+              monitor: "Monitor"=None,
               save_every: int = 0,
               separate_eval: bool = False,
               stop_early: bool = True,
@@ -542,6 +543,7 @@ class PPOAgent:
         self.cycle_reward_std_history.append(None if stats.numb_completed_episodes <= 1 else stdev_eps_rewards)
         self.cycle_stat_n_history.append(stats.numb_completed_episodes)
         self.underflow_history.append(stats.tbptt_underflow)
+        self.current_per_receptor_mean = {s: arr.tolist() for s, arr in stats.per_receptor_mean.items()}
 
     def _make_actor(self) -> Gatherer:
         # create the Gatherer

@@ -179,15 +179,6 @@ class Gatherer:
 
                 file_writer.write(record)
 
-        del dataset
-        del buffer
-        del states
-        del advantages
-        del values
-        del actions
-        del action_probabilities
-        del joint
-
         gc.collect()
         tf.keras.backend.clear_session()
         tf.compat.v1.reset_default_graph()
