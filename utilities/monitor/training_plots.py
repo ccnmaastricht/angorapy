@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-
+import bokeh.io
 from bokeh import embed
 from bokeh.models import Span, Range1d, LinearAxis
 from bokeh.plotting import figure
@@ -108,7 +108,6 @@ def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
     p = figure(title="Preprocessor Running Mean",
                x_axis_label='Cycle',
                y_axis_label='Running Mean',
-               # y_range=(min(all_times), max(all_times)),
                **plot_styling)
 
     for i, sense in enumerate(preprocessor_data["mean"][0].keys()):
@@ -116,9 +115,15 @@ def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
         if len(trace) > 1:
             trace = trace[1:]
 
-        p.line(x, trace, legend_label=sense, line_width=2, color=palette[i])
+            if i == 0:
+                x = x[1:]
+
+        print(x)
+        print(trace)
+        p.line(x, trace, legend_label=str(sense), line_width=2, color=palette[i])
 
     p.legend.location = "bottom_right"
     style_plot(p)
 
+    bokeh.io.show(p)
     return embed.components(p)
