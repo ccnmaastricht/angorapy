@@ -173,7 +173,8 @@ class Investigator:
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
-    def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False, substeps_per_step=1) -> None:
+    def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False, substeps_per_step=1,
+                       act_confidently=True) -> None:
         """Render an episode in the given environment."""
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
@@ -188,7 +189,11 @@ class Investigator:
             prepared_state = state.with_leading_dims(time=is_recurrent).dict()
             probabilities = flatten(self.network(prepared_state, training=False))
 
-            action = self.distribution.act_deterministic(*probabilities)
+            if act_confidently:
+                action = self.distribution.act_deterministic(*probabilities)
+            else:
+                action, _ = self.distribution.act(*probabilities)
+
             observation, reward, done, info = env.step(action)
             cumulative_reward += (reward if "original_reward" not in info else info["original_reward"])
 

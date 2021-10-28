@@ -186,20 +186,26 @@ class Gatherer:
         return stats
 
 
-def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution) -> Tuple[int, int, Any]:
+def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution,
+             act_confidently=False) -> Tuple[int, int, Any]:
     """Evaluate one episode of the given environment following the given policy."""
     policy.reset_states()
     is_recurrent = is_recurrent_model(policy)
+    is_continuous = isinstance(env.action_space, Box)
 
     done = False
     state = env.reset()
     cumulative_reward = 0
     steps = 0
     while not done:
-        probabilities = flatten(policy(add_state_dims(state, dims=2 if is_recurrent else 1)))
+        prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
+        probabilities = flatten(policy(prepared_state))
 
-        action, _ = distribution.act(*probabilities)
-        observation, reward, done, _ = env.step(action)
+        if not act_confidently:
+            action, _ = distribution.act(*probabilities)
+        else:
+            action = distribution.act_deterministic(*probabilities)
+        observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
         cumulative_reward += reward
         observation = observation
 

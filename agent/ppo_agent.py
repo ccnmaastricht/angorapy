@@ -642,30 +642,27 @@ class PPOAgent:
         tf.compat.v1.reset_default_graph()
         gc.collect()
 
-    def evaluate(self, n: int, save: bool = False) -> Tuple[StatBundle, Any]:
+    def evaluate(self, n: int, save: bool = False, act_confidently=False) -> Tuple[StatBundle, Any]:
         """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
         visually inspect the performance.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
             save (bool): whether to save the evaluation to the monitor directory
-
+            act_confidently (bool): Choose actions deterministically instead of sampling them from the distribution
         Returns:
             StatBundle with evaluation results
         """
-        values = mpi_comm.bcast(self.joint.get_weights(), root=0)
-        self.joint.set_weights(values)
+        policy, value, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
-        evaluation_result = evaluate(self.policy, self.env, self.distribution)
-        gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
+        gathered_evaluation_result = []
+        for i in range(n):
+            gathered_evaluation_result.append(evaluate(policy, self.env, self.distribution, act_confidently))
 
-        stats, classes = None, None
-        if MPI.COMM_WORLD.rank == 0:
-            lengths, rewards, classes = zip(*gathered_evaluation_result)
-            stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0)
+        # gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
 
-        stats = mpi_comm.bcast(stats, root=0)
-        classes = mpi_comm.bcast(classes, root=0)
+        lengths, rewards, classes = zip(*gathered_evaluation_result)
+        stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0, per_receptor_mean={})
 
         if save and MPI.COMM_WORLD.rank == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)

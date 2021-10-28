@@ -26,6 +26,7 @@ parser.add_argument("--force-case-circulation", action="store_true", help="circl
 parser.add_argument("--freeze-wrist", action="store_true", help="prevent wrist movements")
 parser.add_argument("--hide-targets", action="store_true", help="do not show visualization of targets")
 parser.add_argument("--rcon", type=str, help="reward configuration", default=None)
+parser.add_argument("--act-stochastic", action="store_true", help="keep stochasticity in decisions")
 
 args = parser.parse_args()
 
@@ -68,7 +69,8 @@ print(f"Environment has the following transformers: {env.transformers}")
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
         investigator.render_episode(env,
-                                    slow_down=False)
+                                    slow_down=False,
+                                    act_confidently=not args.act_stochastic)
 else:
     env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
     if args.freeze_wrist:
