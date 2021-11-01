@@ -37,8 +37,8 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
 
             if isinstance(observation["observation"], Sensation):
                 return observation["observation"]
-            elif isinstance(observation["observation"], numpy.ndarray):
-                return Sensation(proprioception=observation["observation"])
+            elif isinstance(observation["observation"], numpy.ndarray):  # GOAl ENVS
+                return Sensation(proprioception=observation["observation"], goal=observation["desired_goal"])
             elif isinstance(observation["observation"], dict) and all([k in observation["observation"].keys() for k in Sensation.sense_names]):
                 return Sensation(**observation["observation"])
 

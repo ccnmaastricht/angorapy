@@ -206,7 +206,7 @@ def show_experiment(exp_id):
     cycles_loaded = []
     if "loaded_at" in stats.keys():
         cycles_loaded = stats["loaded_at"]
-    plots["reward_progress"] = plot_reward_progress(progress["rewards"]["mean"], cycles_loaded)
+    plots["reward_progress"] = plot_reward_progress(progress["rewards"], cycles_loaded)
     plots["policy_loss"] = plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0)
     plots["value_loss"] = plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1)
     plots["entropies"] = plot_loss(progress["entropies"], progress["rewards"]["mean"], "Entropy", color_id=2)

@@ -724,6 +724,11 @@ class PPOAgent:
         nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
         nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
 
+        # years of experience
+        years_of_experience_report = ""
+        if self.years_of_experience is not None:
+            years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
+
         # print the report
         if is_root:
             pass
@@ -737,7 +742,7 @@ class PPOAgent:
             f"lr: {nc}{current_lr:.2e}{ec}; "
             f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
             f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
-            f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
+            f"{years_of_experience_report}"
             f"{underflow}"
             f"times: {time_string} {time_distribution_string}; "
             f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "

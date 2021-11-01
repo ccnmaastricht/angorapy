@@ -11,6 +11,9 @@ import pandas as pd
 
 def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
     """Boxplot of the rewards and lengths given."""
+    if len(rewards) < 1:
+        return "", ""
+
     cats = ["reward"]
     rewards = np.array(rewards, dtype=np.float)
 

@@ -157,9 +157,10 @@ def build_simple_models(env: BaseWrapper,
 
     # this function is just a wrapper routing the requests for ffn and rnns
     if model_type == "ffn":
-        return build_ffn_models(env, distribution, shared)
+        return build_ffn_models(env, distribution, shared, layer_sizes=(64, 64))
     else:
-        return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length, model_type=model_type)
+        return build_rnn_models(env, distribution, shared, bs=bs, sequence_length=sequence_length, model_type=model_type,
+                                layer_sizes=(64, 64))
 
 
 def build_deeper_models(env: BaseWrapper,
@@ -199,8 +200,11 @@ def build_wider_models(env: BaseWrapper,
 if __name__ == '__main__':
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    cont_env = gym.make("LunarLanderContinuous-v2")
-    disc_env = gym.make("LunarLander-v2")
+    cont_env = gym.make("FetchReachDense-v1")
+
+    model = build_simple_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
+    print(f"Simple model has {model[0].count_params()} parameters.")
+    plot_model(model[2], show_shapes=True, to_file="model_graph_simple.png", expand_nested=True)
 
     model = build_deeper_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
     print(f"Deeper model has {model[0].count_params()} parameters.")

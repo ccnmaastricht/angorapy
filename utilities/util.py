@@ -44,7 +44,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], int]:
     if isinstance(env.observation_space, spaces.Dict):
         # dict observation with observation field, for all GoalEnvs
         if isinstance(env.observation_space["observation"], spaces.Box):
-            obs_dim = {"proprioception": env.observation_space["observation"].shape}
+            obs_dim = {"proprioception": env.observation_space["observation"].shape, "goal": env.observation_space["desired_goal"].shape}
         elif isinstance(env.observation_space["observation"], spaces.Dict):
             # made for sensation
             obs_dim = {name: field.shape for name, field in env.observation_space["observation"].spaces.items()}

@@ -1,8 +1,10 @@
 from typing import List, Dict
 
 import bokeh
+import numpy as np
+import pandas as pd
 from bokeh import embed
-from bokeh.models import Span, Range1d, LinearAxis
+from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource
 from bokeh.plotting import figure
 
 from utilities.monitor.plotting_base import palette, plot_styling, style_plot
@@ -35,6 +37,9 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
                  + (optimization_timings if optimization_timings is not None else [])
                  + (gathering_timings if gathering_timings is not None else []))
 
+    if len(all_times) < 1:
+        return None, None
+
     p = figure(title="Execution Times",
                x_axis_label='Cycle',
                y_axis_label='Seconds',
@@ -53,17 +58,32 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
     return embed.components(p)
 
 
-def plot_reward_progress(rewards, cycles_loaded):
+def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
     """Plot the execution times of a full cycle and optionally bot sub phases."""
-    x = list(range(len(rewards)))
+    means, stds = rewards["mean"], rewards["stdev"]
+
+    x = list(range(len(means)))
+    df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
 
     p = figure(title="Average Rewards per Cycle",
                x_axis_label='Cycle',
                y_axis_label='Total Episode Return',
-               y_range=(min(rewards), max(rewards)),
+               y_range=(min(df["lower"]), max(df["upper"])),
+               x_range=(0, max(x)),
                **plot_styling)
 
-    p.line(x, rewards, legend_label="Reward", line_width=2, color=palette[0])
+    error_band = bokeh.models.Band(
+        base="x", lower="lower", upper="upper",
+        source=ColumnDataSource(df.reset_index()),
+        fill_color=palette[0],
+        fill_alpha=0.2,
+        line_color=palette[0],
+        line_alpha=0.4,
+    )
+    p.add_layout(error_band)
+    p.renderers.extend([error_band])
+
+    p.line(x, means, legend_label="Reward", line_width=2, color=palette[0])
 
     load_markings = []
     for load_timing in cycles_loaded:
