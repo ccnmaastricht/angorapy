@@ -64,14 +64,16 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
 
     x = list(range(len(means)))
     df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
+    value_range = max(df["upper"]) - min(df["lower"])
 
     p = figure(title="Average Rewards per Cycle",
                x_axis_label='Cycle',
                y_axis_label='Total Episode Return',
-               y_range=(min(df["lower"]), max(df["upper"])),
+               y_range=(min(df["lower"]), max(df["upper"]) + value_range * 0.1),
                x_range=(0, max(x)),
                **plot_styling)
 
+    # ERROR BAND
     error_band = bokeh.models.Band(
         base="x", lower="lower", upper="upper",
         source=ColumnDataSource(df.reset_index()),
@@ -83,7 +85,21 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
     p.add_layout(error_band)
     p.renderers.extend([error_band])
 
+    # REWARD LINE
     p.line(x, means, legend_label="Reward", line_width=2, color=palette[0])
+
+    # MAX VALUE MARKING
+    x_max = np.argmax(means)
+    y_max = np.max(means)
+    p.add_layout(bokeh.models.Arrow(end=bokeh.models.NormalHead(size=15,
+                                                                line_color="darkred",
+                                                                line_width=2,
+                                                                fill_color="red"),
+                                    line_color="darkred",
+                                    line_width=2,
+                                    x_start=x_max, y_start=y_max + value_range * 0.1,
+                                    x_end=x_max, y_end=y_max))
+
 
     load_markings = []
     for load_timing in cycles_loaded:
