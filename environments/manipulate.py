@@ -125,6 +125,7 @@ class BaseManipulate(BaseShadowHandEnv):
         for _, site_id in self._touch_sensor_id_site_id:
             self.sim.model.site_rgba[site_id][3] = 0.0
 
+        self.consecutive_goals_reached = 0
         self.previous_achieved_goal = self._get_achieved_goal()
         self._set_default_reward_function_and_config()
 
@@ -363,13 +364,17 @@ class BaseManipulate(BaseShadowHandEnv):
         obs, reward, done, info = super().step(action)
         dropped = self._is_dropped()
         success = self._is_success(self._get_achieved_goal(), self.goal)
-        done = done or dropped
 
+        # determine if a goal has been reached
         if not success:
             self.previous_achieved_goal = self._get_achieved_goal().copy()
         else:
+            self.consecutive_goals_reached += 1
             self.goal = self._sample_goal()
             obs = self._get_obs()
+
+        # determine if done
+        done = done or dropped or self.consecutive_goals_reached >= 50
 
         return obs, reward, done, info
 
