@@ -82,6 +82,8 @@ def get_fingertip_distance(ft_a, ft_b):
 class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
 
+    continuous = True
+
     def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True, model=MODEL_PATH):
         gym.utils.EzPickle.__init__(**locals())
 
@@ -114,7 +116,12 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.goal = self._sample_goal()
         obs = self._get_obs()
 
-        self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
+        if self.continuous:
+            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
+        else:
+            self.action_space = spaces.MultiDiscrete(np.ones(20) * 11)
+            self.discrete_action_values = np.linspace(-1, 1, 11)
+
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
@@ -177,8 +184,12 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def step(self, action):
-        action = np.clip(action, self.action_space.low, self.action_space.high)
+    def step(self, action: np.ndarray):
+        if self.continuous:
+            action = np.clip(action, self.action_space.low, self.action_space.high)
+        else:
+            action = self.discrete_action_values[action.astype(np.int)]
+
         if self._freeze_wrist:
             action[:2] = 0
 
@@ -193,6 +204,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         }
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
+
         return obs, reward, done, info
 
     def reset(self):

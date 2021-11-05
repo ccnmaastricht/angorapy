@@ -256,6 +256,10 @@ manipulate = make_config(
     model="gru"
 )
 
+manipulate_discrete = derive_config(manipulate, dict(
+    distribution="multi-categorical",
+))
+
 # RECOMMENDED CONFIGS FOR ENVs
 
 recommended_config = dict(

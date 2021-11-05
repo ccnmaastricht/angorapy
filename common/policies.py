@@ -9,6 +9,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
+from agent.core import extract_discrete_action_probabilities
 from common.layers import StdevLayer
 from common.const import EPSILON
 from utilities.util import env_extract_dims
@@ -81,7 +82,7 @@ class BasePolicyDistribution(abc.ABC):
         return .5 * tf.reduce_mean(tf.square(log_pa - log_pb))
 
     @abc.abstractmethod
-    def build_action_head(self, n_actions: int, input_shape: tuple, batch_size: Union[int, None]):
+    def build_action_head(self, n_actions: Tuple[int], input_shape: tuple, batch_size: Union[int, None]):
         """Build the step_tuple head of a policy using this distribution."""
         pass
 
@@ -95,7 +96,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy'serialization short identifier."""
+        """Policy's short identifier."""
         return "categorical"
 
     @property
@@ -129,9 +130,11 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         """Not Implemented"""
         raise NotImplementedError("A categorical distribution has no pdf.")
 
-    def log_probability(self, **kwargs):
-        """Not implemented"""
-        raise NotImplementedError("A categorical distribution has no pdf.")
+    @staticmethod
+    @tf.function
+    def log_probability(actions: tf.Tensor, distribution: tf.Tensor):
+        """Calculate log probability of a (batch of) actions given their distribution."""
+        return extract_discrete_action_probabilities(distribution, actions)
 
     @tf.function
     def _entropy_from_pmf(self, pmf: tf.Tensor):
@@ -148,14 +151,101 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
         return - self._entropy_from_log_pmf(pmf)
 
-    def build_action_head(self, n_actions: int, input_shape: tuple, batch_size: int):
+    def build_action_head(self, n_actions: Tuple[int], input_shape: tuple, batch_size: int):
         """Build a discrete step_tuple head as a log softmax output layer."""
+        assert len(n_actions) == 1, "Categorical distribution expects only a single action dimension. " \
+                                    "For other multiple action dimensions use MultiCategoricalPolicyDistribution."
+
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
-        x = tf.keras.layers.Dense(n_actions,
+        x = tf.keras.layers.Dense(n_actions[0],
                                   kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
         x = tf.nn.log_softmax(x, name="log_likelihoods")
+
+        return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
+
+
+class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
+    """Policy distribution for multi-discrete action spaces."""
+
+    def act_deterministic(self, *args, **kwargs):
+        raise NotImplementedError("Act deterministic not defined for Categorical Distribution.")
+
+    @property
+    def short_name(self):
+        """Policy's short identifier."""
+        return "multi-categorical"
+
+    @property
+    def has_log_params(self):
+        """Categorical distribution expects pmf in log space."""
+        return True
+
+    def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+        """Sample an action from the distribution based on the provided log probabilities."""
+        action = self.sample(log_probabilities)
+        sample_probability = tf.gather_nd(tf.squeeze(log_probabilities), tf.stack([tf.range(len(action)), action], axis=-1))
+
+        return action.astype(np.int), tf.math.reduce_sum(sample_probability, axis=-1)
+
+    def sample(self, log_probabilities: tf.Tensor) -> np.ndarray:
+        """Sample an step_tuple from the distribution."""
+        assert isinstance(log_probabilities, tf.Tensor) or isinstance(log_probabilities, np.ndarray), \
+            f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
+            f"not {type(log_probabilities).__name__}."
+
+        if tf.rank(log_probabilities) == 4:
+            # there appears to be a sequence dimension
+            assert log_probabilities.shape[
+                       1] == 1, "Policy actions can only be selected for a single timestep, but the " \
+                                "dimensionality of the given tensor is more than 1 at rank 1."
+
+            log_probabilities = tf.squeeze(log_probabilities, axis=1)
+
+        action = [tf.random.categorical(log_probabilities[..., a_id, :], 1)[0][0].numpy().item()
+                  for a_id in range(log_probabilities.shape[-2])]
+
+        return np.array(action)
+
+    def probability(self, **kwargs):
+        """Not Implemented"""
+        raise NotImplementedError("A categorical distribution has no pdf.")
+
+    @staticmethod
+    @tf.function
+    def log_probability(actions, distribution):
+        return tf.math.reduce_sum(
+            tf.gather_nd(tf.squeeze(distribution), tf.stack([tf.range(len(tf.squeeze(actions))), tf.squeeze(actions)], axis=-1))
+        )
+
+    @tf.function
+    def _entropy_from_pmf(self, pmf: tf.Tensor):
+        """Calculate entropy of a categorical distribution from raw pmf."""
+        return - tf.reduce_sum(tf.math.log(pmf) * pmf, axis=-1)
+
+    @tf.function
+    def _entropy_from_log_pmf(self, pmf: tf.Tensor):
+        """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
+        return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
+
+    @tf.function
+    def entropy(self, pmf: tf.Tensor):
+        """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
+        return - self._entropy_from_log_pmf(pmf)
+
+    def build_action_head(self, n_actions: Tuple[int], input_shape: tuple, batch_size: int):
+        """Build a discrete step_tuple head as a log softmax output layer."""
+        assert len(n_actions) == 2, "MultiCategoricalPolicyDistribution expects two action dimensions."
+
+        inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
+
+        x = tf.keras.layers.Dense(tf.multiply(*n_actions),
+                                  kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
+                                  bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
+        unflattened_shape = x.shape[1:-1].concatenate(n_actions)
+        x = tf.keras.layers.Reshape(unflattened_shape)(x)
+        x = tf.nn.log_softmax(x, axis=-1, name="log_likelihoods")
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 
@@ -277,8 +367,11 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         log_stdevs = params[1]
         return self._entropy_from_log_params(log_stdevs)
 
-    def build_action_head(self, n_actions, input_shape, batch_size, stdevs_from_latent=False):
+    def build_action_head(self, n_actions: Tuple[int], input_shape, batch_size, stdevs_from_latent=False):
         """Build a policy head for the gaussian distribution, for mean and stdev prediction."""
+        assert len(n_actions) == 1, "Continuous policy distributions expect only a single int to indicate n_actions."
+        n_actions = n_actions[0]
+
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
         means = tf.keras.layers.Dense(n_actions, name="means",
@@ -309,7 +402,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy'serialization short identidier."""
+        """Policy's short identifier."""
         return "beta"
 
     @property
@@ -405,6 +498,9 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         """Build a policy head for the beta distribution, for alpha and beta prediction.
 
         """
+        assert len(n_actions) == 1, "Continuous policy distributions expect only a single int to indicate n_actions."
+        n_actions = n_actions[0]
+
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
         alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus",
@@ -426,6 +522,8 @@ _distribution_short_name_map = {
     "gaussian": GaussianPolicyDistribution,
     "discrete": CategoricalPolicyDistribution,
     "categorical": CategoricalPolicyDistribution,
+    "multi-categorical": MultiCategoricalPolicyDistribution,
+    "multi-discrete": MultiCategoricalPolicyDistribution,
     "beta": BetaPolicyDistribution
 }
 

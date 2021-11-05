@@ -9,14 +9,14 @@ from common.senses import Sensation, stack_sensations
 class ExperienceBuffer:
     """Buffer for experience gathered by a single worker."""
 
-    def __init__(self, capacity: int, state_dim: Dict[str, Tuple[int]], action_dim: int, is_continuous: bool):
+    def __init__(self, capacity: int, state_dim: Dict[str, Tuple[int]], action_dim: Tuple[int], is_continuous: bool):
         """Initialize the buffer with empty numpy arrays.
 
         Individual buffers include a leading batch dimension."""
 
         # data buffers
         self.states = {sense: np.empty((capacity, *shape,), dtype=np.float32) for sense, shape in state_dim.items()}
-        self.actions = np.empty((capacity, action_dim,), dtype=np.float32)
+        self.actions = np.empty((capacity, *action_dim[:-1]), dtype=np.float32 if is_continuous else np.int32)
         self.action_probabilities = np.empty((capacity,), dtype=np.float32)
         self.returns = np.empty((capacity,), dtype=np.float32)
         self.advantages = np.empty((capacity,), dtype=np.float32)
@@ -73,7 +73,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         states:         dims (B,
     """
 
-    def __init__(self, capacity: int, state_dim: Dict[str, Tuple[int]], action_dim: int, is_continuous: bool,
+    def __init__(self, capacity: int, state_dim: Dict[str, Tuple[int]], action_dim: Tuple[int], is_continuous: bool,
                  seq_length: int):
 
         super().__init__(capacity, state_dim, action_dim, is_continuous)
@@ -81,7 +81,7 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
 
         self.states = {sense: np.zeros((1, capacity, self.seq_length, *shape,), dtype=np.float32) for sense, shape in
                        state_dim.items()}
-        self.actions = np.zeros((1, capacity, self.seq_length, action_dim,), dtype=np.float32)
+        self.actions = np.zeros((1, capacity, self.seq_length, *action_dim[:-1],), dtype=np.float32 if is_continuous else np.int32)
         self.action_probabilities = np.zeros((1, capacity, self.seq_length,), dtype=np.float32)
         self.returns = np.zeros((1, capacity, self.seq_length,), dtype=np.float32)
         self.advantages = np.zeros((1, capacity, self.seq_length,), dtype=np.float32)

@@ -5,7 +5,7 @@ import gym
 from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel
-from environments.manipulate import ManipulateBlock, ManipulateEgg
+from environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete
 from environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
 from environments.nrp.shadowhand import BaseNRPShadowHandEnv
 from environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
@@ -156,6 +156,15 @@ for control_mode in ["Relative", "Absolute"]:
         id=f'ManipulateBlock{control_mode}-v0',
         entry_point='environments:ManipulateBlock',
         kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "relative_control": control_mode == "Relative"},
+        max_episode_steps=SHADOWHAND_MAX_STEPS,
+    )
+
+    gym.envs.register(
+        id=f'ManipulateBlockDiscrete{control_mode}-v0',
+        entry_point='environments:ManipulateBlockDiscrete',
+        kwargs={'target_position': 'ignore',
+                'target_rotation': 'xyz',
+                "relative_control": control_mode == "Relative"},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
 

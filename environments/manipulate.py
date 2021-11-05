@@ -362,7 +362,6 @@ class BaseManipulate(BaseShadowHandEnv):
     def step(self, action):
         """Make step in environment."""
         obs, reward, done, info = super().step(action)
-        dropped = self._is_dropped()
         success = self._is_success(self._get_achieved_goal(), self.goal)
 
         # determine if a goal has been reached
@@ -374,6 +373,7 @@ class BaseManipulate(BaseShadowHandEnv):
             obs = self._get_obs()
 
         # determine if done
+        dropped = self._is_dropped()
         done = done or dropped or self.consecutive_goals_reached >= 50
 
         return obs, reward, done, info
@@ -394,6 +394,10 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 vision=vision,
                                 relative_control=relative_control
                                 )
+
+
+class ManipulateBlockDiscrete(ManipulateBlock):
+    continuous = False
 
 
 class ManipulateEgg(BaseManipulate, utils.EzPickle):

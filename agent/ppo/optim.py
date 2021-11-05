@@ -50,7 +50,7 @@ def learn_on_batch(batch,
             action_probabilities = distribution.log_probability(batch["action"], *policy_output)
         else:
             # if the action space is discrete, extract the probabilities of actions actually chosen
-            action_probabilities = extract_discrete_action_probabilities(policy_output, batch["action"])
+            action_probabilities = distribution.log_probability(batch["action"], policy_output)
 
         # calculate the three loss components
         policy_loss = loss.policy_loss(action_prob=action_probabilities,

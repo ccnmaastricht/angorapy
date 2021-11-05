@@ -10,7 +10,7 @@ import numpy
 import numpy as np
 import tensorflow as tf
 from gym import spaces
-from gym.spaces import Discrete, Box
+from gym.spaces import Discrete, Box, MultiDiscrete
 from mpi4py import MPI
 from tensorflow.python.client import device_lib
 
@@ -36,7 +36,7 @@ def set_all_seeds(seed):
     random.seed(seed)
 
 
-def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], int]:
+def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], Tuple[int]]:
     """Returns state and action space dimensionality for given environment."""
     obs_dim: dict
 
@@ -60,9 +60,14 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], int]:
 
     # action space
     if isinstance(env.action_space, Discrete):
-        act_dim = env.action_space.n
+        act_dim = (env.action_space.n,)
+    elif isinstance(env.action_space, MultiDiscrete):
+        assert np.alltrue(env.action_space.nvec == env.action_space.nvec[0]), "Can only handle multi-discrete action" \
+                                                                              "spaces where all actions have the same " \
+                                                                              "number of categories."
+        act_dim = (env.action_space.shape[0], env.action_space.nvec[0].item())
     elif isinstance(env.action_space, Box):
-        act_dim = env.action_space.shape[0]
+        act_dim = (env.action_space.shape[0],)
     else:
         raise NotImplementedError(f"Environment has unknown Action Space Typ: {env.action_space}")
 

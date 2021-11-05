@@ -16,7 +16,7 @@ import numpy as np
 import nvidia_smi
 import psutil
 import tensorflow as tf
-from gym.spaces import Discrete, Box
+from gym.spaces import Discrete, Box, MultiDiscrete
 from mpi4py import MPI
 from psutil import NoSuchProcess
 from tensorflow.keras.optimizers import Optimizer
@@ -128,7 +128,7 @@ class PPOAgent:
         self.env: BaseWrapper = environment
         self.env_name = self.env.unwrapped.spec.id
         self.state_dim, self.n_actions = env_extract_dims(self.env)
-        if isinstance(self.env.action_space, Discrete):
+        if isinstance(self.env.action_space, (Discrete, MultiDiscrete)):
             self.continuous_control = False
         elif isinstance(self.env.action_space, Box):
             self.continuous_control = True

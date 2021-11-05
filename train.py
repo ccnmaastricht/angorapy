@@ -12,7 +12,7 @@ import argparse
 import logging
 
 import argcomplete
-from gym.spaces import Box
+from gym.spaces import Box, Discrete, MultiDiscrete
 
 from configs import hp_config
 from common.policies import get_distribution_by_short_name
@@ -66,7 +66,12 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     # choose and make policy distribution
     if settings["distribution"] is None:
-        settings["distribution"] = "categorical" if env_action_space_type == "discrete" else "gaussian"
+        if isinstance(env.action_space, Box):
+            settings["distribution"] = "gaussian"
+        elif isinstance(env.action_space, Discrete):
+            settings["distribution"] = "categorical"
+        elif isinstance(env.action_space, MultiDiscrete):
+            settings["distribution"] = "multi-categorical"
 
     distribution = get_distribution_by_short_name(settings["distribution"])(env)
 

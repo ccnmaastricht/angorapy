@@ -1,3 +1,5 @@
+import sys
+
 import tensorflow as tf
 
 
@@ -21,10 +23,10 @@ def policy_loss(action_prob: tf.Tensor,
       the value of the objective function
 
     """
-    r = tf.exp(action_prob - old_action_prob)
+    ratio = tf.exp(action_prob - old_action_prob)
     clipped = tf.maximum(
-        tf.math.multiply(r, -advantage),
-        tf.math.multiply(tf.clip_by_value(r, 1 - clipping_bound, 1 + clipping_bound), -advantage)
+        tf.math.multiply(ratio, -advantage),
+        tf.math.multiply(tf.clip_by_value(ratio, 1 - clipping_bound, 1 + clipping_bound), -advantage)
     )
 
     if is_recurrent:
