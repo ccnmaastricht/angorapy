@@ -83,6 +83,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
 
     continuous = True
+    discrete_bin_count = 3
 
     def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True, model=MODEL_PATH):
         gym.utils.EzPickle.__init__(**locals())
@@ -119,8 +120,8 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         if self.continuous:
             self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
         else:
-            self.action_space = spaces.MultiDiscrete(np.ones(20) * 11)
-            self.discrete_action_values = np.linspace(-1, 1, 11)
+            self.action_space = spaces.MultiDiscrete(np.ones(20) * BaseShadowHandEnv.discrete_bin_count)
+            self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
 
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),

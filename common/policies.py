@@ -185,7 +185,8 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
     def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         """Sample an action from the distribution based on the provided log probabilities."""
         action = self.sample(log_probabilities)
-        sample_probability = tf.gather_nd(tf.squeeze(log_probabilities), tf.stack([tf.range(len(action)), action], axis=-1))
+        sample_probability = tf.gather_nd(tf.squeeze(log_probabilities),
+                                          tf.stack([tf.range(len(action)), action], axis=-1))
 
         return action.astype(np.int), tf.math.reduce_sum(sample_probability, axis=-1)
 
@@ -215,9 +216,14 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
     @staticmethod
     @tf.function
     def log_probability(actions, distribution):
-        return tf.math.reduce_sum(
-            tf.gather_nd(tf.squeeze(distribution), tf.stack([tf.range(len(tf.squeeze(actions))), tf.squeeze(actions)], axis=-1))
-        )
+        # the tf.where() trick gives us indices of the same shape as the actions tensor
+        prepending_indices = tf.cast(tf.where(tf.ones(actions.shape)), dtype=tf.int32)
+        indices = tf.concat([prepending_indices, tf.reshape(actions, [-1, 1])], axis=-1)
+
+        single_action_logits = tf.reshape(tf.gather_nd(distribution, indices), actions.shape)
+
+        # reduce by sum to give joined probability of multi-categorical distribution; sum because of log space
+        return tf.math.reduce_sum(single_action_logits, axis=-1)
 
     @tf.function
     def _entropy_from_pmf(self, pmf: tf.Tensor):
@@ -444,7 +450,8 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
     @tf.function
     def _scale_sample_to_distribution_range(self, sample) -> tf.Tensor:
         # clipping just to, you know, be sure
-        return tf.clip_by_value(tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff), EPSILON, 1 - EPSILON)
+        return tf.clip_by_value(tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff), EPSILON,
+                                1 - EPSILON)
 
     @tf.function
     def probability(self, samples: tf.Tensor, alphas: tf.Tensor, betas: tf.Tensor):
@@ -687,4 +694,3 @@ if __name__ == '__main__':
 
     print(d.entropy(([[1.5, 3.4]], [[1.2, 1.1]])))
     print(d.act([[1.5, 3.4]], [[1.2, 1.1]]))
-
