@@ -54,7 +54,8 @@ env = agent.env
 if args.freeze_wrist:
     env.env.toggle_wrist_freezing()
 
-print(f"Evaluating on {env.unwrapped.spec.id} with {env.unwrapped.sim.nsubsteps} substeps.")
+substeps = "" if not hasattr(env.unwrapped, "sim") else f" with {env.unwrapped.sim.nsubsteps} substeps"
+print(f"Evaluating on {env.unwrapped.spec.id}{substeps}.")
 print(f"Environment has the following transformers: {env.transformers}")
 
 # if args.env != "":

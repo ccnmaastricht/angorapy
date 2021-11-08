@@ -91,8 +91,8 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the step_tuple space is discrete and the agent thus predicts a pmf over the possible actions."""
 
-    def act_deterministic(self, *args, **kwargs):
-        raise NotImplementedError("Act deterministic not defined for Categorical Distribution.")
+    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> np.ndarray:
+        return tf.squeeze(tf.argmax(log_probabilities, axis=-1)).numpy()
 
     @property
     def short_name(self):
@@ -169,8 +169,10 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
 class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy distribution for multi-discrete action spaces."""
 
-    def act_deterministic(self, *args, **kwargs):
-        raise NotImplementedError("Act deterministic not defined for Categorical Distribution.")
+    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> np.ndarray:
+        action = tf.argmax(log_probabilities, axis=-1)
+
+        return tf.squeeze(action).numpy()
 
     @property
     def short_name(self):
@@ -541,156 +543,3 @@ def get_distribution_by_short_name(name: str) -> type(BasePolicyDistribution):
         raise ValueError("Unknown distribution type.")
 
     return _distribution_short_name_map[name]
-
-
-if __name__ == '__main__':
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-    tf.config.experimental_run_functions_eagerly(True)
-
-    alpha_values = tf.Variable(
-        tf.convert_to_tensor([[57.557674],
-                              [57.55842],
-                              [57.545856],
-                              [57.553318],
-                              [57.558605],
-                              [57.547817],
-                              [57.556812],
-                              [57.556156],
-                              [57.559284],
-                              [57.557617],
-                              [57.559086],
-                              [57.55797],
-                              [57.55919],
-                              [57.55272],
-                              [57.549812],
-                              [57.558773],
-                              [57.556538],
-                              [57.558437],
-                              [57.55689],
-                              [57.55559],
-                              [57.55926],
-                              [57.559128],
-                              [57.55904],
-                              [57.55914],
-                              [57.559177],
-                              [57.541996],
-                              [57.55887],
-                              [57.55832],
-                              [57.558136],
-                              [57.55903],
-                              [57.559196],
-                              [57.558605],
-                              [57.55935],
-                              [57.559017],
-                              [57.55817],
-                              [57.559273],
-                              [57.55278],
-                              [57.559284],
-                              [57.557278],
-                              [57.556152],
-                              [57.559235],
-                              [57.550365],
-                              [57.558537],
-                              [57.552933],
-                              [57.549023],
-                              [57.552174],
-                              [57.557743],
-                              [57.558556],
-                              [57.558983],
-                              [57.558617],
-                              [57.557953],
-                              [57.55909],
-                              [57.430237],
-                              [57.559086],
-                              [57.559208],
-                              [57.55862],
-                              [57.558758],
-                              [57.559124],
-                              [57.558365],
-                              [57.538708],
-                              [57.555473],
-                              [57.55923],
-                              [57.55934],
-                              [57.489655]], dtype=np.float32), trainable=True)
-    beta_values = tf.Variable(
-        tf.convert_to_tensor([[58.16996],
-                              [58.17037],
-                              [58.163185],
-                              [58.16744],
-                              [58.170513],
-                              [58.164295],
-                              [58.169468],
-                              [58.16905],
-                              [58.170918],
-                              [58.16992],
-                              [58.170757],
-                              [58.170143],
-                              [58.170868],
-                              [58.167072],
-                              [58.165413],
-                              [58.17061],
-                              [58.169292],
-                              [58.170425],
-                              [58.169476],
-                              [58.168755],
-                              [58.170914],
-                              [58.170834],
-                              [58.170765],
-                              [58.17084],
-                              [58.17086],
-                              [58.16095],
-                              [58.170666],
-                              [58.17033],
-                              [58.1702],
-                              [58.170742],
-                              [58.170883],
-                              [58.170513],
-                              [58.170998],
-                              [58.17077],
-                              [58.170254],
-                              [58.17091],
-                              [58.167084],
-                              [58.170948],
-                              [58.16969],
-                              [58.169086],
-                              [58.170864],
-                              [58.165756],
-                              [58.17045],
-                              [58.167217],
-                              [58.164925],
-                              [58.16675],
-                              [58.170006],
-                              [58.170456],
-                              [58.170765],
-                              [58.170517],
-                              [58.170124],
-                              [58.170788],
-                              [58.098007],
-                              [58.170795],
-                              [58.17084],
-                              [58.17052],
-                              [58.1706],
-                              [58.17081],
-                              [58.170357],
-                              [58.15913],
-                              [58.16864],
-                              [58.1709],
-                              [58.170994],
-                              [58.131294]], dtype=np.float32), trainable=True)
-
-    with tf.GradientTape() as tape:
-        d = BetaPolicyDistribution(gym.make("LunarLanderContinuous-v2"))
-        index = np.where(np.isinf(d.log_probability(alpha_values.value(), alpha_values.value(), beta_values.value())))
-        entropy = d.log_probability(alpha_values.value(), alpha_values.value(), beta_values.value())
-
-    grads = tape.gradient(entropy, alpha_values)
-    critical_index = np.where(np.isnan(grads))
-    print(grads)
-    print(f"Kritischer Bengel: {critical_index}")
-    print(beta_values.value().numpy()[critical_index])
-    print(alpha_values.value().numpy()[critical_index])
-    print(entropy)
-
-    print(d.entropy(([[1.5, 3.4]], [[1.2, 1.1]])))
-    print(d.act([[1.5, 3.4]], [[1.2, 1.1]]))
