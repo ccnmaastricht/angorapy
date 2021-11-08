@@ -377,7 +377,6 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def build_action_head(self, n_actions: Tuple[int], input_shape, batch_size, stdevs_from_latent=False):
         """Build a policy head for the gaussian distribution, for mean and stdev prediction."""
-        assert len(n_actions) == 1, "Continuous policy distributions expect only a single int to indicate n_actions."
         n_actions = n_actions[0]
 
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
@@ -507,7 +506,6 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         """Build a policy head for the beta distribution, for alpha and beta prediction.
 
         """
-        assert len(n_actions) == 1, "Continuous policy distributions expect only a single int to indicate n_actions."
         n_actions = n_actions[0]
 
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))

@@ -67,7 +67,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], Tuple[int]]:
                                                                               "number of categories."
         act_dim = (env.action_space.shape[0], env.action_space.nvec[0].item())
     elif isinstance(env.action_space, Box):
-        act_dim = (env.action_space.shape[0],)
+        act_dim = (env.action_space.shape[0], 1)
     else:
         raise NotImplementedError(f"Environment has unknown Action Space Typ: {env.action_space}")
 
