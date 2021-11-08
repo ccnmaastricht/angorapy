@@ -83,7 +83,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
 
     continuous = True
-    discrete_bin_count = 3
+    discrete_bin_count = 11
 
     def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True, model=MODEL_PATH):
         gym.utils.EzPickle.__init__(**locals())
