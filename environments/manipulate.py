@@ -189,6 +189,10 @@ class BaseManipulate(BaseShadowHandEnv):
             self.sim.data.set_joint_qpos(name, value)
         self.sim.forward()
 
+    def reset(self):
+        self.consecutive_goals_reached = 0
+        return super().reset()
+
     def _reset_sim(self):
         self.sim.set_state(self.initial_state)
         self.sim.forward()

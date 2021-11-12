@@ -32,7 +32,7 @@ args = parser.parse_args()
 
 scale_the_substeps = False
 
-if args.state not in ["b", "best"]:
+if args.state not in ["b", "best", "last"]:
     args.state = int(args.state)
 
 if args.id is None:
