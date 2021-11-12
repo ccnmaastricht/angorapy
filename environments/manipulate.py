@@ -450,6 +450,10 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
         }
 
 
+class OpenAIManipulateDiscrete(OpenAIManipulate):
+    continuous = False
+
+
 class ManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
 
