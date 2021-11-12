@@ -2,16 +2,16 @@ import os
 
 import mujoco_py
 import numpy as np
-from gym import utils, spaces
-from gym.envs.robotics import HandBlockEnv, rotations
-from gym.envs.robotics.hand.manipulate import robot_get_obs
+from gym import utils
+from gym.envs.robotics import rotations
 from gym.envs.robotics.utils import robot_get_obs
+from scipy.spatial import transform
 
+from common.const import VISION_WH, N_SUBSTEPS
 from common.reward import manipulate
 from common.senses import Sensation
 from configs.reward_config import MANIPULATE_BASE
-from environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE
-from common.const import VISION_WH, N_SUBSTEPS
+from environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "assets/hand",
@@ -135,7 +135,8 @@ class BaseManipulate(BaseShadowHandEnv):
 
     def assert_reward_setup(self):
         """Assert whether the reward config fits the environment. """
-        assert set(MANIPULATE_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete manipulate reward configuration."
+        assert set(MANIPULATE_BASE.keys()).issubset(
+            self.reward_config.keys()), "Incomplete manipulate reward configuration."
 
     def _get_achieved_goal(self):
         # Object position and rotation.
@@ -382,7 +383,8 @@ class BaseManipulate(BaseShadowHandEnv):
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with a Block as an object."""
 
-    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata', relative_control=True,
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+                 relative_control=True,
                  vision: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
@@ -396,6 +398,54 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 )
 
 
+class OpenAIManipulate(BaseManipulate, utils.EzPickle):
+
+    def __init__(self):
+        utils.EzPickle.__init__(self, "ignore", "xyz", 'sensordata', "dense")
+        BaseManipulate.__init__(self,
+                                model_path=MODEL_PATH_MANIPULATE,
+                                touch_get_obs='sensordata',
+                                target_rotation="xyz",
+                                target_position="ignore",
+                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                                vision=False,
+                                relative_control=True
+                                )
+
+    def _get_obs(self):
+        finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()
+        object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        target_orientation = self.goal.ravel().copy()[3:]
+
+        target_quat = transform.Rotation.from_quat(target_orientation)
+        current_quat = transform.Rotation.from_quat((object_qpos[3:]))
+        relative_target_orientation = (target_quat * current_quat.inv()).as_quat()
+
+        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
+        object_positional_velocity = self.sim.data.get_body_xvelp('object')
+        object_angular_velocity = self.sim.data.get_body_xvelr('object')  # quaternions in OpenAI model
+
+        proprioception = np.concatenate([
+            finger_tip_positions,
+            object_qpos,
+            relative_target_orientation,
+            hand_joint_angles,
+            hand_joint_velocities,
+            object_positional_velocity,
+            object_angular_velocity
+        ])
+
+        return {
+            "observation": Sensation(
+                vision=None,
+                proprioception=proprioception.copy(),
+                somatosensation=None,
+                goal=target_orientation),
+            "achieved_goal": object_qpos.copy(),
+            "desired_goal": self.goal.ravel().copy(),
+        }
+
+
 class ManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
 
@@ -403,7 +453,8 @@ class ManipulateBlockDiscrete(ManipulateBlock):
 class ManipulateEgg(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with an Egg as an object."""
 
-    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata', relative_control=True,
+    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+                 relative_control=True,
                  vision: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
