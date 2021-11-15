@@ -7,90 +7,90 @@
 {% endblock %}
 
 {% block side_nav %}
-        <ul class="list-unstyled components">
-            <li class="active"><a href="#bookmark-view">Bookmarked Experiments</a></li>
-            <li><a href="#all-view">Other Experiments</a></li>
-        </ul>
+    <ul class="list-unstyled components">
+        <li class="active"><a href="#bookmark-view">Bookmarked Experiments</a></li>
+        <li><a href="#all-view">Other Experiments</a></li>
+    </ul>
 {% endblock %}
 
 {% block page_content %}
 
     <nav class="navbar navbar-expand-lg navbar-light">
-            <div class="container-fluid">
+        <div class="container-fluid">
 
-                <div class="reload-button">
-                    <button type="button" id="refresh" class="btn btn-circle btn-md">
-                        <i class="fas fa-sync"></i>
-                    </button>
-                </div>
-
-                <div>
-                    <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i>
-                        Clear All Empty
-                    </button>
-
-                    <button type="button" class="btn btn-warning" id="clear-short"><i class="fas fa-trash-alt"></i>
-                        Clear All Short
-                    </button>
-                </div>
-
-                <div>
-                    {#                <label for="filter-env">Show</label>#}
-                    <select class="custom-select" id="filter-env">
-                        <option selected>Show All</option>
-                        {% for env in envs_available|sort(reverse=true) %}
-                            <option value="{{ env }}">{{ env }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
+            <div class="reload-button">
+                <button type="button" id="refresh" class="btn btn-circle btn-md">
+                    <i class="fas fa-sync"></i>
+                </button>
             </div>
-        </nav>
 
-    <div class="topic-group"  id="bookmark-view">
+            <div>
+                <button type="button" class="btn btn-warning" id="clear-empty"><i class="fas fa-trash-alt"></i>
+                    Clear All Empty
+                </button>
 
-        <table class="table table-hover">
-            <thead class="thead-dark bookmarked">
-                <tr>
-                    <th scope="col">#</th>
-                    <th scope="col">Agent ID</th>
-                    <th scope="col">Environment</th>
-                    <th scope="col">Config</th>
-                    <th scope="col">Reward</th>
-                    <th scope="col">Date</th>
-                    <th scope="col">Host</th>
-                    <th scope="col">Iterations</th>
-                    <th scope="col">Maximum Reward</th>
-                    <th scope="col">Actions</th>
-                </tr>
-            </thead>
+                <button type="button" class="btn btn-warning" id="clear-short"><i class="fas fa-trash-alt"></i>
+                    Clear All Short
+                </button>
+            </div>
 
-            <tbody>
+            <div>
+                {#                <label for="filter-env">Show</label>#}
+                <select class="custom-select" id="filter-env">
+                    <option selected>Show All</option>
+                    {% for env in envs_available|sort(reverse=true) %}
+                        <option value="{{ env }}">{{ env }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-            {% for exp, info in exps.items()|sort(reverse=true) if info.bookmark%}
-                <tr class="exp-row {{ "table-success" if info.is_success else ("table-info" if info.success == "maybe" else "") }}">
-                    <th scope="row">{{ loop.index }}</th>
-                    <td class="id-col">{{ exp }}</td>
-                    <td class="name-col">{{ info.env }}</td>
-                    <td>{{ info.config_name }}</td>
-                    <td>{{ info.reward.identifier }}</td>
-                    <td>{{ info.date }}</td>
-                    <td>{{ info.host }}</td>
-                    <td>{{ info.iterations }}</td>
-                    <td>{{ info.max_reward }}</td>
-                    <td class="actions">
-                        <span class="pin-item active"><i class="far fa-bookmark"></i></span>
-                    </td>
-                </tr>
-            {% endfor %}
+        </div>
+    </nav>
 
-            </tbody>
-        </table>
-    </div>
+    {#    <div class="topic-group"  id="bookmark-view">#}
+    {##}
+    {#        <table class="table table-hover">#}
+    {#            <thead class="thead-dark bookmarked">#}
+    {#                <tr>#}
+    {#                    <th scope="col">#</th>#}
+    {#                    <th scope="col">Agent ID</th>#}
+    {#                    <th scope="col">Environment</th>#}
+    {#                    <th scope="col">Config</th>#}
+    {#                    <th scope="col">Reward</th>#}
+    {#                    <th scope="col">Date</th>#}
+    {#                    <th scope="col">Host</th>#}
+    {#                    <th scope="col">Iterations</th>#}
+    {#                    <th scope="col">Maximum Reward</th>#}
+    {#                    <th scope="col">Actions</th>#}
+    {#                </tr>#}
+    {#            </thead>#}
+    {##}
+    {#            <tbody>#}
+    {##}
+    {#            {% for exp, info in exps.items()|sort(reverse=true) if info.bookmark%}#}
+    {#                <tr class="exp-row {{ "table-success" if info.is_success else ("table-info" if info.success == "maybe" else "") }}">#}
+    {#                    <th scope="row">{{ loop.index }}</th>#}
+    {#                    <td class="id-col">{{ exp }}</td>#}
+    {#                    <td class="name-col">{{ info.env }}</td>#}
+    {#                    <td>{{ info.config_name }}</td>#}
+    {#                    <td>{{ info.reward.identifier }}</td>#}
+    {#                    <td>{{ info.date }}</td>#}
+    {#                    <td>{{ info.host }}</td>#}
+    {#                    <td>{{ info.iterations }}</td>#}
+    {#                    <td>{{ info.max_reward }}</td>#}
+    {#                    <td class="actions">#}
+    {#                        <span class="pin-item active"><i class="far fa-bookmark"></i></span>#}
+    {#                    </td>#}
+    {#                </tr>#}
+    {#            {% endfor %}#}
+    {##}
+    {#            </tbody>#}
+    {#        </table>#}
+    {#    </div>#}
 
-    <div class="topic-group"  id="all-view">
+    <div class="topic-group" id="all-view">
 
-        <table class="table table-hover">
+        <table class="table table-hover" id="experiment-table">
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
@@ -109,7 +109,7 @@
 
             <tbody>
 
-            {% for exp, info in exps.items()|sort(reverse=true) if not info.bookmark %}
+            {% for exp, info in exps.items()|sort(reverse=true) %}
                 <tr class="exp-row {{ "table-success" if info.is_success else ("table-info" if info.success == "maybe" else "") }}">
                     <th scope="row">{{ loop.index }}</th>
                     <td class="id-col">{{ exp }}</td>
@@ -177,8 +177,8 @@
         });
 
         // ACTIONS
-        $("tr.exp-row > td:not(.actions)").on("click", function() {
-            window.location='experiment/' + $(this).parent().find("td.id-col").text();
+        $("tr.exp-row > td:not(.actions)").on("click", function () {
+            window.location = 'experiment/' + $(this).parent().find("td.id-col").text();
         });
 
         $(".delete-item").on("click", function () {
@@ -208,5 +208,16 @@
                 }
             });
         });
+
+        // DATA TABLE
+        let experiment_table = $("#experiment-table");
+        let exp_dt = experiment_table.DataTable({
+            dom: 'Bfrtip',
+            pageLength: 30,
+            buttons: [
+                'columnsToggle'
+            ]
+        });
+
     </script>
 {% endblock %}

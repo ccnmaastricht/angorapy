@@ -68,8 +68,8 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
     value_range = max(df["upper"]) - min(df["lower"])
 
     tooltip = HoverTool(
-        tooltips=[("Cycle", "$x"),
-                  ("Reward", "$y")],
+        tooltips=[("Cycle", "@x"),
+                  ("Reward", "@y")],
         mode="vline"
     )
 
@@ -110,6 +110,12 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
                                     line_width=2,
                                     x_start=x_max, y_start=y_max + value_range * 0.1,
                                     x_end=x_max, y_end=y_max))
+    p.add_layout(bokeh.models.Label(x=x_max, y=y_max + value_range * 0.1, text=str(y_max),
+                                    border_line_color='black', border_line_alpha=1.0,
+                                    background_fill_color='white', background_fill_alpha=1.0, text_align="center",
+                                    text_line_height=1.5, text_font_size="10pt",
+
+                                    ))
 
     load_markings = []
     for load_timing in cycles_loaded:

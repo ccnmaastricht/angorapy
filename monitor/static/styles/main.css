@@ -227,15 +227,11 @@ a.button-control:hover {
   top: 0;
   right: 0;
 }
-#content .active {
-  width: 100%;
-}
 
 .exp-row:hover {
   cursor: pointer;
 }
 
-/* MEDIAQUERIES */
 @media (max-width: 768px) {
   #sidebar {
     margin-left: -250px;
