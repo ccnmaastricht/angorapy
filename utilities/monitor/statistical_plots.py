@@ -41,7 +41,6 @@ def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
                x_axis_label='Cycle',
                y_axis_label='Running Mean',
                **plot_styling,
-               tools="",
                x_range=cats
     )
 

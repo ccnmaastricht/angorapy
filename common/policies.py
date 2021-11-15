@@ -282,7 +282,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @property
     def short_name(self):
-        """Policy'serialization short identidier."""
+        """Policy's short identidier."""
         return "gaussian"
 
     @property

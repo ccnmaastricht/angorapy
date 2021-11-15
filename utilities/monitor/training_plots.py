@@ -4,7 +4,7 @@ import bokeh
 import numpy as np
 import pandas as pd
 from bokeh import embed
-from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource
+from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource, HoverTool
 from bokeh.plotting import figure
 
 from utilities.monitor.plotting_base import palette, plot_styling, style_plot
@@ -43,7 +43,7 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
     p = figure(title="Execution Times",
                x_axis_label='Cycle',
                y_axis_label='Seconds',
-               y_range=(min(all_times), max(all_times)),
+               y_range=(0, max(all_times)),
                **plot_styling)
 
     p.line(x, cycle_timings, legend_label="Full Cycle", line_width=2, color=palette[0])
@@ -61,10 +61,17 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
 def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
     """Plot the execution times of a full cycle and optionally bot sub phases."""
     means, stds = rewards["mean"], rewards["stdev"]
+    stds = np.array(stds) * 0.2
 
     x = list(range(len(means)))
     df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
     value_range = max(df["upper"]) - min(df["lower"])
+
+    tooltip = HoverTool(
+        tooltips=[("Cycle", "$x"),
+                  ("Reward", "$y")],
+        mode="vline"
+    )
 
     p = figure(title="Average Rewards per Cycle",
                x_axis_label='Cycle',
@@ -72,6 +79,10 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
                y_range=(min(df["lower"]), max(df["upper"]) + value_range * 0.1),
                x_range=(0, max(x)),
                **plot_styling)
+
+    p.add_tools(tooltip)
+    p.add_tools(bokeh.models.BoxZoomTool())
+    p.add_tools(bokeh.models.ResetTool())
 
     # ERROR BAND
     error_band = bokeh.models.Band(
@@ -99,7 +110,6 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
                                     line_width=2,
                                     x_start=x_max, y_start=y_max + value_range * 0.1,
                                     x_end=x_max, y_end=y_max))
-
 
     load_markings = []
     for load_timing in cycles_loaded:

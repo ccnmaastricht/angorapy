@@ -16,7 +16,8 @@ tooltip {
 plot_styling = dict(
     plot_height=500,
     sizing_mode="stretch_width",
-    toolbar_location=None,
+    toolbar_location="above",
+    tools=""
 )
 
 
@@ -36,3 +37,5 @@ def style_plot(p):
     p.title.align = "center"
     p.title.text_font_size = "14pt"
     p.title.text_font = "Fira Sans"
+
+    p.toolbar.logo = None
