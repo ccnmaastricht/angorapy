@@ -204,8 +204,7 @@ class Investigator:
 
             env.render() if not to_gif else env.render(mode="rgb_array")
 
-        print(f"Finished after {step} steps.")
-        print(f"Achieved a score of {cumulative_reward}. "
+        print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
 

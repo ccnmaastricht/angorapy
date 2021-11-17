@@ -126,6 +126,7 @@ class BaseManipulate(BaseShadowHandEnv):
             self.sim.model.site_rgba[site_id][3] = 0.0
 
         self.consecutive_goals_reached = 0
+        self.steps_with_current_goal = 0
         self.previous_achieved_goal = self._get_achieved_goal()
         self._set_default_reward_function_and_config()
 
@@ -191,6 +192,8 @@ class BaseManipulate(BaseShadowHandEnv):
 
     def reset(self):
         self.consecutive_goals_reached = 0
+        self.steps_with_current_goal = 0
+
         return super().reset()
 
     def _reset_sim(self):
@@ -367,6 +370,8 @@ class BaseManipulate(BaseShadowHandEnv):
     def step(self, action):
         """Make step in environment."""
         obs, reward, done, info = super().step(action)
+        self.steps_with_current_goal += 1
+
         success = self._is_success(self._get_achieved_goal(), self.goal)
 
         # determine if a goal has been reached
@@ -375,6 +380,7 @@ class BaseManipulate(BaseShadowHandEnv):
         else:
             self.consecutive_goals_reached += 1
             self.goal = self._sample_goal()
+            self.steps_with_current_goal = 0
             obs = self._get_obs()
 
         # determine if done
@@ -404,6 +410,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
 
 class OpenAIManipulate(BaseManipulate, utils.EzPickle):
 
+    max_steps_per_goal = 100
+
     def __init__(self):
         utils.EzPickle.__init__(self, "ignore", "xyz", 'sensordata', "dense")
         BaseManipulate.__init__(self,
@@ -415,6 +423,14 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
                                 vision=False,
                                 relative_control=True
                                 )
+
+    def step(self, action):
+        obs, reward, done, info = super(OpenAIManipulate, self).step(action)
+
+        if self.steps_with_current_goal >= OpenAIManipulate.max_steps_per_goal:
+            done = True
+
+        return obs, reward, done, info
 
     def _get_obs(self):
         finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()

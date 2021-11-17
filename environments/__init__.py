@@ -180,14 +180,14 @@ gym.envs.register(
     id=f'OpenAIManipulate-v0',
     entry_point='environments:OpenAIManipulate',
     kwargs={},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
+    max_episode_steps=50 * 100,
 )
 
 gym.envs.register(
     id=f'OpenAIManipulateDiscrete-v0',
     entry_point='environments:OpenAIManipulateDiscrete',
     kwargs={},
-    max_episode_steps=SHADOWHAND_MAX_STEPS,
+    max_episode_steps=50 * 100,
 )
 
 # MODIFIED ENVIRONMENTS
