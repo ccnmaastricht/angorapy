@@ -15,7 +15,7 @@ from flask_jsglue import JSGlue
 from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
 from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
-    plot_reward_progress, plot_loss
+    plot_reward_progress, plot_loss, plot_length_progress, plot_distribution
 from utilities.statistics import ignore_none
 
 
@@ -202,11 +202,13 @@ def show_experiment(exp_id):
     if "StateNormalizationTransformer" in progress["preprocessors"]:
         plots["normalization"]["state"] = plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"])
 
-    plots["evaluation_boxplot"] = plot_episode_box_plots(progress["rewards"]["last_cycle"], progress["lengths"]["last_cycle"])
+    plots["reward_distribution"] = plot_distribution(progress["rewards"]["last_cycle"], "Rewards (Last Cycle)", color=0)
+    plots["length_distribution"] = plot_distribution(progress["lengths"]["last_cycle"], "Episode Lengths (Last Cycle)", color=1)
     cycles_loaded = []
     if "loaded_at" in stats.keys():
         cycles_loaded = stats["loaded_at"]
     plots["reward_progress"] = plot_reward_progress(progress["rewards"], cycles_loaded)
+    plots["length_progress"] = plot_length_progress(progress["lengths"], cycles_loaded)
     plots["policy_loss"] = plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0)
     plots["value_loss"] = plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1)
     plots["entropies"] = plot_loss(progress["entropies"], progress["rewards"]["mean"], "Entropy", color_id=2)

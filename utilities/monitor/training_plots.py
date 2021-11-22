@@ -1,11 +1,13 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import bokeh
 import numpy as np
 import pandas as pd
+import scipy
 from bokeh import embed
 from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource, HoverTool
 from bokeh.plotting import figure
+from scipy import stats
 
 from utilities.monitor.plotting_base import palette, plot_styling, style_plot
 
@@ -124,6 +126,108 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
         )
 
     p.renderers.extend(load_markings)
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_length_progress(lengths: Dict[str, list], cycles_loaded):
+    """Plot development of the lengths of episodes throughout training."""
+    means, stds = lengths["mean"], lengths["stdev"]
+    stds = np.array(stds) * 0.2
+
+    x = list(range(len(means)))
+    df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
+    value_range = max(df["upper"]) - min(df["lower"])
+
+    tooltip = HoverTool(
+        tooltips=[("Cycle", "@x"),
+                  ("Length", "@y")],
+        mode="vline"
+    )
+
+    p = figure(title="Average Length of Episodes",
+               x_axis_label='Cycle',
+               y_axis_label='Total Episode Return',
+               y_range=(min(df["lower"]), max(df["upper"]) + value_range * 0.1),
+               x_range=(0, max(x)),
+               **plot_styling)
+
+    p.add_tools(tooltip)
+    p.add_tools(bokeh.models.BoxZoomTool())
+    p.add_tools(bokeh.models.ResetTool())
+
+    # ERROR BAND
+    error_band = bokeh.models.Band(
+        base="x", lower="lower", upper="upper",
+        source=ColumnDataSource(df.reset_index()),
+        fill_color=palette[1],
+        fill_alpha=0.2,
+        line_color=palette[1],
+        line_alpha=0.4,
+    )
+    p.add_layout(error_band)
+    p.renderers.extend([error_band])
+
+    # REWARD LINE
+    p.line(x, means, legend_label="Episode Length (time steps)", line_width=2, color=palette[1])
+
+    # MAX VALUE MARKING
+    x_max = np.argmax(means)
+    y_max = np.max(means)
+    p.add_layout(bokeh.models.Arrow(end=bokeh.models.NormalHead(size=15,
+                                                                line_color="darkred",
+                                                                line_width=2,
+                                                                fill_color="red"),
+                                    line_color="darkred",
+                                    line_width=2,
+                                    x_start=x_max, y_start=y_max + value_range * 0.1,
+                                    x_end=x_max, y_end=y_max))
+    p.add_layout(bokeh.models.Label(x=x_max, y=y_max + value_range * 0.1, text=str(y_max),
+                                    border_line_color='black', border_line_alpha=1.0,
+                                    background_fill_color='white', background_fill_alpha=1.0, text_align="center",
+                                    text_line_height=1.5, text_font_size="10pt",
+
+                                    ))
+
+    load_markings = []
+    for load_timing in cycles_loaded:
+        load_markings.append(
+            Span(location=load_timing[0], dimension="height", line_color="red", line_width=2, line_dash=[6, 3])
+        )
+
+    p.renderers.extend(load_markings)
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return embed.components(p)
+
+
+def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
+    hist, edges = np.histogram(metric, density=True, bins=50)
+
+    p = figure(title=f"Distribution of {name}",
+               x_axis_label=name,
+               y_range=(0, np.max(hist)),
+               **plot_styling)
+
+    width = (max(metric) - min(metric)) / len(hist) * 0.9
+    hist_glyph = p.rect(x=edges, y=hist / 2, height=hist, width=width, line_color="white", fill_color=palette[color])
+
+    x, mean, sigma = np.linspace(min(metric), max(metric), 50), np.mean(metric), np.std(metric)
+    pdf = stats.gaussian_kde(metric, bw_method=0.4).pdf(x)
+    p.line(x, pdf, line_color=palette[color], line_width=4, alpha=0.7, )
+
+    tooltip = HoverTool(
+        tooltips=[("Reward", "@x"),
+                  ("Density", "@y")],
+        mode="vline",
+        renderers=[hist_glyph]
+    )
+    p.add_tools(tooltip)
 
     p.legend.location = "bottom_right"
     style_plot(p)
