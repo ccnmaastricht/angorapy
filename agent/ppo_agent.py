@@ -328,17 +328,17 @@ class PPOAgent:
                 f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
                 f"IDs over Optimizers: {list_of_optimizer_collection_id_lists}")
 
-            assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-        assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+        if self.is_recurrent:
+            assert batch_size % self.tbptt_length == 0, f"Batch size (the number of transitions per update)" \
+                                                        f" must be a multiple of the sequence length "
 
-        if self.is_recurrent and batch_size > self.n_workers:
             if is_root:
-                logging.warning(
-                    f"Batchsize is larger than possible with the available number of independent sequences for "
-                    f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
-                    f"transitions per batch.")
-
-            batch_size = self.n_workers
+                print(f"The policy is recurrent and as such the batch size is interpreted as the number of transitions "
+                      f"per policy update. Given the batch size of {batch_size} this results in "
+                      f"{batch_size / self.tbptt_length} (sub-)sequences per update and "
+                      f"{(self.n_workers * self.horizon) / batch_size} updates per epoch.")
+        else:
+            assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
 
         # rebuild model with desired batch size
         joint_weights = self.joint.get_weights()
@@ -600,6 +600,7 @@ class PPOAgent:
                         # fed into the model chronologically to adhere to statefulness
                         # if the following line throws a CPU to GPU error this is most likely due to too little memory
                         # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                        batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
                         split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
                         for i in range(len(split_batch["advantage"])):
                             # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
@@ -612,11 +613,21 @@ class PPOAgent:
                                 continuous_control=self.continuous_control, clip_values=self.clip_values,
                                 gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
                                 c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+
+                            if i == 0:
+                                batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
+                            else:
+                                batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
+                                batch_ent += ent
+                                batch_pi_loss += pi_loss
+                                batch_v_loss += v_loss
 
                             # make partial RNN state resets
                             reset_mask = detect_finished_episodes(partial_batch["done"])
                             reset_states_masked(self.joint, reset_mask)
+
+                        batch_grad = batch_grad / (i + 1)
+                        self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
 
                 # todo makes no sense with the split batches, need to average over them
                 entropies.append(ent)
