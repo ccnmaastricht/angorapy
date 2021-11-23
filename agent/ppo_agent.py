@@ -332,19 +332,24 @@ class PPOAgent:
             assert batch_size % self.tbptt_length == 0, f"Batch size (the number of transitions per update)" \
                                                         f" must be a multiple of the sequence length "
 
+            effective_batch_size = batch_size // self.tbptt_length
+
             if is_root:
                 print(f"The policy is recurrent and as such the batch size is interpreted as the number of transitions "
                       f"per policy update. Given the batch size of {batch_size} this results in "
-                      f"{batch_size / self.tbptt_length} (sub-)sequences per update and "
-                      f"{(self.n_workers * self.horizon) / batch_size} updates per epoch.")
+                      f"{effective_batch_size} (sub-)sequences per update and "
+                      f"{(self.n_workers * self.horizon) // batch_size} updates per epoch.")
+
+            # the effective batch size is the number of sequences per batch
         else:
             assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+            effective_batch_size = batch_size
 
         # rebuild model with desired batch size
         joint_weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
-            batch_size=batch_size // n_optimizers,
+            batch_size=effective_batch_size // n_optimizers,
             sequence_length=self.tbptt_length)
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
@@ -463,7 +468,7 @@ class PPOAgent:
                 dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
                                                     responsive_senses=self.policy.input_names)
-                self.optimize(dataset, epochs, batch_size // n_optimizers)
+                self.optimize(dataset, epochs, effective_batch_size // n_optimizers)
 
                 time_dict["optimizing"] = time.time() - subprocess_start
 
@@ -626,7 +631,7 @@ class PPOAgent:
                             reset_mask = detect_finished_episodes(partial_batch["done"])
                             reset_states_masked(self.joint, reset_mask)
 
-                        batch_grad = batch_grad / (i + 1)
+                        batch_grad = [b / (i + 1) for b in batch_grad]
                         self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
 
                 # todo makes no sense with the split batches, need to average over them
