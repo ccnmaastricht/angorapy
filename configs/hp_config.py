@@ -152,8 +152,8 @@ mujoco_beta_shared = derive_config(mujoco_beta, {"shared": True})
 # ROBOSCHOOL TASKS
 
 roboschool = make_config(
-    iterations=50000000 // (32 * 512),  # 50 million timesteps
-    workers=32,
+    iterations=50000000 // (36 * 512),  # 50 million timesteps
+    workers=36,
     batch_size=4096,
     horizon=512,
     c_entropy=0.0,

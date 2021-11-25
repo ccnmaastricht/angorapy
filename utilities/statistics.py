@@ -1,3 +1,4 @@
+import numpy as np
 from numpy import ndarray as arr
 
 
@@ -25,3 +26,28 @@ def ignore_none(func, sequence):
         return func(no_nones)
 
     return None
+
+
+def mean_fill_nones(sequence, dtype=np.float):
+    """In a sequence of numbers, replace Nones by the non-None boundary mean."""
+
+    sequence = np.array(sequence, dtype=dtype)
+
+    while np.any(np.isnan(sequence)):
+        left = (np.isnan(sequence)).nonzero()[0] - 1
+        right = (np.isnan(sequence)).nonzero()[0] + 1
+
+        while np.any(np.isnan(sequence[left])):
+            left[np.isnan(sequence[left])] -= 1
+
+        while np.any(np.isnan(sequence[right])):
+            right[np.isnan(sequence[right])] += 1
+
+        sequence[np.isnan(sequence)] = (sequence[right] + sequence[left]) / 2
+
+    return sequence
+
+
+if __name__ == '__main__':
+    means = [1, 2, 3, None, None, 6, 7, None, 9]
+    print(mean_fill_nones(means))

@@ -10,6 +10,7 @@ from bokeh.plotting import figure
 from scipy import stats
 
 from utilities.monitor.plotting_base import palette, plot_styling, style_plot
+from utilities.statistics import mean_fill_nones
 
 
 def plot_memory_usage(memory_trace: List):
@@ -63,7 +64,11 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
 def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
     """Plot the execution times of a full cycle and optionally bot sub phases."""
     means, stds = rewards["mean"], rewards["stdev"]
-    stds = np.array(stds) * 0.2
+    stds = np.array(stds)
+    stds[stds == None] = 0
+    stds = stds * 0.2
+    means = np.array(means)
+    means = mean_fill_nones(means)
 
     x = list(range(len(means)))
     df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
@@ -136,7 +141,11 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
 def plot_length_progress(lengths: Dict[str, list], cycles_loaded):
     """Plot development of the lengths of episodes throughout training."""
     means, stds = lengths["mean"], lengths["stdev"]
-    stds = np.array(stds) * 0.2
+    stds = np.array(stds)
+    stds[stds == None] = 0
+    stds = stds * 0.2
+    means = np.array(means)
+    means[means == None] = 0
 
     x = list(range(len(means)))
     df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
@@ -238,6 +247,8 @@ def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
 def plot_loss(loss, rewards, name, color_id=0):
     """Plot a loss as it develops over cycles."""
     x = list(range(len(loss)))
+    loss = np.array(loss, dtype=float)
+    rewards = np.array(rewards, dtype=float)
 
     p = figure(title=name,
                x_axis_label='Cycle',
