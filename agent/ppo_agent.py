@@ -586,8 +586,6 @@ class PPOAgent:
 
         _learn_on_batch = tf.function(learn_on_batch)
 
-        n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
-
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
 
@@ -596,7 +594,7 @@ class PPOAgent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
             # then divide into batches
-            batched_dataset = dataset.batch(n_trajectories_per_batch if self.is_recurrent else batch_size, drop_remainder=True)
+            batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
 
             # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
@@ -618,6 +616,8 @@ class PPOAgent:
                         # fed into the model chronologically to adhere to statefulness
                         # if the following line throws a CPU to GPU error this is most likely due to too little memory
                         # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                        n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+
                         split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for bk, bv in b.items()}
                         for batch_i in range(len(split_batch["advantage"])):
                             batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None

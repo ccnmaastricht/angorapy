@@ -67,7 +67,7 @@ discrete_no_norms_short = derive_config(discrete_no_norms, {"horizon": 512})
 #   - BipedalWalker (use beta distribution to crack the reward threshold)
 
 continuous = make_config(
-    batch_size=64,
+    batch_size=512,
     horizon=2048,
     c_entropy=0.0,
     lr_pi=0.0003,
@@ -192,7 +192,6 @@ hand = make_config(
     model="gru"
 )
 
-
 hand_no_ent = derive_config(hand, {"c_entropy": 0.0})
 hand_manipulate = derive_config(hand, {
     "c_entropy": 0.01,
@@ -205,17 +204,18 @@ andrypulate = make_config(
     batch_size=256,
     horizon=512,
     c_entropy=0.001,
-    lr_pi=5e-4,
+    lr_pi=3e-4,
     lr_schedule="exponential",
-    epochs=10,
+    epochs=3,
     clip=0.2,
     lam=0.95,
     discount=0.998,
     grad_norm=0.5,
+    tbptt=10,
     clip_values=False,
-    distribution="beta",
+    distribution="multi-categorical",
     architecture="wider",
-    model="lstm"
+    model="lstm",
 )
 
 akkaypulate = make_config(
