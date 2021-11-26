@@ -599,9 +599,9 @@ class PPOAgent:
             # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
 
-            for b in batched_dataset:
+            with tf.device(self.device):  # todo move around dataset?
+                for b in batched_dataset:
                 # use the dataset to optimize the model
-                with tf.device(self.device):  # todo move around dataset?
                     if not self.is_recurrent:
                         grad, ent, pi_loss, v_loss = _learn_on_batch(
                             batch=b, joint=self.joint, distribution=self.distribution,
