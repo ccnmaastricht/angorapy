@@ -589,19 +589,17 @@ class PPOAgent:
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
 
-            # for each epoch, dataset first should be shuffled to break correlation
+            # shuffle to break correlation; not for recurrent data since that would break chunk dependence
             if not self.is_recurrent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            # then divide into batches
+            # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
             batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
 
-            # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
 
-            with tf.device(self.device):  # todo move around dataset?
+            with tf.device(self.device):
                 for b in batched_dataset:
-                # use the dataset to optimize the model
                     if not self.is_recurrent:
                         grad, ent, pi_loss, v_loss = _learn_on_batch(
                             batch=b, joint=self.joint, distribution=self.distribution,
