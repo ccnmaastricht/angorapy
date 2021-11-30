@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Helper functions."""
 import random
 import sys
@@ -128,6 +127,30 @@ def detect_finished_episodes(dones: tf.Tensor):
     return finished
 
 
+def find_divisors(number: int):
+    divisors = []
+    for i in range(1, number // 2 + 1):
+        if number % i == 0:
+            divisors.append(i)
+            divisors.append(number // i)
+
+    return list(sorted(set(divisors)))
+
+
+def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int) -> Tuple[int, int]:
+    """For a given shape of a matrix (floor), find the shape of a tiles that fit the floor and contain
+    exactly tile_size elements."""
+    height_divisors = list(reversed(find_divisors(floor_shape[0])))
+    width_divisors = find_divisors(floor_shape[1])
+
+    for hd in height_divisors:
+        for wd in width_divisors:
+            if hd * wd == tile_size:
+                return hd, wd
+
+    raise ValueError(f"No tiling of size {tile_size} possible for a floor of shape {floor_shape}.")
+
+
 class HiddenPrints:
     """Context that hides print calls."""
 
@@ -140,8 +163,24 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
-
 if __name__ == "__main__":
+    from configs import hp_config
 
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+    conf = hp_config.manipulate
+    n_optimizers = 32
+
+    total_tiling = find_optimal_tile_shape(
+        (conf["workers"], conf["horizon"] // conf["tbptt"]),
+        tile_size=conf["batch_size"] // conf["tbptt"]
+    )
+
+    optimizer_tiling = find_optimal_tile_shape(
+        (conf["workers"] // n_optimizers, conf["horizon"] // conf["tbptt"] // n_optimizers),
+        tile_size=conf["batch_size"] // conf["tbptt"] // n_optimizers
+    )
+
+    print(f"Total tiling: {total_tiling}\n"
+          f"Optimizer's Tiling: {optimizer_tiling}")

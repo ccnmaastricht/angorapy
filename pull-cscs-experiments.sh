@@ -13,7 +13,7 @@ while getopts "i:d" opt; do
   esac
 done
 
-if [ REMOVE ]; then
+if [ $REMOVE ]; then
   echo "Deleting existing storage zip file."
   ssh daint "rm ~/storage.zip"
 fi

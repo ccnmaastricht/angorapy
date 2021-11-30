@@ -37,7 +37,7 @@ from utilities.datatypes import mpi_condense_stats, StatBundle
 from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
 from utilities.statistics import ignore_none
-from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes
+from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape
 
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
@@ -328,23 +328,44 @@ class PPOAgent:
                 f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
                 f"IDs over Optimizers: {list_of_optimizer_collection_id_lists}")
 
-            assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-        assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+        if self.is_recurrent:
+            assert batch_size % self.tbptt_length == 0, f"Batch size (the number of transitions per update)" \
+                                                        f" must be a multiple of the sequence length "
 
-        if self.is_recurrent and batch_size > self.n_workers:
+            n_chunks_per_trajectory = self.horizon // self.tbptt_length
+            n_chunks_per_batch = batch_size // self.tbptt_length
+            n_chunks_per_batch_per_process = n_chunks_per_batch // n_optimizers
+            n_trajectories_per_process = self.n_workers // n_optimizers
+
+            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = find_optimal_tile_shape(
+                (n_trajectories_per_process, n_chunks_per_trajectory),
+                n_chunks_per_batch_per_process
+            )
+
+            n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
+            n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process * n_optimizers
+
             if is_root:
-                logging.warning(
-                    f"Batchsize is larger than possible with the available number of independent sequences for "
-                    f"Truncated BPTT. Setting batchsize to {self.n_workers}, which means {self.n_workers * self.tbptt_length} "
-                    f"transitions per batch.")
+                print(f"\nThe policy is recurrent and the batch size is interpreted as the number of transitions "
+                      f"per policy update. Given the batch size of {batch_size} this results in: \n"
+                      f"\t{n_chunks_per_batch} chunks per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch\n"
+                      f"\tBatch tilings of "
+                      f"{n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process} per process "
+                      f"and {n_trajectories_per_batch, n_chunks_per_trajectory_per_batch} in total.")
 
-            batch_size = self.n_workers
+            batch_size = n_trajectories_per_batch_per_process
+            effective_batch_size = (n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process)
+
+        else:
+            assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
+            batch_size = batch_size // n_optimizers
+            effective_batch_size = batch_size
 
         # rebuild model with desired batch size
         joint_weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
-            batch_size=batch_size // n_optimizers,
+            batch_size=batch_size,
             sequence_length=self.tbptt_length)
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
@@ -463,7 +484,7 @@ class PPOAgent:
                 dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                                                     id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
                                                     responsive_senses=self.policy.input_names)
-                self.optimize(dataset, epochs, batch_size // n_optimizers)
+                self.optimize(dataset, epochs, effective_batch_size)
 
                 time_dict["optimizing"] = time.time() - subprocess_start
 
@@ -513,7 +534,7 @@ class PPOAgent:
 
         # after training rebuild the network so that it is available to the agent
         self.policy, self.value, self.joint = self.build_models(
-            weights=joint_weights, batch_size=batch_size // n_optimizers, sequence_length=self.tbptt_length
+            weights=joint_weights, batch_size=batch_size, sequence_length=self.tbptt_length
         )
 
         if is_root:
@@ -549,7 +570,7 @@ class PPOAgent:
         # create the Gatherer
         return Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
 
-    def optimize(self, dataset: tf.data.Dataset, epochs: int, batch_size: int) -> None:
+    def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: Union[int, Tuple[int, int]]) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
         
         Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
@@ -562,7 +583,7 @@ class PPOAgent:
         Args:
             dataset (tf.data.Dataset): tensorflow dataset containing serialization, a, p(a), r and A as components per data point
             epochs (int): number of epochs to train on this dataset
-            batch_size (int): batch size with which the dataset is sampled
+            batch_size (int): batch size representing the number of TRANSITIONS per batch (not chunks)
 
         Returns:
             None
@@ -573,19 +594,17 @@ class PPOAgent:
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         for epoch in range(epochs):
 
-            # for each epoch, dataset first should be shuffled to break correlation
+            # shuffle to break correlation; not for recurrent data since that would break chunk dependence
             if not self.is_recurrent:
                 dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            # then divide into batches
-            batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+            # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
+            batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
 
-            # and iterate over it while accumulating losses
             policy_epoch_losses, value_epoch_losses, entropies = [], [], []
-            for b in batched_dataset:
 
-                # use the dataset to optimize the model
-                with tf.device(self.device):
+            with tf.device(self.device):
+                for b in batched_dataset:
                     if not self.is_recurrent:
                         grad, ent, pi_loss, v_loss = _learn_on_batch(
                             batch=b, joint=self.joint, distribution=self.distribution,
@@ -600,23 +619,39 @@ class PPOAgent:
                         # fed into the model chronologically to adhere to statefulness
                         # if the following line throws a CPU to GPU error this is most likely due to too little memory
                         # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
-                        split_batch = {bk: tf.split(bv, bv.shape[1], axis=1) for bk, bv in b.items()}
-                        for i in range(len(split_batch["advantage"])):
-                            # extract subsequence and squeeze away the N_SUBSEQUENCES dimension
-                            partial_batch = {k: tf.squeeze(v[i], axis=1) for k, v in split_batch.items()}
+                        n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
 
-                            # find and apply the gradients
-                            # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape) for v in self.joint.trainable_variables], 0, 0, 0
-                            grad, ent, pi_loss, v_loss = _learn_on_batch(
-                                batch=partial_batch, joint=self.joint, distribution=self.distribution,
-                                continuous_control=self.continuous_control, clip_values=self.clip_values,
-                                gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
-                                c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for bk, bv in b.items()}
+                        for batch_i in range(len(split_batch["advantage"])):
+                            batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
 
-                            # make partial RNN state resets
-                            reset_mask = detect_finished_episodes(partial_batch["done"])
-                            reset_states_masked(self.joint, reset_mask)
+                            for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
+                                # extract chunks
+                                partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
+
+                                # find and apply the gradients
+                                # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
+                                # for v in self.joint.trainable_variables], 0, 0, 0
+                                grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                    batch=partial_batch, joint=self.joint, distribution=self.distribution,
+                                    continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                    gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
+                                    c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+
+                                if chunk_i == 0:
+                                    batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
+                                else:
+                                    batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
+                                    batch_ent += ent
+                                    batch_pi_loss += pi_loss
+                                    batch_v_loss += v_loss
+
+                                # make partial RNN state resets
+                                reset_mask = detect_finished_episodes(partial_batch["done"])
+                                reset_states_masked(self.joint, reset_mask)
+
+                            batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
+                            self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
 
                 # todo makes no sense with the split batches, need to average over them
                 entropies.append(ent)
