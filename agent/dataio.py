@@ -55,7 +55,7 @@ def tf_serialize_example(sample):
 def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, StatBundle]:
     """Make dataset object and StatBundle from ExperienceBuffer."""
     completed_episodes = buffer.episodes_completed
-    numb_processed_frames = buffer.capacity
+    numb_processed_frames = buffer.capacity * buffer.seq_length
 
     # build the dataset
     tensor_slices = {
