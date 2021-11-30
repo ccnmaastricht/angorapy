@@ -343,7 +343,7 @@ class PPOAgent:
             )
 
             n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
-            n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process * n_optimizers
+            n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process
 
             if is_root:
                 print(f"\nThe policy is recurrent and the batch size is interpreted as the number of transitions "
@@ -351,7 +351,7 @@ class PPOAgent:
                       f"\t{n_chunks_per_batch} chunks per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch\n"
                       f"\tBatch tilings of "
                       f"{n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process} per process "
-                      f"and {n_trajectories_per_batch, n_chunks_per_trajectory_per_batch} in total.")
+                      f"and {n_trajectories_per_batch, n_chunks_per_trajectory_per_batch} in total.\n\n")
 
             batch_size = n_trajectories_per_batch_per_process
             effective_batch_size = (n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process)
