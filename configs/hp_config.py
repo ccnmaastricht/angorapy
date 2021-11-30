@@ -239,8 +239,8 @@ akkaypulate = make_config(
 
 manipulate = make_config(
     iterations=50000,
-    workers=396,   # need divisibility by 12
-    batch_size=256,
+    workers=384,   # need divisibility by 12
+    batch_size=384 * 32,
     horizon=2048,
     c_entropy=0.01,
     lr_pi=3e-4,

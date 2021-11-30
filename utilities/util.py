@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Helper functions."""
 import random
 import sys
@@ -149,7 +148,7 @@ def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int) -> Tup
             if hd * wd == tile_size:
                 return hd, wd
 
-    raise ValueError(f"No possible tiling of size {tile_size} possible for a floor of shape {floor_shape}.")
+    raise ValueError(f"No tiling of size {tile_size} possible for a floor of shape {floor_shape}.")
 
 
 class HiddenPrints:
@@ -165,8 +164,23 @@ class HiddenPrints:
 
 
 if __name__ == "__main__":
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    from configs import hp_config
+
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    print(find_divisors(100))
-    print(find_optimal_tile_shape((12, 128), 16))
+    conf = hp_config.manipulate
+    n_optimizers = 32
+
+    total_tiling = find_optimal_tile_shape(
+        (conf["workers"], conf["horizon"] // conf["tbptt"]),
+        tile_size=conf["batch_size"] // conf["tbptt"]
+    )
+
+    optimizer_tiling = find_optimal_tile_shape(
+        (conf["workers"] // n_optimizers, conf["horizon"] // conf["tbptt"] // n_optimizers),
+        tile_size=conf["batch_size"] // conf["tbptt"] // n_optimizers
+    )
+
+    print(f"Total tiling: {total_tiling}\n"
+          f"Optimizer's Tiling: {optimizer_tiling}")

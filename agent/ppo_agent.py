@@ -337,19 +337,24 @@ class PPOAgent:
             n_chunks_per_batch_per_process = n_chunks_per_batch // n_optimizers
             n_trajectories_per_process = self.n_workers // n_optimizers
 
-            n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = find_optimal_tile_shape(
+            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = find_optimal_tile_shape(
                 (n_trajectories_per_process, n_chunks_per_trajectory),
                 n_chunks_per_batch_per_process
             )
 
-            if is_root:
-                print(f"The policy is recurrent and the batch size is interpreted as the number of transitions "
-                      f"per policy update. Given the batch size of {batch_size} this results in "
-                      f"{n_chunks_per_batch} chunks [{n_trajectories_per_batch, n_chunks_per_trajectory_per_batch}] "
-                      f"per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch.")
+            n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
+            n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process * n_optimizers
 
-            batch_size = n_trajectories_per_batch
-            effective_batch_size = (n_trajectories_per_batch, n_chunks_per_trajectory_per_batch)
+            if is_root:
+                print(f"\nThe policy is recurrent and the batch size is interpreted as the number of transitions "
+                      f"per policy update. Given the batch size of {batch_size} this results in: \n"
+                      f"\t{n_chunks_per_batch} chunks per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch\n"
+                      f"\tBatch tilings of "
+                      f"{n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process} per process "
+                      f"and {n_trajectories_per_batch, n_chunks_per_trajectory_per_batch} in total.")
+
+            batch_size = n_trajectories_per_batch_per_process
+            effective_batch_size = (n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process)
 
         else:
             assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
