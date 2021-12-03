@@ -3,6 +3,9 @@
 
 import argparse
 import os
+
+from environments.shadowhand import BaseShadowHandEnv
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from utilities.datatypes import mpi_condense_stats
@@ -31,6 +34,9 @@ if args.id is None:
 
 start = time.time()
 agent = PPOAgent.from_agent_state(args.id, "b")
+
+if isinstance(agent.env.unwrapped, BaseShadowHandEnv):
+    agent.env.env.set_delta_t_simulation(0.0005)
 
 if is_root:
     print(f"Agent {args.id} successfully loaded from state 'best' (training performance: {agent.cycle_reward_history[-1]}).")

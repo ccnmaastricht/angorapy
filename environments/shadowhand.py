@@ -4,7 +4,6 @@ import abc
 import copy
 import os
 import random
-from pprint import pprint
 from typing import Callable, Union
 
 import gym
@@ -101,9 +100,16 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
 
+        # build simulation
         model = mujoco_py.load_model_from_path(model)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
         self.sim.model.opt.timestep = delta_t
+
+        # time control
+        self._delta_t_control: float = delta_t
+        self._delta_t_simulation: float = delta_t
+        self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
+
         self._viewers = {}
         self.viewer = None
 
@@ -125,12 +131,14 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.goal = self._sample_goal()
         obs = self._get_obs()
 
+        # action space
         if self.continuous:
             self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
         else:
             self.action_space = spaces.MultiDiscrete(np.ones(20) * BaseShadowHandEnv.discrete_bin_count)
             self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
 
+        # observation space
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
@@ -146,6 +154,16 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     def dt(self):
         """Difference between timesteps h. Time progresses from t to t + h every step. In seconds."""
         return self.sim.model.opt.timestep * self.sim.nsubsteps
+
+    def set_delta_t_simulation(self, new: float):
+        """Set new value for the simulation delta t."""
+        assert np.isclose(self._delta_t_control % new, 0, rtol=1.e-3, atol=1.e-4), \
+            f"Delta t of simulation must divide control delta t into integer " \
+            f"parts, but gives {self._delta_t_control % new}."
+
+        self._delta_t_simulation = new
+        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation)
+        self.sim.model.opt.timestep = self._delta_t_simulation
 
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
@@ -203,9 +221,15 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         if self._freeze_wrist:
             action[:2] = 0
 
+        # submit action to the simulation
         self._set_action(action)
-        self.sim.step()
-        self._step_callback()
+
+        # perform steps in simulation
+        for simulation_step in range(self._simulation_steps_per_control_step):
+            self.sim.step()
+            self._step_callback()
+
+        # read out observation from simulation
         obs = self._get_obs()
 
         done = False

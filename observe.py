@@ -4,7 +4,7 @@ import argparse
 import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from environments.shadowhand import FINGERTIP_SITE_NAMES
+from environments.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
 
 import time
 import gym
@@ -66,6 +66,8 @@ print(f"Environment has the following transformers: {env.transformers}")
 #     print(new_name)
 #     env = make_env(new_name, args.rcon)
 
+if isinstance(env.unwrapped, BaseShadowHandEnv):
+    env.env.set_delta_t_simulation(0.0005)
 
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
