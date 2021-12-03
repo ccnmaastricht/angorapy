@@ -14,6 +14,7 @@ from gym import spaces
 from gym.utils import seeding
 
 from common import reward
+from common.const import N_SUBSTEPS
 from configs.reward_config import resolve_config_name
 
 FINGERTIP_SITE_NAMES = [
@@ -85,7 +86,13 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     continuous = True
     discrete_bin_count = 11
 
-    def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True, model=MODEL_PATH):
+    def __init__(self,
+                 initial_qpos,
+                 distance_threshold,
+                 n_substeps=N_SUBSTEPS,
+                 delta_t=0.002,
+                 relative_control=True,
+                 model=MODEL_PATH):
         gym.utils.EzPickle.__init__(**locals())
 
         self.relative_control = relative_control
@@ -96,6 +103,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         model = mujoco_py.load_model_from_path(model)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
+        self.sim.model.opt.timestep = delta_t
         self._viewers = {}
         self.viewer = None
 
@@ -136,6 +144,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
     @property
     def dt(self):
+        """Difference between timesteps h. Time progresses from t to t + h every step. In seconds."""
         return self.sim.model.opt.timestep * self.sim.nsubsteps
 
     def toggle_wrist_freezing(self):

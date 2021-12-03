@@ -46,6 +46,7 @@ class BaseManipulate(BaseShadowHandEnv):
             relative_control=False,
             ignore_z_target_rotation=False,
             n_substeps=N_SUBSTEPS,
+            delta_t=0.002,
             touch_get_obs="sensordata",
             vision=False,
             touch=True
@@ -108,6 +109,7 @@ class BaseManipulate(BaseShadowHandEnv):
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,
                          n_substeps=n_substeps,
+                         delta_t=delta_t,
                          relative_control=relative_control,
                          model=model_path)
 
@@ -393,7 +395,10 @@ class BaseManipulate(BaseShadowHandEnv):
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with a Block as an object."""
 
-    def __init__(self, target_position='ignore', target_rotation='xyz', touch_get_obs='sensordata',
+    def __init__(self,
+                 target_position='ignore',
+                 target_rotation='xyz',
+                 touch_get_obs='sensordata',
                  relative_control=True,
                  vision: bool = False):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
@@ -409,10 +414,9 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
 
 
 class OpenAIManipulate(BaseManipulate, utils.EzPickle):
-
     max_steps_per_goal = 100
 
-    def __init__(self):
+    def __init__(self, delta_t=0.002):
         utils.EzPickle.__init__(self, "ignore", "xyz", 'sensordata', "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -421,6 +425,8 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
                                 target_position="ignore",
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                                 vision=False,
+                                n_substeps=10,
+                                delta_t=delta_t,
                                 relative_control=True
                                 )
 

@@ -33,7 +33,8 @@ start = time.time()
 agent = PPOAgent.from_agent_state(args.id, "b")
 
 if is_root:
-    print(f"Agent {args.id} successfully loaded.")
+    print(f"Agent {args.id} successfully loaded from state 'best' (training performance: {agent.cycle_reward_history[-1]}).")
+
 
 # determine number of repetitions on this worker
 worker_base, worker_extra = divmod(args.n, MPI.COMM_WORLD.size)

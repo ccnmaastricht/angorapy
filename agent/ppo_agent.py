@@ -494,7 +494,7 @@ class PPOAgent:
                     self.total_frames_seen += stats.numb_processed_frames
                     self.total_episodes_seen += stats.numb_completed_episodes
                     if hasattr(self.env, "dt"):
-                        self.years_of_experience += (stats.numb_processed_frames * self.env.dt * 3.171e-8)
+                        self.years_of_experience += (stats.numb_processed_frames * self.env.dt / 3.154e+7)
                     else:
                         self.years_of_experience = None
 

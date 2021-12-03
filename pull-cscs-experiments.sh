@@ -16,7 +16,7 @@ while getopts "i:ds" opt; do
   esac
 done
 
-if [ $REMOVE ]; then
+if [ "$REMOVE" = true ]; then
   echo "Deleting existing storage zip file."
   ssh daint "rm ~/storage.zip"
 fi
@@ -24,18 +24,19 @@ fi
 # zip on server and pull
 if [ -z ${ID} ]; then
   echo "Zipping entire storage."
-  ZIP_COMMAND="zip -u -r ~/storage.zip /scratch/snx3000/bp000299/dexterous-robot-hand/storage/ -x /scratch/snx3000/bp000299/dexterous-robot-hand/storage/experience/\* "
-  if [ $ONLY_STATS ]; then
+  ZIP_COMMAND="zip -r ~/storage.zip /scratch/snx3000/bp000299/dexterous-robot-hand/storage/ -x /scratch/snx3000/bp000299/dexterous-robot-hand/storage/experience/\* "
+  if [ "$ONLY_STATS" = true ]; then
     ZIP_COMMAND="$ZIP_COMMAND -x /scratch/snx3000/bp000299/dexterous-robot-hand/storage/saved_models/\*"
   fi
-  echo $ZIP_COMMAND
 else
   echo "Updating/Adding $ID to zip file."
-  ZIP_COMMAND="zip -u -r ~/storage.zip /scratch/snx3000/bp000299/dexterous-robot-hand/storage/experiments/$ID/ "
-  if [ ! $ONLY_STATS ]; then
-    ZIP_COMMAND+="/scratch/snx3000/bp000299/dexterous-robot-hand/storage/saved_models/$ID/"
+  ZIP_COMMAND="zip -r ~/storage.zip /scratch/snx3000/bp000299/dexterous-robot-hand/storage/experiments/$ID/ "
+  if [ "$ONLY_STATS" = false ]; then
+    ZIP_COMMAND="$ZIP_COMMAND /scratch/snx3000/bp000299/dexterous-robot-hand/storage/saved_models/$ID/"
   fi
 fi
+
+echo $ZIP_COMMAND
 
 # execute and download
 ssh daint $ZIP_COMMAND

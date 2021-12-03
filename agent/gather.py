@@ -206,7 +206,7 @@ def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyD
         else:
             action = distribution.act_deterministic(*probabilities)
         observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
-        cumulative_reward += reward
+        cumulative_reward += info["original_reward"]
         observation = observation
 
         state = observation
