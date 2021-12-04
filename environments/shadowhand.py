@@ -162,8 +162,9 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             f"parts, but gives {self._delta_t_control % new}."
 
         self._delta_t_simulation = new
-        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation)
+        # self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation)
         self.sim.model.opt.timestep = self._delta_t_simulation
+        self.sim.nsubsteps = self.sim.nsubsteps * int(self._delta_t_control // self._delta_t_simulation)
 
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
