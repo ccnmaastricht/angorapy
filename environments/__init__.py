@@ -197,6 +197,13 @@ gym.envs.register(
     max_episode_steps=50 * 100,
 )
 
+gym.envs.register(
+    id=f'OpenAIManipulateApprox-v0',
+    entry_point='environments:OpenAIManipulate',
+    kwargs={"delta_t": 0.008},
+    max_episode_steps=50 * 100,
+)
+
 # MODIFIED ENVIRONMENTS
 
 gym.envs.register(

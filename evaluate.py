@@ -4,9 +4,9 @@
 import argparse
 import os
 
-from environments.shadowhand import BaseShadowHandEnv
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+from environments.shadowhand import BaseShadowHandEnv
 
 from utilities.datatypes import mpi_condense_stats
 import statistics
