@@ -109,6 +109,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self._delta_t_control: float = delta_t
         self._delta_t_simulation: float = delta_t
         self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
+        self._always_render_mode = False
 
         self._viewers = {}
         self.viewer = None
@@ -162,9 +163,8 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             f"parts, but gives {self._delta_t_control % new}."
 
         self._delta_t_simulation = new
-        # self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation)
+        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation)
         self.sim.model.opt.timestep = self._delta_t_simulation
-        self.sim.nsubsteps = self.sim.nsubsteps * int(self._delta_t_control // self._delta_t_simulation)
 
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
@@ -190,7 +190,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.reward_function = function
 
     def set_reward_config(self, new_config: Union[str, dict]):
-        """Set the environment'serialization reward configuration by its identifier or a dict."""
+        """Set the environment's reward configuration by its identifier or a dict."""
         if isinstance(new_config, str):
             new_config: dict = resolve_config_name(new_config)
 
@@ -229,6 +229,9 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         for simulation_step in range(self._simulation_steps_per_control_step):
             self.sim.step()
             self._step_callback()
+
+            if self._always_render_mode and simulation_step < self._simulation_steps_per_control_step - 1:
+                self.render()
 
         # read out observation from simulation
         obs = self._get_obs()

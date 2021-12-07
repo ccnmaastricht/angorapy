@@ -68,6 +68,7 @@ print(f"Environment has the following transformers: {env.transformers}")
 
 if isinstance(env.unwrapped, BaseShadowHandEnv):
     env.env.set_delta_t_simulation(0.002)
+    env.env._always_render_mode = True
 
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
