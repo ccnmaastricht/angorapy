@@ -32,6 +32,8 @@ def quat_from_angle_and_axis(angle, axis):
 class BaseManipulate(BaseShadowHandEnv):
     """Base class for in-hand object manipulation tasks."""
 
+    max_steps_per_goal = 100
+
     def __init__(
             self,
             model_path,
@@ -378,6 +380,9 @@ class BaseManipulate(BaseShadowHandEnv):
             self.steps_with_current_goal = 0
             obs = self._get_obs()
 
+        if self.steps_with_current_goal >= BaseManipulate.max_steps_per_goal:
+            done = True
+
         # determine if done
         dropped = self._is_dropped()
         done = done or dropped or self.consecutive_goals_reached >= 50
@@ -393,7 +398,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  target_rotation='xyz',
                  touch_get_obs='sensordata',
                  relative_control=True,
-                 vision: bool = False):
+                 vision: bool = False,
+                 delta_t: float = 0.002):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -402,12 +408,12 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_position=target_position,
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                                 vision=vision,
-                                relative_control=relative_control
+                                relative_control=relative_control,
+                                delta_t=delta_t
                                 )
 
 
 class OpenAIManipulate(BaseManipulate, utils.EzPickle):
-    max_steps_per_goal = 100
 
     def __init__(self, delta_t=0.002):
         utils.EzPickle.__init__(self, "ignore", "xyz", 'sensordata', "dense")
@@ -422,14 +428,6 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
                                 delta_t=delta_t,
                                 relative_control=True
                                 )
-
-    def step(self, action):
-        obs, reward, done, info = super(OpenAIManipulate, self).step(action)
-
-        if self.steps_with_current_goal >= OpenAIManipulate.max_steps_per_goal:
-            done = True
-
-        return obs, reward, done, info
 
     def _get_obs(self):
         finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()
