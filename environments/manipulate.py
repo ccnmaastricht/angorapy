@@ -320,30 +320,23 @@ class BaseManipulate(BaseShadowHandEnv):
         self.sim.forward()
 
     def _get_obs(self):
-        # "primary" information, either this is the visual frame or the object position and velocity
-        achieved_goal = self._get_achieved_goal().ravel()
+        object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        target_orientation = self.goal.ravel().copy()[3:]
+        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
 
-        # get proprioceptive information (positions of joints)
-        robot_pos, robot_vel = robot_get_obs(self.sim)
-        proprioception = np.concatenate([robot_pos, robot_vel])
-
-        if self.vision:
-            vision = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
-        else:
-            object_vel = self.sim.data.get_joint_qvel('object:joint')
-            object_pose = np.concatenate([achieved_goal, object_vel])
-            proprioception = np.concatenate([proprioception, object_pose])
-
-        # touch sensor information
-        touch = self.sim.data.sensordata[self._touch_sensor_id]
+        proprioception = np.concatenate([
+            hand_joint_angles,
+            hand_joint_velocities,
+            object_qpos,
+        ])
 
         return {
             "observation": Sensation(
-                vision=vision if self.vision else None,
+                vision=None,
                 proprioception=proprioception.copy(),
-                somatosensation=touch.copy(),
-                goal=self.goal.ravel().copy()),
-            "achieved_goal": achieved_goal.copy(),
+                somatosensation=None,
+                goal=target_orientation),
+            "achieved_goal": object_qpos.copy(),
             "desired_goal": self.goal.ravel().copy(),
         }
 
