@@ -149,7 +149,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     @tf.function
     def entropy(self, pmf: tf.Tensor):
         """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
-        return - self._entropy_from_log_pmf(pmf)
+        return self._entropy_from_log_pmf(pmf)
 
     def build_action_head(self, n_actions: Tuple[int], input_shape: tuple, batch_size: int):
         """Build a discrete step_tuple head as a log softmax output layer."""
@@ -233,14 +233,14 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
         return - tf.reduce_sum(tf.math.log(pmf) * pmf, axis=-1)
 
     @tf.function
-    def _entropy_from_log_pmf(self, pmf: tf.Tensor):
+    def _entropy_from_log_pmf(self, log_pmf: tf.Tensor):
         """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
-        return - tf.reduce_sum(tf.exp(pmf) * pmf, axis=-1)
+        return - tf.reduce_sum(tf.exp(log_pmf) * log_pmf, axis=-1)
 
     @tf.function
     def entropy(self, pmf: tf.Tensor):
         """Calculate entropy of a categorical distribution, where the pmf is given as log probabilities."""
-        return - self._entropy_from_log_pmf(pmf)
+        return self._entropy_from_log_pmf(pmf)
 
     def build_action_head(self, n_actions: Tuple[int], input_shape: tuple, batch_size: int):
         """Build a discrete step_tuple head as a log softmax output layer."""

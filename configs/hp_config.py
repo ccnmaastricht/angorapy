@@ -258,6 +258,7 @@ manipulate = make_config(
 
 manipulate_discrete = derive_config(manipulate, dict(
     distribution="multi-categorical",
+    c_entropy=0.001,
 ))
 
 # RECOMMENDED CONFIGS FOR ENVs
