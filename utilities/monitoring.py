@@ -106,7 +106,7 @@ class Monitor:
     def make_metadata(self):
         """Write meta data information about experiment into json file."""
         metadata = dict(
-            date=str(datetime.datetime.now()),
+            date=str(datetime.datetime.now()).split(".")[0],
             config=self.config_name,
             host=socket.gethostname(),
             iterations=self.iterations,
