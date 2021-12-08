@@ -116,6 +116,10 @@ def manipulate(env, achieved_goal, goal, info: dict):
     d_pos, d_rot = env._goal_distance(achieved_goal, goal)
     d_progress = env._goal_progress()
 
-    return (+ d_progress  # convergence to goal reward
-            + success * env.reward_config["SUCCESS_BONUS"]  # reward for finishing
-            - env._is_dropped() * env.reward_config["DROPPING_PENALTY"])  # dropping penalty
+    reward = (+ d_progress  # convergence to goal reward
+              + success * env.reward_config["SUCCESS_BONUS"]  # reward for finishing
+              - env._is_dropped() * env.reward_config["DROPPING_PENALTY"])  # dropping penalty
+
+    reward -= calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
+
+    return reward

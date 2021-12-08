@@ -24,10 +24,10 @@ REACH_BASE = dict(
 )
 
 MANIPULATE_BASE = dict(
-    SUCCESS_BONUS = 5,
-    DROPPING_PENALTY = 20
+    SUCCESS_BONUS=5,
+    DROPPING_PENALTY=20,
+    FORCE_MULTIPLIER=.0,
 )
-
 
 # REACH
 reach = dict(
@@ -65,7 +65,9 @@ sequential_free_reach = dict(
 
 # MANIPULATE
 manipulate = dict(
-    default=MANIPULATE_BASE
+    default=MANIPULATE_BASE,
+    penalized_force=dict(MANIPULATE_BASE,
+                         FORCE_MULTIPLIER=0.001,),
 )
 
 if __name__ == '__main__':
