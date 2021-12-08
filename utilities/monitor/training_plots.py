@@ -61,7 +61,7 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
     return embed.components(p)
 
 
-def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
+def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_threshold=None):
     """Plot the execution times of a full cycle and optionally bot sub phases."""
     means, stds = rewards["mean"], rewards["stdev"]
     stds = np.array(stds)
@@ -80,10 +80,13 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
         mode="vline"
     )
 
+    range_max = max(df["upper"]) + value_range * 0.1
+    if reward_threshold is not None:
+        range_max = max(range_max, reward_threshold * 1.1)
     p = figure(title="Average Rewards per Cycle",
                x_axis_label='Cycle',
                y_axis_label='Total Episode Return',
-               y_range=(min(df["lower"]), max(df["upper"]) + value_range * 0.1),
+               y_range=(min(df["lower"]), range_max),
                x_range=(0, max(x)),
                **plot_styling)
 
@@ -105,6 +108,11 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded):
 
     # REWARD LINE
     p.line(x, means, legend_label="Reward", line_width=2, color=palette[0])
+
+    # REWARD THRESHOLD
+    if reward_threshold is not None:
+        p.line(x, [reward_threshold for _ in x], line_color="green", line_width=2, line_alpha=0.7, line_dash="dashed",
+               legend_label="Solution Threshold")
 
     # MAX VALUE MARKING
     x_max = np.argmax(means)

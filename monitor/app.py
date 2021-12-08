@@ -202,12 +202,15 @@ def show_experiment(exp_id):
     if "StateNormalizationTransformer" in progress["preprocessors"]:
         plots["normalization"]["state"] = plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"])
 
+    reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
+        meta["environment"]["reward_threshold"])
+
     plots["reward_distribution"] = plot_distribution(progress["rewards"]["last_cycle"], "Rewards (Last Cycle)", color=0)
     plots["length_distribution"] = plot_distribution(progress["lengths"]["last_cycle"], "Episode Lengths (Last Cycle)", color=1)
     cycles_loaded = []
     if "loaded_at" in stats.keys():
         cycles_loaded = stats["loaded_at"]
-    plots["reward_progress"] = plot_reward_progress(progress["rewards"], cycles_loaded)
+    plots["reward_progress"] = plot_reward_progress(progress["rewards"], cycles_loaded, reward_threshold=reward_threshold)
     plots["length_progress"] = plot_length_progress(progress["lengths"], cycles_loaded)
     plots["policy_loss"] = plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0)
     plots["value_loss"] = plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1)
