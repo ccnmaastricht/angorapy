@@ -15,13 +15,14 @@ from models.convolutional import _build_openai_encoder, _build_openai_small_enco
 from common.const import VISION_WH
 from utilities.util import env_extract_dims
 
-SSCModule = tf.keras.Sequential([
-    tf.keras.layers.Dense(128),
-    tf.keras.layers.ReLU(),
-    tf.keras.layers.Dense(64),
-    tf.keras.layers.ReLU()],
-    name="Somatosensory Cortex"
-)
+def build_ssc_module():
+    SSCModule = tf.keras.Sequential([
+        tf.keras.layers.Dense(128),
+        tf.keras.layers.ReLU(),
+        tf.keras.layers.Dense(64),
+        tf.keras.layers.ReLU()],
+        name="Somatosensory Cortex"
+    )
 
 
 def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape):
