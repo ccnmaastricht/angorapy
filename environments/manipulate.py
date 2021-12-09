@@ -463,6 +463,32 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
         }
 
 
+class HumanoidManipulateBlockDiscrete(ManipulateBlock):
+    continuous = False
+
+    def _get_obs(self):
+        object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        target_orientation = self.goal.ravel().copy()[3:]
+        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
+
+        proprioception = np.concatenate([
+            hand_joint_angles,
+            hand_joint_velocities
+        ])
+
+        touch = self.sim.data.sensordata[self._touch_sensor_id]
+
+        return {
+            "observation": Sensation(
+                vision=object_qpos,
+                proprioception=proprioception.copy(),
+                somatosensation=touch,
+                goal=target_orientation),
+            "achieved_goal": object_qpos.copy(),
+            "desired_goal": self.goal.ravel().copy(),
+        }
+
+
 class OpenAIManipulateDiscrete(OpenAIManipulate):
     continuous = False
 

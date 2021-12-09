@@ -6,7 +6,7 @@ from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_
 from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
 from environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
-    OpenAIManipulateDiscrete
+    OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete
 from environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
 from environments.nrp.shadowhand import BaseNRPShadowHandEnv
 from environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
@@ -210,6 +210,15 @@ gym.envs.register(
     kwargs={"delta_t": 0.008},
     max_episode_steps=50 * 100,
 )
+
+gym.envs.register(
+    id=f'HumanoidManipulateBlockDiscrete-v0',
+    entry_point='environments:HumanoidManipulateBlockDiscrete',
+    kwargs={"delta_t": 0.008},
+    max_episode_steps=50 * 100,
+)
+
+
 
 # MODIFIED ENVIRONMENTS
 
