@@ -8,20 +8,18 @@ from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from common.policies import BasePolicyDistribution, BetaPolicyDistribution, MultiCategoricalPolicyDistribution
-from common.wrappers import make_env
-from models import _build_encoding_sub_model
-from models.convolutional import _build_openai_encoder, _build_openai_small_encoder
 from common.const import VISION_WH
+from common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
+from common.wrappers import make_env
 from utilities.util import env_extract_dims
 
 
 def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape):
     """Build the model of the SSC."""
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + somatosensation_input_shape, name="SSCInput")
-    ssc = tf.keras.layers.Dense(128)(ssc_input)
+    ssc = TD(tf.keras.layers.Dense(128))(ssc_input)
     ssc = tf.keras.layers.ReLU()(ssc)
-    ssc = tf.keras.layers.Dense(64)(ssc)
+    ssc = TD(tf.keras.layers.Dense(64))(ssc)
     ssc = tf.keras.layers.ReLU()(ssc)
 
     return tf.keras.Model(inputs=ssc_input, outputs=ssc, name="SomatosensoryCortex")
@@ -32,15 +30,15 @@ def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape):
     vc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + vc_input_shape, name="VCInput")
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSCInput")
 
-    spl_input = tf.keras.layers.Concatenate()([vc_input, ssc_input])
-    spl = tf.keras.layers.Dense(256)(spl_input)
+    spl_input = tf.keras.layers.concatenate([vc_input, ssc_input])
+    spl = TD(tf.keras.layers.Dense(256, name="SPL"))(spl_input)
     spl = tf.keras.layers.ReLU()(spl)
 
-    ipl = tf.keras.layers.Dense(256)(spl)
+    ipl = TD(tf.keras.layers.Dense(256, name="IPL"))(spl)
     ipl = tf.keras.layers.ReLU()(ipl)
 
-    ips_input = tf.keras.layers.Concatenate()([ipl, ssc_input])
-    ips = tf.keras.layers.Dense(128)(ips_input)
+    ips_input = tf.keras.layers.concatenate([ipl, ssc_input])
+    ips = TD(tf.keras.layers.Dense(128, name="IPS"))(ips_input)
     ips = tf.keras.layers.ReLU()(ips)
 
     return tf.keras.Model(inputs=[vc_input, ssc_input], outputs=[spl, ipl, ips], name="PosteriorParietalCortex")
@@ -53,12 +51,12 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSC Input")
     it_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + it_input_shape, name="IT Input")
 
-    mcc_input = tf.keras.layers.Concatenate()([goal_input, ssc_input])
-    mcc = tf.keras.layers.Dense(64)(mcc_input)
+    mcc_input = tf.keras.layers.concatenate([goal_input, ssc_input])
+    mcc = TD(tf.keras.layers.Dense(64))(mcc_input)
     mcc = tf.keras.layers.ReLU()(mcc)
 
-    lpfc_input = tf.keras.layers.Concatenate()([mcc, goal_input, it_input])
-    lpfc = tf.keras.layers.Dense(128)(lpfc_input)
+    lpfc_input = tf.keras.layers.concatenate([mcc, goal_input, it_input])
+    lpfc = TD(tf.keras.layers.Dense(128))(lpfc_input)
     lpfc = tf.keras.layers.ReLU()(lpfc)
 
     return tf.keras.Model(inputs=[goal_input, ssc_input, it_input], outputs=[mcc, lpfc], name="PrefrontalCortex")
@@ -66,14 +64,14 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape
 
 def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape, ipl_input_shape,
                     ips_input_shape, ssc_input_shape):
-    mcc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + mcc_input_shape, name="Goal Input")
-    lpfc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + lpfc_input_shape, name="Goal Input")
-    ipl_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ipl_input_shape, name="Goal Input")
-    ips_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ips_input_shape, name="Goal Input")
-    ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="Goal Input")
+    mcc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + mcc_input_shape, name="GoalInput")
+    lpfc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + lpfc_input_shape, name="LPFCInput")
+    ipl_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ipl_input_shape, name="IPLInput")
+    ips_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ips_input_shape, name="IPSInput")
+    ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSCInput")
 
-    pmc_input = tf.keras.layers.Concatenate([lpfc_input, ipl_input])
-    pmc = tf.keras.layers.Dense(512)(pmc_input)
+    pmc_input = tf.keras.layers.concatenate([lpfc_input, ipl_input])
+    pmc = TD(tf.keras.layers.Dense(512))(pmc_input)
     pmc = tf.keras.layers.ReLU()(pmc)
     pmc, *_ = tf.keras.layers.LSTM(512,
                                    stateful=True,
@@ -82,8 +80,8 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
                                    return_state=True,
                                    name="pmc_recurrent_layer")(pmc)
 
-    m1_input = tf.keras.layers.Concatenate([pmc, mcc_input, lpfc_input, ssc_input, ips_input])
-    m1 = tf.keras.layers.Dense(256)(m1_input)
+    m1_input = tf.keras.layers.concatenate([pmc, mcc_input, lpfc_input, ssc_input, ips_input])
+    m1 = TD(tf.keras.layers.Dense(256))(m1_input)
     m1 = tf.keras.layers.ReLU()(m1)
 
     return tf.keras.Model(inputs=[mcc_input, lpfc_input, ipl_input, ips_input, ssc_input],
@@ -111,32 +109,31 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
                                 name="proprioception")
     touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["somatosensation"],),
                               name="somatosensation")
-    goal_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["goal"],), name="goal")
+    goal_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["goal"],), name="goal")
 
-    input_list = [visual_input, proprio_in, touch_in, goal_in]
+    input_list = [visual_input, proprio_in, touch_in, goal_input]
 
-    somatosensation = tf.keras.layers.Concatenate()([proprio_in, touch_in])
+    somatosensation = tf.keras.layers.concatenate([proprio_in, touch_in])
     somatosensation_masked = tf.keras.layers.Masking(
-        batch_input_shape=(bs, sequence_length,) + somatosensation.shape
+        batch_input_shape=somatosensation.shape
     )(somatosensation)
 
-    vision = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + visual_input.shape)(visual_input)
+    vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(visual_input)
+    goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)
 
-    # sensory cortices
-    ssc_model = build_ssc_module((bs * sequence_length,), somatosensation.shape)
-    ssc_output = TD(ssc_model, name="SSC")(somatosensation_masked)
-    ssc_output.set_shape([bs] + ssc_output.shape[1:])
+    ssc = build_ssc_module((bs, sequence_length,), (somatosensation_masked.shape[-1],))
+    ssc_out = ssc(somatosensation_masked)
 
-    # higher cortices
-    ppc_model = TD(build_ppc_module((bs, sequence_length,), vision.shape, ssc_output.shape))
-    ipl_output, ips_output = ppc_model([vision, ssc_output])
+    ppc = build_ppc_module((bs, sequence_length,), (vision_masked.shape[-1],), (ssc.output_shape[-1],))
+    spl_out, ipl_out, ips_out = ppc([vision_masked, ssc_out])
 
-    pfc_model = TD(build_pfc_module((bs, sequence_length,), goal_in.shape, ssc_output.shape, vision.shape))
-    mcc_output, lpfc_output = pfc_model([goal_in, ssc_output, vision])
+    pfc = build_pfc_module((bs, sequence_length,), (goal_masked.shape[-1],), (ssc.output_shape[-1],),
+                           (vision_masked.shape[-1],))
+    mcc, lpfc = pfc([goal_masked, ssc_out, vision_masked])
 
-    mc_model = build_mc_module((bs, sequence_length,), mcc_output.shape, lpfc_output.shape, ipl_output.shape,
-                               ips_output.shape, ssc_output.shape)
-    m1_output = mc_model([mcc_output, lpfc_output, ipl_output, ips_output, ssc_output])
+    mc = build_mc_module((bs, sequence_length,), (mcc.shape[-1],), (lpfc.shape[-1],), (ipl_out.shape[-1],),
+                         (ips_out.shape[-1],), (ssc_out.shape[-1],))
+    m1_output = mc([mcc, lpfc, ipl_out, ips_out, ssc_out])
 
     # output heads
     policy_out = distribution.build_action_head(n_actions, m1_output.shape[1:], bs)(m1_output)
@@ -163,14 +160,12 @@ def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution
 
 
 if __name__ == "__main__":
-    from environments import *
-
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     # tf.config.experimental.set_memory_growth("GPU:0", True)
 
-    sequence_length = 4
     batch_size = 256
+    sequence_length = 16
 
     env = make_env("HumanoidManipulateBlockDiscrete-v0")
     _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
@@ -182,7 +177,7 @@ if __name__ == "__main__":
 
     joint({
         "vision": tf.random.normal((batch_size, sequence_length, VISION_WH, VISION_WH, 3)),
-        "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
+        # "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
         "somatosensation": tf.random.normal((batch_size, sequence_length, 92)),
         "goal": tf.random.normal((batch_size, sequence_length, 15)),
     })

@@ -81,7 +81,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
             print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
             settings["model"] = "gru"
 
-        if "vision" in env.observation_space["observation"].spaces.keys():
+        if len(env.observation_space["observation"]["vision"].shape) > 1:
             build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
                                              blind=False)
         else:
