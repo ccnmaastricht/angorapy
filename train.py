@@ -62,7 +62,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[
         "eval"] and is_root:
-        logging.warning("Careful! Your horizon is lower than the max reward, this will most likely skew stats heavily.")
+        logging.warning("Careful! Your horizon is lower than the max environment steps, "
+                        "this will most likely skew stats heavily.")
 
     # choose and make policy distribution
     if settings["distribution"] is None:
