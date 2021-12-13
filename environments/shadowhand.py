@@ -281,6 +281,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         if self.viewer is None:
             if mode == 'human':
                 self.viewer = mujoco_py.MjViewer(self.sim)
+                self.viewer._run_speed /= self._simulation_steps_per_control_step
             elif mode == 'rgb_array':
                 self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
 
