@@ -15,7 +15,7 @@ from flask_jsglue import JSGlue
 from agent.ppo_agent import PPOAgent
 from common.const import PATH_TO_EXPERIMENTS
 from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
-    plot_reward_progress, plot_loss, plot_length_progress, plot_distribution
+    plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress
 from utilities.statistics import ignore_none
 
 
@@ -224,6 +224,32 @@ def show_experiment(exp_id):
     ))
 
     return flask.render_template("experiment.html", info=info)
+
+
+@app.route("/compare/", methods=("POST", "GET"))
+def show_comparison():
+    """Compare experiments of given IDs."""
+    ids = request.args.getlist('ids')
+
+    info = {
+        "ids": ids,
+        "plots": {}
+    }
+
+    progress_reports = {}
+    for exp_id in ids:
+        path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
+        with open(os.path.join(path, "progress.json"), "r") as f:
+            progress = json.load(f)
+
+        progress_reports.update({exp_id: progress})
+
+    info["plots"]["reward"] = compare_reward_progress(
+        {id: progress["rewards"] for id, progress in progress_reports.items()},
+        None
+    )
+
+    return flask.render_template("compare.html", info=info)
 
 
 @app.route("/expfile/<int:exp_id>/<path:filename>")
