@@ -66,9 +66,9 @@ print(f"Environment has the following transformers: {env.transformers}")
 #     print(new_name)
 #     env = make_env(new_name, args.rcon)
 
-if isinstance(env.unwrapped, BaseShadowHandEnv):
-    env.env.set_delta_t_simulation(0.002)
-    env.env._always_render_mode = True
+# if isinstance(env.unwrapped, BaseShadowHandEnv):
+#     env.env.set_delta_t_simulation(0.002)
+#     env.env._always_render_mode = True
 
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):

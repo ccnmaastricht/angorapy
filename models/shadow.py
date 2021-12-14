@@ -148,7 +148,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     return policy, value, joint
 
 
-def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
+def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "lstm",
                               blind: bool = False, **kwargs):
     """Build shadow brain networks (policy, value, joint) for given parameter settings."""
 

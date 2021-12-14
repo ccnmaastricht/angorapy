@@ -104,6 +104,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         model = mujoco_py.load_model_from_path(model)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
         self.sim.model.opt.timestep = delta_t
+        self.original_n_substeps = n_substeps
 
         # time control
         self._delta_t_control: float = delta_t
@@ -163,8 +164,10 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             f"parts, but gives {self._delta_t_control % new}."
 
         self._delta_t_simulation = new
-        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation)
+        self.sim.nsubsteps = 1
         self.sim.model.opt.timestep = self._delta_t_simulation
+
+        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation) * self.original_n_substeps
 
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
@@ -200,7 +203,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         self.assert_reward_setup()
 
-    # INFROMATION METHODS
+    # INFORMATION METHODS
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
         as such the output is a 15-D numpy array."""
@@ -281,7 +284,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         if self.viewer is None:
             if mode == 'human':
                 self.viewer = mujoco_py.MjViewer(self.sim)
-                self.viewer._run_speed /= self._simulation_steps_per_control_step
+                # self.viewer._run_speed /= self._simulation_steps_per_control_step
             elif mode == 'rgb_array':
                 self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
 
