@@ -110,7 +110,7 @@
             <tbody>
 
             {% for exp, info in exps.items()|sort(reverse=true) %}
-                <tr class="exp-row {{ "table-success" if info.is_success else ("table-info" if info.success == "maybe" else "") }}">
+                <tr class="exp-row">
                     <th scope="row">{{ loop.index }}</th>
                     <td class="id-col">{{ exp }}</td>
                     <td class="name-col">{{ info.env }}</td>
@@ -177,10 +177,6 @@
         });
 
         // ACTIONS
-        $("tr.exp-row > td:not(.actions)").on("click", function () {
-            window.location = 'experiment/' + $(this).parent().find("td.id-col").text();
-        });
-
         $(".delete-item").on("click", function () {
             let eid = $(this).parent().parent().find("td.id-col").text();
             console.log(eid);
@@ -215,7 +211,23 @@
             dom: 'Bfrtip',
             pageLength: 30,
             buttons: [
-                'columnsToggle'
+                'columnsToggle',
+                {
+                    extend: 'selected',
+                    text: 'Analyse Selected',
+                    action: function (e, dt, node, config) {
+                        let rows = dt.rows({selected: true});
+                        let ids = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText)
+
+                        if (ids.length > 1) {
+                            let get_ids = ids.map(id => "ids=" + id + "&")
+                            window.location = 'compare?' + get_ids.join("");
+                        } else {
+                            window.location = 'experiment/' + ids[0];
+                        }
+
+                    }
+                }
             ],
             select: true
         });
