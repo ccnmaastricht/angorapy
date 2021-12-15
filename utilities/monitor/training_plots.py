@@ -157,6 +157,7 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
                y_axis_label='Total Episode Return',
                **plot_styling)
 
+    names_and_lines = []
     for i, (name, data) in enumerate(rewards.items()):
         means, stds = data["mean"], data["stdev"]
         stds = np.array(stds)
@@ -191,16 +192,19 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
         error_band = bokeh.models.Band(
             base="x", lower="lower", upper="upper",
             source=ColumnDataSource(df.reset_index()),
-            fill_color=palette[i],
+            fill_color=palette[i % len(palette)],
             fill_alpha=0.2,
-            line_color=palette[i],
+            line_color=palette[i % len(palette)],
             line_alpha=0.4,
         )
         p.add_layout(error_band)
         p.renderers.extend([error_band])
 
         # REWARD LINE
-        p.line(x, means, legend_label=name, line_width=2, color=palette[i])
+        reward_line = p.line(x, means, line_width=2, color=palette[i % len(palette)])
+        names_and_lines.append((
+            name, [reward_line]
+        ))
 
     p.add_tools(bokeh.models.BoxZoomTool())
     p.add_tools(bokeh.models.ResetTool())
@@ -211,8 +215,12 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
                legend_label="Solution Threshold")
 
     p.y_range = bokeh.models.Range1d(y_min, y_max)
-    p.legend.location = "bottom_right"
+
+    legend = bokeh.models.Legend(items=names_and_lines, location="bottom_center")
+    p.add_layout(legend, "below")
+
     style_plot(p)
+    p.height = 750 + legend.glyph_height * len(rewards)
 
     return embed.components(p)
 

@@ -242,7 +242,10 @@ def show_comparison():
         with open(os.path.join(path, "progress.json"), "r") as f:
             progress = json.load(f)
 
-        progress_reports.update({exp_id: progress})
+        with open(os.path.join(path, "meta.json"), "r") as f:
+            meta = json.load(f)
+
+        progress_reports.update({f"{meta['environment']['name'].split('-')[0]}-{meta['hyperparameters']['architecture']}-{meta['reward_function']['identifier']} ({exp_id})": progress})
 
     info["plots"]["reward"] = compare_reward_progress(
         {id: progress["rewards"] for id, progress in progress_reports.items()},
