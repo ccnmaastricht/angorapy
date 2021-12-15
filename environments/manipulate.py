@@ -465,10 +465,18 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
 
 class HumanoidManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
+    asynchronous = False
 
     def _get_obs(self):
+        """Gather humanoid senses and asynchronous information."""
+
+        # vision
         object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+
+        # goal
         target_orientation = self.goal.ravel().copy()[3:]
+
+        # proprioception
         hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
 
         proprioception = np.concatenate([
@@ -476,17 +484,40 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
             hand_joint_velocities
         ])
 
+        # touch
         touch = self.sim.data.sensordata[self._touch_sensor_id]
+
+        # asynchronous information
+        finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()
+        target_quat = transform.Rotation.from_quat(target_orientation)
+        current_quat = transform.Rotation.from_quat((object_qpos[3:]))
+        relative_target_orientation = (target_quat * current_quat.inv()).as_quat()
+
+        object_positional_velocity = self.sim.data.get_body_xvelp('object')
+        object_angular_velocity = self.sim.data.get_body_xvelr('object')  # quaternions in OpenAI model
+
+        asynchronous = np.concatenate([
+            finger_tip_positions,
+            relative_target_orientation,
+            object_positional_velocity,
+            object_angular_velocity
+        ])
 
         return {
             "observation": Sensation(
                 vision=object_qpos,
                 proprioception=proprioception.copy(),
                 somatosensation=touch,
-                goal=target_orientation),
+                goal=target_orientation,
+                asynchronous=None if not self.asynchronous else asynchronous
+            ),
             "achieved_goal": object_qpos.copy(),
             "desired_goal": self.goal.ravel().copy(),
         }
+
+
+class HumanoidManipulateBlockDiscreteAsynchronous(HumanoidManipulateBlockDiscrete):
+    asynchronous = True
 
 
 class OpenAIManipulateDiscrete(OpenAIManipulate):

@@ -85,7 +85,7 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
     m1 = tf.keras.layers.ReLU()(m1)
 
     return tf.keras.Model(inputs=[mcc_input, lpfc_input, ipl_input, ips_input, ssc_input],
-                          outputs=m1, name="MotorCortex")
+                          outputs=[pmc, m1], name="MotorCortex")
 
 
 def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
@@ -129,15 +129,28 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
     pfc = build_pfc_module((bs, sequence_length,), (goal_masked.shape[-1],), (ssc.output_shape[-1],),
                            (vision_masked.shape[-1],))
-    mcc, lpfc = pfc([goal_masked, ssc_out, vision_masked])
+    mcc_out, lpfc_out = pfc([goal_masked, ssc_out, vision_masked])
 
-    mc = build_mc_module((bs, sequence_length,), (mcc.shape[-1],), (lpfc.shape[-1],), (ipl_out.shape[-1],),
+    mc = build_mc_module((bs, sequence_length,), (mcc_out.shape[-1],), (lpfc_out.shape[-1],), (ipl_out.shape[-1],),
                          (ips_out.shape[-1],), (ssc_out.shape[-1],))
-    m1_output = mc([mcc, lpfc, ipl_out, ips_out, ssc_out])
+    pmc_out, m1_out = mc([mcc_out, lpfc_out, ipl_out, ips_out, ssc_out])
 
-    # output heads
-    policy_out = distribution.build_action_head(n_actions, m1_output.shape[1:], bs)(m1_output)
-    value_out = tf.keras.layers.Dense(1, name="value")(m1_output)
+    # policy head
+    policy_out = distribution.build_action_head(n_actions, m1_out.shape[1:], bs)(m1_out)
+
+    # value head
+    value_inputs = [pmc_out, mcc_out, ips_out, lpfc_out, ssc_out]
+    if "asynchronous" in state_dimensionality.keys():
+        asynchronous = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asynchronous"], name="asynchronous")
+        input_list.append(asynchronous)
+        value_inputs.append(asynchronous)
+
+    value_in = tf.keras.layers.concatenate(value_inputs)
+    value_out = tf.keras.layers.Dense(512)(value_in)
+    value_out = tf.keras.layers.ReLU()(value_out)
+    value_out = tf.keras.layers.Dense(512)(value_out)
+    value_out = tf.keras.layers.ReLU()(value_out)
+    value_out = tf.keras.layers.Dense(1, name="value")(value_out)
 
     # define models
     policy = tf.keras.Model(inputs=input_list, outputs=[policy_out], name="shadow_brain_policy")

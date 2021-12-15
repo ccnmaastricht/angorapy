@@ -10,10 +10,10 @@ class Sensation:
     encapsulated too. The convention is to refer to any non-sensory data as proprioception, following the intuition
     that it represents inner states."""
 
-    sense_names = ["vision", "somatosensation", "proprioception", "goal"]
+    sense_names = ["vision", "somatosensation", "proprioception", "goal", "asynchronous"]
 
     def __init__(self, vision: np.ndarray = None, proprioception: np.ndarray = None, somatosensation: np.ndarray = None,
-                 goal=None):
+                 goal: np.ndarray = None, asynchronous: np.ndarray = None):
         assert not all(s is None for s in (vision, somatosensation, proprioception, goal)), \
             "Sensation requires data for at least on sense (or 'goal')."
 
@@ -21,6 +21,7 @@ class Sensation:
         self.somatosensation = somatosensation.astype(np.float32) if somatosensation is not None else None
         self.proprioception = proprioception.astype(np.float32) if proprioception is not None else None
         self.goal = goal.astype(np.float32) if goal is not None else None
+        self.asynchronous = asynchronous.astype(np.float32) if asynchronous is not None else None
 
     def __repr__(self):
         return str(self.__dict__)
@@ -64,10 +65,10 @@ class Sensation:
     # MAGIC
 
     def __iter__(self):
-        return iter((self.vision, self.somatosensation, self.proprioception, self.goal))
+        return iter((self.vision, self.somatosensation, self.proprioception, self.goal, self.asynchronous))
 
     def __len__(self):
-        return 4
+        return 5
 
     def __contains__(self, item):
         return item in self.dict()
