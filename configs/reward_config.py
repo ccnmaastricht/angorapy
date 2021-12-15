@@ -27,6 +27,7 @@ MANIPULATE_BASE = dict(
     SUCCESS_BONUS=5,
     DROPPING_PENALTY=20,
     FORCE_MULTIPLIER=.0,
+    TENDON_STRESS_MULTIPLIER=.0,
 )
 
 # REACH
@@ -67,7 +68,10 @@ sequential_free_reach = dict(
 manipulate = dict(
     default=MANIPULATE_BASE,
     penalized_force=dict(MANIPULATE_BASE,
-                         FORCE_MULTIPLIER=0.001,),
+                         FORCE_MULTIPLIER=0.001, ),
+    penalized_anatomy=dict(MANIPULATE_BASE,
+                           TENDON_STRESS_MULTIPLIER=0.01,
+                           FORCE_MULTIPLIER=0.01, )
 )
 
 if __name__ == '__main__':

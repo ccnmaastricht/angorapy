@@ -1,6 +1,7 @@
 from typing import List
 
 import numpy as np
+import tqdm
 from gym.envs.robotics.hand.reach import FINGERTIP_SITE_NAMES
 
 from environments.shadowhand import get_fingertip_distance
@@ -11,6 +12,12 @@ from environments.shadowhand import get_fingertip_distance
 def calculate_force_penalty(simulator) -> float:
     """Calculate a penalty for applying force. Sum of squares of forces, ignoring the wrist."""
     return (simulator.data.actuator_force[2:] ** 2).sum()
+
+
+def calculate_tendon_stress_penalty(simulator) -> float:
+    """Calculate a penalty for applying force. Sum of squares of forces, ignoring the wrist. Scaled up by a constant
+    to match force penalty in average scale."""
+    return ((simulator.data.ten_length ** 2) * 116).sum()
 
 
 def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -> float:
@@ -121,5 +128,28 @@ def manipulate(env, achieved_goal, goal, info: dict):
               - env._is_dropped() * env.reward_config["DROPPING_PENALTY"])  # dropping penalty
 
     reward -= calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
+    reward -= calculate_tendon_stress_penalty(env.sim) * env.reward_config["TENDON_STRESS_MULTIPLIER"]
 
     return reward
+
+
+if __name__ == '__main__':
+    from environments import *
+
+    env = gym.make("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    env.reset()
+
+    force_penalties = []
+    tendon_penalties = []
+    for i in tqdm.tqdm(range(100000)):
+        o, r, d, _ = env.step(env.action_space.sample())
+
+        tendon_penalties.append(calculate_tendon_stress_penalty(env.sim))
+        force_penalties.append(calculate_force_penalty(env.sim))
+
+        if d:
+            env.reset()
+
+    print(f"Mean Force Penalty: {np.mean(force_penalties)}")
+    print(f"Mean Tendon Penalty: {np.mean(tendon_penalties)}")
+    print(f"Suggested Scaling: {np.round(np.mean(force_penalties) / np.mean(tendon_penalties))}")
