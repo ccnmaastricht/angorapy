@@ -63,7 +63,7 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape
 
 
 def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape, ipl_input_shape,
-                    ips_input_shape, ssc_input_shape):
+                    ips_input_shape, ssc_input_shape, rnn_class=tf.keras.layers.LSTM):
     mcc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + mcc_input_shape, name="GoalInput")
     lpfc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + lpfc_input_shape, name="LPFCInput")
     ipl_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ipl_input_shape, name="IPLInput")
@@ -73,12 +73,12 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
     pmc_input = tf.keras.layers.concatenate([lpfc_input, ipl_input])
     pmc = TD(tf.keras.layers.Dense(512))(pmc_input)
     pmc = tf.keras.layers.ReLU()(pmc)
-    pmc, *_ = tf.keras.layers.LSTM(512,
-                                   stateful=True,
-                                   return_sequences=True,
-                                   batch_size=batch_and_sequence_shape[0],
-                                   return_state=True,
-                                   name="pmc_recurrent_layer")(pmc)
+    pmc, *_ = rnn_class(512,
+                        stateful=True,
+                        return_sequences=True,
+                        batch_size=batch_and_sequence_shape[0],
+                        return_state=True,
+                        name="pmc_recurrent_layer")(pmc)
 
     m1_input = tf.keras.layers.concatenate([pmc, mcc_input, lpfc_input, ssc_input, ips_input])
     m1 = TD(tf.keras.layers.Dense(256))(m1_input)
@@ -132,7 +132,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     mcc_out, lpfc_out = pfc([goal_masked, ssc_out, vision_masked])
 
     mc = build_mc_module((bs, sequence_length,), (mcc_out.shape[-1],), (lpfc_out.shape[-1],), (ipl_out.shape[-1],),
-                         (ips_out.shape[-1],), (ssc_out.shape[-1],))
+                         (ips_out.shape[-1],), (ssc_out.shape[-1],), rnn_class=rnn_choice)
     pmc_out, m1_out = mc([mcc_out, lpfc_out, ipl_out, ips_out, ssc_out])
 
     # policy head
@@ -141,12 +141,18 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     # value head
     value_inputs = [pmc_out, mcc_out, ips_out, lpfc_out, ssc_out]
     if "asynchronous" in state_dimensionality.keys():
-        asynchronous = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asynchronous"], name="asynchronous")
+        asynchronous = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asynchronous"],
+                                      name="asynchronous")
         input_list.append(asynchronous)
         value_inputs.append(asynchronous)
 
     value_in = tf.keras.layers.concatenate(value_inputs)
-    value_out = tf.keras.layers.Dense(512)(value_in)
+    value_out, *_ = rnn_choice(512,
+                               stateful=True,
+                               return_sequences=True,
+                               batch_size=bs,
+                               return_state=True,
+                               name="value_recurrent_layer")(value_in)
     value_out = tf.keras.layers.ReLU()(value_out)
     value_out = tf.keras.layers.Dense(512)(value_out)
     value_out = tf.keras.layers.ReLU()(value_out)
@@ -180,19 +186,17 @@ if __name__ == "__main__":
     batch_size = 256
     sequence_length = 16
 
-    env = make_env("HumanoidManipulateBlockDiscrete-v0")
+    env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
-                                          sequence_length=sequence_length)
+                                          sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
-    exit()
 
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     joint({
-        "vision": tf.random.normal((batch_size, sequence_length, VISION_WH, VISION_WH, 3)),
-        # "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
+        "vision": tf.random.normal((batch_size, sequence_length, 7)),
+        "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
         "somatosensation": tf.random.normal((batch_size, sequence_length, 92)),
-        "goal": tf.random.normal((batch_size, sequence_length, 15)),
+        "asynchronous": tf.random.normal((batch_size, sequence_length, 25)),
+        "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })
-
-    joint.summary()
