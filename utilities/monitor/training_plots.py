@@ -156,6 +156,7 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
                x_axis_label='Cycle',
                y_axis_label='Total Episode Return',
                **plot_styling)
+    p.x_range.start = 0
 
     names_and_lines = []
     for i, (name, data) in enumerate(rewards.items()):
