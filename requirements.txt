@@ -1,6 +1,7 @@
+numpy~=1.19.0
 tensorflow==2.4.0
 tensorflow_datasets
-mujoco-py<1.50.2,>=1.50.1
+mujoco-py==2.1.2.14
 mpi4py~=3.0.3
 
 nvidia_smi
@@ -12,7 +13,6 @@ graphviz
 psutil
 scipy
 sklearn
-numpy~=1.19.0
 Flask~=1.1.2
 Flask-JSGlue
 argcomplete
