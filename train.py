@@ -2,6 +2,11 @@ import os
 import pprint
 import traceback
 
+mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
+if not mujoco_path:
+    mujoco_path = os.path.join(os.path.expanduser('~'), '.mujoco', 'mujoco210')
+print(os.listdir(mujoco_path))
+
 import distance
 import numpy as np
 
