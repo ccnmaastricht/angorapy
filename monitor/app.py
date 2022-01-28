@@ -13,7 +13,7 @@ from flask import request, Blueprint, send_from_directory
 from flask_jsglue import JSGlue
 
 from agent.ppo_agent import PPOAgent
-from common.const import PATH_TO_EXPERIMENTS
+from common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
 from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
     plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress
 from utilities.statistics import ignore_none
@@ -34,20 +34,25 @@ def overview():
     """Write Overview page."""
     exp_dir = PATH_TO_EXPERIMENTS
     experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]
+    models_paths = [os.path.join(BASE_SAVE_PATH, p) for p in os.listdir(BASE_SAVE_PATH)]
 
     experiments = {}
     envs_available = set()
-    for path in experiment_paths:
-        eid_m = re.match("[0-9]+", str(path.split("/")[-1]))
+    for exp_path, model_path in zip(experiment_paths, models_paths):
+        eid_m = re.match("[0-9]+", str(exp_path.split("/")[-1]))
         if eid_m:
             eid = eid_m.group(0)
 
-            if os.path.isfile(os.path.join(path, "progress.json")):
-                with open(os.path.join(path, "progress.json"), "r") as f:
+            if os.path.isfile(os.path.join(exp_path, "progress.json")):
+                with open(os.path.join(exp_path, "progress.json"), "r") as f:
                     progress = json.load(f)
 
-                with open(os.path.join(path, "meta.json"), "r") as f:
+                with open(os.path.join(exp_path, "meta.json"), "r") as f:
                     meta = json.load(f)
+
+                model_available = False
+                if os.path.isfile(os.path.join(model_path, "best/weights.index")):
+                    model_available = True
 
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])
@@ -73,7 +78,8 @@ def overview():
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,
                         "config_name": meta["config"] if "config" in meta else "unknown",
                         "reward": meta["reward_function"] if "reward_function" in meta else "None",
-                        "model": architecture + "[" + model + "]"
+                        "model": architecture + "[" + model + "]",
+                        "model_available": model_available
                     }
                 })
 

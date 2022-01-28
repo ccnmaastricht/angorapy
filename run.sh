@@ -2,7 +2,7 @@
 #SBATCH --job-name="dexterity"
 #SBATCH --account="ich020"
 #SBATCH --time=24:00:00
-#SBATCH --nodes=8
+#SBATCH --nodes=32
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=12
 #SBATCH --cpus-per-task=1
@@ -25,7 +25,7 @@ export DISPLAY=:0
 
 if test -z "$SCRIPTCOMMAND"
 then
-  srun python3 -u train.py ManipulateBlockRelative-v0 --pcon hand_manipulate --model gru --architecture deeper --workers 96 --save-every 100
+  srun python3 -u train.py HumanoidManipulateBlockDiscreteAsynchronous-v0 --pcon manipulate_discrete --model gru --architecture shadow --workers 96 --save-every 100
 else
   eval $SCRIPTCOMMAND
 fi
