@@ -33,7 +33,10 @@ def list_layer_names(network, only_para_layers=True) -> List[str]:
     """Get a list of unique string representations of all layers in the network."""
     if only_para_layers:
         return [layer.name for layer in extract_layers(network) if
-                not isinstance(layer, (tf.keras.layers.Activation, tf.keras.layers.InputLayer))]
+                not isinstance(layer, (tf.keras.layers.Activation,
+                                       tf.keras.layers.InputLayer,
+                                       tf.keras.layers.Concatenate,
+                                       tf.keras.layers.Reshape))]
     else:
         return [layer.name for layer in extract_layers(network) if
                 not isinstance(layer, tf.keras.layers.InputLayer)]
@@ -86,16 +89,18 @@ def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.ke
         layer_input_id = 0
         while not success:
             success = True
-            try:
-                tf.keras.Model(inputs=[network.input], outputs=[layer.get_output_at(layer_input_id)])
-            except ValueError as ve:
-                if len(ve.args) > 0 and ve.args[0].split(" ")[0] == "Graph":
-                    layer_input_id += 1
-                    success = False
-                else:
-                    raise ValueError(f"Cannot use layer {layer.name}. Error: {ve.args}")
-            else:
-                outputs.append([layer.get_output_at(layer_input_id)])
+            outputs.append([layer.output])
+
+            # try:
+            #     tf.keras.Model(inputs=[network.input], outputs=[layer.get_output_at(layer_input_id)])
+            # except ValueError as error:
+            #     if len(error.args) > 0 and error.args[0].split(" ")[0] == "Graph":
+            #         layer_input_id += 1
+            #         success = False
+            #     else:
+            #         raise ValueError(f"Cannot use layer {layer.name}. Error: {error.args}")
+            # else:
+            #     outputs.append([layer.get_output_at(layer_input_id)])
 
     if include_original:
         outputs = outputs + network.outputs
