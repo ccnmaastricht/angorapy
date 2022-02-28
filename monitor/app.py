@@ -38,10 +38,12 @@ def overview():
 
     experiments = {}
     envs_available = set()
-    for exp_path, model_path in zip(experiment_paths, models_paths):
+    for exp_path in experiment_paths:
+
         eid_m = re.match("[0-9]+", str(exp_path.split("/")[-1]))
         if eid_m:
             eid = eid_m.group(0)
+            model_path = os.path.join(BASE_SAVE_PATH, eid)
 
             if os.path.isfile(os.path.join(exp_path, "progress.json")):
                 with open(os.path.join(exp_path, "progress.json"), "r") as f:
