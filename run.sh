@@ -25,7 +25,7 @@ export DISPLAY=:0
 
 if test -z "$SCRIPTCOMMAND"
 then
-  srun python3 -u train.py HumanoidManipulateBlockDiscreteAsynchronous-v0 --pcon manipulate_discrete --model gru --architecture shadow --workers 96 --save-every 100
+  srun python3 -u train.py HumanoidManipulateBlockDiscreteAsynchronous-v0 --pcon manipulate_discrete --rcon manipulate.penalized_force --model lstm --architecture shadow --workers 96 --save-every 300
 else
   eval $SCRIPTCOMMAND
 fi
