@@ -147,15 +147,10 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         value_inputs.append(asynchronous)
 
     value_in = tf.keras.layers.concatenate(value_inputs)
-    value_out, *_ = rnn_choice(512,
-                               stateful=True,
-                               return_sequences=True,
-                               batch_size=bs,
-                               return_state=True,
-                               name="value_recurrent_layer")(value_in)
-    value_out = tf.keras.layers.ReLU()(value_out)
+    value_out = tf.keras.layers.Dense(512)(value_in)
+    value_out = tf.keras.layers.Activation("relu")(value_out)
     value_out = tf.keras.layers.Dense(512)(value_out)
-    value_out = tf.keras.layers.ReLU()(value_out)
+    value_out = tf.keras.layers.Activation("relu")(value_out)
     value_out = tf.keras.layers.Dense(1, name="value")(value_out)
 
     # define models
