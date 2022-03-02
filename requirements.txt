@@ -1,4 +1,6 @@
 numpy~=1.19.0
+Box2D
+gym~=0.18
 tensorflow==2.4.0
 tensorflow_datasets
 mujoco-py==2.1.2.14
@@ -16,10 +18,9 @@ sklearn
 Flask~=1.1.2
 Flask-JSGlue
 argcomplete
-gym~=0.18
-Box2D
 matplotlib
 scikit-learn~=0.24.1
+pandas==1.0.4
 seaborn
 bokeh
 distance
