@@ -1,6 +1,6 @@
 <img src="docs/img/logo.png" width=15% align="right" />
 
-# Dexterous Robot Hand
+# Anthropomorphic Robotic Control with Biologically Plausible Networks
 
 ![](https://img.shields.io/github/license/ccnmaastricht/dexterous-robot-hand)
 ![](https://img.shields.io/github/issues/ccnmaastricht/dexterous-robot-hand)
@@ -8,6 +8,7 @@
 ![](https://img.shields.io/github/stars/ccnmaastricht/dexterous-robot-hand)
 
 [![handreach.gif](https://i.postimg.cc/ZYgWRqFM/handreach.gif)](https://postimg.cc/vDrY2bKr)
+![Manipulation Gif](docs/gifs/manipulate_best.gif)
 
 ### Requirements
 
