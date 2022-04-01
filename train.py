@@ -169,15 +169,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")
 
     # general parameters
-    parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target environment")
+    parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target gym environment")
     parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow"], default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
-                        help=f"model type if not shadowhand")
-    parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta"])
+                        help=f"model type if architecture allows for choices")
+    parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta", "multi-categorical"])
     parser.add_argument("--shared", action="store_true",
                         help=f"make the model share part of the network for policy and value")
-    parser.add_argument("--iterations", type=int, default=1000, help=f"number of iterations before training ends")
+    parser.add_argument("--iterations", type=int, default=5000, help=f"number of iterations before training ends")
 
     # meta arguments
     parser.add_argument("--pcon", type=str, default=None, help="config name (utilities/hp_config.py) to be loaded")
@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--horizon", type=int, default=2048, help=f"number of timesteps one worker generates")
+    parser.add_argument("--horizon", type=int, default=2048, help=f"number of time steps one worker generates per cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")
