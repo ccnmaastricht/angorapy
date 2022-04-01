@@ -7,7 +7,6 @@
 ![](https://img.shields.io/github/forks/ccnmaastricht/dexterous-robot-hand)
 ![](https://img.shields.io/github/stars/ccnmaastricht/dexterous-robot-hand)
 
-[![handreach.gif](https://i.postimg.cc/ZYgWRqFM/handreach.gif)](https://postimg.cc/vDrY2bKr)
 ![Manipulation Gif](docs/gifs/manipulate_best.gif)
 
 ### Requirements
