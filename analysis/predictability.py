@@ -1,18 +1,9 @@
 #!/usr/bin/env python
-"""Evaluate a loaded agent on a task."""
 import argparse
-import os
-
-from analysis.investigation import Investigator
-from utilities.model_utils import is_recurrent_model
-from utilities.util import flatten
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from agent.ppo_agent import PPOAgent
-import tensorflow as tf
-
-tf.get_logger().setLevel('INFO')
+from analysis.investigation import Investigator
+from utilities.model_utils import is_recurrent_model
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1639582562)
