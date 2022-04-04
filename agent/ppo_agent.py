@@ -206,6 +206,8 @@ class PPOAgent:
         if not self.is_recurrent:
             self.tbptt_length = 1
 
+        self.gatherer_class = Gatherer
+
         # miscellaneous
         self.iteration = 0
         self.current_fps = 0
@@ -274,6 +276,9 @@ class PPOAgent:
         """Set GPU usage mode."""
         self.device = "GPU:0" if activated else "CPU:0"
         pass
+
+    def assign_gatherer(self, new_gathering_class: Callable):
+        self.gatherer_class = new_gathering_class
 
     def drill(self,
               n: int,
@@ -568,7 +573,7 @@ class PPOAgent:
 
     def _make_actor(self) -> Gatherer:
         # create the Gatherer
-        return Gatherer(MPI.COMM_WORLD.rank, self.agent_id)
+        return self.gatherer_class(MPI.COMM_WORLD.rank, self.agent_id)
 
     def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: Union[int, Tuple[int, int]]) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
@@ -799,7 +804,7 @@ class PPOAgent:
         parameters = self.__dict__.copy()
         del parameters["env"]
         del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["gatherer_class"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()

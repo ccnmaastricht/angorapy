@@ -213,7 +213,7 @@ my_conf = make_config(
 )
 
 my_sub_conf = derive_config(my_conf,
-    {model="gru"}
+    {"model": "gru"}
 )
 ```
 
