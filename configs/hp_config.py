@@ -267,7 +267,7 @@ recommended_config = dict(
     **dict.fromkeys(
         ["CartPole-v2", "CartPole-v1"], discrete_no_norms
     ), **dict.fromkeys(
-        ["Acrobot-v1", "MountainCar-v0", "lunarLander-v2"], discrete
+        ["Acrobot-v1", "MountainCar-v0", "LunarLander-v2"], discrete
     ), **dict.fromkeys(
         ["Pendulum-v0"], pendulum_beta
     ), **dict.fromkeys(
