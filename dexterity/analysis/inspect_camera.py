@@ -2,12 +2,11 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import tensorflow as tf
-import numpy as np
 from environments import *
 
 from agent.ppo_agent import PPOAgent
 from common.wrappers import make_env
-from models import get_model_builder
+from dexterity.models import get_model_builder
 
 import matplotlib.pyplot as plt
 

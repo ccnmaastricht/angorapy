@@ -18,7 +18,7 @@ from common import const
 from common.const import PATH_TO_EXPERIMENTS
 from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
 from common.wrappers import BaseWrapper
-from models import get_model_type
+from models.mighty_maker import get_model_type
 from utilities.util import add_state_dims, flatten
 import tensorflow as tf
 

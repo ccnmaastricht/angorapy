@@ -210,7 +210,7 @@ class Investigator:
 
 if __name__ == "__main__":
     print("INVESTIGATING")
-    os.chdir("../")
+    os.chdir("../../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 

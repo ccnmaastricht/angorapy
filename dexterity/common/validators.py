@@ -20,7 +20,7 @@ def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) ->
 if __name__ == '__main__':
     from environments import *
     from common.policies import BetaPolicyDistribution
-    from models import build_shadow_brain_base, build_simple_models
+    from dexterity.models import build_shadow_brain_base, build_simple_models
 
     e = make_env("LunarLanderContinuous-v2")
     _, _, m = build_simple_models(e, BetaPolicyDistribution(e), bs=16)

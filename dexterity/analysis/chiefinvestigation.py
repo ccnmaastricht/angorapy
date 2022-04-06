@@ -185,7 +185,7 @@ class Chiefinvestigator(Investigator):
 
 
 if __name__ == "__main__":
-    os.chdir("../")  # remove if you want to search for ids in the analysis directory
+    os.chdir("../../")  # remove if you want to search for ids in the analysis directory
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     # agent_id = 1583404415  # 1583180664 lunarlandercont

@@ -7,7 +7,7 @@ from agent.ppo_agent import PPOAgent
 
 AGENT_ID = 1582658038
 
-os.chdir("../../")
+os.chdir("../../../")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 agent = PPOAgent.from_agent_state(AGENT_ID, "b", path_modifier="")
 

@@ -2,7 +2,6 @@
 """Implementation of Proximal Policy Optimization Algorithm."""
 import gc
 import json
-import logging
 import os
 import re
 import statistics
@@ -19,7 +18,6 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, MultiDiscrete
 from mpi4py import MPI
 from psutil import NoSuchProcess
-from tensorflow.keras.optimizers import Optimizer
 
 import models
 from agent.dataio import read_dataset_from_storage
@@ -43,6 +41,9 @@ from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_epi
 mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
 is_root = mpi_comm.rank == 0
+
+if is_root:
+    print(f"Detected {len(gpus)} GPU devices.")
 
 if len(gpus) > 0:
     node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))

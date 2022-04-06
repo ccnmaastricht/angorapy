@@ -10,7 +10,7 @@ import argcomplete
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from models.convolutional import _build_openai_encoder, _build_visual_decoder, _build_openai_small_encoder
+from dexterity.models import _build_openai_encoder, _build_visual_decoder, _build_openai_small_encoder
 from common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
 from utilities.data_generation import gen_cube_quats_prediction_data, gen_hand_pos_prediction_data
 from common.loss import EuclideanDistanceLoss

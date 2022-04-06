@@ -118,7 +118,8 @@ class TransformationWrapper(BaseWrapper):
         return [t.serialize() for t in self.transformers]
 
 
-def make_env(env_name, reward_config: Union[str, dict] = None,
+def make_env(env_name,
+             reward_config: Union[str, dict] = None,
              transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = None) -> BaseWrapper:
     """Make environment, including a possible reward config and transformers."""
     base_env = gym.make(env_name)

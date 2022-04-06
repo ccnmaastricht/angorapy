@@ -15,7 +15,7 @@ from common.const import QUALITATIVE_COLOR_PALETTE, PATH_TO_EXPERIMENTS
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 AGENT_ID =    1587117437
-os.chdir("../../")
+os.chdir("../../../")
 
 with open(f"{PATH_TO_EXPERIMENTS}/{AGENT_ID}/progress.json", "r") as f:
     data = json.load(f)

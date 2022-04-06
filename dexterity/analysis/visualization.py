@@ -14,7 +14,7 @@ from sklearn.manifold import TSNE
 from tqdm import tqdm
 
 from analysis.investigation import Investigator
-from pretrain import top_5_accuracy
+from dexterity.pretrain import top_5_accuracy
 from utilities.model_utils import extract_layers, build_sub_model_to, is_conv
 from utilities.plotting import plot_image_tiling, transparent_cmap
 from utilities.util import normalize

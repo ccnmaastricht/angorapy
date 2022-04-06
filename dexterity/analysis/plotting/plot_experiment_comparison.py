@@ -9,9 +9,9 @@ experiment_ids = [   1626374994   ]
 
 reward_developments = {}
 for id in experiment_ids:
-    with open(os.path.join("../../", PATH_TO_EXPERIMENTS, str(id), "meta.json")) as f:
+    with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "meta.json")) as f:
         meta = json.load(f)
-    with open(os.path.join("../../", PATH_TO_EXPERIMENTS, str(id), "progress.json")) as f:
+    with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "progress.json")) as f:
         progress = json.load(f)
 
     exp_name = meta["hyperparameters"]["model"].upper()
