@@ -1,4 +1,0 @@
-catkin build
-copy model folders to "${HOME}/.gazebo/models"
-
-roslaunch shadow_hand_contact_sensor shadow_hand_gazebo.launch

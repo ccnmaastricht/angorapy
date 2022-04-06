@@ -2,7 +2,7 @@ docs/analysis/*
 MUJOCO_LOG.TXT
 
 monitor/static/experiments/
-storage/*
+storage/
 !storage/saved_models
 storage/saved_models/*
 !/storage/saved_models/*.zip
