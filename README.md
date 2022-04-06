@@ -194,6 +194,9 @@ The number of parallel workers will equal the number of nodes times the number o
 We've build this framework with modularity in mind. Many aspects of the training process can be customized through your own implementations. The most common customization is the usage of your own network architecture. The distributed reinforcement learning pipeline requires your model's implementation to follow specific rules. These are specified [here]() alongside a tutorial on how to incorporate your own model into the training process.
 
 ### Custom Policy Distributions
+Currently, four builtin policy distributions are supported, the Gaussian and the Beta distribution for *continuous* and the (multi-)categorical distribution for *discrete* environments. 
+
+To implement new policy distributions, extend the *BasePolicyDistribution* abstract class.
 
 ### Custom Environments
 
