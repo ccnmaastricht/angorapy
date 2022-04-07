@@ -459,16 +459,18 @@ class PPOAgent:
                     except NoSuchProcess:
                         pass
 
-                nvidia_smi.nvmlInit()
-                nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-                procs = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(nvidia_handle)
                 used_gpu_memory = 0
-                for p in procs:
-                    try:
-                        if "python" in psutil.Process(p.pid).name():
-                            used_gpu_memory += p.usedGpuMemory
-                    except NoSuchProcess:
-                        pass
+                if len(gpus) > 0:
+                    nvidia_smi.nvmlInit()
+                    nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+                    procs = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(nvidia_handle)
+                    used_gpu_memory = 0
+                    for p in procs:
+                        try:
+                            if "python" in psutil.Process(p.pid).name():
+                                used_gpu_memory += p.usedGpuMemory
+                        except NoSuchProcess:
+                            pass
 
                 self.used_memory.append(round(used_memory / 1e9, 2))
                 self.used_gpu_memory.append(round(used_gpu_memory / 1e9, 2))
@@ -761,8 +763,12 @@ class PPOAgent:
         if len(self.cycle_timings) > 0:
             time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
 
-        nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-        nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
+        total_gpu_memory = 0
+        if len(gpus) > 0:
+            nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+            nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
+            total_gpu_memory = nvidia_info.total
+
 
         # years of experience
         years_of_experience_report = ""
@@ -786,7 +792,7 @@ class PPOAgent:
             f"{underflow}"
             f"times: {time_string} {time_distribution_string}; "
             f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
-            f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}|{self.used_gpu_memory[-1]}/{round(nvidia_info.total / 1e9, 2)};\n")
+            f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}|{self.used_gpu_memory[-1]}/{round(total_gpu_memory / 1e9, 2)};\n")
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""
