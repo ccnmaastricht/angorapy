@@ -1,7 +1,7 @@
 docs/analysis/*
 MUJOCO_LOG.TXT
 
-monitor/static/experiments/
+dexterity/monitor/static/experiments/
 storage/
 !storage/saved_models
 storage/saved_models/*
@@ -14,7 +14,7 @@ docs/monitor/experiments/
 docs/benchmarks/backup/*
 docs/benchmarks/*.pdf
 docs/storage/
-monitor/experiments/
+dexterity/monitor/experiments/
 rnnconstruction/firsttrainhistory
 rnnconstruction/saved/
 

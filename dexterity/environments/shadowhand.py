@@ -12,7 +12,6 @@ import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
-from common import reward
 from common.const import N_SUBSTEPS
 from configs.reward_config import resolve_config_name
 

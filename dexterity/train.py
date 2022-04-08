@@ -2,6 +2,8 @@ import os
 import pprint
 import traceback
 
+from agent.gather import EpsilonGreedyGatherer
+
 mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
 if not mujoco_path:
     mujoco_path = os.path.join(os.path.expanduser('~'), '.mujoco', 'mujoco210')
@@ -131,6 +133,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         agent.set_gpu(not settings["cpu"])
     else:
         agent.set_gpu(False)
+
+    agent.assign_gatherer(EpsilonGreedyGatherer)
 
     monitor = None
     if use_monitor and is_root:

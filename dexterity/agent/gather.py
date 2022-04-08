@@ -224,11 +224,11 @@ class Gatherer(BaseGatherer):
 class EpsilonGreedyGatherer(Gatherer):
 
     def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
-        if random.random() < 0.95:
+        if random.random() < 0.9:
             action, action_probability = super(EpsilonGreedyGatherer, self).select_action(predicted_parameters)
         else:
             action = tf.cast(self.distribution.action_space.sample(), tf.float32)
-            action_probability = self.distribution.probability(action, *predicted_parameters)
+            action_probability = self.distribution.log_probability(action, *predicted_parameters)
 
         return action, action_probability
 

@@ -2,6 +2,9 @@ import json
 import os
 import re
 import shutil
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utilities.monitor.statistical_plots import plot_episode_box_plots, plot_per_receptor_mean
 
@@ -19,10 +22,10 @@ from utilities.monitor.training_plots import plot_memory_usage, plot_execution_t
 from utilities.statistics import ignore_none
 
 
-agents = Blueprint("agents", __name__, static_folder="../storage/saved_models/states")
-exps = Blueprint("exps", __name__, static_folder="../storage/experiments")
+agents = Blueprint("agents", __name__, static_folder="storage/saved_models/states")
+exps = Blueprint("exps", __name__, static_folder="storage/experiments")
 
-app = flask.Flask(__name__, )
+app = flask.Flask(__name__, template_folder="templates")
 app.register_blueprint(agents)
 app.register_blueprint(exps)
 
@@ -34,7 +37,6 @@ def overview():
     """Write Overview page."""
     exp_dir = PATH_TO_EXPERIMENTS
     experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]
-    models_paths = [os.path.join(BASE_SAVE_PATH, p) for p in os.listdir(BASE_SAVE_PATH)]
 
     experiments = {}
     envs_available = set()

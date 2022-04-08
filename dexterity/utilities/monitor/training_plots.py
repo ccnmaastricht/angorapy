@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple
 
 import bokeh
+import numpy
 import numpy as np
 import pandas as pd
 import scipy
@@ -337,6 +338,8 @@ def plot_loss(loss, rewards, name, color_id=0):
     x = list(range(len(loss)))
     loss = np.array(loss, dtype=float)
     rewards = np.array(rewards, dtype=float)
+
+    loss[np.isnan(loss)] = None
 
     p = figure(title=name,
                x_axis_label='Cycle',
