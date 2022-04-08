@@ -62,9 +62,6 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     # setup environment and extract and report information
     env = make_env(environment, reward_config=settings["rcon"], transformers=wrappers)
     state_dim, number_of_actions = env_extract_dims(env)
-    env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
-    env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
-    env_name = env.unwrapped.spec.id
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[
         "eval"] and is_root:
@@ -101,6 +98,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
     if verbose and is_root:
+        env_action_space_type = "continuous" if isinstance(env.action_space, Box) else "discrete"
+        env_observation_space_type = "continuous" if isinstance(env.observation_space, Box) else "discrete"
+        env_name = env.unwrapped.spec.id
+
         print(f"-----------------------------------------\n"
               f"{wn}Learning the Task{ec}: {bc}{env_name}{ec}\n"
               f"{bc}{state_dim}{ec}-dimensional states ({bc}{env_observation_space_type}{ec}) "
