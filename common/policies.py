@@ -24,6 +24,7 @@ class BasePolicyDistribution(abc.ABC):
 
     def __init__(self, env: gym.Env):
         self.state_dim, self.action_dim = env_extract_dims(env)
+        self.action_space: gym.Space = env.action_space
 
     @property
     def is_continuous(self):
@@ -57,7 +58,7 @@ class BasePolicyDistribution(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def probability(self, **kwargs):
+    def probability(self, *args, **kwargs):
         """Get the probability of given sample with given distribution parameters. For continuous distributions this is
         the probability density function."""
         pass
@@ -418,14 +419,14 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         return False
 
     def act(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
-        """Sample an step_tuple from a beta distribution."""
+        """Sample an action from a beta distribution."""
         actions = self.sample(alphas, betas)
         probabilities = tf.squeeze(self.log_probability(actions, alphas, betas)).numpy()
 
         return actions, probabilities
 
     def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
-        """Compute the mode of a beta distribution as step_tuple."""
+        """Get action by deterministically taking the mode of the distribution."""
         actions = (alphas - 1) / (alphas + betas - 2)
 
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()

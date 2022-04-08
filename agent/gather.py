@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
+import abc
 import gc
+import random
 from typing import Tuple, Any
 
 import numpy as np
@@ -19,20 +21,47 @@ from utilities.model_utils import is_recurrent_model
 from utilities.util import add_state_dims, flatten, env_extract_dims
 
 
-class Gatherer:
-    """Worker implementation for collecting experience by rolling out a policy."""
+class BaseGatherer(abc.ABC):
 
-    def __init__(self, worker_id: int, exp_id: int):
-        self.worker_id = worker_id
-        self.exp_id = exp_id
+    @abc.abstractmethod
+    def collect(self, *args, **kwargs):
+        pass
 
-    def collect(self, joint: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution, horizon: int, discount: float, lam: float,
-                subseq_length: int, collector_id: int) -> StatBundle:
-        """Collect a batch shard of experience for a given number of timesteps.
+    @abc.abstractmethod
+    def select_action(self, *args, **kwargs) -> Tuple[tf.Tensor, tf.Tensor]:
+        pass
+
+
+class Gatherer(BaseGatherer):
+    """Standard worker implementation for collecting experience by rolling out a policy.
+
+    This is the default PPO behaviour.
+    """
+
+    def __init__(self, worker_id: int, exp_id: int, distribution: BasePolicyDistribution):
+        """
 
         Args:
-            env:            environment from which to gather the data
             distribution:   policy distribution object
+        """
+
+        self.worker_id = worker_id
+        self.exp_id = exp_id
+        self.distribution = distribution
+
+    def collect(self,
+                joint: tf.keras.Model,
+                env: BaseWrapper,
+                horizon: int,
+                discount: float,
+                lam: float,
+                subseq_length: int,
+                collector_id: int) -> StatBundle:
+        """Collect a batch shard of experience for a given number of time steps.
+
+        Args:
+            joint:          network returning both policy and value
+            env:            environment from which to gather the data
             horizon:        the number of steps gatherd by this worker
             discount:       discount factor
             lam:            lambda parameter of GAE balancing the tradeoff between bias and variance
@@ -72,14 +101,13 @@ class Gatherer:
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
             policy_out = flatten(joint(prepared_state))
-            a_distr, value = policy_out[:-1], policy_out[-1]
+            predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
 
             states.append(state)
             values.append(np.squeeze(value))
 
             # from the action distribution sample an action and remember both the action and its probability
-            action, action_probability = distribution.act(*a_distr)
-            action = action if not DETERMINISTIC else np.zeros(action.shape)
+            action, action_probability = self.select_action(predicted_distribution_parameters)
 
             actions.append(action)
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
@@ -184,6 +212,25 @@ class Gatherer:
         tf.compat.v1.reset_default_graph()
 
         return stats
+
+    def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
+        """Standard action selection where an action is sampled fully from the predicted distribution."""
+        action, action_probability = self.distribution.act(*predicted_parameters)
+        action = action if not DETERMINISTIC else np.zeros(action.shape)
+
+        return action, action_probability
+
+
+class EpsilonGreedyGatherer(Gatherer):
+
+    def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
+        if random.random() < 0.95:
+            action, action_probability = super(EpsilonGreedyGatherer, self).select_action(predicted_parameters)
+        else:
+            action = tf.cast(self.distribution.action_space.sample(), tf.float32)
+            action_probability = self.distribution.probability(action, *predicted_parameters)
+
+        return action, action_probability
 
 
 def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution,

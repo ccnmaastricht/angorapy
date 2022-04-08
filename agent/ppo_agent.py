@@ -23,7 +23,7 @@ from tensorflow.keras.optimizers import Optimizer
 
 import models
 from agent.dataio import read_dataset_from_storage
-from agent.gather import Gatherer, evaluate
+from agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
 from agent.ppo.optim import learn_on_batch
 from common import policies, const
 from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
@@ -404,9 +404,8 @@ class PPOAgent:
             worker_stats = []
 
             for i in worker_collection_ids:
-                stats = actor.collect(actor_joint, self.env, self.distribution, self.horizon,
-                                      self.discount, self.lam,
-                                      self.tbptt_length, collector_id=i)
+                stats = actor.collect(actor_joint, self.env, self.horizon, self.discount, self.lam, self.tbptt_length,
+                                      collector_id=i)
                 worker_stats.append(stats)
 
             # merge gatherings from all workers
@@ -573,7 +572,11 @@ class PPOAgent:
 
     def _make_actor(self) -> Gatherer:
         # create the Gatherer
-        return self.gatherer_class(MPI.COMM_WORLD.rank, self.agent_id)
+        return self.gatherer_class(
+            worker_id=MPI.COMM_WORLD.rank,
+            exp_id=self.agent_id,
+            distribution=self.distribution
+        )
 
     def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: Union[int, Tuple[int, int]]) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
