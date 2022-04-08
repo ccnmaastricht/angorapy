@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from common.policies import BetaPolicyDistribution
-from models import get_model_builder
+from dexterity.models import get_model_builder
 from utilities.model_utils import reset_states_masked, build_sub_model_from, get_layers_by_names
 
 
