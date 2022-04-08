@@ -222,6 +222,11 @@ class Gatherer(BaseGatherer):
 
 
 class EpsilonGreedyGatherer(Gatherer):
+    """Exemplary epsilon greedy gathering strategy.
+
+    This is not safe! At some point, the probability of a uniform sample may become zero under the current policy and
+    thereby the log probability goes to negative infinity, leading to the optimization to collapse.
+    """
 
     def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
         if random.random() < 0.9:

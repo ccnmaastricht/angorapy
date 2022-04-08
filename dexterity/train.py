@@ -134,8 +134,6 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     else:
         agent.set_gpu(False)
 
-    agent.assign_gatherer(EpsilonGreedyGatherer)
-
     monitor = None
     if use_monitor and is_root:
         monitor = Monitor(agent,

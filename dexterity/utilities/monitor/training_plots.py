@@ -81,7 +81,7 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_thresho
         mode="vline"
     )
 
-    range_max = max(df["upper"]) + value_range * 0.1
+    range_max = max(df["upper"]) + value_range * 0.2
     if reward_threshold is not None:
         range_max = max(range_max, reward_threshold * 1.1)
     p = figure(title="Average Rewards per Cycle",
@@ -118,20 +118,20 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_thresho
     # MAX VALUE MARKING
     x_max = np.argmax(means)
     y_max = np.max(means)
-    # p.add_layout(bokeh.models.Arrow(end=bokeh.models.NormalHead(size=15,
-    #                                                             line_color="darkred",
-    #                                                             line_width=2,
-    #                                                             fill_color="red"),
-    #                                 line_color="darkred",
-    #                                 line_width=2,
-    #                                 x_start=x_max, y_start=y_max + value_range * 0.1,
-    #                                 x_end=x_max, y_end=y_max))
-    # p.add_layout(bokeh.models.Label(x=x_max, y=y_max + value_range * 0.1, text=str(y_max),
-    #                                 border_line_color='black', border_line_alpha=1.0,
-    #                                 background_fill_color='white', background_fill_alpha=1.0, text_align="center",
-    #                                 text_line_height=1.5, text_font_size="10pt",
-    #
-    #                                 ))
+    p.add_layout(bokeh.models.Arrow(end=bokeh.models.NormalHead(size=10,
+                                                                line_color="darkred",
+                                                                line_width=2,
+                                                                fill_color="red"),
+                                    line_color="darkred",
+                                    line_width=2,
+                                    x_start=x_max, y_start=y_max + value_range * 0.07,
+                                    x_end=x_max, y_end=y_max))
+    p.add_layout(bokeh.models.Label(x=x_max, y=y_max + value_range * 0.075, text=str(y_max),
+                                    border_line_color='black', border_line_alpha=0,
+                                    background_fill_color='white', background_fill_alpha=1.0, text_align="center",
+                                    text_line_height=1.5, text_font_size="10pt", text_color="darkred"
+
+                                    ))
 
     load_markings = []
     for load_timing in cycles_loaded:
@@ -139,7 +139,7 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_thresho
             Span(location=load_timing[0], dimension="height", line_color="red", line_width=2, line_dash=[6, 3])
         )
 
-    # p.renderers.extend(load_markings)
+    p.renderers.extend(load_markings)
 
     p.legend.location = "bottom_right"
     style_plot(p)
