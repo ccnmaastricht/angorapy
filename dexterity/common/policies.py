@@ -89,7 +89,7 @@ class BasePolicyDistribution(abc.ABC):
 
 
 class CategoricalPolicyDistribution(BasePolicyDistribution):
-    """Policy implementation fro categorical (also discrete) distributions. That is, this policy is to be used in any
+    """Policy implementation of categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the step_tuple space is discrete and the agent thus predicts a pmf over the possible actions."""
 
     def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> np.ndarray:

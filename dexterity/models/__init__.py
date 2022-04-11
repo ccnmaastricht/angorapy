@@ -9,7 +9,7 @@ from dexterity.models.simple import build_ffn_models, build_deeper_models, build
     build_simple_models
 
 
-def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = True, blind: bool = False) -> Callable:
+def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = False, blind: bool = True) -> Callable:
     """Get a builder function for a model with the described parameters."""
     # TODO shared seems not to work yet
     params = locals()
