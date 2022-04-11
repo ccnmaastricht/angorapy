@@ -4,7 +4,7 @@ import numpy as np
 import tqdm
 from gym.envs.robotics.hand.reach import FINGERTIP_SITE_NAMES
 
-from environments.shadowhand import get_fingertip_distance
+from dexterity.environments.shadowhand import get_fingertip_distance
 
 
 # HELPER FUNCTIONS

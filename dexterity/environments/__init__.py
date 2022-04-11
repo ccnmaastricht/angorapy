@@ -4,7 +4,7 @@ import os
 import gym
 from mpi4py import MPI
 
-from common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
+from dexterity.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 
 if os.path.isdir('~/.mujoco'):
     if MPI.COMM_WORLD.rank == 0:

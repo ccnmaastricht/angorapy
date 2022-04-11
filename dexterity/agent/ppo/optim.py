@@ -2,10 +2,10 @@ from typing import Union
 
 import tensorflow as tf
 
-from agent.core import extract_discrete_action_probabilities
-from agent.ppo import loss
-from common.policies import BasePolicyDistribution
-from common.senses import Sensation
+from dexterity.agent.core import extract_discrete_action_probabilities
+from dexterity.agent.ppo import loss
+from dexterity.common.policies import BasePolicyDistribution
+from dexterity.common.senses import Sensation
 
 
 def learn_on_batch(batch,

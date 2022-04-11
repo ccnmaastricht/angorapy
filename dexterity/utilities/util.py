@@ -13,7 +13,7 @@ from gym.spaces import Discrete, Box, MultiDiscrete
 from mpi4py import MPI
 from tensorflow.python.client import device_lib
 
-from utilities.error import UninterpretableObservationSpace
+from dexterity.utilities.error import UninterpretableObservationSpace
 
 
 def get_available_gpus():

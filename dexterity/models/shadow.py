@@ -8,10 +8,10 @@ from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from common.const import VISION_WH
-from common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
-from common.wrappers import make_env
-from utilities.util import env_extract_dims
+from dexterity.common.const import VISION_WH
+from dexterity.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
+from dexterity.common.wrappers import make_env
+from dexterity.utilities.util import env_extract_dims
 
 
 def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape):

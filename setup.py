@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='dexterity',
@@ -8,12 +8,12 @@ setup(
     author='Tonio Weidler',
     author_email='t.weidler@maastrichtuniversity.ml',
     license='GPL-3.0',
-    packages=['dexterity'],
+    packages=find_packages(),
     install_requires=[
-        "numpy==1.19.0",
+        "numpy==1.19.2",
         "gym==0.18",
-        "tensorflow=2.4.0",
-        "mpi4py=3.0.3",
+        "tensorflow==2.4.0",
+        "mpi4py==3.0.3",
         "tqdm",
         "simplejson",
         "psutil",
@@ -23,6 +23,7 @@ setup(
         "matplotlib",
         "scikit-learn==0.24.1",
         "pandas==1.0.4",
+        "nvidia-ml-py3",
         "seaborn",
         "distance"
     ],

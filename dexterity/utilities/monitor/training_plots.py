@@ -10,8 +10,8 @@ from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource, HoverTool
 from bokeh.plotting import figure
 from scipy import stats
 
-from utilities.monitor.plotting_base import palette, plot_styling, style_plot
-from utilities.statistics import mean_fill_nones
+from dexterity.utilities.monitor.plotting_base import palette, plot_styling, style_plot
+from dexterity.utilities.statistics import mean_fill_nones
 
 
 def plot_memory_usage(memory_trace: List):

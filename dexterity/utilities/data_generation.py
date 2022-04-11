@@ -1,17 +1,12 @@
 """Generation of auxiliary datasets."""
-import os
 
-import gym
-from tqdm import tqdm
-
-from environments import *
 import numpy as np
 import tensorflow as tf
-from common.wrappers import make_env
-from common.loss import multi_point_euclidean_distance
+from tqdm import tqdm
 
-import matplotlib.pyplot as plt
-import random
+from dexterity.common.loss import multi_point_euclidean_distance
+from dexterity.common.wrappers import make_env
+from dexterity.environments import *
 
 
 def gen_cube_quats_prediction_data(n):
@@ -54,7 +49,8 @@ def gen_hand_pos_prediction_data(n):
 
     mean_pos = tf.reduce_mean(Y, axis=0)
     print(f"MSE from Mean: {tf.losses.mse(tf.reshape(Y, -1), tf.tile(mean_pos, [Y.shape[0]]))}")
-    print(f"Euclidean Distance from Mean: {multi_point_euclidean_distance(tf.reshape(Y, -1), tf.tile(mean_pos, [Y.shape[0]]))}")
+    print(
+        f"Euclidean Distance from Mean: {multi_point_euclidean_distance(tf.reshape(Y, -1), tf.tile(mean_pos, [Y.shape[0]]))}")
 
     # for i in range(20):
     #     index = random.randint(0, X.shape[0])

@@ -12,8 +12,8 @@ import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
-from common.const import N_SUBSTEPS
-from configs.reward_config import resolve_config_name
+from dexterity.common.const import N_SUBSTEPS
+from dexterity.configs.reward_config import resolve_config_name
 
 FINGERTIP_SITE_NAMES = [
     'robot0:S_fftip',

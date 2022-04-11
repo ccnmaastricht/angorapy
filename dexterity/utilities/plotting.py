@@ -3,7 +3,6 @@ import colorsys
 import math
 from typing import List
 
-import matplotlib.pyplot as plt
 import numpy
 import numpy as np
 from matplotlib import pyplot as plt, colors as mc

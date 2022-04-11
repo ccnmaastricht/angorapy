@@ -10,11 +10,11 @@ import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
+from dexterity.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
     MultiCategoricalPolicyDistribution
-from common.wrappers import BaseWrapper
-from models.components import _build_encoding_sub_model
-from utilities.util import env_extract_dims
+from dexterity.common.wrappers import BaseWrapper
+from dexterity.models.components import _build_encoding_sub_model
+from dexterity.utilities.util import env_extract_dims
 
 
 def build_ffn_models(env: BaseWrapper,

@@ -4,7 +4,7 @@ import bokeh.layouts
 from bokeh import embed
 from bokeh.plotting import figure
 
-from utilities.monitor.plotting_base import palette, plot_styling, style_plot
+from dexterity.utilities.monitor.plotting_base import palette, plot_styling, style_plot
 import numpy as np
 import pandas as pd
 

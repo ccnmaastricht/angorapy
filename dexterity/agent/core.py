@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.signal import lfilter
 
-from common.const import NP_FLOAT_PREC
+from dexterity.common.const import NP_FLOAT_PREC
 
 
 def get_discounted_returns(reward_trajectory, discount_factor: float):

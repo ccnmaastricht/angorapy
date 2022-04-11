@@ -10,10 +10,10 @@ import numpy as np
 import tensorflow as tf
 from mpi4py import MPI
 
-from common.const import STORAGE_DIR
-from common.senses import Sensation
-from utilities.datatypes import StatBundle
-from common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
+from dexterity.common.const import STORAGE_DIR
+from dexterity.common.senses import Sensation
+from dexterity.utilities.datatypes import StatBundle
+from dexterity.common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 
 
 def _float_feature(value):

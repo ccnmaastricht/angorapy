@@ -5,12 +5,12 @@ from typing import List, Dict
 
 import numpy as np
 
-from common.senses import Sensation
-from common.const import NP_FLOAT_PREC, EPSILON
-from utilities.types import StepTuple
-from utilities.util import env_extract_dims
+from dexterity.common.senses import Sensation
+from dexterity.common.const import NP_FLOAT_PREC, EPSILON
+from dexterity.utilities.types import StepTuple
+from dexterity.utilities.util import env_extract_dims
 
-from environments import *
+from dexterity.environments import *
 
 TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "env_id", "data"])
 

@@ -10,17 +10,17 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy
 import simplejson as json
+import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
 
-from agent.ppo_agent import PPOAgent
-from common import const
-from common.const import PATH_TO_EXPERIMENTS
-from common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from common.wrappers import BaseWrapper
-from models.mighty_maker import get_model_type
-from utilities.util import add_state_dims, flatten
-import tensorflow as tf
+from dexterity.agent.ppo_agent import PPOAgent
+from dexterity.common import const
+from dexterity.common.const import PATH_TO_EXPERIMENTS
+from dexterity.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from dexterity.common.wrappers import BaseWrapper
+from dexterity.models.mighty_maker import get_model_type
+from dexterity.utilities.util import add_state_dims, flatten
 
 matplotlib.use('Agg')
 

@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict
 import numpy as np
 from numpy.core._multiarray_umath import ndarray as arr
 
-from common.senses import Sensation, stack_sensations
+from dexterity.common.senses import Sensation, stack_sensations
 
 
 class ExperienceBuffer:

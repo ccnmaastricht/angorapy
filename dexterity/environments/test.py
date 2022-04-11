@@ -1,5 +1,5 @@
-from common.transformers import StateNormalizationTransformer
-from common.wrappers import make_env
+from dexterity.common.transformers import StateNormalizationTransformer
+from dexterity.common.wrappers import make_env
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

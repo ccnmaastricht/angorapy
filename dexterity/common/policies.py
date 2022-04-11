@@ -9,10 +9,10 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from agent.core import extract_discrete_action_probabilities
-from common.layers import StdevLayer
-from common.const import EPSILON
-from utilities.util import env_extract_dims
+from dexterity.agent.core import extract_discrete_action_probabilities
+from dexterity.common.layers import StdevLayer
+from dexterity.common.const import EPSILON
+from dexterity.utilities.util import env_extract_dims
 
 
 class BasePolicyDistribution(abc.ABC):

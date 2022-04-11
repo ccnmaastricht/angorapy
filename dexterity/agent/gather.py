@@ -9,16 +9,16 @@ import numpy as np
 import tensorflow as tf
 from gym.spaces import Box
 
-from agent.core import estimate_episode_advantages
-from agent.dataio import tf_serialize_example, make_dataset_and_stats, serialize_sample
-from common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
-from common.policies import BasePolicyDistribution
-from common.senses import Sensation
-from common.wrappers import BaseWrapper, make_env
-from common.const import STORAGE_DIR, DETERMINISTIC
-from utilities.datatypes import StatBundle
-from utilities.model_utils import is_recurrent_model
-from utilities.util import add_state_dims, flatten, env_extract_dims
+from dexterity.agent.core import estimate_episode_advantages
+from dexterity.agent.dataio import tf_serialize_example, make_dataset_and_stats, serialize_sample
+from dexterity.common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
+from dexterity.common.policies import BasePolicyDistribution
+from dexterity.common.senses import Sensation
+from dexterity.common.wrappers import BaseWrapper, make_env
+from dexterity.common.const import STORAGE_DIR, DETERMINISTIC
+from dexterity.utilities.datatypes import StatBundle
+from dexterity.utilities.model_utils import is_recurrent_model
+from dexterity.utilities.util import add_state_dims, flatten, env_extract_dims
 
 
 class BaseGatherer(abc.ABC):

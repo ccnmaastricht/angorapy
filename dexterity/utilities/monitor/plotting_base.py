@@ -1,6 +1,6 @@
 from bokeh import colors
 
-from common.const import COLORMAP
+from dexterity.common.const import COLORMAP
 
 palette = [colors.RGB(*[int(c * 255) for c in color]) for color in COLORMAP]
 darker_palette = [c.darken(0.3) for c in palette]

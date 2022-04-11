@@ -15,11 +15,11 @@ import flask
 from flask import request, Blueprint, send_from_directory
 from flask_jsglue import JSGlue
 
-from agent.ppo_agent import PPOAgent
-from common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
-from utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
+from dexterity.agent.ppo_agent import PPOAgent
+from dexterity.common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
+from dexterity.utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
     plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress
-from utilities.statistics import ignore_none
+from dexterity.utilities.statistics import ignore_none
 
 
 agents = Blueprint("agents", __name__, static_folder="storage/saved_models/states")

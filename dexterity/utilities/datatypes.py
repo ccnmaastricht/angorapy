@@ -5,11 +5,8 @@ import statistics
 from collections import namedtuple
 from typing import List, Union
 
-import gym
 import numpy as np
 from mpi4py import MPI
-
-from common.data_buffers import TimeSequenceExperienceBuffer
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths", "tbptt_underflow",

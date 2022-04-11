@@ -1,8 +1,9 @@
+import sys
 import os
 import pprint
 import traceback
 
-from agent.gather import EpsilonGreedyGatherer
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
 if not mujoco_path:
@@ -20,17 +21,17 @@ import logging
 import argcomplete
 from gym.spaces import Box, Discrete, MultiDiscrete
 
-from configs import hp_config
-from common.policies import get_distribution_by_short_name
-from models import get_model_builder
-from common.const import COLORS
-from utilities.monitoring import Monitor
-from utilities.util import env_extract_dims
-from common.wrappers import make_env
-from common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
-from agent.ppo_agent import PPOAgent
+from dexterity.configs import hp_config
+from dexterity.common.policies import get_distribution_by_short_name
+from dexterity.models import get_model_builder
+from dexterity.common.const import COLORS
+from dexterity.utilities.monitoring import Monitor
+from dexterity.utilities.util import env_extract_dims
+from dexterity.common.wrappers import make_env
+from dexterity.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
+from dexterity.agent.ppo_agent import PPOAgent
 
-from environments import *
+from dexterity.environments import *
 
 from mpi4py import MPI
 
@@ -177,7 +178,8 @@ if __name__ == "__main__":
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if architecture allows for choices")
-    parser.add_argument("--distribution", type=str, default=None, choices=["categorical", "gaussian", "beta", "multi-categorical"])
+    parser.add_argument("--distribution", type=str, default=None,
+                        choices=["categorical", "gaussian", "beta", "multi-categorical"])
     parser.add_argument("--shared", action="store_true",
                         help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=5000, help=f"number of iterations before training ends")
@@ -201,7 +203,8 @@ if __name__ == "__main__":
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--horizon", type=int, default=2048, help=f"number of time steps one worker generates per cycle")
+    parser.add_argument("--horizon", type=int, default=2048,
+                        help=f"number of time steps one worker generates per cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")

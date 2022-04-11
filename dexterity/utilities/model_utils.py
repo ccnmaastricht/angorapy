@@ -1,13 +1,12 @@
+from inspect import getfullargspec as fargs
 from typing import List, Union
 
 import numpy
 import numpy as np
-
 import tensorflow as tf
 from tensorflow.python.keras.layers import TimeDistributed
 
-from utilities.util import flatten
-from inspect import getfullargspec as fargs
+from dexterity.utilities.util import flatten
 
 
 def is_recurrent_model(model: tf.keras.Model):

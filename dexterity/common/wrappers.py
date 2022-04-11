@@ -7,9 +7,9 @@ import gym
 import numpy
 from mpi4py import MPI
 
-from common.senses import Sensation
-from common.transformers import BaseTransformer, merge_transformers
-from utilities.util import env_extract_dims
+from dexterity.common.senses import Sensation
+from dexterity.common.transformers import BaseTransformer, merge_transformers
+from dexterity.utilities.util import env_extract_dims
 
 
 class BaseWrapper(gym.ObservationWrapper, abc.ABC):

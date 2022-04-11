@@ -19,23 +19,23 @@ from gym.spaces import Discrete, Box, MultiDiscrete
 from mpi4py import MPI
 from psutil import NoSuchProcess
 
-import models
-from agent.dataio import read_dataset_from_storage
-from agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
-from agent.ppo.optim import learn_on_batch
-from common import policies, const
-from common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
-from common.const import MIN_STAT_EPS
-from common.mpi_optim import MpiAdam
-from common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
-from common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
-from common.validators import validate_env_model_compatibility
-from common.wrappers import BaseWrapper, make_env
-from utilities.datatypes import mpi_condense_stats, StatBundle
-from utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
+from dexterity import models
+from dexterity.agent.dataio import read_dataset_from_storage
+from dexterity.agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
+from dexterity.agent.ppo.optim import learn_on_batch
+from dexterity.common import policies, const
+from dexterity.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
+from dexterity.common.const import MIN_STAT_EPS
+from dexterity.common.mpi_optim import MpiAdam
+from dexterity.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
+from dexterity.common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
+from dexterity.common.validators import validate_env_model_compatibility
+from dexterity.common.wrappers import BaseWrapper, make_env
+from dexterity.utilities.datatypes import mpi_condense_stats, StatBundle
+from dexterity.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
-from utilities.statistics import ignore_none
-from utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape
+from dexterity.utilities.statistics import ignore_none
+from dexterity.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape
 
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD

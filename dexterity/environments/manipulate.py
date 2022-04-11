@@ -7,11 +7,11 @@ from gym.envs.robotics import rotations
 from gym.envs.robotics.utils import robot_get_obs
 from scipy.spatial import transform
 
-from common.const import VISION_WH, N_SUBSTEPS
-from common.reward import manipulate
-from common.senses import Sensation
-from configs.reward_config import MANIPULATE_BASE
-from environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
+from dexterity.common.const import VISION_WH, N_SUBSTEPS
+from dexterity.common.reward import manipulate
+from dexterity.common.senses import Sensation
+from dexterity.configs.reward_config import MANIPULATE_BASE
+from dexterity.environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "assets/hand",

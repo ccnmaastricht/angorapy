@@ -7,13 +7,13 @@ import numpy as np
 from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance, HandReachEnv
 from gym.envs.robotics.utils import robot_get_obs
 
-from common import reward
-from common.reward import sequential_free_reach, free_reach, reach, sequential_reach
-from common.senses import Sensation
-from configs.reward_config import REACH_BASE, resolve_config_name
-from environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
-from common.const import N_SUBSTEPS, VISION_WH
-from utilities.util import HiddenPrints
+from dexterity.common import reward
+from dexterity.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
+from dexterity.common.senses import Sensation
+from dexterity.configs.reward_config import REACH_BASE, resolve_config_name
+from dexterity.environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
+from dexterity.common.const import N_SUBSTEPS, VISION_WH
+from dexterity.utilities.util import HiddenPrints
 
 
 class Reach(BaseShadowHandEnv):

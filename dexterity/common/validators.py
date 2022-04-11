@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from common.wrappers import BaseWrapper, make_env
-from utilities.error import IncompatibleModelException
+from dexterity.common.wrappers import BaseWrapper, make_env
+from dexterity.utilities.error import IncompatibleModelException
 
 
 def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) -> bool:
