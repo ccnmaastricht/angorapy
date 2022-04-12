@@ -208,7 +208,7 @@ To implement new policy distributions, extend the *BasePolicyDistribution* abstr
 Last, and somewhat least, you can add your own preset hyperparameter configuration. 
 
 ```python
-from configs.hp_config import make_config, derive_config
+from dexterity.configs.hp_config import make_config, derive_config
 
 my_conf = make_config(
     batch_size=128,
