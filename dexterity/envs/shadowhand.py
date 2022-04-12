@@ -1,16 +1,20 @@
 #!/usr/bin/env python
-"""ShadowHand Baseclass for NRP Environments."""
-
+"""BaseShadowHandEnv Environment Wrappers."""
 import abc
 import copy
 import os
 import random
+from typing import Callable, Union
 
 import gym
 import mujoco_py
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
+
+from dexterity.common.const import N_SUBSTEPS
+from dexterity.configs.reward_config import resolve_config_name
+from dexterity.common import reward
 
 FINGERTIP_SITE_NAMES = [
     'robot0:S_fftip',
@@ -47,7 +51,9 @@ DEFAULT_INITIAL_QPOS = {
     'robot0:THJ0': -0.7894883021600622,
 }
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand.xml')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
+# MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
+MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand_manipulate.xml')
 
 
 def generate_random_sim_qpos(base: dict) -> dict:
@@ -73,10 +79,19 @@ def get_fingertip_distance(ft_a, ft_b):
     return np.linalg.norm(ft_a - ft_b, axis=-1)
 
 
-class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
-    """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
+class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
+    """Base class for all shadow hand envs, setting up mostly visual characteristics of the environment."""
 
-    def __init__(self, initial_qpos, distance_threshold, n_substeps=20, relative_control=True):
+    continuous = True
+    discrete_bin_count = 11
+
+    def __init__(self,
+                 initial_qpos,
+                 distance_threshold,
+                 n_substeps=N_SUBSTEPS,
+                 delta_t=0.002,
+                 relative_control=True,
+                 model=MODEL_PATH):
         gym.utils.EzPickle.__init__(**locals())
 
         self.relative_control = relative_control
@@ -85,8 +100,18 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
 
-        model = mujoco_py.load_model_from_path(MODEL_PATH)
+        # build simulation
+        model = mujoco_py.load_model_from_path(model)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
+        self.sim.model.opt.timestep = delta_t
+        self.original_n_substeps = n_substeps
+
+        # time control
+        self._delta_t_control: float = delta_t
+        self._delta_t_simulation: float = delta_t
+        self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
+        self._always_render_mode = False
+
         self._viewers = {}
         self.viewer = None
 
@@ -108,7 +133,14 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.goal = self._sample_goal()
         obs = self._get_obs()
 
-        self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
+        # action space
+        if self.continuous:
+            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
+        else:
+            self.action_space = spaces.MultiDiscrete(np.ones(20) * BaseShadowHandEnv.discrete_bin_count)
+            self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
+
+        # observation space
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
@@ -118,11 +150,60 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
             ),
         ))
 
+        self._freeze_wrist = False
+
     @property
     def dt(self):
+        """Difference between timesteps h. Time progresses from t to t + h every step. In seconds."""
         return self.sim.model.opt.timestep * self.sim.nsubsteps
 
-    # INFROMATION METHODS
+    def set_delta_t_simulation(self, new: float):
+        """Set new value for the simulation delta t."""
+        assert np.isclose(self._delta_t_control % new, 0, rtol=1.e-3, atol=1.e-4), \
+            f"Delta t of simulation must divide control delta t into integer " \
+            f"parts, but gives {self._delta_t_control % new}."
+
+        self._delta_t_simulation = new
+        self.sim.nsubsteps = 1
+        self.sim.model.opt.timestep = self._delta_t_simulation
+
+        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation) * self.original_n_substeps
+
+    def toggle_wrist_freezing(self):
+        """Toggle flag preventing the wrist from moving."""
+        self._freeze_wrist = not self._freeze_wrist
+        print("Wrist movements are now frozen.")
+
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute reward with additional success bonus."""
+        return self.reward_function(self, achieved_goal, goal, info)
+
+    @abc.abstractmethod
+    def assert_reward_setup(self):
+        pass
+
+    def set_reward_function(self, function: Union[str, Callable]):
+        """Set the environment reward function by its config identifier or a callable."""
+        if isinstance(function, str):
+            try:
+                function = getattr(reward, function.split(".")[0])
+            except AttributeError:
+                raise AttributeError("Reward function unknown.")
+
+        self.reward_function = function
+
+    def set_reward_config(self, new_config: Union[str, dict]):
+        """Set the environment's reward configuration by its identifier or a dict."""
+        if isinstance(new_config, str):
+            new_config: dict = resolve_config_name(new_config)
+
+        self.reward_config = new_config
+        if "SUCCESS_DISTANCE" in self.reward_config.keys():
+            self.distance_threshold = self.reward_config["SUCCESS_DISTANCE"]
+
+        self.assert_reward_setup()
+
+    # INFORMATION METHODS
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
         as such the output is a 15-D numpy array."""
@@ -135,18 +216,36 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def step(self, action):
-        action = np.clip(action, self.action_space.low, self.action_space.high)
+    def step(self, action: np.ndarray):
+        if self.continuous:
+            action = np.clip(action, self.action_space.low, self.action_space.high)
+        else:
+            action = self.discrete_action_values[action.astype(np.int)]
+
+        if self._freeze_wrist:
+            action[:2] = 0
+
+        # submit action to the simulation
         self._set_action(action)
-        self.sim.step()
-        self._step_callback()
+
+        # perform steps in simulation
+        for simulation_step in range(self._simulation_steps_per_control_step):
+            self.sim.step()
+            self._step_callback()
+
+            if self._always_render_mode and simulation_step < self._simulation_steps_per_control_step - 1:
+                self.render()
+
+        # read out observation from simulation
         obs = self._get_obs()
 
         done = False
         info = {
             'is_success': self._is_success(obs['achieved_goal'], self.goal),
         }
+
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
+
         return obs, reward, done, info
 
     def reset(self):
@@ -155,7 +254,7 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
         # In this case, we just keep randomizing until we eventually achieve a valid initial
         # configuration.
-        super(BaseNRPShadowHandEnv, self).reset()
+        super(BaseShadowHandEnv, self).reset()
         did_reset_sim = False
         while not did_reset_sim:
             did_reset_sim = self._reset_sim()
@@ -170,7 +269,7 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
             self._viewers = {}
 
     def render(self, mode='human', width=500, height=500):
-        self._render_callback(render_targets=(mode == "human"))
+        self._render_callback(render_targets=True)
         if mode == 'rgb_array':
             self._get_viewer(mode).render(width, height)
             # window size used for old mujoco-py:
@@ -185,6 +284,7 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         if self.viewer is None:
             if mode == 'human':
                 self.viewer = mujoco_py.MjViewer(self.sim)
+                # self.viewer._run_speed /= self._simulation_steps_per_control_step
             elif mode == 'rgb_array':
                 self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
 
@@ -261,17 +361,20 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
         for idx, value in enumerate(lookat):
             self.viewer.cam.lookat[idx] = value
 
-        # set colors
-        self.sim.model.mat_rgba[2] = np.array([16, 18, 35, 255]) / 255  # hand
+        # hand color
+        self.sim.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
         # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
-        self.sim.model.mat_rgba[4] = np.array([71, 116, 144, 255]) / 255  # background
+
+        # background color
+        self.sim.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        # self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
         self.viewpoint = "topdown"
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.32  # zoom in
+            self.viewer.cam.distance = 0.4  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[1] -= 0.07  # slightly move forward
@@ -283,20 +386,3 @@ class BaseNRPShadowHandEnv(gym.GoalEnv, abc.ABC):
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
         else:
             raise NotImplementedError("Unknown Viewpoint.")
-
-
-if __name__ == "__main__":
-    from environments import *
-
-    # env = gym.make("HandTappingAbsolute-v1")
-    # env = gym.make("HandFreeReachLFAbsolute-v0")
-    # env = gym.make("BaseShadowHandEnv-v0")
-    # env = gym.make("HandManipulateBlock-v0")
-    env = gym.make("HandReachDenseRelative-v0")
-    d, s = False, env.reset()
-    while True:
-        env.render()
-        action = env.action_space.sample()
-        s, r, d, i = env.step(action)
-        if d:
-            env.reset()

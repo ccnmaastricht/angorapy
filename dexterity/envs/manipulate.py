@@ -11,7 +11,7 @@ from dexterity.common.const import VISION_WH, N_SUBSTEPS
 from dexterity.common.reward import manipulate
 from dexterity.common.senses import Sensation
 from dexterity.configs.reward_config import MANIPULATE_BASE
-from dexterity.environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
+from dexterity.envs.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "assets/hand",
@@ -56,7 +56,7 @@ class BaseManipulate(BaseShadowHandEnv):
         """Initializes a new Hand manipulation environment.
 
         Args:
-            model_path (string): path to the environments XML file
+            model_path (string): path to the envs XML file
             target_position (string): the type of target position:
                 - ignore: target position is fully ignored, i.e. the object can be positioned arbitrarily
                 - fixed: target position is set to the initial position of the object

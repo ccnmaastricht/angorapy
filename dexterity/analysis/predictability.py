@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import argparse
 
-from agent.ppo_agent import PPOAgent
-from analysis.investigation import Investigator
-from utilities.model_utils import is_recurrent_model
+from dexterity.agent.ppo_agent import PPOAgent
+from dexterity.analysis.investigation import Investigator
+from dexterity.utilities.model_utils import is_recurrent_model
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1639582562)
@@ -12,7 +12,7 @@ parser.add_argument("--state", type=str, help="state, either iteration or 'best'
 args = parser.parse_args()
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
-agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../")
+agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../../")
 investigator = Investigator.from_agent(agent)
 env = agent.env
 

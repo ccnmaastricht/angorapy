@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from dexterity.common.loss import multi_point_euclidean_distance
 from dexterity.common.wrappers import make_env
-from dexterity.environments import *
+from dexterity.envs import *
 
 
 def gen_cube_quats_prediction_data(n):

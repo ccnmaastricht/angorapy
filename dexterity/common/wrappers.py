@@ -1,4 +1,4 @@
-"""Wrappers encapsulating environments to modulate n_steps, rewards, and control state initialization."""
+"""Wrappers encapsulating envs to modulate n_steps, rewards, and control state initialization."""
 import abc
 from pprint import pprint
 from typing import Union, List, Type, OrderedDict

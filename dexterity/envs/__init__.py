@@ -1,4 +1,4 @@
-"""Module for additional environments as well as registering modified environments."""
+"""Module for additional envs as well as registering modified envs."""
 import os
 
 import gym
@@ -6,28 +6,28 @@ from mpi4py import MPI
 
 from dexterity.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 
-if os.path.isdir('~/.mujoco'):
+if os.path.exists(os.path.expanduser('~/.mujoco')):
     if MPI.COMM_WORLD.rank == 0:
-        print("A MuJoCo path exists. MuJoCo is being loaded...")
+        print(f"A MuJoCo path exists. MuJoCo is being loaded...")
 
-    from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
+    from dexterity.envs.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
-    from environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
+    from dexterity.envs.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
         OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous
-    from environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
-    from environments.nrp.shadowhand import BaseNRPShadowHandEnv
-    from environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
+    from dexterity.envs.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
+    from dexterity.envs.nrp.shadowhand import BaseNRPShadowHandEnv
+    from dexterity.envs.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
 
     # SHADOW HAND
     gym.envs.register(
         id='BaseShadowHandEnv-v0',
-        entry_point='environments:ManipulateBlock',
+        entry_point='dexterity.envs:ManipulateBlock',
         kwargs={"visual_input": True, "max_steps": SHADOWHAND_MAX_STEPS},
     )
 
     gym.envs.register(
         id='ShadowHandBlind-v0',
-        entry_point='environments:ManipulateBlock',
+        entry_point='dexterity.envs:ManipulateBlock',
         kwargs={"visual_input": False, "max_steps": SHADOWHAND_MAX_STEPS},
     )
 
@@ -35,14 +35,14 @@ if os.path.isdir('~/.mujoco'):
 
     gym.envs.register(
         id='HandReachDenseAbsolute-v1',
-        entry_point='environments:OldShadowHandReach',
+        entry_point='dexterity.envs:OldShadowHandReach',
         kwargs={"reward_type": "dense", "relative_control": False, "success_multiplier": 0.1},
         max_episode_steps=100,
     )
 
     gym.envs.register(
         id='HandReachDenseAbsoluteFine-v1',
-        entry_point='environments:OldShadowHandReach',
+        entry_point='dexterity.envs:OldShadowHandReach',
         kwargs={"reward_type": "dense", "n_substeps": 1, "relative_control": False, "success_multiplier": 0.1},
         max_episode_steps=100,
     )
@@ -53,7 +53,7 @@ if os.path.isdir('~/.mujoco'):
                 for init_mode in ["", "Random", "Buffered"]:
                     gym.envs.register(
                         id=f'Reach{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
-                        entry_point='environments:Reach',
+                        entry_point='dexterity.envs:Reach',
                         kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}),
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
@@ -62,7 +62,7 @@ if os.path.isdir('~/.mujoco'):
 
                     gym.envs.register(
                         id=f'Reach{init_mode}{control_mode}{vision_mode}NoTouch{step_granularity}-v0',
-                        entry_point='environments:Reach',
+                        entry_point='dexterity.envs:Reach',
                         kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}), "touch": False,
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
@@ -71,7 +71,7 @@ if os.path.isdir('~/.mujoco'):
 
                     gym.envs.register(
                         id=f'FreeReach{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
-                        entry_point='environments:FreeReach',
+                        entry_point='dexterity.envs:FreeReach',
                         kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}),
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
@@ -81,7 +81,7 @@ if os.path.isdir('~/.mujoco'):
                     for i, name in enumerate(["FF", "MF", "RF", "LF"]):
                         gym.envs.register(
                             id=f'FreeReach{name}{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
-                            entry_point='environments:FreeReach',
+                            entry_point='dexterity.envs:FreeReach',
                             kwargs={"relative_control": control_mode == "Relative",
                                     "vision": vision_mode == "Visual",
                                     "force_finger": i,
@@ -92,7 +92,7 @@ if os.path.isdir('~/.mujoco'):
 
                         gym.envs.register(
                             id=f'Reach{name}{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
-                            entry_point='environments:Reach',
+                            entry_point='dexterity.envs:Reach',
                             kwargs={"relative_control": control_mode == "Relative",
                                     "vision": vision_mode == "Visual",
                                     "force_finger": i,
@@ -104,7 +104,7 @@ if os.path.isdir('~/.mujoco'):
                     # REACH SEQUENCES
                     gym.envs.register(
                         id=f'FreeReachSequential{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
-                        entry_point='environments:FreeReachSequential',
+                        entry_point='dexterity.envs:FreeReachSequential',
                         kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}),
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
@@ -113,7 +113,7 @@ if os.path.isdir('~/.mujoco'):
 
                     gym.envs.register(
                         id=f'ReachSequential{init_mode}{control_mode}{vision_mode}{step_granularity}-v0',
-                        entry_point='environments:ReachSequential',
+                        entry_point='dexterity.envs:ReachSequential',
                         kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
                                 **({"initial_qpos": init_mode.lower()} if init_mode else {}),
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
@@ -122,21 +122,21 @@ if os.path.isdir('~/.mujoco'):
 
     gym.envs.register(
         id=f'NRPReachRelativeVisual-v0',
-        entry_point='environments:NRPShadowHandReachSimple',
+        entry_point='dexterity.envs:NRPShadowHandReachSimple',
         kwargs={"relative_control": True, "vision": True},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
 
     gym.envs.register(
         id=f'NRPHandReachDenseAbsolute-v1',
-        entry_point='environments:NRPShadowHandReachSimple',
+        entry_point='dexterity.envs:NRPShadowHandReachSimple',
         kwargs={"relative_control": False},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
 
     gym.envs.register(
         id=f'NRPReachAbsolute-v0',
-        entry_point='environments:NRPShadowHandReach',
+        entry_point='dexterity.envs:NRPShadowHandReach',
         kwargs={"relative_control": False, "vision": True},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
@@ -144,7 +144,7 @@ if os.path.isdir('~/.mujoco'):
 
     gym.envs.register(
         id=f'NRPReachAbsoluteNoTouch-v0',
-        entry_point='environments:NRPShadowHandReach',
+        entry_point='dexterity.envs:NRPShadowHandReach',
         kwargs={"relative_control": False, "vision": False, "touch": False},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
@@ -152,7 +152,7 @@ if os.path.isdir('~/.mujoco'):
 
     gym.envs.register(
         id=f'NRPReachRelative-v0',
-        entry_point='environments:NRPShadowHandReach',
+        entry_point='dexterity.envs:NRPShadowHandReach',
         kwargs={"relative_control": True, "vision": True},
         max_episode_steps=SHADOWHAND_MAX_STEPS,
     )
@@ -162,14 +162,14 @@ if os.path.isdir('~/.mujoco'):
     for control_mode in ["Relative", "Absolute"]:
         gym.envs.register(
             id=f'ManipulateBlock{control_mode}-v0',
-            entry_point='environments:ManipulateBlock',
+            entry_point='dexterity.envs:ManipulateBlock',
             kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "relative_control": control_mode == "Relative"},
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
         gym.envs.register(
             id=f'ManipulateBlockDiscrete{control_mode}-v0',
-            entry_point='environments:ManipulateBlockDiscrete',
+            entry_point='dexterity.envs:ManipulateBlockDiscrete',
             kwargs={'target_position': 'ignore',
                     'target_rotation': 'xyz',
                     "relative_control": control_mode == "Relative"},
@@ -178,56 +178,56 @@ if os.path.isdir('~/.mujoco'):
 
         gym.envs.register(
             id=f'ManipulateEgg{control_mode}-v0',
-            entry_point='environments:ManipulateEgg',
+            entry_point='dexterity.envs:ManipulateEgg',
             kwargs={'target_position': 'ignore', 'target_rotation': 'xyz', "relative_control": control_mode == "Relative"},
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
     gym.envs.register(
         id=f'OpenAIManipulate-v0',
-        entry_point='environments:OpenAIManipulate',
+        entry_point='dexterity.envs:OpenAIManipulate',
         kwargs={},
         max_episode_steps=50 * 100,
     )
 
     gym.envs.register(
         id=f'OpenAIManipulateDiscrete-v0',
-        entry_point='environments:OpenAIManipulateDiscrete',
+        entry_point='dexterity.envs:OpenAIManipulateDiscrete',
         kwargs={},
         max_episode_steps=50 * 100,
     )
 
     gym.envs.register(
         id=f'OpenAIManipulateApproxDiscrete-v0',
-        entry_point='environments:OpenAIManipulateDiscrete',
+        entry_point='dexterity.envs:OpenAIManipulateDiscrete',
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
 
     gym.envs.register(
         id=f'OpenAIManipulateApprox-v0',
-        entry_point='environments:OpenAIManipulate',
+        entry_point='dexterity.envs:OpenAIManipulate',
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
 
     gym.envs.register(
         id=f'ManipulateBlockApproxDiscrete-v0',
-        entry_point='environments:ManipulateBlockDiscrete',
+        entry_point='dexterity.envs:ManipulateBlockDiscrete',
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
 
     gym.envs.register(
         id=f'HumanoidManipulateBlockDiscrete-v0',
-        entry_point='environments:HumanoidManipulateBlockDiscrete',
+        entry_point='dexterity.envs:HumanoidManipulateBlockDiscrete',
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
 
     gym.envs.register(
         id=f'HumanoidManipulateBlockDiscreteAsynchronous-v0',
-        entry_point='environments:HumanoidManipulateBlockDiscreteAsynchronous',
+        entry_point='dexterity.envs:HumanoidManipulateBlockDiscreteAsynchronous',
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
@@ -243,38 +243,38 @@ if os.path.isdir('~/.mujoco'):
 
     gym.envs.register(
         id="InvertedPendulumNoVel-v2",
-        entry_point="environments:InvertedPendulumNoVelEnv",
+        entry_point="dexterity.envs:InvertedPendulumNoVelEnv",
         max_episode_steps=1000,
         reward_threshold=950.0,
     )
 
     gym.envs.register(
         id='ReacherNoVel-v2',
-        entry_point='environments:ReacherNoVelEnv',
+        entry_point='dexterity.envs:ReacherNoVelEnv',
         max_episode_steps=50,
         reward_threshold=-3.75,
     )
 
     gym.envs.register(
         id='HalfCheetahNoVel-v2',
-        entry_point='environments:HalfCheetahNoVelEnv',
+        entry_point='dexterity.envs:HalfCheetahNoVelEnv',
         max_episode_steps=1000,
         reward_threshold=4800.0,
     )
 
     gym.envs.register(
         id='LunarLanderContinuousNoVel-v2',
-        entry_point='environments:LunarLanderContinuousNoVel',
+        entry_point='dexterity.envs:LunarLanderContinuousNoVel',
         max_episode_steps=1000,
         reward_threshold=200,
     )
 
     gym.envs.register(
         id='LunarLanderMultiDiscrete-v2',
-        entry_point='environments:LunarLanderMultiDiscrete',
+        entry_point='dexterity.envs:LunarLanderMultiDiscrete',
         max_episode_steps=1000,
         reward_threshold=200,
     )
 else:
     if MPI.COMM_WORLD.rank == 0:
-        print("No MuJoCo path exists. MuJoCo is not going to be loaded...")
+        print(f"No MuJoCo path exists  ({os.path.abspath(os.path.expanduser('~/.mujoco'))}). MuJoCo is not going to be loaded...")

@@ -10,7 +10,7 @@ from dexterity.common.const import NP_FLOAT_PREC, EPSILON
 from dexterity.utilities.types import StepTuple
 from dexterity.utilities.util import env_extract_dims
 
-from dexterity.environments import *
+from dexterity.envs import *
 
 TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "env_id", "data"])
 

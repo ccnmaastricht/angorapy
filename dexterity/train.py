@@ -31,7 +31,7 @@ from dexterity.common.wrappers import make_env
 from dexterity.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 from dexterity.agent.ppo_agent import PPOAgent
 
-from dexterity.environments import *
+from dexterity.envs import *
 
 from mpi4py import MPI
 

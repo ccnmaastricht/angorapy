@@ -11,7 +11,7 @@ from dexterity.common import reward
 from dexterity.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from dexterity.common.senses import Sensation
 from dexterity.configs.reward_config import REACH_BASE, resolve_config_name
-from dexterity.environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
+from dexterity.envs.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
 from dexterity.common.const import N_SUBSTEPS, VISION_WH
 from dexterity.utilities.util import HiddenPrints
 

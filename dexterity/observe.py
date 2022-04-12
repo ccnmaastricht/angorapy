@@ -4,7 +4,7 @@ import argparse
 import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from environments.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
+from envs.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
 
 import time
 import gym

@@ -1,4 +1,4 @@
-"""Predefined configurations for different (groups of) environments."""
+"""Predefined configurations for different (groups of) envs."""
 
 
 def make_config(batch_size=128, c_entropy=0.01, c_value=1, clip=0.2, cpu=False, debug=False, discount=0.99,

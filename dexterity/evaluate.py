@@ -6,7 +6,7 @@ import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from environments.shadowhand import BaseShadowHandEnv
+from envs.shadowhand import BaseShadowHandEnv
 
 from utilities.datatypes import mpi_condense_stats
 import statistics

@@ -9,13 +9,13 @@ from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, HandReachEnv, goa
 from gym.envs.robotics.utils import robot_get_obs
 from mujoco_py import GlfwContext
 
-from common.const import VISION_WH, N_SUBSTEPS
-from common.reward import reach
-from common.senses import Sensation
-from configs.reward_config import resolve_config_name, REACH_BASE
-from environments.nrp.shadowhand import FINGERTIP_SITE_NAMES, generate_random_sim_qpos, BaseNRPShadowHandEnv, \
+from dexterity.common.const import VISION_WH, N_SUBSTEPS
+from dexterity.common.reward import reach
+from dexterity.common.senses import Sensation
+from dexterity.configs.reward_config import resolve_config_name, REACH_BASE
+from dexterity.envs.nrp.shadowhand import FINGERTIP_SITE_NAMES, generate_random_sim_qpos, BaseNRPShadowHandEnv, \
     get_fingertip_distance
-from utilities.util import HiddenPrints
+from dexterity.utilities.util import HiddenPrints
 
 
 class NRPShadowHandReachSimple(HandReachEnv):

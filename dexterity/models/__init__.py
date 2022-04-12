@@ -1,4 +1,4 @@
-"""A collection of builder functions for models usable with different environments in PPO."""
+"""A collection of builder functions for models usable with different envs in PPO."""
 from typing import Callable
 
 from dexterity.models.components import _build_fcn_component, _build_encoding_sub_model

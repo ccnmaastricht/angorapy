@@ -9,7 +9,7 @@ from dexterity.common.wrappers import make_env
 
 from dexterity.models import get_model_builder
 
-# For most environments, PPO needs to normalize states and rewards; to add this functionality we wrap the environment
+# For most envs, PPO needs to normalize states and rewards; to add this functionality we wrap the environment
 # with transformers fulfilling this task. You can also add your own custom transformers this way.
 wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
 env = make_env("LunarLanderContinuous-v2", reward_config=None, transformers=wrappers)
