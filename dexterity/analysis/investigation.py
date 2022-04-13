@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import copy
 import os
 from time import sleep
 from typing import List, Union
@@ -8,6 +9,7 @@ import tensorflow as tf
 
 from dexterity.common.policies import BasePolicyDistribution
 from dexterity.agent.ppo_agent import PPOAgent
+from dexterity.utilities.hooks import register_hook
 from dexterity.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from dexterity.utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
@@ -128,16 +130,20 @@ class Investigator:
         else:
             raise ValueError("Recurrent layer type not understood. Is it custom?")
 
-    def get_layer_activations(self, layer_name: str, input_tensor=None):
+    def get_layer_activations(self, layer_names: List[str], input_tensor=None):
         """Get activations of a layer. If no input tensor is given, a random tensor is used."""
+        activations = {}
 
-        # make a sub model to the requested layer
-        sub_model = build_sub_model_to(self.network, [layer_name])
+        def activation_hook(module, input, output):
+            activations[module.name] = output
 
+        register_hook(get_layers_by_names(self.network, layer_names), after_call=activation_hook)
         if input_tensor is None:
-            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(sub_model.input_shape))
+            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(self.network.input_shape))
 
-        return sub_model.predict(input_tensor)
+        self.network(input_tensor)
+
+        return activations
 
     def get_activations_over_episode(self, layer_names: Union[List[str], str], env: gym.Env, render: bool = False):
         """Run an episode using the network and get (serialization, activation, r) tuples for each timestep."""

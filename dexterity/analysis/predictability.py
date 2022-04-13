@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 import argparse
 
-from agent.ppo_agent import PPOAgent
-from analysis.investigation import Investigator
-from utilities.model_utils import is_recurrent_model
+from dexterity.agent.ppo_agent import PPOAgent
+from dexterity.analysis.investigation import Investigator
+from dexterity.utilities.hooks import register_hook
+from dexterity.utilities.model_utils import is_recurrent_model
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1639582562)
@@ -12,7 +13,7 @@ parser.add_argument("--state", type=str, help="state, either iteration or 'best'
 args = parser.parse_args()
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
-agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../")
+agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../../")
 investigator = Investigator.from_agent(agent)
 env = agent.env
 
@@ -22,14 +23,8 @@ investigator.network.reset_states()
 done, step = False, 0
 state = env.reset()
 prepared_state = state.with_leading_dims(time=is_recurrent).dict()
-investigator.network(prepared_state, training=False)
+investigator.network(prepared_state)
 
-investigator.network.summary()
+activations = investigator.get_layer_activations(["SomatosensoryCortex"], prepared_state)
 
-print(investigator.list_layer_names())
-for layer_name in investigator.list_layer_names():
-    print(layer_name)
-    # if isinstance(investigator.get_layer_by_name(layer_name), tf.keras.layers.TimeDistributed):
-    #     continue
-    activities = investigator.get_layer_activations(layer_name, prepared_state)
-    # print(f"{layer_name}: {[w.shape for w in activities]}")
+print(activations.keys())

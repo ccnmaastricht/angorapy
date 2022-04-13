@@ -2,19 +2,19 @@
 """Evaluate a loaded agent on a task."""
 import argparse
 import os
+import sys
+import time
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from envs.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
-
-import time
-import gym
-import numpy as np
-
-from agent.ppo_agent import PPOAgent
-from analysis.investigation import Investigator
-from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
-from common.wrappers import make_env
 import tensorflow as tf
+
+from dexterity.envs.shadowhand import FINGERTIP_SITE_NAMES
+from dexterity.agent.ppo_agent import PPOAgent
+from dexterity.analysis.investigation import Investigator
+from dexterity.common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
+from dexterity.common.wrappers import make_env
 
 tf.get_logger().setLevel('INFO')
 
@@ -40,7 +40,7 @@ if args.id is None:
     args.id = max(ids)
 
 start = time.time()
-agent = PPOAgent.from_agent_state(args.id, args.state, force_env_name=None if not args.env else args.env)
+agent = PPOAgent.from_agent_state(args.id, args.state, force_env_name=None if not args.env else args.env, path_modifier="../")
 print(f"Agent {args.id} successfully loaded.")
 
 try:
