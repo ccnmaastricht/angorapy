@@ -5,10 +5,8 @@ import os
 import gym
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD
-# from tensorflow_core.python.keras.utils import plot_model
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from dexterity.common.const import VISION_WH
 from dexterity.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
 from dexterity.common.wrappers import make_env
 from dexterity.utilities.util import env_extract_dims
