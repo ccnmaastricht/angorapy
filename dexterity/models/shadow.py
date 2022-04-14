@@ -50,11 +50,11 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape
     it_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + it_input_shape, name="IT Input")
 
     mcc_input = tf.keras.layers.concatenate([goal_input, ssc_input])
-    mcc = TD(tf.keras.layers.Dense(64, name="mcc"), name="TD_mcc")(mcc_input)
+    mcc = TD(tf.keras.layers.Dense(64, name="MCC"), name="TD_mcc")(mcc_input)
     mcc = tf.keras.layers.Activation("relu", name="MCC_activation")(mcc)
 
     lpfc_input = tf.keras.layers.concatenate([mcc, goal_input, it_input])
-    lpfc = TD(tf.keras.layers.Dense(128, name="lpfc"), name="TD_lpfc")(lpfc_input)
+    lpfc = TD(tf.keras.layers.Dense(128, name="LPFC"), name="TD_lpfc")(lpfc_input)
     lpfc = tf.keras.layers.Activation("relu", name="LPFC_activation")(lpfc)
 
     return tf.keras.Model(inputs=[goal_input, ssc_input, it_input], outputs=[mcc, lpfc], name="PrefrontalCortex")
@@ -69,7 +69,7 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSCInput")
 
     pmc_input = tf.keras.layers.concatenate([lpfc_input, ipl_input])
-    pmc = TD(tf.keras.layers.Dense(512, name="pmc_dense"), name="TD_pmc_dense")(pmc_input)
+    pmc = TD(tf.keras.layers.Dense(512, name="PMC_dense"), name="TD_pmc_dense")(pmc_input)
     pmc = tf.keras.layers.Activation("relu", name="PMC_activation")(pmc)
     pmc, *_ = rnn_class(512,
                         stateful=True,

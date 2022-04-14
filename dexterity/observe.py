@@ -12,7 +12,7 @@ import tensorflow as tf
 
 from dexterity.envs.shadowhand import FINGERTIP_SITE_NAMES
 from dexterity.agent.ppo_agent import PPOAgent
-from dexterity.analysis.investigation import Investigator
+from dexterity.analysis.investigators.base_investigator import Investigator
 from dexterity.common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 from dexterity.common.wrappers import make_env
 

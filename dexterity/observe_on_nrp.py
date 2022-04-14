@@ -1,16 +1,11 @@
 #!/usr/bin/env python
 """Evaluate a loaded agent on a task."""
-import argparse
 import os
 import time
 
-import gym
-
 from agent.ppo_agent import PPOAgent
-from analysis.investigation import Investigator
-from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
+from dexterity.analysis.investigators.base_investigator import Investigator
 from common.wrappers import make_env
-import tensorflow as tf
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

@@ -29,13 +29,14 @@ class Investigator:
         """
         self.network: tf.keras.Model = network
         self.distribution: BasePolicyDistribution = distribution
+        self.is_recurrent = is_recurrent_model(self.network)
 
-    @staticmethod
-    def from_agent(agent: PPOAgent):
+    @classmethod
+    def from_agent(cls, agent: PPOAgent):
         """Instantiate an investigator from an agent object."""
         agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(),
                                                                     batch_size=1, sequence_length=1)
-        return Investigator(agent.policy, agent.distribution)
+        return cls(agent.policy, agent.distribution)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
@@ -220,7 +221,7 @@ class Investigator:
 
 if __name__ == "__main__":
     print("INVESTIGATING")
-    os.chdir("../../")
+    os.chdir("../../../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
