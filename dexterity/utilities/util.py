@@ -151,6 +151,13 @@ def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int) -> Tup
     raise ValueError(f"No tiling of size {tile_size} possible for a floor of shape {floor_shape}.")
 
 
+def stack_dicts(dicts: List[Dict[str, tf.Tensor]]):
+    """Stack matching elements of a dict over a prepended domain."""
+    return {
+        key: np.stack([s[key] for s in dicts], axis=0) for key in dicts[0].keys()
+    }
+
+
 class HiddenPrints:
     """Context that hides print calls."""
 

@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from dexterity.common.policies import BasePolicyDistribution
 from dexterity.agent.ppo_agent import PPOAgent
-from dexterity.utilities.hooks import register_hook
+from dexterity.utilities.hooks import register_hook, clear_hooks
 from dexterity.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from dexterity.utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
@@ -141,7 +141,11 @@ class Investigator:
         if input_tensor is None:
             input_tensor = tf.random.normal(insert_unknown_shape_dimensions(self.network.input_shape))
 
-        self.network(input_tensor)
+        output = self.network(input_tensor, training=False)
+        activations["output"] = output
+
+        # release the hook to prevent infinite nesting
+        clear_hooks(self.network)
 
         return activations
 

@@ -22,3 +22,17 @@ def register_hook(layers: List[tf.keras.layers.Layer],
         layer._after_call = after_call
         layer._old_call = layer.call
         layer.call = functools.partial(hooked_call, obj=layer)
+
+
+# todo this could be done through a context
+def clear_hooks(module: tf.keras.Model):
+    """Remove all hooks from a model."""
+
+    for layer in module.submodules:
+        if not hasattr(layer, "_old_call"):
+            continue
+
+        del layer._before_call
+        del layer._after_call
+        layer.call = layer._old_call
+        del layer._old_call

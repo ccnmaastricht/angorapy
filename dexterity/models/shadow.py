@@ -29,7 +29,7 @@ def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape):
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSCInput")
 
     spl_input = tf.keras.layers.concatenate([vc_input, ssc_input])
-    spl = TD(tf.keras.layers.Dense(256, name="SPL"), name="TD_ssc_1SPL")(spl_input)
+    spl = TD(tf.keras.layers.Dense(256, name="SPL"), name="TD_SPL")(spl_input)
     spl = tf.keras.layers.Activation("relu", name="SPL_activation")(spl)
 
     ipl = TD(tf.keras.layers.Dense(256, name="IPL"), name="TD_IPL")(spl)

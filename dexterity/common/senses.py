@@ -117,7 +117,7 @@ class Sensation:
 
 
 def stack_sensations(sensations: List[Sensation]):
-    """Stack Sensation objects over a prepended temporal domain."""
+    """Stack Sensation objects over a prepended domain."""
     return Sensation(**{
         sense: np.stack([s[sense] for s in sensations], axis=0) for sense in sensations[0].dict().keys()
     })
