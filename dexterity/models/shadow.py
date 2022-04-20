@@ -15,9 +15,9 @@ from dexterity.utilities.util import env_extract_dims
 def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape):
     """Build the model of the SSC."""
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + somatosensation_input_shape, name="SSCInput")
-    ssc = TD(tf.keras.layers.Dense(128, name="ssc_1"), name="TD_ssc_1")(ssc_input)
+    ssc = TD(tf.keras.layers.Dense(128, name="SSC_1"), name="TD_ssc_1")(ssc_input)
     ssc = tf.keras.layers.Activation("relu", name="SSC_activation_1")(ssc)
-    ssc = TD(tf.keras.layers.Dense(64, name="ssc_2"), name="TD_ssc_2")(ssc)
+    ssc = TD(tf.keras.layers.Dense(64, name="SSC_2"), name="TD_ssc_2")(ssc)
     ssc = tf.keras.layers.Activation("relu", name="SSC_activation_2")(ssc)
 
     return tf.keras.Model(inputs=ssc_input, outputs=ssc, name="SomatosensoryCortex")

@@ -15,8 +15,13 @@ agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../../")
 investigator = investigators.Predictability.from_agent(agent)
 env = agent.env
 
-investigator.prepare(env, layers=["LPFC_activation", "IPS_activation", "PMC_activation"])
+investigator.prepare(env, layers=["LPFC_activation", "SSC_1", "SSC_2", "SSC_activation_2", "SSC_activation_1", "M1_activation",
+                                  "IPS_activation", "PMC_activation"],
+                     n_states=1000)
 investigator.measure_predictability("noise", "proprioception")
+investigator.measure_predictability("SSC_1", "proprioception")
+investigator.measure_predictability("SSC_2", "proprioception")
 investigator.measure_predictability("LPFC_activation", "proprioception")
 investigator.measure_predictability("IPS_activation", "proprioception")
 investigator.measure_predictability("PMC_activation", "proprioception")
+investigator.measure_predictability("M1_activation", "proprioception")

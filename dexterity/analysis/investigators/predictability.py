@@ -1,5 +1,6 @@
 from typing import List
 
+import numpy as np
 import tensorflow as tf
 import tqdm
 
@@ -18,12 +19,13 @@ class Predictability(base_investigator.Investigator):
         self._data = None
         self.prepared = False
 
-    def prepare(self, env: BaseWrapper, layers: List[str]):
+        self.n_states = np.nan
+
+    def prepare(self, env: BaseWrapper, layers: List[str], n_states=1000):
         """Prepare samples to predict from."""
         state = env.reset()
         state_collection = []
         activation_collection = []
-        n_states = 10000
         for _ in tqdm.tqdm(range(n_states)):
             state_collection.append(state)
 
@@ -47,8 +49,9 @@ class Predictability(base_investigator.Investigator):
         self._data = tf.data.Dataset.from_tensor_slices({
             **stack_dicts(activation_collection),
             **stack_sensations(state_collection).dict(),
-        })
+        }).shuffle(n_states)
 
+        self.train_data, self.val_data = self._data.skip(int(0.2 * n_states)), self._data.take(int(0.2 * n_states))
         self.prepared = True
 
     def measure_predictability(self, source_layer: str, target_information: str):
@@ -60,9 +63,7 @@ class Predictability(base_investigator.Investigator):
         output_dim = self._data.as_numpy_iterator().__next__()[target_information].shape[-1]
 
         predictor = tf.keras.Sequential([
-            tf.keras.layers.Dense(100),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Dense(100),
+            tf.keras.layers.Dense(128),
             tf.keras.layers.ReLU(),
             tf.keras.layers.Dense(output_dim),
         ])
@@ -70,18 +71,23 @@ class Predictability(base_investigator.Investigator):
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         predictor.compile(
             optimizer,
-            loss="mse"
+            loss="mse",
+            metrics=["mae"]
         )
 
         base_shape = list(self._data.as_numpy_iterator().__next__().values())[0].shape
-        predictor.fit(
-            self._data.map(lambda x:
-                           (tf.random.normal(base_shape) if source_layer == "noise" else x[source_layer],
-                            x[target_information])),
-            batch_size=64,
+        map_fnc = lambda x: (tf.random.normal(base_shape) if source_layer == "noise" else x[source_layer], x[target_information])
+        history = predictor.fit(
+            self.train_data.map(map_fnc),
+            batch_size=128,
             epochs=30,
             shuffle=True,
             callbacks=[
-                tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
-            ]
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
+            ],
+            validation_data=self.val_data.map(map_fnc)
         )
+
+        print(
+            f"Trained predictability of {target_information} from {source_layer} to a loss of {min(history.history['val_loss'])}."
+            f"\n\n")
