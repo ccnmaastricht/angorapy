@@ -9,6 +9,7 @@ setup(
     author_email='t.weidler@maastrichtuniversity.ml',
     license='GPL-3.0',
     packages=find_packages(),
+    include_package_data=True,
     install_requires=[
         "numpy==1.19.2",
         "gym==0.18",
@@ -25,7 +26,11 @@ setup(
         "pandas==1.0.4",
         "nvidia-ml-py3",
         "seaborn",
-        "distance"
+        "distance",
+        "Flask~=1.1.2",
+        "Jinja2==3.0.0",
+        "bokeh",
+        "flask_jsglue"
     ],
 
     classifiers=[

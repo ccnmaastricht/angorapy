@@ -6,7 +6,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from utilities.monitor.statistical_plots import plot_episode_box_plots, plot_per_receptor_mean
+from dexterity.utilities.monitor.statistical_plots import plot_episode_box_plots, plot_per_receptor_mean
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -21,11 +21,12 @@ from dexterity.utilities.monitor.training_plots import plot_memory_usage, plot_e
     plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress
 from dexterity.utilities.statistics import ignore_none
 
+from dexterity.monitor import app
+
 
 agents = Blueprint("agents", __name__, static_folder="storage/saved_models/states")
 exps = Blueprint("exps", __name__, static_folder="storage/experiments")
 
-app = flask.Flask(__name__, template_folder="templates")
 app.register_blueprint(agents)
 app.register_blueprint(exps)
 

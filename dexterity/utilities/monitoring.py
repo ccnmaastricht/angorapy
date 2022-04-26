@@ -34,7 +34,12 @@ def scale(vector):
 class Monitor:
     """Monitor for learning progress. Tracks and writes statistics to be parsed by the Flask app."""
 
-    def __init__(self, agent: PPOAgent, env: BaseWrapper, frequency: int, gif_every: int, id=None,
+    def __init__(self,
+                 agent: PPOAgent,
+                 env: BaseWrapper,
+                 frequency: int = 1,
+                 gif_every: int = 0,
+                 id=None,
                  iterations=None, config_name: str = "unknown"):
         self.agent = agent
         self.env = env
