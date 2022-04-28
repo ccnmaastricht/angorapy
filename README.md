@@ -11,14 +11,12 @@
 
 ## Installation
 
-### Requirements
+### Pip Installation
 
-![Python 3.8](https://img.shields.io/badge/python-3.8%2B-blue) ![MuJoCo 2.1.0](https://img.shields.io/badge/MuJoCo-2.1.0-green) 
-
-To install all required python packages run
+You can install this repository with pip. Clone it and then from within its root directory run
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 #### MuJoCo and MuJoCo-Py
