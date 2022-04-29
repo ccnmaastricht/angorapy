@@ -24,10 +24,16 @@ class Predictability(base_investigator.Investigator):
     def prepare(self, env: BaseWrapper, layers: List[str], n_states=1000):
         """Prepare samples to predict from."""
         state = env.reset()
+        reward = 0
+
         state_collection = []
         activation_collection = []
+        other_collection = []
         for _ in tqdm.tqdm(range(n_states)):
             state_collection.append(state)
+            other = {
+                "reward": reward,
+            }
 
             prepared_state = state.with_leading_dims(time=self.is_recurrent).dict()
             activation_collection.append(self.get_layer_activations(
@@ -39,6 +45,12 @@ class Predictability(base_investigator.Investigator):
             action, _ = self.distribution.act(*probabilities)
 
             observation, reward, done, info = env.step(action)
+
+            other["translation"] = 0  # todo
+            other["translation_to_10"] = 0  # todo
+            other["translation_to_50"] = 0  # todo
+            other["translation_matrix"] = 0  # todo
+            other["current_rotational_axis"] = 0  # todo
 
             if done:
                 state = env.reset()
@@ -54,7 +66,7 @@ class Predictability(base_investigator.Investigator):
         self.train_data, self.val_data = self._data.skip(int(0.2 * n_states)), self._data.take(int(0.2 * n_states))
         self.prepared = True
 
-    def measure_predictability(self, source_layer: str, target_information: str):
+    def measure(self, source_layer: str, target_information: str):
         """Measure the predictability of target_information based on the information in source_layer's activation."""
         assert self.prepared, "Need to prepare before investigating."
         assert source_layer in self.list_layer_names(only_para_layers=False) + ["noise"]

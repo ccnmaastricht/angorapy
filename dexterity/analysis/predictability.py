@@ -12,16 +12,25 @@ args = parser.parse_args()
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
 agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../../")
-investigator = investigators.Predictability.from_agent(agent)
+investigator = investigators.Correlation.from_agent(agent)
 env = agent.env
 
-investigator.prepare(env, layers=["LPFC_activation", "SSC_1", "SSC_2", "SSC_activation_2", "SSC_activation_1", "M1_activation",
-                                  "IPS_activation", "PMC_activation"],
+investigator.prepare(env,
+                     layers=[
+                         "LPFC_activation",
+                         "SSC_1",
+                         "SSC_2",
+                         "SSC_activation_2",
+                         "SSC_activation_1",
+                         "M1_activation",
+                         "IPS_activation",
+                         "PMC_activation"],
                      n_states=1000)
-investigator.measure_predictability("noise", "proprioception")
-investigator.measure_predictability("SSC_1", "proprioception")
-investigator.measure_predictability("SSC_2", "proprioception")
-investigator.measure_predictability("LPFC_activation", "proprioception")
-investigator.measure_predictability("IPS_activation", "proprioception")
-investigator.measure_predictability("PMC_activation", "proprioception")
-investigator.measure_predictability("M1_activation", "proprioception")
+
+# investigator.measure("noise", "proprioception")
+investigator.measure("SSC_1", "proprioception")
+investigator.measure("SSC_2", "proprioception")
+investigator.measure("LPFC_activation", "proprioception")
+investigator.measure("IPS_activation", "proprioception")
+investigator.measure("PMC_activation", "proprioception")
+investigator.measure("M1_activation", "proprioception")
