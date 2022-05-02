@@ -1,6 +1,6 @@
 numpy~=1.19.0
 Box2D
-gym[all]==0.18.0
+gym[all]
 tensorflow==2.4.0
 tensorflow_datasets
 mujoco-py

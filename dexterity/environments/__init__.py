@@ -10,13 +10,13 @@ if os.path.isdir('~/.mujoco'):
     if MPI.COMM_WORLD.rank == 0:
         print("A MuJoCo path exists. MuJoCo is being loaded...")
 
-    from environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
+    from dexterity.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
-    from environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
+    from dexterity.environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
         OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous
-    from environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
-    from environments.nrp.shadowhand import BaseNRPShadowHandEnv
-    from environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
+    from dexterity.environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
+    from dexterity.environments.nrp.shadowhand import BaseNRPShadowHandEnv
+    from dexterity.environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
 
     # SHADOW HAND
     gym.envs.register(
