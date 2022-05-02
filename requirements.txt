@@ -3,7 +3,7 @@ Box2D
 gym[all]==0.18.0
 tensorflow==2.4.0
 tensorflow_datasets
-mujoco-py==2.1.2.14
+mujoco-py
 mpi4py~=3.0.3
 
 nvidia_smi
