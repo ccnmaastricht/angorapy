@@ -943,7 +943,7 @@ class PPOAgent:
 
     def finalize(self):
         """Perform final steps on the agent that are necessary no matter whether an error occurred or not."""
-        for file in glob(f"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
+        for file in glob(fr"{STORAGE_DIR}/{self.agent_id}_data_[0-9]+\.tfrecord"):
             os.remove(file)
 
     def build_models(self, weights, batch_size, sequence_length=1):
