@@ -17,10 +17,16 @@ class Correlation(Predictability):
         assert source_layer in self.list_layer_names(only_para_layers=False) + ["noise"]
         assert target_information in self._data.as_numpy_iterator().__next__().keys()
 
-        correlation = tfp.stats.correlation(
-            x=self._data[source_layer],
-            y=self._data[target_information],
-            sample_axis=0
-        )
+        all_cross_correlations = []
+        for source, target in zip(list(self._data.map(lambda x: x[source_layer]).as_numpy_iterator()),
+                                  list(self._data.map(lambda x: x[target_information]).as_numpy_iterator())):
 
-        print(correlation)
+            source = source[..., tf.newaxis]
+            target = target[..., tf.newaxis, tf.newaxis]
+
+            cross_correlation = tf.reduce_mean(tf.nn.convolution(source, target))
+            all_cross_correlations.append(cross_correlation)
+
+        mean_correlation = tf.reduce_mean(all_cross_correlations)
+
+        print(f"{source_layer} -> {target_information}: {mean_correlation}")
