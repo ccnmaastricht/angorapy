@@ -3,6 +3,8 @@ import os
 import pprint
 import traceback
 
+from dexterity.utilities.defaults import autoselect_distribution
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
@@ -71,14 +73,9 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     # choose and make policy distribution
     if settings["distribution"] is None:
-        if isinstance(env.action_space, Box):
-            settings["distribution"] = "gaussian"
-        elif isinstance(env.action_space, Discrete):
-            settings["distribution"] = "categorical"
-        elif isinstance(env.action_space, MultiDiscrete):
-            settings["distribution"] = "multi-categorical"
-
-    distribution = get_distribution_by_short_name(settings["distribution"])(env)
+        distribution = autoselect_distribution(env)
+    else:
+        distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
     if settings["architecture"] == "shadow":

@@ -12,9 +12,10 @@ setup(
     include_package_data=True,
     install_requires=[
         "numpy==1.19.2",
+        "Box2D",
         "gym==0.18",
-        "tensorflow==2.4.0",
-        "mpi4py==3.0.3",
+        "tensorflow==2.4.2",
+        "mpi4py==3.1.3",
         "tqdm",
         "simplejson",
         "psutil",
@@ -27,6 +28,8 @@ setup(
         "nvidia-ml-py3",
         "seaborn",
         "distance",
+
+        # webinterface
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
         "bokeh",
