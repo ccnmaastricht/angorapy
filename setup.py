@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='dexterity',
-    version='1.0.0',
-    description='Anthropomorphic Robotic Control with Biologically Plausible Networks',
+    name='angorapy',
+    version='0.7.0',
+    description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',
-    author_email='t.weidler@maastrichtuniversity.ml',
+    author_email='t.weidler@maastrichtuniversity.nl',
     license='GPL-3.0',
     packages=find_packages(),
     include_package_data=True,
