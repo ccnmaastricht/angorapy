@@ -94,6 +94,7 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_thresho
     p.add_tools(tooltip)
     p.add_tools(bokeh.models.BoxZoomTool())
     p.add_tools(bokeh.models.ResetTool())
+    p.add_tools(bokeh.models.SaveTool())
 
     # ERROR BAND
     error_band = bokeh.models.Band(
@@ -210,6 +211,7 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
 
     p.add_tools(bokeh.models.BoxZoomTool())
     p.add_tools(bokeh.models.ResetTool())
+    p.add_tools(bokeh.models.SaveTool())
 
     # REWARD THRESHOLD
     if reward_threshold is not None:
@@ -256,6 +258,7 @@ def plot_length_progress(lengths: Dict[str, list], cycles_loaded):
     p.add_tools(tooltip)
     p.add_tools(bokeh.models.BoxZoomTool())
     p.add_tools(bokeh.models.ResetTool())
+    p.add_tools(bokeh.models.SaveTool())
 
     # ERROR BAND
     error_band = bokeh.models.Band(
@@ -326,6 +329,7 @@ def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
         renderers=[hist_glyph]
     )
     p.add_tools(tooltip)
+    p.add_tools(bokeh.models.SaveTool())
 
     p.legend.location = "bottom_right"
     style_plot(p)
@@ -353,6 +357,9 @@ def plot_loss(loss, rewards, name, color_id=0):
     p.line(x, rewards, legend_label="Reward", line_width=2, color="lightgrey", y_range_name="Reward")
     p.line(x, loss, legend_label=name, line_width=2, color=palette[color_id])
 
+    p.add_tools(bokeh.models.SaveTool())
+
+
     p.legend.location = "bottom_right"
     style_plot(p)
 
@@ -378,6 +385,8 @@ def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
                 x = x[1:]
 
         p.line(x, trace, legend_label=str(sense), line_width=2, color=palette[i])
+
+        p.add_tools(bokeh.models.SaveTool())
 
         p.legend.location = "bottom_right"
         style_plot(p)
