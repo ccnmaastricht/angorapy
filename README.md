@@ -11,7 +11,7 @@
 
 ![Manipulation Gif](docs/gifs/manipulate_best.gif)
 
-## 🧑‍💻 Installation
+## 📥 Installation
 
 To install this package, use pip
 
@@ -24,12 +24,6 @@ To train on any MuJoCo-based environment, you will need MuJoCo. As of late 2021,
 As an interface to python, we use mujoco-py, [available here](https://github.com/openai/mujoco-py). To install both, follow their respective instructions.
 
 If you do not want/can install MuJoCo and/or mujoco-py you can use this framework without MuJoCo. Our implementation automatically checks for a `.mujoco` directory in you home directory. If it does not exist, it will try to avoid loading MuJoCo. However, you can then not load any environments that rely on MuJoCo!
-
-## 🧑‍🎓 Other READMEs
-Documentation on specific modules is provided in their respective READMEs.
-
- - <a href="analysis/README.md">Analysis</a>
- - <a href="monitor/README.md">Monitoring</a>
 
 ## 🚀 Getting Started
 The scripts `train.py`, `evaluate.py` and `observe.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.
@@ -50,19 +44,55 @@ For more advanced options like custom hyperparameters, consult
     python train.py -h
 
 
-### Evaluating an Agent
-Use the `evaluate.py` script to easily evaluate a trained agent. Agents are identified by their ID stated in the beginning of a training. You can also find agent IDs in the monitor. Use the script as follows:
+### Evaluating and Observing an Agent
+There are two more entry points for evaluating and observing an agent: `evaluate.py` and `observe.py`. General usage is as follows
 
-    usage: evaluate.py [-h] [-n N] [id]
+    python evaluate.py ID
 
-    Evaluate an agent.
+Where ID is the agent's ID given when its created (`train.py` prints this outt, in custom scripts get it with `agent.agent_id`).
 
-    positional arguments:
-      id          id of the agent, defaults to newest
+### Writing a Training Script
+To train agents with custom models, environments, etc. you write your own script. The following is a minimal example:
 
-    optional arguments:
-      -h, --help  show this help message and exit
-      -n N        number of evaluation episodes
+    from angorapy.agent.ppo_agent import PPOAgent
+    from angorapy.common.policies import BetaPolicyDistribution
+    from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+    from angorapy.common.wrappers import make_env
+    from angorapy.models import get_model_builder
+
+    wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+    env = make_env("LunarLanderContinuous-v2", reward_config=None, transformers=wrappers)
+
+    # make policy distribution
+    distribution = BetaPolicyDistribution(env)
+
+    # the agent needs to create the model itself, so we build a method that builds a model
+    build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
+
+    # given the model builder and the environment we can create an agent
+    agent = PPOAgent(build_models, env, horizon=1024, workers=12, distribution=distribution)
+
+    # let's check the agents ID, so we can find its saved states after training
+    print(f"My Agent's ID: {agent.agent_id}")
+
+    # ... and then train that agent for n cycles
+    agent.drill(n=100, epochs=3, batch_size=64)
+
+    # after training, we can save the agent for analysis or the like
+    agent.save_agent_state()
+
+For more details, consult the [examples](examples).
+
+## 🎓 Documentation
+Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs: 
+
+ - [Agent](angorapy/agent) [WIP]
+ - [Environments](angorapy/environments)
+ - [Models](angorapy/models)
+ - [Analysis](angorapy/analysis)
+ - [Monitoring](angorapy/monitoring)
+
+If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
 
 ## 🔀 Distributed Computation
 PPO is an asynchronous algorithm, allowing multiple parallel workers to generate experience independently. 
@@ -115,17 +145,17 @@ srun python3 -u train.py ...
 The number of parallel workers will equal the number of nodes times the number of CPUs per node 
 (32 x 12 = 384 in the template above).
 
-## Citing AngoraPy
+## 🔗 Citing AngoraPy
 
 If you use AngoraPy for your research, please cite us as follows
 
-    Weidler, T., & Senden, M. (2020). AngoraPy - Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
+    Weidler, T., & Senden, M. (2020). AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
 
 Or using bibtex
 
     @software{angorapy2020,
         author = {Weidler, Tonio and Senden, Mario},
         month = {3},
-        title = {{AngoraPy - Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling}},
+        title = {{AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling}},
         year = {2020}
     }
