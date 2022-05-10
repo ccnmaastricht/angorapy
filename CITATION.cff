@@ -1,7 +1,6 @@
 cff-version: 1.2.0
 title: >-
-  AngoraPy - Anthropomorphic Goal-Oriented Robotic Control with Biologically
-  Plausible Networks
+  AngoraPy - Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
