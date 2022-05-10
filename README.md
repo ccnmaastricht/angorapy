@@ -163,7 +163,7 @@ On any SLURM-based HPC cluster you may submit your job with sbatch usising the f
 
 ```bash
 #!/bin/bash -l
-#SBATCH --job-name="dexterity"
+#SBATCH --job-name="angorapy"
 #SBATCH --account=xxx
 #SBATCH --time=24:00:00
 #SBATCH --nodes=32
@@ -203,10 +203,10 @@ To implement new policy distributions, extend the *BasePolicyDistribution* abstr
 ### Custom Input and Output Transformers
 
 ### Custom Hyperparameters Configurations
-Last, and somewhat least, you can add your own preset hyperparameter configuration. 
+Last, and somewhat least, you can add your own preset hyperparameter configuration.
 
 ```python
-from dexterity.configs.hp_config import make_config, derive_config
+from angorapy.configs.hp_config import make_config, derive_config
 
 my_conf = make_config(
     batch_size=128,
@@ -216,8 +216,8 @@ my_conf = make_config(
 )
 
 my_sub_conf = derive_config(my_conf,
-    {"model": "gru"}
-)
+                            {"model": "gru"}
+                            )
 ```
 
 Hyperparameter configurations created `make_config(...)` automatically assign default values to all required parameters and let you specify only those you want to change. With the help of `derive_config(...)` you can build variants of other configurations, including your own created by either `make_config(...)` or `derive_config(...)`.

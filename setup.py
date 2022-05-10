@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='dexterity',
+    name='angorapy',
     version='1.0.0',
     description='Anthropomorphic Robotic Control with Biologically Plausible Networks',
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',

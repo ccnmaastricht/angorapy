@@ -2,12 +2,12 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-from dexterity.agent.ppo_agent import PPOAgent
-from dexterity.common.policies import BetaPolicyDistribution
-from dexterity.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from dexterity.common.wrappers import make_env
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.common.policies import BetaPolicyDistribution
+from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from angorapy.common.wrappers import make_env
 
-from dexterity.models import get_model_builder
+from angorapy.models import get_model_builder
 
 # For most environments, PPO needs to normalize states and rewards; to add this functionality we wrap the environment
 # with transformers fulfilling this task. You can also add your own custom transformers this way.
