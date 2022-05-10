@@ -123,7 +123,7 @@ On any SLURM-based HPC cluster you may submit your job with sbatch usising the f
 
 ```bash
 #!/bin/bash -l
-#SBATCH --job-name="dexterity"
+#SBATCH --job-name="angorapy"
 #SBATCH --account=xxx
 #SBATCH --time=24:00:00
 #SBATCH --nodes=32
