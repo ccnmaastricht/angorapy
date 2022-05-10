@@ -11,15 +11,13 @@
 
 ## Installation
 
-### Pip Installation
-
-You can install this repository with pip. Clone it and then from within its root directory run
+To install this package, use pip
 
 ```bash
-pip install -e .
+pip install angorapy
 ```
 
-#### MuJoCo and MuJoCo-Py
+### MuJoCo and MuJoCo-Py
 To train on any MuJoCo-based environment, you will need MuJoCo. As of late 2021, MuJoCo is free and can be [downloaded here](https://mujoco.org/download). 
 As an interface to python, we use mujoco-py, [available here](https://github.com/openai/mujoco-py). To install both, follow their respective instructions.
 
