@@ -2,6 +2,12 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+try:
+    from mpi4py import MPI
+    is_root = MPI.COMM_WORLD.rank == 0
+except:
+    is_root = True
+
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.policies import BetaPolicyDistribution
 from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
@@ -30,4 +36,5 @@ print(f"My Agent's ID: {agent.agent_id}")
 agent.drill(n=100, epochs=3, batch_size=64)
 
 # after training, we can save the agent for analysis or the like
-agent.save_agent_state()
+if is_root:
+    agent.save_agent_state()
