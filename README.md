@@ -1,7 +1,7 @@
 <br />
 <br />
 
-<p align="center"><img src="docs/img/angorapy.svg" width=50% align="center" /></p>
+<p align="center"><img src="docs/img/angorapy.svg" width=25% align="center" /></p>
 <h3> <p align="center"> Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling </p> </h3>
 
 <br />
