@@ -1,7 +1,4 @@
-<img src="docs/img/logo.png" width=15% align="right" />
-
-<h1> <p align="center"> AngoraPy </p> </h1> 
-
+<p align="center"><img src="docs/img/angorapy.svg" width=50% align="center" /></p>
 <h3> <p align="center"> Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling </p> </h3>
 
 <br />
