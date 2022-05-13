@@ -6,7 +6,7 @@ setup(
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',
-    author_email='t.weidler@maastrichtuniversity.nl',
+    author_email='research@tonioweidler.de',
     license='GPL-3.0',
     packages=find_packages(),
     include_package_data=True,
