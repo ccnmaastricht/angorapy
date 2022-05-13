@@ -288,7 +288,7 @@ class PPOAgent:
               monitor: "Monitor"=None,
               save_every: int = 0,
               separate_eval: bool = False,
-              stop_early: bool = True,
+              stop_early: bool = False,
               radical_evaluation=False) -> "PPOAgent":
         """Start a training loop of the agent.
         

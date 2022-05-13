@@ -6,11 +6,11 @@ from typing import List, Union
 import gym
 import tensorflow as tf
 
-from common.policies import BasePolicyDistribution
-from agent.ppo_agent import PPOAgent
-from utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
+from angorapy.common.policies import BasePolicyDistribution
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
-from utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
+from angorapy.utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
 
 
 class Investigator:

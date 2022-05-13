@@ -3,9 +3,9 @@ import os
 import pprint
 import traceback
 
-from dexterity.utilities.defaults import autoselect_distribution
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from angorapy.utilities.defaults import autoselect_distribution
 
 mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
 if not mujoco_path:
