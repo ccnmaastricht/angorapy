@@ -1,14 +1,17 @@
 <img src="docs/img/logo.png" width=15% align="right" />
 
-# AngoraPy
+<h1> <p align="center"> AngoraPy </p> </h1> 
 
-## Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling
+<h3> <p align="center"> Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling </p> </h3>
 
-![](https://img.shields.io/github/license/ccnmaastricht/dexterous-robot-hand)
-![](https://img.shields.io/github/issues/ccnmaastricht/dexterous-robot-hand)
-![](https://img.shields.io/github/forks/ccnmaastricht/dexterous-robot-hand)
-![](https://img.shields.io/github/stars/ccnmaastricht/dexterous-robot-hand)
+<br />
 
+![](https://img.shields.io/pypi/pyversions/angorapy)
+![](https://img.shields.io/pypi/v/angorapy)
+![](https://img.shields.io/github/license/ccnmaastricht/angorapy)
+![](https://img.shields.io/github/stars/ccnmaastricht/angorapy)
+
+    
 **AngoraPy** is an open source modeling library for [goal-oriented research](https://pubmed.ncbi.nlm.nih.gov/26906502/) in **neuroscience**. It provides a simple interface to train deep neural network models of the human brain on various, customizable, sensorimotor tasks, using reinforcement learning. It thereby empowers goal-driven modeling to surpass the sensory domain and enter that of sensori_motor_ control, closing the perception-action loop. 
 
 **AngoraPy** is designed to require no deeper understanding of reinforcement learning. It employs state-of-the-art machine learning techniques, optimized for distributed computation scaling from local workstations to high-performance computing clusters. We aim to hide as much of this under the hood of an intuitive, high-level API but preserve the option for customizing most aspects of the pipeline.
