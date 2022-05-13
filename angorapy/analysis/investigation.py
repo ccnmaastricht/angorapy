@@ -182,7 +182,7 @@ class Investigator:
         done, step = False, 0
         state = env.reset()
         cumulative_reward = 0
-        env.render() if not to_gif else env.render(mode="rgb_array")
+        # env.render() if not to_gif else env.render(mode="rgb_array")
         while not done:
             step += 1
 

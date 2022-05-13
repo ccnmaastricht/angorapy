@@ -4,7 +4,7 @@ from typing import List, Union
 import numpy
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.keras.layers import TimeDistributed
+from tensorflow.keras.layers import TimeDistributed
 
 from angorapy.utilities.util import flatten
 

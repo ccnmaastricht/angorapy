@@ -120,9 +120,10 @@ class TransformationWrapper(BaseWrapper):
 
 def make_env(env_name,
              reward_config: Union[str, dict] = None,
-             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = None) -> BaseWrapper:
+             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = None,
+             **kwargs) -> BaseWrapper:
     """Make environment, including a possible reward config and transformers."""
-    base_env = gym.make(env_name)
+    base_env = gym.make(env_name, **kwargs)
     state_dim, n_actions = env_extract_dims(base_env)
 
     if transformers is None:
