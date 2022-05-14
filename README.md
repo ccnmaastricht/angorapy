@@ -1,3 +1,7 @@
+![](https://img.shields.io/pypi/pyversions/angorapy)
+![](https://img.shields.io/pypi/v/angorapy)
+![](https://img.shields.io/github/license/ccnmaastricht/angorapy)
+![](https://img.shields.io/github/stars/ccnmaastricht/angorapy)
 
 
 <br />
@@ -17,12 +21,8 @@ This library is developed as part of the [Human Brain Project](https://www.human
 ![Manipulation Gif](docs/gifs/manipulate_best.gif)
 
 ## 📥 Installation
-![](https://img.shields.io/pypi/pyversions/angorapy)
-![](https://img.shields.io/pypi/v/angorapy)
-![](https://img.shields.io/github/license/ccnmaastricht/angorapy)
-![](https://img.shields.io/github/stars/ccnmaastricht/angorapy)
 
-To install this package, use pip
+AngoraPy is available on PyPI. 
 
 ```bash
 pip install angorapy
