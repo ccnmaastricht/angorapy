@@ -4,5 +4,8 @@
 <svg version="1.1" id="Ebene_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 width="507.844px" height="114.378px" viewBox="0 0 507.844 114.378" enable-background="new 0 0 507.844 114.378"
 	 xml:space="preserve">
+	<defs>
+		<style type="text/css">@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap');</style>
+	</defs>
 <text transform="matrix(1 0 0 1 0.7139 84.313)"><tspan x="0" y="0" fill="#1352E2" font-family="'Corbel'" font-size="124">Angora</tspan><tspan x="378.357" y="0" font-family="'Corbel'" font-size="124">Py</tspan></text>
 </svg>
