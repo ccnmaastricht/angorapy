@@ -18,7 +18,8 @@ from flask_jsglue import JSGlue
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
 from angorapy.utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
-    plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress
+    plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress, \
+    grouped_reward_progress
 from angorapy.utilities.statistics import ignore_none
 
 from angorapy.monitor import app
@@ -260,6 +261,11 @@ def show_comparison():
 
     info["plots"]["reward"] = compare_reward_progress(
         {id: progress["rewards"] for id, progress in progress_reports.items()},
+        None
+    )
+
+    info["plots"]["reward_grouped"] = grouped_reward_progress(
+        {id: (0, progress["rewards"]) for id, progress in progress_reports.items()},
         None
     )
 

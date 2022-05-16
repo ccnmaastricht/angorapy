@@ -29,6 +29,17 @@
         </div>
     </div>
 
+    <div class="topic-group">
+        <div class="row justify-content-center">
+            <div class="col col-12">
+                <div id="grouped-reward-plot">
+                    {{ info.plots.reward_grouped[0]|safe }}
+                    {{ info.plots.reward_grouped[1]|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
 {% endblock %}
 
 {% block js_footer %}

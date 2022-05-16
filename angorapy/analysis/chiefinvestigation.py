@@ -3,7 +3,7 @@ import gym
 #import numpy as np
 from time import sleep
 import sys
-sys.path.append("/Users/Raphael/dexterous-robot-hand/rnn_dynamical_systems")
+sys.path.append("/Users/Raphael/angorapy/rnn_dynamical_systems")
 import matplotlib.pyplot as plt
 import sklearn
 

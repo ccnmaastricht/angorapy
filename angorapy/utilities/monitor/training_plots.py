@@ -229,6 +229,92 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
     return embed.components(p)
 
 
+def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], reward_threshold=None):
+    y_min = 0
+    y_max = 0
+    x_all = []
+
+    p = figure(title="Average Rewards per Cycle",
+               x_axis_label='Cycle',
+               y_axis_label='Total Episode Return',
+               **plot_styling)
+    p.x_range.start = 0
+
+    by_groups = {}
+    for name, (group, data) in rewards.items():
+        if group not in by_groups.keys():
+            by_groups[group] = []
+
+        by_groups[group].append(data)
+
+    i = 0
+    names_and_lines = []
+    for group, datas in by_groups.items():
+        means = np.mean([mean_fill_nones(d["mean"]) for d in datas], axis=0)
+        stds = np.std([d["mean"] for d in datas], axis=0)
+
+        y_min = min(min(means), y_min)
+        y_max = max(max(means), y_max)
+
+        x = list(range(len(means)))
+        if len(x) > len(x_all):
+            x_all = x
+
+        df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
+        value_range = max(df["upper"]) - min(df["lower"])
+
+        tooltip = HoverTool(
+            tooltips=[("Cycle", "@x"),
+                      ("Reward", "@y")],
+            mode="vline"
+        )
+
+        range_max = max(df["upper"]) + value_range * 0.1
+        if reward_threshold is not None:
+            range_max = max(range_max, reward_threshold * 1.1)
+
+        p.add_tools(tooltip)
+
+        # ERROR BAND
+        error_band = bokeh.models.Band(
+            base="x", lower="lower", upper="upper",
+            source=ColumnDataSource(df.reset_index()),
+            fill_color=palette[i % len(palette)],
+            fill_alpha=0.2,
+            line_color=palette[i % len(palette)],
+            line_alpha=0.4,
+        )
+        p.add_layout(error_band)
+        p.renderers.extend([error_band])
+
+        # REWARD LINE
+        reward_line = p.line(x, means, line_width=2, color=palette[i % len(palette)])
+        names_and_lines.append((
+            str(group), [reward_line]
+        ))
+
+        i += 1
+
+    p.add_tools(bokeh.models.BoxZoomTool())
+    p.add_tools(bokeh.models.ResetTool())
+    p.add_tools(bokeh.models.SaveTool())
+
+    # REWARD THRESHOLD
+    if reward_threshold is not None:
+        p.line(x_all, [reward_threshold for _ in x_all], line_color="green", line_width=2, line_alpha=0.7, line_dash="dashed",
+               legend_label="Solution Threshold")
+
+    p.y_range = bokeh.models.Range1d(y_min, y_max)
+
+    legend = bokeh.models.Legend(items=names_and_lines, location="bottom_center")
+    p.add_layout(legend, "below")
+
+    style_plot(p)
+    p.height = 750 + legend.glyph_height * len(rewards)
+
+    return embed.components(p)
+
+
 def plot_length_progress(lengths: Dict[str, list], cycles_loaded):
     """Plot development of the lengths of episodes throughout training."""
     means, stds = lengths["mean"], lengths["stdev"]
