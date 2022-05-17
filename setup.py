@@ -36,6 +36,10 @@ setup(
         "flask_jsglue"
     ],
 
+    package_data={
+        "angorapy": ["environments/assets/**/*"],
+    },
+
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

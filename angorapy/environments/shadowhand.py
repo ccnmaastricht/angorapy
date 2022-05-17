@@ -16,6 +16,7 @@ from angorapy.common import reward
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.configs.reward_config import resolve_config_name
 
+
 FINGERTIP_SITE_NAMES = [
     'robot0:S_fftip',
     'robot0:S_mftip',
