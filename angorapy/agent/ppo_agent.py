@@ -43,7 +43,7 @@ gpus = tf.config.list_physical_devices('GPU')
 is_root = mpi_comm.rank == 0
 
 if is_root:
-    print(f"Detected {len(gpus)} GPU devices.")
+    print(f"Detected {mpi_comm.allreduce(len(gpus), op=MPI.SUM)} GPU devices.")
 
 if len(gpus) > 0:
     node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
