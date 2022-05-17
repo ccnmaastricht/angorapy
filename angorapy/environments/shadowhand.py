@@ -11,6 +11,7 @@ import mujoco_py
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
+from angorapy.common import reward
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.configs.reward_config import resolve_config_name

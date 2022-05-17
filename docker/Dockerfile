@@ -11,7 +11,7 @@ RUN sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/
 RUN sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/*
 RUN apt-key del 7fa2af80
 
-COPY cuda-keyring_1.0-1_all.deb cuda-keyring_1.0-1_all.deb
+COPY docker/cuda-keyring_1.0-1_all.deb cuda-keyring_1.0-1_all.deb
 RUN dpkg -i cuda-keyring_1.0-1_all.deb
 RUN apt-get update
 
@@ -74,16 +74,19 @@ RUN virtualenv --python=python3.8 $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # INSTALL TOOL
-RUN pip install angorapy
+RUN mkdir /ang_tmp
+COPY . /ang_tmp
+RUN pip install /ang_tmp
 RUN pip install mujoco-py
+RUN rm -rf /ang_tmp
 
 # MUJOCOPY-SINGULARITY BUG FIX
 RUN sed -i "s?os.path.dirname(cext_so_path), 'mujocopy-buildlock'?'/tmp', 'mujocopy-buildlock'?g" $VIRTUAL_ENV/lib/python3.8/site-packages/mujoco_py/builder.py
 RUN python -c "import mujoco_py"
 
 WORKDIR /
-COPY train.py train.py
 RUN ls -la
+COPY angorapy/train.py train.py
 
 # FINAL
 CMD [ "/bin/bash" ]

@@ -253,7 +253,7 @@ manipulate = make_config(
     clip_values=False,
     distribution="beta",
     architecture="wider",
-    model="gru"
+    model="lstm"
 )
 
 manipulate_discrete = derive_config(manipulate, dict(
