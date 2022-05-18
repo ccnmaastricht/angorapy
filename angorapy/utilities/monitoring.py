@@ -108,8 +108,12 @@ class Monitor:
 
             plt.close()
 
-    def make_metadata(self):
+    def make_metadata(self, additional_hps: dict = None):
         """Write meta data information about experiment into json file."""
+
+        if additional_hps is None:
+            additional_hps = {}
+
         metadata = dict(
             date=str(datetime.datetime.now()).split(".")[0],
             config=self.config_name,
@@ -144,7 +148,8 @@ class Monitor:
                 reward_norming=str(RewardNormalizationTransformer in self.env.transformers),
                 state_norming=str(StateNormalizationTransformer in self.env.transformers),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
-                architecture=self.agent.builder_function_name.split("_")[1]
+                architecture=self.agent.builder_function_name.split("_")[1],
+                **additional_hps
             ),
             reward_function=dict(self.agent.env.reward_config if hasattr(self.agent.env, "reward_config") else dict(),
                                  identifier=self.agent.reward_configuration)

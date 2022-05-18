@@ -42,8 +42,9 @@ mpi_comm = MPI.COMM_WORLD
 gpus = tf.config.list_physical_devices('GPU')
 is_root = mpi_comm.rank == 0
 
+n_gpus_total = mpi_comm.allreduce(len(gpus), op=MPI.SUM)
 if is_root:
-    print(f"Detected {mpi_comm.allreduce(len(gpus), op=MPI.SUM)} GPU devices.")
+    print(f"Detected {n_gpus_total} GPU devices.")
 
 if len(gpus) > 0:
     node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
@@ -308,8 +309,15 @@ class PPOAgent:
 
 
         Returns:
-            self
+            self, for chaining
         """
+
+        # start monitor
+        if is_root:
+            monitor.make_metadata(additional_hps={
+                "epochs_per_cycle": epochs,
+                "batch_size": batch_size,
+            })
 
         # determine the number of independent repeated gatherings required on this worker
         worker_base, worker_extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
