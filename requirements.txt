@@ -17,6 +17,7 @@ scipy
 sklearn
 Flask~=1.1.2
 Flask-JSGlue
+Jinja2==3.0.0
 argcomplete
 matplotlib
 scikit-learn~=0.24.1
