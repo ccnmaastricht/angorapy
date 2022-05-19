@@ -36,13 +36,14 @@ class Monitor:
 
     def __init__(self,
                  agent: PPOAgent,
-                 env: BaseWrapper,
+                 env: BaseWrapper = None,
                  frequency: int = 1,
                  gif_every: int = 0,
                  id=None,
-                 iterations=None, config_name: str = "unknown"):
+                 iterations=None,
+                 config_name: str = "unknown"):
         self.agent = agent
-        self.env = env
+        self.env = env if env is not None else agent.env
         self.iterations = iterations
 
         self.config_name = config_name
