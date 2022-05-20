@@ -67,7 +67,6 @@ ENV LD_LIBRARY_PATH="/usr/lib/nvidia:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.2/lib64:$LD_LIBRARY_PATH"
 
-
 # SETUP ENV
 ENV VIRTUAL_ENV=/venv
 RUN virtualenv --python=python3.8 $VIRTUAL_ENV

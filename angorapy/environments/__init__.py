@@ -6,11 +6,8 @@ from mpi4py import MPI
 
 from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 
-has_mujoco_custom_path = False
-if hasattr(os.environ, "MUJOCO_PY_MUJOCO_PATH"):
-    has_mujoco_custom_path = True
 
-if os.path.isdir(os.path.expanduser('~/.mujoco/')) or has_mujoco_custom_path:
+if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in os.environ.keys():
     if MPI.COMM_WORLD.rank == 0:
         print("A MuJoCo path exists. MuJoCo is being loaded...")
 
