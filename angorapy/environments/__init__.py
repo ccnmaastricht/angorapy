@@ -8,7 +8,7 @@ from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_
 
 has_mujoco_custom_path = False
 if hasattr(os.environ, "MUJOCO_PY_MUJOCO_PATH"):
-    has_mujoco_custom_path = os.path.isdir(os.environ["MUJOCO_PY_MUJOCO_PATH"])
+    has_mujoco_custom_path = True
 
 if os.path.isdir(os.path.expanduser('~/.mujoco/')) or has_mujoco_custom_path:
     if MPI.COMM_WORLD.rank == 0:
