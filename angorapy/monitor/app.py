@@ -249,6 +249,7 @@ def show_comparison():
     }
 
     progress_reports = {}
+    metas = {}
     for exp_id in ids:
         path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
         with open(os.path.join(path, "progress.json"), "r") as f:
@@ -257,7 +258,8 @@ def show_comparison():
         with open(os.path.join(path, "meta.json"), "r") as f:
             meta = json.load(f)
 
-        progress_reports.update({f"{meta['environment']['name'].split('-')[0]}-{meta['hyperparameters']['architecture']}-{meta['reward_function']['identifier']} ({exp_id})": progress})
+        progress_reports.update({f"{exp_id}": progress})
+        metas[str(exp_id)] = meta
 
     info["plots"]["reward"] = compare_reward_progress(
         {id: progress["rewards"] for id, progress in progress_reports.items()},
@@ -265,7 +267,7 @@ def show_comparison():
     )
 
     info["plots"]["reward_grouped"] = grouped_reward_progress(
-        {id: (0, progress["rewards"]) for id, progress in progress_reports.items()},
+        {id: (metas[str(id)]["hyperparameters"]["epochs_per_cycle"], progress["rewards"]) for id, progress in progress_reports.items() if metas[str(id)]["hyperparameters"]["epochs_per_cycle"] > 30},
         None
     )
 

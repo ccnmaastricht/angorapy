@@ -2,7 +2,7 @@
 
 REMOVE=false
 ONLY_STATS=false
-BASE_DIRECTORY="$HOME"
+BASE_DIRECTORY="\$SCRATCH"
 
 ARGS=""
 while [ $# -gt 0 ]
@@ -24,8 +24,7 @@ done
 
 POSARGS=($ARGS)
 HOST=${POSARGS[0]}
-ssh $HOST eval BASE_DIRECTORY=$BASE_DIRECTORY
-ssh $HOST echo $BASE_DIRECTORY
+BASE_DIRECTORY=$(ssh $HOST echo $BASE_DIRECTORY)
 
 echo "PULLING $ID"
 echo "FROM $BASE_DIRECTORY"
@@ -38,15 +37,15 @@ fi
 # zip on server and pull
 if [ -z ${ID} ]; then
   echo "Zipping entire storage."
-  ZIP_COMMAND="zip -r ~/storage.zip $BASE_DIRECTORY/storage/ -x $BASE_DIRECTORY/storage/experience/\* "
+  ZIP_COMMAND="zip -r $BASE_DIRECTORY/storage.zip $BASE_DIRECTORY/ -x $BASE_DIRECTORY/experience/\* "
   if [ "$ONLY_STATS" = true ]; then
-    ZIP_COMMAND="$ZIP_COMMAND -x $BASE_DIRECTORY/storage/saved_models/\*"
+    ZIP_COMMAND="$ZIP_COMMAND -x $BASE_DIRECTORY/saved_models/\*"
   fi
 else
   echo "Updating/Adding $ID to zip file."
-  ZIP_COMMAND="zip -r ~/storage.zip $BASE_DIRECTORY/storage/experiments/$ID/ "
+  ZIP_COMMAND="zip -r $BASE_DIRECTORY/storage.zip $BASE_DIRECTORY/experiments/$ID/ "
   if [ "$ONLY_STATS" = false ]; then
-    ZIP_COMMAND="$ZIP_COMMAND $BASE_DIRECTORY/storage/saved_models/$ID/"
+    ZIP_COMMAND="$ZIP_COMMAND $BASE_DIRECTORY/saved_models/$ID/"
   fi
 fi
 
@@ -54,12 +53,12 @@ echo $ZIP_COMMAND
 
 # execute and download
 ssh $HOST $ZIP_COMMAND
-scp $HOST:~/storage.zip .
+scp $HOST:$BASE_DIRECTORY/storage.zip .
 
-# unzip locally and move to correct directory
 unzip -n storage.zip -d storage/
-cp -r "storage/$BASE_DIRECTORY/storage/*" storage/
+cp -r storage/$BASE_DIRECTORY/* storage/
 
 # cleanup
-rm -r storage/scratch
+IFS="/" read -a PATH_ARRAY <<< $BASE_DIRECTORY
+rm -r storage/$PATH_ARRAY[0]
 rm storage.zip

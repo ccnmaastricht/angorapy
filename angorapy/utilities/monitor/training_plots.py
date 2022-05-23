@@ -179,17 +179,9 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
         df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
         value_range = max(df["upper"]) - min(df["lower"])
 
-        tooltip = HoverTool(
-            tooltips=[("Cycle", "@x"),
-                      ("Reward", "@y")],
-            mode="vline"
-        )
-
         range_max = max(df["upper"]) + value_range * 0.1
         if reward_threshold is not None:
             range_max = max(range_max, reward_threshold * 1.1)
-
-        p.add_tools(tooltip)
 
         # ERROR BAND
         error_band = bokeh.models.Band(
@@ -249,6 +241,7 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
 
     i = 0
     names_and_lines = []
+    tooltip_parts = []
     for group, datas in by_groups.items():
         means = np.mean([mean_fill_nones(d["mean"]) for d in datas], axis=0)
         stds = np.std([d["mean"] for d in datas], axis=0)
@@ -263,17 +256,11 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
         df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
         value_range = max(df["upper"]) - min(df["lower"])
 
-        tooltip = HoverTool(
-            tooltips=[("Cycle", "@x"),
-                      ("Reward", "@y")],
-            mode="vline"
-        )
+        tooltip_parts.append((f"Group {group}", "@y"))
 
         range_max = max(df["upper"]) + value_range * 0.1
         if reward_threshold is not None:
             range_max = max(range_max, reward_threshold * 1.1)
-
-        p.add_tools(tooltip)
 
         # ERROR BAND
         error_band = bokeh.models.Band(
@@ -295,6 +282,14 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
 
         i += 1
 
+    # tooltip_parts.append(("Cycle", "@x"))
+    # tooltip = HoverTool(
+    #     tooltips=tooltip_parts,
+    #     mode="vline"
+    # )
+    #
+    # p.add_tools(tooltip)
+
     p.add_tools(bokeh.models.BoxZoomTool())
     p.add_tools(bokeh.models.ResetTool())
     p.add_tools(bokeh.models.SaveTool())
@@ -306,11 +301,11 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
 
     p.y_range = bokeh.models.Range1d(y_min, y_max)
 
-    legend = bokeh.models.Legend(items=names_and_lines, location="bottom_center")
+    legend = bokeh.models.Legend(items=names_and_lines, location="bottom_center", orientation="horizontal")
     p.add_layout(legend, "below")
 
     style_plot(p)
-    p.height = 750 + legend.glyph_height * len(rewards)
+    p.height = 750
 
     return embed.components(p)
 
