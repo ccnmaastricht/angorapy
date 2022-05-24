@@ -14,7 +14,7 @@ setup(
         "numpy==1.19.2",
         "Box2D",
         "gym==0.18",
-        "tensorflow==2.4.2",
+        "tensorflow==2.6.4",
         "mpi4py==3.1.3",
         "tqdm",
         "simplejson",

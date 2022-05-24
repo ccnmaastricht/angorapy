@@ -2,7 +2,7 @@ numpy~=1.19.0
 Box2D
 mujoco-py==2.1.2.14
 gym[all]
-tensorflow==2.4.0
+tensorflow==2.6.4
 tensorflow_datasets
 mpi4py~=3.0.3
 
