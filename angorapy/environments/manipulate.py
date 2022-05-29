@@ -3,11 +3,11 @@ import os
 import mujoco_py
 import numpy as np
 from gym import utils
-from gym.envs.robotics import rotations
-from gym.envs.robotics.utils import robot_get_obs
+from angorapy.environments import rotations
+from angorapy.environments.utils import robot_get_obs
 from scipy.spatial import transform
 
-from angorapy.common.const import VISION_WH, N_SUBSTEPS
+from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.reward import manipulate
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import MANIPULATE_BASE
@@ -190,9 +190,8 @@ class BaseManipulate(BaseShadowHandEnv):
         return achieved_both
 
     def _env_setup(self, initial_qpos):
-        for name, value in initial_qpos.items():
-            self.sim.data.set_joint_qpos(name, value)
-        self.sim.forward()
+        if initial_qpos is not None:
+            self.set_state(initial_qpos, np.zeros(self.model.nv))
 
     def reset(self):
         self.consecutive_goals_reached = 0

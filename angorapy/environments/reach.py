@@ -4,8 +4,8 @@ from typing import Union, Callable
 
 import mujoco_py
 import numpy as np
-from gym.envs.robotics.hand.reach import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES, goal_distance, HandReachEnv
-from gym.envs.robotics.utils import robot_get_obs
+from angorapy.environments.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
+from angorapy.environments.utils import robot_get_obs
 
 from angorapy.common import reward
 from angorapy.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
@@ -64,7 +64,7 @@ class Reach(BaseShadowHandEnv):
         assert set(REACH_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete free reach reward configuration."
 
     def _get_achieved_goal(self):
-        goal = [self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
         return np.array(goal).flatten()
 
     def _is_success(self, achieved_goal, desired_goal):
@@ -73,7 +73,7 @@ class Reach(BaseShadowHandEnv):
 
     def get_thumb_position(self) -> np.ndarray:
         """Get the position of the thumb in space."""
-        return self.sim.data.get_site_xpos(self.thumb_name).flatten()
+        return self.data.site(self.thumb_name).xpos.flatten()
 
     def get_thumbs_previous_position(self) -> np.ndarray:
         """Get the previous position of the thumb in space."""
@@ -85,7 +85,7 @@ class Reach(BaseShadowHandEnv):
 
     def get_target_finger_position(self) -> np.ndarray:
         """Get position of the target finger in space."""
-        return self.sim.data.get_site_xpos(FINGERTIP_SITE_NAMES[self.current_target_finger]).flatten()
+        return self.data.site(FINGERTIP_SITE_NAMES[self.current_target_finger]).xpos.flatten()
 
     def get_target_fingers_previous_position(self) -> np.ndarray:
         """Get position of the target finger in space."""
@@ -93,7 +93,7 @@ class Reach(BaseShadowHandEnv):
 
     def get_finger_position(self, finger_name: str) -> np.ndarray:
         """Get position of the specified finger in space."""
-        return self.sim.data.get_site_xpos(finger_name).flatten()
+        return self.data.site(finger_name).xpos.flatten()
 
     def _reset_sim(self):
         """Resets a simulation and indicates whether or not it was successful."""
@@ -116,11 +116,11 @@ class Reach(BaseShadowHandEnv):
         return True
 
     def _get_obs(self):
-        touch = self.sim.data.sensordata[self._touch_sensor_id]
+        touch = self.data.sensordata[self._touch_sensor_id]
 
         achieved_goal = self._get_achieved_goal().ravel()
 
-        robot_qpos, robot_qvel = robot_get_obs(self.sim)
+        robot_qpos, robot_qvel = robot_get_obs(self.model, self.data)
         proprioception = np.concatenate([robot_qpos, robot_qvel, achieved_goal.copy()])  # todo remove achieved goal?
 
         return {
@@ -168,12 +168,13 @@ class Reach(BaseShadowHandEnv):
         return goal.flatten()
 
     def _env_setup(self, initial_qpos):
-        for name, value in initial_qpos.items():
-            self.sim.data.set_joint_qpos(name, value)
-        self.sim.forward()
+        if initial_qpos is not None:
+            self.set_state(initial_qpos, np.zeros(self.model.nv))
 
         self.initial_goal = self._get_achieved_goal().copy()
-        self.palm_xpos = self.sim.data.body_xpos[self.sim.model.body_name2id('robot0:palm')].copy()
+        self.palm_xpos = self.data.body('robot0:palm').xpos.copy()
+
+        self.goal = self._sample_goal()
 
     def _render_callback(self, render_targets=False):
         if render_targets:
@@ -421,25 +422,5 @@ class FreeReachSequential(FreeReach):
         return observation, reward, done, info
 
 
-class OldShadowHandReach(HandReachEnv):
-    """Simpler Reaching task."""
-
-    def __init__(self, distance_threshold=0.02, n_substeps=20, relative_control=True,
-                 initial_qpos=DEFAULT_INITIAL_QPOS, reward_type='dense', success_multiplier=0.1):
-        super().__init__(distance_threshold, n_substeps, relative_control, initial_qpos, reward_type)
-        self.success_multiplier = success_multiplier
-
-    def compute_reward(self, achieved_goal, goal, info):
-        """Compute reward with additional success bonus."""
-        return super().compute_reward(achieved_goal, goal, info) + info["is_success"] * self.success_multiplier
-
-    def _get_obs(self):
-        robot_qpos, robot_qvel = robot_get_obs(self.sim)
-        achieved_goal = self._get_achieved_goal().ravel()
-        observation = np.concatenate([robot_qpos, robot_qvel, achieved_goal, self.goal.copy()])
-
-        return {
-            'observation': observation.copy(),
-            'achieved_goal': achieved_goal.copy(),
-            'desired_goal': self.goal.copy(),
-        }
+if __name__ == '__main__':
+    hand = Reach()

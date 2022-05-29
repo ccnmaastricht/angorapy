@@ -1,8 +1,8 @@
-numpy~=1.19.0
 Box2D
-mujoco-py==2.1.2.14
-gym[all]
-tensorflow==2.4.2
+numpy==1.20
+mujoco
+gym[all]==0.24.0
+tensorflow==2.9.1
 tensorflow_datasets
 mpi4py~=3.0.3
 
@@ -21,7 +21,7 @@ Jinja2==3.0.0
 argcomplete
 matplotlib
 scikit-learn~=0.24.1
-pandas==1.0.4
+pandas
 seaborn
 bokeh
 distance
