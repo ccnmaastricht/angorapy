@@ -1,3 +1,5 @@
+from typing import Dict
+
 import numpy as np
 
 from gym import error
@@ -28,3 +30,10 @@ def mj_get_category_names(model, category: str):
     # todo make assert
     adresses = getattr(model, f"name_{category}adr")
     return model.names[adresses[0]:].split(b'\x00')[:len(adresses)]
+
+
+def mj_qpos_dict_to_qpos_vector(model, qpos_dict: Dict):
+    """From a given dictionary of joint name-position pairs, create a vector using their order in the model."""
+    return np.array(
+        [qpos_dict[n] for n in map(lambda x: x.decode("utf-8"), model.names.split(b"\x00")) if n in qpos_dict.keys()]
+    )

@@ -8,6 +8,8 @@ import mujoco
 import gym
 from gym import error, logger, spaces
 
+from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector
+
 DEFAULT_SIZE = 480
 
 
@@ -45,22 +47,21 @@ class AnthropomorphicEnv(gym.Env):
 
         self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
         self.data = mujoco.MjData(self.model)
-
-        self.init_qpos = self.data.qpos.ravel().copy()
-        self.init_qvel = self.data.qvel.ravel().copy()
         self._viewers = {}
-
-        self.frame_skip = frame_skip
-
         self.viewer = None
 
+        self.frame_skip = frame_skip
         self.metadata = {
             "render_modes": ["human", "rgb_array", "depth_array"],
             "render_fps": int(np.round(1.0 / self.dt)),
         }
 
-        self._env_setup(initial_qpos=initial_qpos)
+        self.initial_state = {
+            "qpos": mj_qpos_dict_to_qpos_vector(self.model, initial_qpos),
+            "qvel": self.data.qvel[:]
+        }
 
+        self._env_setup(initial_state=self.initial_state)
         self._set_action_space()
 
         action = self.action_space.sample()
@@ -77,14 +78,14 @@ class AnthropomorphicEnv(gym.Env):
         self.observation_space = convert_observation_to_space(observation)
         return self.observation_space
 
-    def _env_setup(self, initial_qpos):
-        pass
+    def _env_setup(self, initial_state):
+        raise NotImplementedError
 
     # methods to override:
     # ----------------------------
 
     def _get_obs(self):
-        pass
+        raise NotImplementedError
 
     def reset_model(self):
         """
@@ -118,8 +119,16 @@ class AnthropomorphicEnv(gym.Env):
         else:
             return ob, {}
 
+    def get_state(self):
+        """Get the current state of the simulation."""
+        return {
+            "qpos": self.data.qpos[:],
+            "qvel": self.data.qvel[:],
+        }
+
     def set_state(self, qpos, qvel):
-        assert qpos.shape == (self.model.nq,) and qvel.shape == (self.model.nv,)
+        assert qpos.shape == (self.model.nq,) and qvel.shape == (self.model.nv,), \
+            f"State shape [{qpos.shape}|{qvel.shape}] does not fit [{self.model.nq}|{self.model.nv}]"
 
         self.data.qpos[:] = np.copy(qpos)
         self.data.qvel[:] = np.copy(qvel)

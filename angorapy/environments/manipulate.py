@@ -180,8 +180,8 @@ class BaseManipulate(BaseShadowHandEnv):
 
         return achieved_both
 
-    def _env_setup(self, initial_qpos):
-        super()._env_setup(initial_qpos)
+    def _env_setup(self, initial_state):
+        super()._env_setup(initial_state)
 
         self.initial_goal = self._get_achieved_goal().copy()
         self.palm_xpos = self.data.body('robot0:palm').xpos.copy()

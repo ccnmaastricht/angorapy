@@ -109,7 +109,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
         self._always_render_mode = False
 
-        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps)
+        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos)
 
         self.model.opt.timestep = delta_t
         self.original_n_substeps = n_substeps
@@ -137,12 +137,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             ),
         ))
 
-    def get_state(self):
-        """Get the current state of the simulation."""
-        return {
-            "qpos": self.data.qpos[:],
-            "qvel": self.data.qvel[:],
-        }
+        print(self.observation_space)
 
     def set_delta_t_simulation(self, new: float):
         """Set new value for the simulation delta t."""

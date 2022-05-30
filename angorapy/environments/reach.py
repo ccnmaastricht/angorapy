@@ -5,7 +5,7 @@ from typing import Union, Callable
 import mujoco_py
 import numpy as np
 from angorapy.environments.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
-from angorapy.environments.utils import robot_get_obs
+from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
 
 from angorapy.common import reward
 from angorapy.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
@@ -28,11 +28,6 @@ class Reach(BaseShadowHandEnv):
                  force_finger=None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
-        if vision:
-            with HiddenPrints():
-                # fix to "ERROR: GLEW initalization error: Missing GL version"
-                mujoco_py.GlfwContext(offscreen=True)
-
         # reward function setup
         self._set_default_reward_function_and_config()
         self.vision = vision
@@ -51,7 +46,12 @@ class Reach(BaseShadowHandEnv):
         elif self.state_initialization == "buffered":
             initial_qpos = DEFAULT_INITIAL_QPOS
 
-        super().__init__(initial_qpos, self.reward_config["SUCCESS_DISTANCE"], n_substeps, relative_control)
+        super().__init__(
+            initial_qpos=initial_qpos,
+            distance_threshold=self.reward_config["SUCCESS_DISTANCE"],
+            n_substeps=n_substeps,
+            relative_control=relative_control
+        )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
 
@@ -97,22 +97,21 @@ class Reach(BaseShadowHandEnv):
 
     def _reset_sim(self):
         """Resets a simulation and indicates whether or not it was successful."""
-        self.sim.set_state(self.initial_state)  # reset everything
+        self.set_state(**self.initial_state)  # reset everything
 
         if self.state_initialization == "random":
-            # generate and set random initial state
             initial_qpos = generate_random_sim_qpos(DEFAULT_INITIAL_QPOS)
 
-            for name, value in initial_qpos.items():
-                self.sim.data.set_joint_qpos(name, value)
-                self.sim.data.set_joint_qvel(name, 0)
+            self.set_state(
+                qpos=mj_qpos_dict_to_qpos_vector(self.model, initial_qpos),
+                qvel=self.initial_state["qvel"]
+            )
         # elif self.state_initialization == "buffered":
         #     # pull state from buffer as initial state for the environment
         #     if len(self.state_memory_buffer) > 100:  # TODO as variable in config?
         #         sampled_initial_state = random.choice(self.state_memory_buffer)
         #         self.sim.set_state(sampled_initial_state)
 
-        self.sim.forward()
         return True
 
     def _get_obs(self):
@@ -127,7 +126,7 @@ class Reach(BaseShadowHandEnv):
             'observation': Sensation(
                 proprioception=proprioception,
                 somatosensation=touch if self.touch else None,
-                vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else None,
+                vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else np.array([]),
                 goal=self.goal.copy()
             ),
 
@@ -167,9 +166,9 @@ class Reach(BaseShadowHandEnv):
 
         return goal.flatten()
 
-    def _env_setup(self, initial_qpos):
-        if initial_qpos is not None:
-            self.set_state(initial_qpos, np.zeros(self.model.nv))
+    def _env_setup(self, initial_state):
+        if initial_state is not None:
+            self.set_state(**initial_state)
 
         self.initial_goal = self._get_achieved_goal().copy()
         self.palm_xpos = self.data.body('robot0:palm').xpos.copy()
@@ -223,7 +222,12 @@ class ReachSequential(Reach):
         self.current_target_finger = None
         self.goal_sequence = []
 
-        super().__init__(initial_qpos, n_substeps, relative_control, vision, touch)
+        super().__init__(
+            initial_qpos=initial_qpos,
+            n_substeps=n_substeps,
+            relative_control=relative_control,
+            vision=vision,
+            touch=touch)
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = sequential_reach
