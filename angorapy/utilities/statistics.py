@@ -28,7 +28,7 @@ def ignore_none(func, sequence):
     return None
 
 
-def mean_fill_nones(sequence, dtype=np.float):
+def mean_fill_nones(sequence, dtype=float):
     """In a sequence of numbers, replace Nones by the non-None boundary mean."""
 
     sequence = np.array(sequence, dtype=dtype)

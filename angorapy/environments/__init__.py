@@ -15,9 +15,7 @@ if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
     from angorapy.environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
         OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous
-    from angorapy.environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
-    from angorapy.environments.nrp.shadowhand import BaseNRPShadowHandEnv
-    from angorapy.environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
+    from angorapy.environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
 
     # SHADOW HAND
     gym.envs.register(
@@ -120,44 +118,6 @@ if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in
                                 "n_substeps": 1 if step_granularity == "Fine" else N_SUBSTEPS},
                         max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
                     )
-
-    gym.envs.register(
-        id=f'NRPReachRelativeVisual-v0',
-        entry_point='angorapy.environments:NRPShadowHandReachSimple',
-        kwargs={"relative_control": True, "vision": True},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-    gym.envs.register(
-        id=f'NRPHandReachDenseAbsolute-v1',
-        entry_point='angorapy.environments:NRPShadowHandReachSimple',
-        kwargs={"relative_control": False},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-    gym.envs.register(
-        id=f'NRPReachAbsolute-v0',
-        entry_point='angorapy.environments:NRPShadowHandReach',
-        kwargs={"relative_control": False, "vision": True},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-
-    gym.envs.register(
-        id=f'NRPReachAbsoluteNoTouch-v0',
-        entry_point='angorapy.environments:NRPShadowHandReach',
-        kwargs={"relative_control": False, "vision": False, "touch": False},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
-
-    gym.envs.register(
-        id=f'NRPReachRelative-v0',
-        entry_point='angorapy.environments:NRPShadowHandReach',
-        kwargs={"relative_control": True, "vision": True},
-        max_episode_steps=SHADOWHAND_MAX_STEPS,
-    )
-
 
     # MANIPULATE
     for control_mode in ["Relative", "Absolute"]:
