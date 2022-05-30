@@ -15,7 +15,9 @@ graphviz
 psutil
 scipy
 sklearn
-Flask~=1.1.2
+itsdangerous==2.0.1
+werkzeug==2.0.3
+Flask==1.1.2
 Flask-JSGlue
 Jinja2==3.0.0
 argcomplete

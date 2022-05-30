@@ -70,10 +70,9 @@ def generate_random_sim_qpos(base: dict) -> dict:
     return base
 
 
-def get_palm_position(sim):
-    """Return the robotic hand'serialization palm'serialization center."""
-    palm_idx = sim.model.body_names.index("robot0:palm")
-    return np.array(sim.model.body_pos[palm_idx])
+def get_palm_position(model):
+    """Return the robotic hand's palm's center."""
+    return model.body("robot0:palm").pos
 
 
 def get_fingertip_distance(ft_a, ft_b):
@@ -112,23 +111,17 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps)
 
-        # build simulation
         self.model.opt.timestep = delta_t
         self.original_n_substeps = n_substeps
-
-        for k, v in zip(mj_get_category_names(self.model, "sensor"), self.model.sensor_adr):
-            if b'robot0:TS_' in k:
-                # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
-                self._touch_sensor_id.append(v)
 
         self.seed()
         self.initial_state = copy.deepcopy(self.get_state())
 
         obs = self._get_obs()
 
-        # action space
+    def _set_action_space(self):
         if self.continuous:
-            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
+            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype=float)
         else:
             self.action_space = spaces.MultiDiscrete(np.ones(20) * BaseShadowHandEnv.discrete_bin_count)
             self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
@@ -158,7 +151,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             f"parts, but gives {self._delta_t_control % new}."
 
         self._delta_t_simulation = new
-        self.frame_skip = 1
         self.model.opt.timestep = self._delta_t_simulation
 
         self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation) * self.original_n_substeps
@@ -214,13 +206,13 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         if self.continuous:
             action = np.clip(action, self.action_space.low, self.action_space.high)
         else:
-            action = self.discrete_action_values[action.astype(np.int)]
+            action = self.discrete_action_values[action.astype(int)]
 
         if self._freeze_wrist:
             action[:2] = 0
 
         # perform simulation
-        self.do_simulation(action, n_frames=self._simulation_steps_per_control_step)
+        self.do_simulation(action, n_frames=self.original_n_substeps)
 
         # read out observation from simulation
         obs = self._get_obs()
@@ -248,6 +240,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         obs = self._get_obs()
         return obs
 
+    def reset_model(self):
+        self.set_state(**self.initial_state)
+
     def close(self):
         if self.viewer is not None:
             # self.viewer.finish()
@@ -265,19 +260,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         elif mode == 'human':
             self._get_viewer(mode).render()
 
-    def _get_viewer(self, mode):
-        self.viewer = self._viewers.get(mode)
-        if self.viewer is None:
-            if mode == 'human':
-                self.viewer = mujoco_py.MjViewer(self.sim)
-                # self.viewer._run_speed /= self._simulation_steps_per_control_step
-            elif mode == 'rgb_array':
-                self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
-
-            self._viewer_setup()
-            self._viewers[mode] = self.viewer
-        return self.viewer
-
     # Extension methods
     # ----------------------------
 
@@ -287,8 +269,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         simulation), this method should indicate such a failure by returning False.
         In such a case, this method will be called again to attempt a the reset again.
         """
-        self.sim.set_state(self.initial_state)
-        self.sim.forward()
+        self.reset_model()
+
         return True
 
     @abc.abstractmethod
@@ -322,11 +304,16 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     def _sample_goal(self):
         pass
 
-    @abc.abstractmethod
     def _env_setup(self, initial_qpos):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
-        pass
+        for k, v in zip(mj_get_category_names(self.model, "sensor"), self.model.sensor_adr):
+            if b'robot0:TS_' in k:
+                # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
+                self._touch_sensor_id.append(v)
+
+        if initial_qpos is not None:
+            self.set_state(initial_qpos, np.zeros(self.model.nv))
 
     @abc.abstractmethod
     def _render_callback(self, render_targets=False):

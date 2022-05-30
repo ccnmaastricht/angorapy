@@ -64,9 +64,7 @@ class AnthropomorphicEnv(gym.Env):
         self._set_action_space()
 
         action = self.action_space.sample()
-        observation, _reward, done, _info = self.step(action)
-        assert not done
-
+        observation = self._get_obs()
         self._set_observation_space(observation)
 
     def _set_action_space(self):
@@ -84,6 +82,9 @@ class AnthropomorphicEnv(gym.Env):
 
     # methods to override:
     # ----------------------------
+
+    def _get_obs(self):
+        pass
 
     def reset_model(self):
         """
