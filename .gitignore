@@ -1,3 +1,4 @@
+migration-venv/
 docs/analysis/*
 MUJOCO_LOG.TXT
 
