@@ -299,7 +299,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     def _sample_goal(self):
         pass
 
-    def _env_setup(self, initial_qpos):
+    def _env_setup(self, initial_state):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
         for k, v in zip(mj_get_category_names(self.model, "sensor"), self.model.sensor_adr):
@@ -307,8 +307,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
                 # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
                 self._touch_sensor_id.append(v)
 
-        if initial_qpos is not None:
-            self.set_state(initial_qpos, np.zeros(self.model.nv))
+        if initial_state is not None:
+            self.set_state(**initial_state)
 
     @abc.abstractmethod
     def _render_callback(self, render_targets=False):

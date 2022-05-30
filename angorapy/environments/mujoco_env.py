@@ -1,3 +1,4 @@
+from abc import ABC
 from collections import OrderedDict
 from os import path
 from typing import Optional
@@ -33,7 +34,7 @@ def convert_observation_to_space(observation):
     return space
 
 
-class AnthropomorphicEnv(gym.Env):
+class AnthropomorphicEnv(gym.Env, ABC):
     """Superclass for all environments."""
 
     def __init__(self, model_path, frame_skip, initial_qpos=None):
@@ -56,8 +57,13 @@ class AnthropomorphicEnv(gym.Env):
             "render_fps": int(np.round(1.0 / self.dt)),
         }
 
+        if initial_qpos is None or not initial_qpos:
+            initial_qpos = self.data.qpos[:]
+        else:
+            initial_qpos = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
+
         self.initial_state = {
-            "qpos": mj_qpos_dict_to_qpos_vector(self.model, initial_qpos),
+            "qpos": initial_qpos,
             "qvel": self.data.qvel[:]
         }
 
