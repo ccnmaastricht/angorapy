@@ -4,6 +4,7 @@ import os
 import gym
 from mpi4py import MPI
 
+import panda_gym
 from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 
 

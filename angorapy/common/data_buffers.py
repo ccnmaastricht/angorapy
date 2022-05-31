@@ -26,6 +26,9 @@ class ExperienceBuffer:
         self.dones = np.zeros((capacity,), dtype=np.bool)
         self.mask = np.ones((capacity,), dtype=np.bool)
 
+        # data not stored but buffered (for postprocessing etc.)
+        self.achieved_goals = []
+
         # secondary data
         self.episode_lengths = []
         self.episode_rewards = []
@@ -41,7 +44,7 @@ class ExperienceBuffer:
     def __repr__(self):
         return f"{self.__class__.__name__}[{self.filled}/{self.capacity}]"
 
-    def fill(self, s: List[Sensation], a: arr, ap: arr, adv: arr, ret: arr, v: arr, dones: arr):
+    def fill(self, s: List[Sensation], a: arr, ap: arr, adv: arr, ret: arr, v: arr, dones: arr, achieved_goals: arr):
         """Fill (and thereby overwrite) the buffer with a 5-tuple of experience."""
         assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), "Inconsistent input sizes."
 
@@ -55,6 +58,7 @@ class ExperienceBuffer:
         self.advantages = adv
         self.values = v
         self.dones = dones
+        self.achieved_goals = achieved_goals
 
     def normalize_advantages(self):
         """Normalize the buffered advantages using z-scores. This requires the sequences to be of equal lengths,
