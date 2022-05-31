@@ -195,7 +195,8 @@ class Gatherer(BaseGatherer):
                         np.array(action_probabilities, dtype="float32"),
                         advantages,
                         returns,
-                        values[:-1])
+                        values[:-1],
+                        np.array(dones))
 
         # postprocessing steps
         buffer = self.postprocess(buffer, joint)
