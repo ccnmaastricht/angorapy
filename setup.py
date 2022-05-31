@@ -34,9 +34,6 @@ setup(
         "Jinja2==3.0.0",
         "bokeh",
         "flask_jsglue",
-
-        # gym tasks
-        "panda-gym"
     ],
 
     package_data={
