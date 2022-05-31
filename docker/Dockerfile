@@ -55,15 +55,7 @@ RUN add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y python3.8-dev python3.8 python3-pip
 
-# INSTALL MUJOCO
-RUN mkdir -p /opt/.mujoco \
-    && wget https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz -O mujoco.tar.gz \
-    && tar -xf mujoco.tar.gz -C /opt/.mujoco \
-    && rm mujoco.tar.gz
-
 # ENVIRONMENT VARIABLES
-ENV MUJOCO_PY_MUJOCO_PATH="/opt/.mujoco/mujoco210/"
-ENV LD_LIBRARY_PATH="/opt/.mujoco/mujoco210/bin:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/lib/nvidia:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.2/lib64:$LD_LIBRARY_PATH"
@@ -83,10 +75,6 @@ COPY . /ang_tmp
 RUN pip install /ang_tmp
 RUN pip install mujoco-py
 RUN rm -rf /ang_tmp
-
-# MUJOCOPY-SINGULARITY BUG FIX
-RUN sed -i "s?os.path.dirname(cext_so_path), 'mujocopy-buildlock'?'/tmp', 'mujocopy-buildlock'?g" $VIRTUAL_ENV/lib/python3.8/site-packages/mujoco_py/builder.py
-RUN python -c "import mujoco_py"
 
 WORKDIR /
 RUN ls -la
