@@ -28,6 +28,7 @@ setup(
         "nvidia-ml-py3",
         "seaborn",
         "distance",
+        "protobuf==3.19.0",
 
         # webinterface
         "Flask~=1.1.2",
