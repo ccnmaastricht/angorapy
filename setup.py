@@ -33,7 +33,10 @@ setup(
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
         "bokeh",
-        "flask_jsglue"
+        "flask_jsglue",
+
+        # gym tasks
+        "panda-gym"
     ],
 
     package_data={
