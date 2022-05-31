@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-dev \
     libgl1-mesa-glx \
     libglew-dev \
+    libc6-dev \
     libosmesa6-dev \
     patchelf \
     software-properties-common \
