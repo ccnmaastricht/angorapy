@@ -85,7 +85,7 @@ RUN pip install mujoco-py
 RUN pip install --no-deps panda-gym
 RUN pip install panda-gym
 RUN rm -rf /ang_tmp
-
+RUN pip install gym==0.18.0
 
 # MUJOCOPY-SINGULARITY BUG FIX
 RUN sed -i "s?os.path.dirname(cext_so_path), 'mujocopy-buildlock'?'/tmp', 'mujocopy-buildlock'?g" $VIRTUAL_ENV/lib/python3.8/site-packages/mujoco_py/builder.py

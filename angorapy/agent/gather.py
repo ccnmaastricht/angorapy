@@ -95,7 +95,7 @@ class Gatherer(BaseGatherer):
 
         # go for it
         t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
-        states, rewards, actions, action_probabilities, values, advantages = [], [], [], [], [], []
+        states, rewards, actions, action_probabilities, values, advantages, dones = [], [], [], [], [], [], []
         episode_endpoints = []
         state = env.reset()
 
@@ -120,6 +120,7 @@ class Gatherer(BaseGatherer):
             observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
             current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
             rewards.append(reward)
+            dones.append(done)
 
             # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
             if is_recurrent and (current_subseq_length == subseq_length or done):
