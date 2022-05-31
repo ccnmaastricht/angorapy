@@ -28,6 +28,10 @@ class BaseGatherer(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model) -> ExperienceBuffer:
+        pass
+
+    @abc.abstractmethod
     def select_action(self, *args, **kwargs) -> Tuple[tf.Tensor, tf.Tensor]:
         pass
 
@@ -192,8 +196,8 @@ class Gatherer(BaseGatherer):
                         returns,
                         values[:-1])
 
-        # normalize advantages
-        buffer.normalize_advantages()
+        # postprocessing steps
+        buffer = self.postprocess(buffer, joint)
 
         # convert buffer to dataset and save it to tf record
         dataset, stats = make_dataset_and_stats(buffer)
@@ -212,6 +216,12 @@ class Gatherer(BaseGatherer):
         tf.compat.v1.reset_default_graph()
 
         return stats
+
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model):
+        """Postprocess the gathered data."""
+        buffer.normalize_advantages()
+
+        return buffer
 
     def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
         """Standard action selection where an action is sampled fully from the predicted distribution."""
