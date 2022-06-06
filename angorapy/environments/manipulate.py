@@ -188,11 +188,11 @@ class BaseManipulate(BaseShadowHandEnv):
 
         self.goal = self._sample_goal()
 
-    def reset(self):
+    def reset(self, **kwargs):
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
 
-        return super().reset()
+        return super().reset(**kwargs)
 
     def _reset_sim(self):
         self.reset_model()

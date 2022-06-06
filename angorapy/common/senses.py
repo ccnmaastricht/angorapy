@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 
-class Sensation:
+class Sensation(dict):
     """Wrapper for state representations. Designed for sensory readings, but non-sensory data can be
     encapsulated too. The convention is to refer to any non-sensory data as proprioception, following the intuition
     that it represents inner states."""
@@ -14,6 +14,8 @@ class Sensation:
 
     def __init__(self, vision: np.ndarray = None, proprioception: np.ndarray = None, somatosensation: np.ndarray = None,
                  goal: np.ndarray = None, asynchronous: np.ndarray = None):
+        super().__init__()
+
         assert not all(s is None for s in (vision, somatosensation, proprioception, goal)), \
             "Sensation requires data for at least on sense (or 'goal')."
 

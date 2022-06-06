@@ -1,5 +1,11 @@
+import logging
+
+logging.getLogger("requests").setLevel(logging.WARNING)
+
 import sys
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import pprint
 import traceback
 
@@ -14,7 +20,6 @@ if not mujoco_path:
 import distance
 import numpy as np
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
 import argparse
@@ -164,7 +169,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
 if __name__ == "__main__":
     tf.get_logger().setLevel('INFO')
-    all_envs = [e.id for e in list(gym.envs.registry.all())]
+    all_envs = [e.id for e in list(gym.envs.registry.values())]
 
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")

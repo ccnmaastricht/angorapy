@@ -3,6 +3,7 @@
 import gc
 import json
 import os
+import random
 import re
 import statistics
 import time
@@ -216,7 +217,7 @@ class PPOAgent:
         self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
-        self.agent_id = mpi_comm.bcast(round(time.time()), root=0)
+        self.agent_id = mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)

@@ -127,17 +127,15 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
 
     def _set_observation_space(self, obs):
-        # observation space
+        # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
-            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
+            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
             observation=spaces.Dict(
-                {name: spaces.Box(-np.inf, np.inf, shape=val.shape, dtype="float32")
+                {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape, dtype=float)
                  for name, val in obs['observation'].dict().items()}
             ),
         ))
-
-        print(self.observation_space)
 
     def set_delta_t_simulation(self, new: float):
         """Set new value for the simulation delta t."""
@@ -221,19 +219,25 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         return obs, reward, done, info
 
-    def reset(self):
+    def reset(self, return_info=False, **kwargs):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
         # is possible to get into a state with numerical issues (e.g. due to penetration or
         # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
         # In this case, we just keep randomizing until we eventually achieve a valid initial
         # configuration.
-        super(BaseShadowHandEnv, self).reset()
+        super(BaseShadowHandEnv, self).reset(**kwargs)
         did_reset_sim = False
+
         while not did_reset_sim:
             did_reset_sim = self._reset_sim()
         self.goal = self._sample_goal().copy()
+
         obs = self._get_obs()
-        return obs
+
+        if return_info:
+            return obs, {}
+        else:
+            return obs
 
     def reset_model(self):
         self.set_state(**self.initial_state)
