@@ -48,10 +48,10 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         """Returns a modified observation and info."""
         observation, reward, done, info = self.env.step(action)
 
-        if "achieved_goal" in observation.keys():
+        if hasattr(observation, "keys") and "achieved_goal" in observation.keys():
             info["achieved_goal"] = observation["achieved_goal"]
 
-        if "desired_goal" in observation.keys():
+        if hasattr(observation, "keys") and "desired_goal" in observation.keys():
             info["desired_goal"] = observation["desired_goal"]
 
         return self.observation(observation), reward, done, info

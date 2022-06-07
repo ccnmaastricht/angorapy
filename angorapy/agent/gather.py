@@ -123,7 +123,7 @@ class Gatherer(BaseGatherer):
             rewards.append(reward)
             dones.append(done)
 
-            if "achieved_goal" in info.keys():
+            if hasattr(info, "keys") and "achieved_goal" in info.keys():
                 achieved_goals.append(info["achieved_goal"])
 
             # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
