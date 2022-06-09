@@ -59,6 +59,6 @@ unzip -o storage.zip -d storage/
 cp -r storage/$BASE_DIRECTORY/* storage/
 
 # cleanup
-IFS="/" read -a PATH_ARRAY <<< $BASE_DIRECTORY
-rm -r storage/$PATH_ARRAY[0]
+IFS="\/" read -a PATH_ARRAY <<< "$BASE_DIRECTORY"
+rm -r storage/${PATH_ARRAY[1]}
 rm storage.zip
