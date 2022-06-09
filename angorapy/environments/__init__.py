@@ -6,11 +6,20 @@ from mpi4py import MPI
 
 from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 
+try:
+    import mujoco
+    has_mujoco = True
 
-if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in os.environ.keys():
     if MPI.COMM_WORLD.rank == 0:
         print("A MuJoCo path exists. MuJoCo is being loaded...")
 
+except ImportError as e:
+    has_mujoco = False
+
+    if MPI.COMM_WORLD.rank == 0:
+        print("No MuJoCo path exists. MuJoCo is not going to be loaded...")
+
+if has_mujoco:
     from angorapy.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
     from angorapy.environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
@@ -236,6 +245,3 @@ if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in
         max_episode_steps=1000,
         reward_threshold=200,
     )
-else:
-    if MPI.COMM_WORLD.rank == 0:
-        print("No MuJoCo path exists. MuJoCo is not going to be loaded...")

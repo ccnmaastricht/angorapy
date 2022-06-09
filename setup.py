@@ -14,6 +14,7 @@ setup(
         "numpy==1.19.2",
         "Box2D",
         "gym==0.24.1",
+        "mujoco",
         "tensorflow==2.4.2",
         "mpi4py==3.1.3",
         "tqdm",

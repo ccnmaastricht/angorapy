@@ -73,11 +73,10 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
 RUN pip install /ang_tmp
-RUN pip uninstall mujoco-py
+RUN pip install mujoco
 RUN rm -rf /ang_tmp
 
 WORKDIR /
-RUN ls -la
 COPY angorapy/train.py train.py
 
 # FINAL
