@@ -14,7 +14,7 @@ if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in
     from angorapy.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
     from angorapy.environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
-        OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous
+        OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, HumanoidManipulateBlockAsynchronous, HumanoidManipulateBlock
     from angorapy.environments.nrp.reach import NRPShadowHandReachSimple, NRPShadowHandReach
     from angorapy.environments.nrp.shadowhand import BaseNRPShadowHandEnv
     from angorapy.environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential, OldShadowHandReach
@@ -232,6 +232,21 @@ if os.path.isdir(os.path.expanduser('~/.mujoco/')) or "MUJOCO_PY_MUJOCO_PATH" in
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
+
+    gym.envs.register(
+        id=f'HumanoidManipulateBlockAsynchronous-v0',
+        entry_point='angorapy.environments:HumanoidManipulateBlockAsynchronous',
+        kwargs={"delta_t": 0.008},
+        max_episode_steps=50 * 100,
+    )
+
+    gym.envs.register(
+        id=f'HumanoidManipulateBlock-v0',
+        entry_point='angorapy.environments:HumanoidManipulateBlock',
+        kwargs={"delta_t": 0.008},
+        max_episode_steps=50 * 100,
+    )
+
 
     # MODIFIED ENVIRONMENTS
 

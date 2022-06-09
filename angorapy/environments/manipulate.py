@@ -516,8 +516,19 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         }
 
 
+class HumanoidManipulateBlock(HumanoidManipulateBlockDiscrete):
+    continuous = True
+    asynchronous = False
+
+
 class HumanoidManipulateBlockDiscreteAsynchronous(HumanoidManipulateBlockDiscrete):
     asynchronous = True
+    continuous = False
+
+
+class HumanoidManipulateBlockAsynchronous(HumanoidManipulateBlockDiscrete):
+    asynchronous = True
+    continuous = True
 
 
 class OpenAIManipulateDiscrete(OpenAIManipulate):
