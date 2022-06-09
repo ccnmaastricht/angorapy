@@ -2,17 +2,6 @@ from typing import Dict
 
 import numpy as np
 
-from gym import error
-
-try:
-    import mujoco_py
-except ImportError as e:
-    raise error.DependencyNotInstalled(
-        "{}. (HINT: you need to install mujoco_py, and also perform the setup instructions here: https://github.com/openai/mujoco-py/.)".format(
-            e
-        )
-    )
-
 
 def robot_get_obs(model, data):
     """Returns all joint positions and velocities associated with a robot."""

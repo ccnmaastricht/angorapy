@@ -74,6 +74,7 @@ RUN mkdir /ang_tmp
 COPY . /ang_tmp
 RUN pip install /ang_tmp
 RUN pip install mujoco
+RUN pip install imageio
 RUN rm -rf /ang_tmp
 
 WORKDIR /

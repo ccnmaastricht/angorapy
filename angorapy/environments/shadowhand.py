@@ -7,10 +7,8 @@ import random
 from typing import Callable, Union
 
 import gym
-import mujoco_py
 import numpy as np
 from gym import spaces
-from gym.envs.mujoco import MujocoEnv
 from gym.utils import seeding
 from angorapy.common import reward
 

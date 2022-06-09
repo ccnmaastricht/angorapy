@@ -2,7 +2,6 @@ import collections
 import random
 from typing import Union, Callable
 
-import mujoco_py
 import numpy as np
 from angorapy.environments.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector

@@ -1,7 +1,6 @@
 import os
 
 import mujoco
-import mujoco_py
 import numpy as np
 from gym import utils
 from angorapy.environments import rotations
