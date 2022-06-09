@@ -11,7 +11,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy==1.20",
+        "numpy==1.19.2",
         "Box2D",
         "gym==0.24.1",
         "tensorflow==2.4.2",
@@ -31,6 +31,8 @@ setup(
         "protobuf==3.19.0",
 
         # webinterface
+        "itsdangerous==2.0.1",
+        "werkzeug==2.0.3",
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
         "bokeh",
