@@ -11,9 +11,9 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy==1.19.2",
+        "numpy==1.20",
         "Box2D",
-        "gym==0.18",
+        "gym==0.24.1",
         "tensorflow==2.4.2",
         "mpi4py==3.1.3",
         "tqdm",

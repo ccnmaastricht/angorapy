@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install software
+# INSTALL MPI
 RUN apt-get update
 RUN apt-get install -y file g++ gcc make gdb strace ca-certificates --no-install-recommends
 RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
@@ -73,7 +73,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
 RUN pip install /ang_tmp
-RUN pip install mujoco-py
+RUN pip uninstall mujoco-py
 RUN rm -rf /ang_tmp
 
 WORKDIR /
