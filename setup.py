@@ -1,9 +1,14 @@
 from setuptools import setup, find_packages
 
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
+
 setup(
     name='angorapy',
-    version='0.7.0',
+    version='0.7.1',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
+    long_description=long_description,
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',
     author_email='research@tonioweidler.de',
