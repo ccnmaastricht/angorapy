@@ -1,20 +1,21 @@
+*venv/
 docs/analysis/*
 MUJOCO_LOG.TXT
 
-dexterity/monitor/static/experiments/
+angorapy/monitor/static/experiments/
 storage/
 !storage/saved_models
 storage/saved_models/*
 !/storage/saved_models/*.zip
 
-dexterity/analysis/monitor/experiments/
-dexterity/analysis/storage/
+angorapy/analysis/monitor/experiments/
+angorapy/analysis/storage/
 
 docs/monitor/experiments/
 docs/benchmarks/backup/*
 docs/benchmarks/*.pdf
 docs/storage/
-dexterity/monitor/experiments/
+angorapy/monitor/experiments/
 rnnconstruction/firsttrainhistory
 rnnconstruction/saved/
 
