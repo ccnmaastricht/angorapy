@@ -61,8 +61,7 @@ ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.2/lib64:$LD_LIBRARY_PATH"
 
 # matplotlib
-RUN mkdir /mplconfs
-ENV MPLCONFIGDIR="/mplconfs"
+ENV MPLCONFIGDIR=/var/cache/matplotlib
 
 # SETUP ENV
 ENV VIRTUAL_ENV=/venv

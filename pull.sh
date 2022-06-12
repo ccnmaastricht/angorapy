@@ -37,13 +37,13 @@ fi
 # zip on server and pull
 if [ -z ${ID} ]; then
   echo "Zipping entire storage."
-  ZIP_COMMAND="zip -r $BASE_DIRECTORY/storage.zip $BASE_DIRECTORY/ -x $BASE_DIRECTORY/experience/\* "
+  ZIP_COMMAND="zip -ur $BASE_DIRECTORY/storage.zip $BASE_DIRECTORY/ -x $BASE_DIRECTORY/experience/\* "
   if [ "$ONLY_STATS" = true ]; then
     ZIP_COMMAND="$ZIP_COMMAND -x $BASE_DIRECTORY/saved_models/\*"
   fi
 else
   echo "Updating/Adding $ID to zip file."
-  ZIP_COMMAND="zip -r $BASE_DIRECTORY/storage.zip $BASE_DIRECTORY/experiments/$ID/ "
+  ZIP_COMMAND="zip -ur $BASE_DIRECTORY/storage.zip $BASE_DIRECTORY/experiments/$ID/ "
   if [ "$ONLY_STATS" = false ]; then
     ZIP_COMMAND="$ZIP_COMMAND $BASE_DIRECTORY/saved_models/$ID/"
   fi
@@ -55,10 +55,10 @@ echo $ZIP_COMMAND
 ssh $HOST $ZIP_COMMAND
 scp $HOST:$BASE_DIRECTORY/storage.zip .
 
-unzip -n storage.zip -d storage/
+unzip -o storage.zip -d storage/
 cp -r storage/$BASE_DIRECTORY/* storage/
 
 # cleanup
-IFS="/" read -a PATH_ARRAY <<< $BASE_DIRECTORY
-rm -r storage/$PATH_ARRAY[0]
+IFS="/" read -a PATH_ARRAY <<< "$BASE_DIRECTORY"
+rm -r storage/${PATH_ARRAY[1]}
 rm storage.zip

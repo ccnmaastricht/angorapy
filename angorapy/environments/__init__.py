@@ -23,7 +23,8 @@ if has_mujoco:
     from angorapy.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
     from angorapy.environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
-        OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous
+        OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, \
+        HumanoidManipulateBlockAsynchronous, HumanoidManipulateBlock
     from angorapy.environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
 
     # SHADOW HAND
@@ -201,6 +202,21 @@ if has_mujoco:
         kwargs={"delta_t": 0.008},
         max_episode_steps=50 * 100,
     )
+
+    gym.envs.register(
+        id=f'HumanoidManipulateBlockAsynchronous-v0',
+        entry_point='angorapy.environments:HumanoidManipulateBlockAsynchronous',
+        kwargs={"delta_t": 0.008},
+        max_episode_steps=50 * 100,
+    )
+
+    gym.envs.register(
+        id=f'HumanoidManipulateBlock-v0',
+        entry_point='angorapy.environments:HumanoidManipulateBlock',
+        kwargs={"delta_t": 0.008},
+        max_episode_steps=50 * 100,
+    )
+
 
     # MODIFIED ENVIRONMENTS
 
