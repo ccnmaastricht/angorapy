@@ -83,8 +83,8 @@ class PPOAgent:
     def __init__(self,
                  model_builder: Callable,
                  environment: BaseWrapper,
-                 horizon: int,
-                 workers: int,
+                 horizon: int = 1024,
+                 workers: int = 8,
                  learning_rate: float = 0.001,
                  discount: float = 0.99,
                  lam: float = 0.95,
@@ -313,7 +313,7 @@ class PPOAgent:
         """
 
         # start monitor
-        if is_root:
+        if is_root and monitor is not None:
             monitor.make_metadata(additional_hps={
                 "epochs_per_cycle": epochs,
                 "batch_size": batch_size,

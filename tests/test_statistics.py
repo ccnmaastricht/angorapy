@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from utilities.statistics import increment_mean_var
+from angorapy.utilities.statistics import increment_mean_var
 
 
 class StatisticsTest(unittest.TestCase):
