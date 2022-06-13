@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+{% block title %} Comparison {% endblock %}
+
+<!-- Page Content -->
+{% block inpage_title %}
+    <h1>Policy Comparison</h1>
+    <h3 class="mt-3" id="agentId"> {{ info.ids }} </h3>
+{% endblock %}
+
+{% block side_nav %}
+        <ul class="list-unstyled components">
+            <li class="active"><a href="#statistics-view">Training Statistics</a></li>
+            <li><a href="#hp-view">Hyperparameters</a></li>
+            <li><a href="#episode-gifs-view">Episode GIFs</a></li>
+            <li><a href="#model-view">Network Graph</a></li>
+        </ul>
+{% endblock %}
+
+{% block page_content %}
+
+    <div class="topic-group">
+        <div class="row justify-content-center">
+            <div class="col col-12">
+                <div id="reward-plot">
+                    {{ info.plots.reward[0]|safe }}
+                    {{ info.plots.reward[1]|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="topic-group">
+        <div class="row justify-content-center">
+            <div class="col col-12">
+                <div id="grouped-reward-plot">
+                    {{ info.plots.reward_grouped[0]|safe }}
+                    {{ info.plots.reward_grouped[1]|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block js_footer %}
+
+<script>
+    $('.carousel').carousel();
+
+    $("nav ul li").on("click", function () {
+        $("nav").find(".active").removeClass("active");
+        $(this).addClass("active");
+    });
+
+    $(".reload-button").on("click", function () {
+        console.log("jo");
+        location.reload();
+    });
+
+    $("#agentId").on("click", function() {
+        /* Get the text field */
+        let copyText = $("#copyText")[0];
+
+        copyText.value = $("#agentId")[0].innerHTML;
+        copyText.select();
+        document.execCommand("copy");
+    });
+
+    $("#evaluate-button").on("click", function () {
+        let eid = {{ info.current_id }};
+        $.ajax({
+            type: 'POST',
+            url: "{{ url_for("evaluate") }}",
+            contentType: 'application/json;charset=UTF-8',
+            data: JSON.stringify({'id': eid}),
+            success: function (ret) {
+                console.log(ret);
+            }
+        });
+    });
+
+</script>
+
+{% endblock %}

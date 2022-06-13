@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name="dexterity"
+#SBATCH --job-name="angorapy"
 #SBATCH --account="ich020"
 #SBATCH --time=24:00:00
 #SBATCH --nodes=32

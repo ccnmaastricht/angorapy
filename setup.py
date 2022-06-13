@@ -6,14 +6,15 @@ setup(
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',
-    author_email='t.weidler@maastrichtuniversity.nl',
+    author_email='research@tonioweidler.de',
     license='GPL-3.0',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy==1.19.2",
+        "numpy==1.19.5",
         "Box2D",
-        "gym==0.18",
+        "gym==0.24.0",
+        "mujoco",
         "tensorflow==2.4.2",
         "mpi4py==3.1.3",
         "tqdm",
@@ -28,13 +29,20 @@ setup(
         "nvidia-ml-py3",
         "seaborn",
         "distance",
+        "protobuf==3.19.0",
 
         # webinterface
+        "itsdangerous==2.0.1",
+        "werkzeug==2.0.3",
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
         "bokeh",
         "flask_jsglue"
     ],
+
+    package_data={
+        "angorapy": ["environments/assets/**/*"],
+    },
 
     classifiers=[
         'Development Status :: 3 - Alpha',
