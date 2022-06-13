@@ -13,14 +13,13 @@ RUN apt-key del 7fa2af80
 
 COPY docker/cuda-keyring_1.0-1_all.deb cuda-keyring_1.0-1_all.deb
 RUN dpkg -i cuda-keyring_1.0-1_all.deb
-RUN apt-get update
 
 WORKDIR /usr/local/cuda-11.2/lib64
 RUN ln -s libcusolver.so.11 libcusolver.so.10
 WORKDIR /
 
 # install packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
@@ -35,12 +34,14 @@ RUN apt-get update && apt-get install -y \
     patchelf \
     software-properties-common \
     gfortran \
+    && apt-get install --no-install-recommends -y file g++ gcc make gdb strace ca-certificates \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get --no-install-recommends install -y python3.8-dev python3.8 python3-pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # INSTALL MPI
-RUN apt-get update
-RUN apt-get install -y file g++ gcc make gdb strace ca-certificates --no-install-recommends
 RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
 RUN tar xf mpich-3.1.4.tar.gz
 WORKDIR mpich-3.1.4
@@ -49,11 +50,6 @@ RUN make -j$(nproc)
 RUN make install
 RUN ldconfig
 WORKDIR /
-
-# INSTALL PYTHON
-RUN add-apt-repository -y ppa:deadsnakes/ppa \
-    && apt-get update \
-    && apt-get install -y python3.8-dev python3.8 python3-pip
 
 # ENVIRONMENT VARIABLES
 ENV LD_LIBRARY_PATH="/usr/lib/nvidia:$LD_LIBRARY_PATH"
@@ -72,13 +68,16 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # INSTALL TOOL
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
-RUN pip install /ang_tmp
-RUN pip install mujoco
-RUN pip install imageio
-RUN rm -rf /ang_tmp
+RUN pip install /ang_tmp \
+    && pip install mujoco \
+    && pip install imageio \
+    && rm -rf /ang_tmp
 
 WORKDIR /
 COPY angorapy/train.py train.py
+
+# CLEANUP
+RUN pip cache purge
 
 # FINAL
 CMD [ "/bin/bash" ]
