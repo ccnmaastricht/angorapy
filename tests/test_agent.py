@@ -50,7 +50,7 @@ class AgentTest(unittest.TestCase):
         except Exception:
             self.fail("Discrete drill raises error.")
 
-    def test_drill_dexterity_multicontinuous(self):
+    def test_drill_manipulate_multicontinuous(self):
         """Test drilling of discrete agent (LunarLander)."""
 
         try:
@@ -62,7 +62,7 @@ class AgentTest(unittest.TestCase):
         except Exception:
             self.fail("HumanoidManipulateBlockDiscreteAsynchronous drill raises error.")
 
-    def test_drill_dexterity_continuous(self):
+    def test_drill_manipulate_continuous(self):
         """Test drilling of discrete agent (LunarLander)."""
 
         try:
@@ -73,6 +73,30 @@ class AgentTest(unittest.TestCase):
             agent.drill(n=2, epochs=2, batch_size=64)
         except Exception:
             self.fail("HumanoidManipulateBlockDiscreteAsynchronous drill raises error.")
+
+    def test_drill_reach(self):
+        """Test drilling of discrete agent (LunarLander)."""
+
+        try:
+            wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+            env = make_env("ReachAbsolute-v0", reward_config=None, transformers=wrappers)
+            build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
+            agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
+            agent.drill(n=2, epochs=2, batch_size=64)
+        except Exception:
+            self.fail("ReachAbsolute drill raises error.")
+
+    def test_drill_freereach(self):
+        """Test drilling of free reach agent."""
+
+        try:
+            wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+            env = make_env("FreeReachAbsolute-v0", reward_config=None, transformers=wrappers)
+            build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
+            agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
+            agent.drill(n=2, epochs=2, batch_size=64)
+        except Exception:
+            self.fail("FreeReachAbsolute drill raises error.")
 
 
 if __name__ == '__main__':

@@ -318,7 +318,7 @@ class FreeReach(Reach):
 
     def get_target_finger_position(self):
         """Get position of the target finger in space."""
-        return self.sim.data.get_site_xpos(FINGERTIP_SITE_NAMES[np.where(self.goal == 1)[0].item()]).flatten()
+        return self.data.site(FINGERTIP_SITE_NAMES[np.where(self.goal == 1)[0].item()]).xpos.flatten()
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(self.get_thumb_position(), self.get_target_finger_position())
