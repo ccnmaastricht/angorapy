@@ -42,24 +42,38 @@ class Gatherer(BaseGatherer):
     This is the default PPO behaviour.
     """
 
-    def __init__(self, worker_id: int, exp_id: int, distribution: BasePolicyDistribution):
+    def __init__(
+            self,
+            worker_id: int,
+            exp_id: int,
+            distribution: BasePolicyDistribution, 
+            horizon: int,
+            discount: float,
+            lam: float,
+            subseq_length: int):
         """
 
         Args:
+            worker_id:
+            exp_id:
+            horizon:
+            lam:
+            discount:
             distribution:   policy distribution object
         """
-
         self.worker_id = worker_id
         self.exp_id = exp_id
+
+        # parameters
         self.distribution = distribution
+        self.horizon = horizon
+        self.lam = lam
+        self.discount = discount
+        self.subseq_length = subseq_length
 
     def collect(self,
                 joint: tf.keras.Model,
                 env: BaseWrapper,
-                horizon: int,
-                discount: float,
-                lam: float,
-                subseq_length: int,
                 collector_id: int) -> StatBundle:
         """Collect a batch shard of experience for a given number of time steps.
 
@@ -87,11 +101,11 @@ class Gatherer(BaseGatherer):
 
         # buffer storing the experience and stats
         if is_recurrent:
-            assert horizon % subseq_length == 0, "Subsequence length would require cutting of part of the n_steps."
-            buffer = TimeSequenceExperienceBuffer(horizon // subseq_length, state_dim, action_dim,
-                                                  is_continuous, subseq_length)
+            assert self.horizon % self.subseq_length == 0, "Subsequence length would require cutting of part of the n_steps."
+            buffer = TimeSequenceExperienceBuffer(self.horizon // self.subseq_length, state_dim, action_dim,
+                                                  is_continuous, self.subseq_length)
         else:
-            buffer = ExperienceBuffer(horizon, state_dim, action_dim, is_continuous)
+            buffer = ExperienceBuffer(self.horizon, state_dim, action_dim, is_continuous)
 
         # go for it
         t, current_episode_return, episode_steps, current_subseq_length = 0, 0, 1, 0
@@ -100,7 +114,7 @@ class Gatherer(BaseGatherer):
         achieved_goals = []
         state = env.reset()
 
-        while t < horizon:
+        while t < self.horizon:
             current_subseq_length += 1
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
@@ -127,7 +141,7 @@ class Gatherer(BaseGatherer):
                 achieved_goals.append(info["achieved_goal"])
 
             # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
-            if is_recurrent and (current_subseq_length == subseq_length or done):
+            if is_recurrent and (current_subseq_length == self.subseq_length or done):
                 buffer.push_seq_to_buffer(states=states,
                                           actions=actions,
                                           action_probabilities=action_probabilities,
@@ -146,12 +160,12 @@ class Gatherer(BaseGatherer):
                 # terminal state that we just observed
                 episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
                                                                  values[-episode_steps:] + [0],
-                                                                 discount, lam)
+                                                                 self.discount, self.lam)
                 episode_returns = episode_advantages + values[-episode_steps:]
 
                 if is_recurrent:
                     # skip as many steps as are missing to fill the subsequence, then push adv ant ret to buffer
-                    t += subseq_length - (t % subseq_length) - 1
+                    t += self.subseq_length - (t % self.subseq_length) - 1
                     buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
                 else:
                     advantages.append(episode_advantages)
@@ -180,7 +194,7 @@ class Gatherer(BaseGatherer):
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
             leftover_advantages = estimate_episode_advantages(rewards[-episode_steps + 1:], values[-episode_steps:],
-                                                              discount, lam)
+                                                              self.discount, self.lam)
             if is_recurrent:
                 leftover_returns = leftover_advantages + values[-len(leftover_advantages) - 1:-1]
                 buffer.push_adv_ret_to_buffer(leftover_advantages, leftover_returns)
