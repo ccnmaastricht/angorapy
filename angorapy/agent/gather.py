@@ -122,12 +122,11 @@ class Gatherer(BaseGatherer):
             policy_out = flatten(joint(prepared_state))
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
 
-            states.append(state)
-            values.append(np.squeeze(value))
-
             # from the action distribution sample an action and remember both the action and its probability
             action, action_probability = self.select_action(predicted_distribution_parameters)
 
+            states.append(state)
+            values.append(np.squeeze(value))
             actions.append(action)
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
