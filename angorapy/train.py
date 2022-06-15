@@ -1,5 +1,11 @@
+import logging
+
+logging.getLogger("requests").setLevel(logging.WARNING)
+
 import sys
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import pprint
 import traceback
 
@@ -14,7 +20,6 @@ if not mujoco_path:
 import distance
 import numpy as np
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
 import argparse
@@ -84,7 +89,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
             print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
             settings["model"] = "gru"
 
-        if len(env.observation_space["observation"]["vision"].shape) > 1:
+        if "vision" in env.observation_space["observation"].keys() and len(env.observation_space["observation"]["vision"].shape) > 1:
             build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
                                              blind=False)
         else:
@@ -165,7 +170,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
 if __name__ == "__main__":
     tf.get_logger().setLevel('INFO')
-    all_envs = [e.id for e in list(gym.envs.registry.all())]
+    all_envs = [e.id for e in list(gym.envs.registry.values())]
 
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Train a PPO Agent on some task.")

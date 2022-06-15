@@ -1,13 +1,13 @@
 import os
 
-import mujoco_py
+import mujoco
 import numpy as np
 from gym import utils
-from gym.envs.robotics import rotations
-from gym.envs.robotics.utils import robot_get_obs
+from angorapy.environments import rotations
+from angorapy.environments.utils import robot_get_obs
 from scipy.spatial import transform
 
-from angorapy.common.const import VISION_WH, N_SUBSTEPS
+from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.reward import manipulate
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import MANIPULATE_BASE
@@ -84,10 +84,6 @@ class BaseManipulate(BaseShadowHandEnv):
             vision (bool): indicator whether the environment should return frames (True) or the exact object
                 position (False)
         """
-        if vision:
-            # init rendering [IMPORTANT]
-            from mujoco_py import GlfwContext
-            GlfwContext(offscreen=True)  # in newer version of gym use quiet=True to silence this
 
         self.touch_get_obs = touch_get_obs
         self.vision = vision
@@ -108,6 +104,11 @@ class BaseManipulate(BaseShadowHandEnv):
         assert self.target_rotation in ['ignore', 'fixed', 'xyz', 'z', 'parallel']
         initial_qpos = initial_qpos or {}
 
+        self.consecutive_goals_reached = 0
+        self.steps_with_current_goal = 0
+        self.previous_achieved_goal = self._get_achieved_goal()
+        self._set_default_reward_function_and_config()
+
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,
                          n_substeps=n_substeps,
@@ -115,24 +116,9 @@ class BaseManipulate(BaseShadowHandEnv):
                          relative_control=relative_control,
                          model=model_path)
 
-        self._touch_sensor_id_site_id = []
-        self._touch_sensor_id = []
-
-        # get touch sensor site names and their ids
-        for k, v in self.sim.model._sensor_name2id.items():
-            if 'robot0:TS_' in k:
-                self._touch_sensor_id_site_id.append(
-                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
-                self._touch_sensor_id.append(v)
-
         # set touch sensors rgba values
         for _, site_id in self._touch_sensor_id_site_id:
-            self.sim.model.site_rgba[site_id][3] = 0.0
-
-        self.consecutive_goals_reached = 0
-        self.steps_with_current_goal = 0
-        self.previous_achieved_goal = self._get_achieved_goal()
-        self._set_default_reward_function_and_config()
+            self.model.site_rgba[site_id][3] = 0.0
 
     def _set_default_reward_function_and_config(self):
         self.reward_function = manipulate
@@ -144,10 +130,14 @@ class BaseManipulate(BaseShadowHandEnv):
             self.reward_config.keys()), "Incomplete manipulate reward configuration."
 
     def _get_achieved_goal(self):
-        # Object position and rotation.
-        object_qpos = self.sim.data.get_joint_qpos('object:joint')
-        assert object_qpos.shape == (7,)
-        return object_qpos.copy()
+        """Object position and rotation."""
+        if hasattr(self, "data"):
+            object_qpos = self.data.jnt('object:joint').qpos
+            assert object_qpos.shape == (7,)
+            return object_qpos.copy()
+        else:
+            # simulation not initialized yet
+            return np.zeros(7)  # todo double check
 
     def _goal_distance(self, goal_a, goal_b):
         assert goal_a.shape == goal_b.shape
@@ -189,22 +179,24 @@ class BaseManipulate(BaseShadowHandEnv):
 
         return achieved_both
 
-    def _env_setup(self, initial_qpos):
-        for name, value in initial_qpos.items():
-            self.sim.data.set_joint_qpos(name, value)
-        self.sim.forward()
+    def _env_setup(self, initial_state):
+        super()._env_setup(initial_state)
 
-    def reset(self):
+        self.initial_goal = self._get_achieved_goal().copy()
+        self.palm_xpos = self.data.body('robot0:palm').xpos.copy()
+
+        self.goal = self._sample_goal()
+
+    def reset(self, **kwargs):
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
 
-        return super().reset()
+        return super().reset(**kwargs)
 
     def _reset_sim(self):
-        self.sim.set_state(self.initial_state)
-        self.sim.forward()
+        self.reset_model()
 
-        initial_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        initial_qpos = self.data.jnt('object:joint').qpos.copy()
         initial_pos, initial_quat = initial_qpos[:3], initial_qpos[3:]
         assert initial_qpos.shape == (7,)
         assert initial_pos.shape == (3,)
@@ -242,22 +234,19 @@ class BaseManipulate(BaseShadowHandEnv):
 
         initial_quat /= np.linalg.norm(initial_quat)
         initial_qpos = np.concatenate([initial_pos, initial_quat])
-        self.sim.data.set_joint_qpos('object:joint', initial_qpos)
+        self.data.jnt('object:joint').qpos[:] = initial_qpos
 
         def is_on_palm():
-            self.sim.forward()
-            cube_middle_idx = self.sim.model.site_name2id('object:center')
-            cube_middle_pos = self.sim.data.site_xpos[cube_middle_idx]
+            mujoco.mj_forward(self.model, self.data)
+            cube_middle_pos = self.data.site("object:center").xpos
             is_on_palm = (cube_middle_pos[2] > 0.04)
             return is_on_palm
 
         # Run the simulation for a bunch of timesteps to let everything settle in.
         for _ in range(10):
             self._set_action(np.zeros(20))
-            try:
-                self.sim.step()
-            except mujoco_py.MujocoException:
-                return False
+            mujoco.mj_step(self.model, self.data)
+
         return is_on_palm()
 
     def _sample_goal(self):
@@ -267,9 +256,9 @@ class BaseManipulate(BaseShadowHandEnv):
             assert self.target_position_range.shape == (3, 2)
             offset = self.np_random.uniform(self.target_position_range[:, 0], self.target_position_range[:, 1])
             assert offset.shape == (3,)
-            target_pos = self.sim.data.get_joint_qpos('object:joint')[:3] + offset
+            target_pos = self.data.jnt('object:joint').qpos[:3] + offset
         elif self.target_position in ['ignore', 'fixed']:
-            target_pos = self.sim.data.get_joint_qpos('object:joint')[:3]
+            target_pos = self.data.jnt('object:joint').qpos[:3]
         else:
             raise error.Error('Unknown target_position option "{}".'.format(self.target_position))
         assert target_pos is not None
@@ -292,7 +281,7 @@ class BaseManipulate(BaseShadowHandEnv):
             axis = self.np_random.uniform(-1., 1., size=3)
             target_quat = quat_from_angle_and_axis(angle, axis)
         elif self.target_rotation in ['ignore', 'fixed']:
-            target_quat = self.sim.data.get_joint_qpos('object:joint')
+            target_quat = self.data.jnt('object:joint').qpos
         else:
             raise error.Error('Unknown target_rotation option "{}".'.format(self.target_rotation))
         assert target_quat is not None
@@ -312,19 +301,20 @@ class BaseManipulate(BaseShadowHandEnv):
             if self.target_position == 'ignore':
                 # Move the object to the side since we do not care about it's position.
                 goal[0] += 0.15
-            self.sim.data.set_joint_qpos('target:joint', goal)
-            self.sim.data.set_joint_qvel('target:joint', np.zeros(6))
 
-            if 'object_hidden' in self.sim.model.geom_names:
-                hidden_id = self.sim.model.geom_name2id('object_hidden')
-                self.sim.model.geom_rgba[hidden_id, 3] = 1.
+            self.data.jnt('target:joint').qpos[:] = goal
+            self.data.jnt('target:joint').qvel[:] = np.zeros(6)
 
-        self.sim.forward()
+            if 'object_hidden' in self.model.names.split(b"\x00"):
+                hidden_id = self.model.geom_name2id('object_hidden')
+                self.model.geom_rgba[hidden_id, 3] = 1.
+
+        mujoco.mj_forward(self.model, self.data)
 
     def _get_obs(self):
-        object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        object_qpos = self.data.jnt('object:joint').qpos.copy()
         target_orientation = self.goal.ravel().copy()[3:]
-        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
+        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.model, self.data)
 
         proprioception = np.concatenate([
             hand_joint_angles,
@@ -346,11 +336,10 @@ class BaseManipulate(BaseShadowHandEnv):
         """Heuristically determine whether the object still is in the hand."""
 
         # determine object center position
-        obj_center_idx = self.sim.model.site_name2id('object:center')
-        obj_center_pos = self.sim.data.site_xpos[obj_center_idx]
+        obj_center_pos = self.data.site("object:center").xpos
 
         # determine palm center position
-        palm_center_pos = get_palm_position(self.sim)
+        palm_center_pos = get_palm_position(self.model)
 
         dropped = (
                 obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
@@ -431,7 +420,7 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
 
     def _get_obs(self):
         finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()
-        object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        object_qpos = self.data.jnt('object:joint').qpos.copy()
         target_orientation = self.goal.ravel().copy()[3:]
 
         target_quat = transform.Rotation.from_quat(target_orientation)
@@ -471,13 +460,13 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         """Gather humanoid senses and asynchronous information."""
 
         # vision
-        object_qpos = self.sim.data.get_joint_qpos('object:joint').copy()
+        object_qpos = self.data.jnt('object:joint').qpos.copy()
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]
 
         # proprioception
-        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
+        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.model, self.data)
 
         proprioception = np.concatenate([
             hand_joint_angles,
@@ -485,16 +474,16 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         ])
 
         # touch
-        touch = self.sim.data.sensordata[self._touch_sensor_id]
+        touch = self.data.sensordata[self._touch_sensor_id]
 
         # asynchronous information
-        finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()
+        finger_tip_positions = np.array([self.data.site(name).xpos for name in FINGERTIP_SITE_NAMES]).flatten()
         target_quat = transform.Rotation.from_quat(target_orientation)
         current_quat = transform.Rotation.from_quat((object_qpos[3:]))
         relative_target_orientation = (target_quat * current_quat.inv()).as_quat()
 
-        object_positional_velocity = self.sim.data.get_body_xvelp('object')
-        object_angular_velocity = self.sim.data.get_body_xvelr('object')  # quaternions in OpenAI model
+        object_positional_velocity = self.data.body("object").cvel[3:]  # todo double check if correct part
+        object_angular_velocity = self.data.body("object").cvel[:3]  # quaternions in OpenAI model
 
         asynchronous = np.concatenate([
             finger_tip_positions,
@@ -516,8 +505,19 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         }
 
 
+class HumanoidManipulateBlock(HumanoidManipulateBlockDiscrete):
+    continuous = True
+    asynchronous = False
+
+
 class HumanoidManipulateBlockDiscreteAsynchronous(HumanoidManipulateBlockDiscrete):
     asynchronous = True
+    continuous = False
+
+
+class HumanoidManipulateBlockAsynchronous(HumanoidManipulateBlockDiscrete):
+    asynchronous = True
+    continuous = True
 
 
 class OpenAIManipulateDiscrete(OpenAIManipulate):
@@ -544,3 +544,7 @@ class ManipulateEgg(BaseManipulate, utils.EzPickle):
                                 vision=vision,
                                 relative_control=relative_control
                                 )
+
+
+if __name__ == '__main__':
+    hand = HumanoidManipulateBlockDiscrete()

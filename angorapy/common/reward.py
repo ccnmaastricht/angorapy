@@ -2,22 +2,22 @@ from typing import List
 
 import numpy as np
 import tqdm
-from gym.envs.robotics.hand.reach import FINGERTIP_SITE_NAMES
+from angorapy.environments.shadowhand import FINGERTIP_SITE_NAMES
 
 from angorapy.environments.shadowhand import get_fingertip_distance
 
 
 # HELPER FUNCTIONS
 
-def calculate_force_penalty(simulator) -> float:
+def calculate_force_penalty(data) -> float:
     """Calculate a penalty for applying force. Sum of squares of forces, ignoring the wrist."""
-    return (simulator.data.actuator_force[2:] ** 2).sum()
+    return (data.actuator_force[2:] ** 2).sum()
 
 
-def calculate_tendon_stress_penalty(simulator) -> float:
+def calculate_tendon_stress_penalty(data) -> float:
     """Calculate a penalty for applying force. Sum of squares of forces, ignoring the wrist. Scaled up by a constant
     to match force penalty in average scale."""
-    return ((simulator.data.ten_length ** 2) * 116).sum()
+    return ((data.ten_length ** 2) * 116).sum()
 
 
 def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -> float:
@@ -48,7 +48,7 @@ def reach(env, achieved_goal, goal, info: dict):
     """Simple reward function for reaching tasks, combining distance, force and success."""
     return (- get_fingertip_distance(achieved_goal, goal)
             + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
-            - calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"])
+            - calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"])
 
 
 def free_reach(env, achieved_goal, goal, info: dict):
@@ -59,7 +59,7 @@ def free_reach(env, achieved_goal, goal, info: dict):
 
     reward = (- get_fingertip_distance(thumb_position, env.get_target_finger_position())
               + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
-              - calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"])
+              - calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"])
 
     reward -= calculate_auxiliary_finger_penalty(env)
 
@@ -76,7 +76,7 @@ def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
     reinforcement_reward = progress_reward + success_reward
 
     # positive punishment
-    penalty = (calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
+    penalty = (calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"]
                + calculate_auxiliary_finger_penalty(env))
 
     # total reward
@@ -89,7 +89,7 @@ def sequential_reach(env, achieved_goal, goal, info: dict):  # TODO adjust for s
     """Reward following a sequence of finger configurations."""
     reward = (- get_fingertip_distance(achieved_goal, goal)
               + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
-              - calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"])
+              - calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"])
 
     return reward
 
@@ -109,7 +109,7 @@ def sequential_free_reach(env, achieved_goal, goal, info: dict):
     if len(env.goal_sequence) > 1:
         exclusions = [env.current_target_finger]
 
-    punishment_reward = (- calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
+    punishment_reward = (- calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"]
                          - calculate_auxiliary_finger_penalty(env, exclude=exclusions))
 
     return reinforcement_reward + punishment_reward
@@ -127,8 +127,8 @@ def manipulate(env, achieved_goal, goal, info: dict):
               + success * env.reward_config["SUCCESS_BONUS"]  # reward for finishing
               - env._is_dropped() * env.reward_config["DROPPING_PENALTY"])  # dropping penalty
 
-    reward -= calculate_force_penalty(env.sim) * env.reward_config["FORCE_MULTIPLIER"]
-    reward -= calculate_tendon_stress_penalty(env.sim) * env.reward_config["TENDON_STRESS_MULTIPLIER"]
+    reward -= calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"]
+    reward -= calculate_tendon_stress_penalty(env.data) * env.reward_config["TENDON_STRESS_MULTIPLIER"]
 
     return reward
 
@@ -144,8 +144,8 @@ if __name__ == '__main__':
     for i in tqdm.tqdm(range(100000)):
         o, r, d, _ = env.step(env.action_space.sample())
 
-        tendon_penalties.append(calculate_tendon_stress_penalty(env.sim))
-        force_penalties.append(calculate_force_penalty(env.sim))
+        tendon_penalties.append(calculate_tendon_stress_penalty(env.data))
+        force_penalties.append(calculate_force_penalty(env.data))
 
         if d:
             env.reset()

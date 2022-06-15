@@ -3,6 +3,7 @@
 import gc
 import json
 import os
+import random
 import re
 import statistics
 import time
@@ -82,8 +83,8 @@ class PPOAgent:
     def __init__(self,
                  model_builder: Callable,
                  environment: BaseWrapper,
-                 horizon: int,
-                 workers: int,
+                 horizon: int = 1024,
+                 workers: int = 8,
                  learning_rate: float = 0.001,
                  discount: float = 0.99,
                  lam: float = 0.95,
@@ -216,7 +217,7 @@ class PPOAgent:
         self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
-        self.agent_id = mpi_comm.bcast(round(time.time()), root=0)
+        self.agent_id = mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
@@ -312,7 +313,7 @@ class PPOAgent:
         """
 
         # start monitor
-        if is_root:
+        if is_root and monitor is not None:
             monitor.make_metadata(additional_hps={
                 "epochs_per_cycle": epochs,
                 "batch_size": batch_size,

@@ -7,7 +7,6 @@ import random
 from typing import Callable, Union
 
 import gym
-import mujoco_py
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
@@ -15,7 +14,8 @@ from angorapy.common import reward
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.configs.reward_config import resolve_config_name
-
+from angorapy.environments.mujoco_env import AnthropomorphicEnv
+from angorapy.environments.utils import mj_get_category_names
 
 FINGERTIP_SITE_NAMES = [
     'robot0:S_fftip',
@@ -68,10 +68,9 @@ def generate_random_sim_qpos(base: dict) -> dict:
     return base
 
 
-def get_palm_position(sim):
-    """Return the robotic hand'serialization palm'serialization center."""
-    palm_idx = sim.model.body_names.index("robot0:palm")
-    return np.array(sim.model.body_pos[palm_idx])
+def get_palm_position(model):
+    """Return the robotic hand's palm's center."""
+    return model.body("robot0:palm").pos
 
 
 def get_fingertip_distance(ft_a, ft_b):
@@ -80,7 +79,7 @@ def get_fingertip_distance(ft_a, ft_b):
     return np.linalg.norm(ft_a - ft_b, axis=-1)
 
 
-class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
+class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
 
     continuous = True
@@ -100,12 +99,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self._touch_sensor_id = []
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
-
-        # build simulation
-        model = mujoco_py.load_model_from_path(model)
-        self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
-        self.sim.model.opt.timestep = delta_t
-        self.original_n_substeps = n_substeps
+        self._freeze_wrist = False
 
         # time control
         self._delta_t_control: float = delta_t
@@ -113,50 +107,33 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
         self._always_render_mode = False
 
-        self._viewers = {}
-        self.viewer = None
+        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos)
 
-        self.metadata = {
-            'render.modes': ['human', 'rgb_array'],
-            'video.frames_per_second': int(np.round(1.0 / self.dt))
-        }
-
-        for k, v in self.sim.model._sensor_name2id.items():
-            if 'robot0:TS_' in k:
-                self._touch_sensor_id_site_id.append(
-                    (v, self.sim.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
-                self._touch_sensor_id.append(v)
+        self.model.opt.timestep = delta_t
+        self.original_n_substeps = n_substeps
 
         self.seed()
-        self._env_setup(initial_qpos=initial_qpos)
-        self.initial_state = copy.deepcopy(self.sim.get_state())
+        self.initial_state = copy.deepcopy(self.get_state())
 
-        self.goal = self._sample_goal()
         obs = self._get_obs()
 
-        # action space
+    def _set_action_space(self):
         if self.continuous:
-            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype='float32')
+            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype=float)
         else:
             self.action_space = spaces.MultiDiscrete(np.ones(20) * BaseShadowHandEnv.discrete_bin_count)
             self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
 
-        # observation space
+    def _set_observation_space(self, obs):
+        # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
-            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
+            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
             observation=spaces.Dict(
-                {name: spaces.Box(-np.inf, np.inf, shape=val.shape, dtype="float32")
+                {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape, dtype=float)
                  for name, val in obs['observation'].dict().items()}
             ),
         ))
-
-        self._freeze_wrist = False
-
-    @property
-    def dt(self):
-        """Difference between timesteps h. Time progresses from t to t + h every step. In seconds."""
-        return self.sim.model.opt.timestep * self.sim.nsubsteps
 
     def set_delta_t_simulation(self, new: float):
         """Set new value for the simulation delta t."""
@@ -165,8 +142,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             f"parts, but gives {self._delta_t_control % new}."
 
         self._delta_t_simulation = new
-        self.sim.nsubsteps = 1
-        self.sim.model.opt.timestep = self._delta_t_simulation
+        self.model.opt.timestep = self._delta_t_simulation
 
         self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation) * self.original_n_substeps
 
@@ -208,7 +184,7 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
         as such the output is a 15-D numpy array."""
-        goal = [self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        goal = [self.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
         return np.array(goal).flatten()
 
     # ENV METHODS
@@ -221,21 +197,13 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         if self.continuous:
             action = np.clip(action, self.action_space.low, self.action_space.high)
         else:
-            action = self.discrete_action_values[action.astype(np.int)]
+            action = self.discrete_action_values[action.astype(int)]
 
         if self._freeze_wrist:
             action[:2] = 0
 
-        # submit action to the simulation
-        self._set_action(action)
-
-        # perform steps in simulation
-        for simulation_step in range(self._simulation_steps_per_control_step):
-            self.sim.step()
-            self._step_callback()
-
-            if self._always_render_mode and simulation_step < self._simulation_steps_per_control_step - 1:
-                self.render()
+        # perform simulation
+        self.do_simulation(action, n_frames=self.original_n_substeps)
 
         # read out observation from simulation
         obs = self._get_obs()
@@ -249,19 +217,28 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
 
         return obs, reward, done, info
 
-    def reset(self):
+    def reset(self, return_info=False, **kwargs):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
         # is possible to get into a state with numerical issues (e.g. due to penetration or
         # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
         # In this case, we just keep randomizing until we eventually achieve a valid initial
         # configuration.
-        super(BaseShadowHandEnv, self).reset()
+        super(BaseShadowHandEnv, self).reset(**kwargs)
         did_reset_sim = False
+
         while not did_reset_sim:
             did_reset_sim = self._reset_sim()
         self.goal = self._sample_goal().copy()
+
         obs = self._get_obs()
-        return obs
+
+        if return_info:
+            return obs, {}
+        else:
+            return obs
+
+    def reset_model(self):
+        self.set_state(**self.initial_state)
 
     def close(self):
         if self.viewer is not None:
@@ -280,19 +257,6 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         elif mode == 'human':
             self._get_viewer(mode).render()
 
-    def _get_viewer(self, mode):
-        self.viewer = self._viewers.get(mode)
-        if self.viewer is None:
-            if mode == 'human':
-                self.viewer = mujoco_py.MjViewer(self.sim)
-                # self.viewer._run_speed /= self._simulation_steps_per_control_step
-            elif mode == 'rgb_array':
-                self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=-1)
-
-            self._viewer_setup()
-            self._viewers[mode] = self.viewer
-        return self.viewer
-
     # Extension methods
     # ----------------------------
 
@@ -302,8 +266,8 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         simulation), this method should indicate such a failure by returning False.
         In such a case, this method will be called again to attempt a the reset again.
         """
-        self.sim.set_state(self.initial_state)
-        self.sim.forward()
+        self.reset_model()
+
         return True
 
     @abc.abstractmethod
@@ -313,22 +277,21 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     def _set_action(self, action):
         assert action.shape == (20,)
 
-        ctrlrange = self.sim.model.actuator_ctrlrange
+        actuator_names = mj_get_category_names(self.model, "actuator")
+        ctrlrange = self.model.actuator_ctrlrange
         actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
         if self.relative_control:
             actuation_center = np.zeros_like(action)
-            for i in range(self.sim.data.ctrl.shape[0]):
-                actuation_center[i] = self.sim.data.get_joint_qpos(
-                    self.sim.model.actuator_names[i].replace(':A_', ':'))
+            for i in range(self.data.ctrl.shape[0]):
+                actuation_center[i] = self.data.jnt(actuator_names[i].replace(b':A_', b':')).qpos
             for joint_name in ['FF', 'MF', 'RF', 'LF']:
-                act_idx = self.sim.model.actuator_name2id(
-                    'robot0:A_{}J1'.format(joint_name))
-                actuation_center[act_idx] += self.sim.data.get_joint_qpos(
-                    'robot0:{}J0'.format(joint_name))
+                act_idx = actuator_names.index(str.encode(f'robot0:A_{joint_name}J1'))
+                actuation_center[act_idx] += self.data.jnt(str.encode(f'robot0:{joint_name}J0')).qpos
         else:
             actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
-        self.sim.data.ctrl[:] = actuation_center + action * actuation_range
-        self.sim.data.ctrl[:] = np.clip(self.sim.data.ctrl, ctrlrange[:, 0], ctrlrange[:, 1])
+
+        self.data.ctrl[:] = actuation_center + action * actuation_range
+        self.data.ctrl[:] = np.clip(self.data.ctrl, ctrlrange[:, 0], ctrlrange[:, 1])
 
     @abc.abstractmethod
     def _is_success(self, achieved_goal, desired_goal):
@@ -338,11 +301,16 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
     def _sample_goal(self):
         pass
 
-    @abc.abstractmethod
-    def _env_setup(self, initial_qpos):
+    def _env_setup(self, initial_state):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
-        pass
+        for k, v in zip(mj_get_category_names(self.model, "sensor"), self.model.sensor_adr):
+            if b'robot0:TS_' in k:
+                # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
+                self._touch_sensor_id.append(v)
+
+        if initial_state is not None:
+            self.set_state(**initial_state)
 
     @abc.abstractmethod
     def _render_callback(self, render_targets=False):
@@ -356,18 +324,18 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
         pass
 
     def _viewer_setup(self):
-        body_id = self.sim.model.body_name2id('robot0:palm')
-        lookat = self.sim.data.body_xpos[body_id]
+        body_id = self.model.body_name2id('robot0:palm')
+        lookat = self.data.body_xpos[body_id]
 
         for idx, value in enumerate(lookat):
             self.viewer.cam.lookat[idx] = value
 
         # hand color
-        self.sim.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
+        self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
         # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
 
         # background color
-        self.sim.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
         # self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
@@ -387,3 +355,10 @@ class BaseShadowHandEnv(gym.GoalEnv, abc.ABC):
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
         else:
             raise NotImplementedError("Unknown Viewpoint.")
+
+
+if __name__ == '__main__':
+    hand = BaseShadowHandEnv(
+        initial_qpos=DEFAULT_INITIAL_QPOS,
+        distance_threshold=0.2
+    )

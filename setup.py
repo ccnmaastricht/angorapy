@@ -1,9 +1,14 @@
 from setuptools import setup, find_packages
 
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
+
 setup(
     name='angorapy',
-    version='0.7.0',
+    version='0.7.1',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
+    long_description=long_description,
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',
     author_email='research@tonioweidler.de',
@@ -11,9 +16,10 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy==1.19.2",
+        "numpy==1.19.5",
         "Box2D",
-        "gym==0.18",
+        "gym==0.24.0",
+        "mujoco",
         "tensorflow==2.4.2",
         "mpi4py==3.1.3",
         "tqdm",
@@ -31,6 +37,8 @@ setup(
         "protobuf==3.19.0",
 
         # webinterface
+        "itsdangerous==2.0.1",
+        "werkzeug==2.0.3",
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
         "bokeh",

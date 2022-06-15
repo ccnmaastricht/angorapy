@@ -13,14 +13,13 @@ RUN apt-key del 7fa2af80
 
 COPY docker/cuda-keyring_1.0-1_all.deb cuda-keyring_1.0-1_all.deb
 RUN dpkg -i cuda-keyring_1.0-1_all.deb
-RUN apt-get update
 
 WORKDIR /usr/local/cuda-11.2/lib64
 RUN ln -s libcusolver.so.11 libcusolver.so.10
 WORKDIR /
 
 # install packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
@@ -35,12 +34,14 @@ RUN apt-get update && apt-get install -y \
     patchelf \
     software-properties-common \
     gfortran \
+    && apt-get install --no-install-recommends -y file g++ gcc make gdb strace ca-certificates \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get --no-install-recommends install -y python3.8-dev python3.8 python3-pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install software
-RUN apt-get update
-RUN apt-get install -y file g++ gcc make gdb strace ca-certificates --no-install-recommends
+# INSTALL MPI
 RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
 RUN tar xf mpich-3.1.4.tar.gz
 WORKDIR mpich-3.1.4
@@ -50,27 +51,13 @@ RUN make install
 RUN ldconfig
 WORKDIR /
 
-# INSTALL PYTHON
-RUN add-apt-repository -y ppa:deadsnakes/ppa \
-    && apt-get update \
-    && apt-get install -y python3.8-dev python3.8 python3-pip
-
-# INSTALL MUJOCO
-RUN mkdir -p /opt/.mujoco \
-    && wget https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz -O mujoco.tar.gz \
-    && tar -xf mujoco.tar.gz -C /opt/.mujoco \
-    && rm mujoco.tar.gz
-
 # ENVIRONMENT VARIABLES
-ENV MUJOCO_PY_MUJOCO_PATH="/opt/.mujoco/mujoco210/"
-ENV LD_LIBRARY_PATH="/opt/.mujoco/mujoco210/bin:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/lib/nvidia:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.2/lib64:$LD_LIBRARY_PATH"
 
 # matplotlib
-RUN mkdir /mplconfs
-ENV MPLCONFIGDIR="/mplconfs"
+ENV MPLCONFIGDIR=/var/cache/matplotlib
 
 # SETUP ENV
 ENV VIRTUAL_ENV=/venv
@@ -80,20 +67,17 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # INSTALL TOOL
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
-RUN pip install /ang_tmp
-RUN pip install mujoco-py
-RUN pip install --no-deps panda-gym
-RUN pip install panda-gym
-RUN rm -rf /ang_tmp
-RUN pip install gym==0.18.0
 
-# MUJOCOPY-SINGULARITY BUG FIX
-RUN sed -i "s?os.path.dirname(cext_so_path), 'mujocopy-buildlock'?'/tmp', 'mujocopy-buildlock'?g" $VIRTUAL_ENV/lib/python3.8/site-packages/mujoco_py/builder.py
-RUN python -c "import mujoco_py"
+RUN pip install /ang_tmp \
+    && pip install mujoco \
+    && pip install imageio \
+    && rm -rf /ang_tmp
 
 WORKDIR /
-RUN ls -la
 COPY angorapy/train.py train.py
+
+# CLEANUP
+RUN pip cache purge
 
 # FINAL
 CMD [ "/bin/bash" ]

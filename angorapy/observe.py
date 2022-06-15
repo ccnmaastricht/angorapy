@@ -2,6 +2,9 @@
 """Evaluate a loaded agent on a task."""
 import argparse
 import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from environments.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv

@@ -53,13 +53,12 @@ class Monitor:
         self.continuous_control = isinstance(self.env.action_space, Box)
 
         if id is None:
-            self.story_id = round(time.time())
-            self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
-            os.makedirs(self.story_directory)
+            self.story_id = agent.agent_id
         else:
             self.story_id = id
-            self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
-            os.makedirs(self.story_directory, exist_ok=True)
+
+        self.story_directory = f"{PATH_TO_EXPERIMENTS}/{self.story_id}/"
+        os.makedirs(self.story_directory, exist_ok=True)
 
         try:
             tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
