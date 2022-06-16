@@ -181,7 +181,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if architecture allows for choices")
     parser.add_argument("--distribution", type=str, default=None,
-                        choices=["categorical", "gaussian", "beta", "multi-categorical"])
+                        choices=["categorical", "gaussian", "beta", "rbeta", "multi-categorical"])
     parser.add_argument("--shared", action="store_true",
                         help=f"make the model share part of the network for policy and value")
     parser.add_argument("--iterations", type=int, default=5000, help=f"number of iterations before training ends")

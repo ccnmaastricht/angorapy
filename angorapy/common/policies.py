@@ -2,7 +2,6 @@
 
 import abc
 import math
-import os
 from typing import Union, Tuple
 
 import gym
@@ -10,8 +9,8 @@ import numpy as np
 import tensorflow as tf
 
 from angorapy.agent.core import extract_discrete_action_probabilities
-from angorapy.common.layers import StdevLayer
 from angorapy.common.const import EPSILON
+from angorapy.common.layers import StdevLayer, BetaDistributionSpreadLayer
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -526,13 +525,43 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         return tf.keras.Model(inputs=inputs, outputs=[alphas, betas], name="beta_action_head")
 
 
+class RBetaPolicyDistribution(BetaPolicyDistribution):
+    """Beta Policy Distribution with input-independent entropy by reparametrization with mean and a+b."""
+
+    @property
+    def short_name(self):
+        return "rbeta"
+
+    def build_action_head(self, n_actions, input_shape, batch_size):
+        """Build a policy head for the beta distribution, for alpha and beta prediction."""
+        n_actions = n_actions[0]
+
+        inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
+
+        mu = tf.keras.layers.Dense(n_actions, name="mean", activation="sigmoid",
+                                   kernel_initializer=tf.keras.initializers.Orthogonal(1),
+                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
+
+        v = BetaDistributionSpreadLayer(n_actions, name="spread")(mu)
+
+        # guarantee a, b > 1 by guaranteeing their sum to be 2
+        v = tf.add(v, 2.)
+
+        # derive alpha and beta
+        alphas = tf.keras.layers.Add(name="alphas")([mu, v])
+        betas = tf.keras.layers.Add(name="betas")([(-mu + 1), v])
+
+        return tf.keras.Model(inputs=inputs, outputs=[alphas, betas], name="beta_action_head")
+
+
 _distribution_short_name_map = {
     "gaussian": GaussianPolicyDistribution,
     "discrete": CategoricalPolicyDistribution,
     "categorical": CategoricalPolicyDistribution,
     "multi-categorical": MultiCategoricalPolicyDistribution,
     "multi-discrete": MultiCategoricalPolicyDistribution,
-    "beta": BetaPolicyDistribution
+    "beta": BetaPolicyDistribution,
+    "rbeta": RBetaPolicyDistribution
 }
 
 

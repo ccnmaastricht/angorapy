@@ -11,7 +11,7 @@ from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
-    MultiCategoricalPolicyDistribution
+    MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
 from angorapy.common.wrappers import BaseWrapper
 from angorapy.models.components import _build_encoding_sub_model
 from angorapy.utilities.util import env_extract_dims
@@ -205,9 +205,9 @@ if __name__ == '__main__':
     discrete_env = gym.make("LunarLander-v2")
     multi_discrete_env = gym.make("ManipulateBlockDiscreteRelative-v0")
 
-    model = build_simple_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
+    model = build_simple_models(cont_env, RBetaPolicyDistribution(cont_env), False, 1, 1, "gru")
     print(f"Simple model has {model[0].count_params()} parameters.")
-    plot_model(model[2], show_shapes=True, to_file="model_graph_simple.png", expand_nested=True)
+    plot_model(model[2], show_shapes=True, to_file="simple.png", expand_nested=True)
 
     model = build_simple_models(discrete_env, CategoricalPolicyDistribution(discrete_env), False, 1, 1, "gru")
     print(f"Simple model has {model[0].count_params()} parameters.")
