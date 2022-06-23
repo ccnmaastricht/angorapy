@@ -4,6 +4,7 @@ import datetime
 import os
 import socket
 import time
+from importlib.metadata import version
 from inspect import getfullargspec as fargs
 
 import matplotlib
@@ -41,11 +42,13 @@ class Monitor:
                  gif_every: int = 0,
                  id=None,
                  iterations=None,
-                 config_name: str = "unknown"):
+                 config_name: str = "unknown",
+                 experiment_group: str = "default"):
         self.agent = agent
         self.env = env if env is not None else agent.env
         self.iterations = iterations
 
+        self.experiment_group = experiment_group
         self.config_name = config_name
 
         self.frequency = frequency
@@ -118,6 +121,8 @@ class Monitor:
             date=str(datetime.datetime.now()).split(".")[0],
             config=self.config_name,
             host=socket.gethostname(),
+            angorapy_version=version("angorapy"),
+            experiment_group=self.experiment_group,
             iterations=self.iterations,
             environment=dict(
                 name=self.agent.env_name,

@@ -146,7 +146,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                           gif_every=settings["gif_every"],
                           id=agent.agent_id,
                           iterations=settings["iterations"],
-                          config_name=settings["pcon"])
+                          config_name=settings["pcon"],
+                          experiment_group=settings["experiment_group"])
 
     try:
         agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
@@ -190,6 +191,7 @@ if __name__ == "__main__":
     parser.add_argument("--pcon", type=str, default=None, help="config name (utilities/hp_config.py) to be loaded")
     parser.add_argument("--rcon", type=str, default=None,
                         help="config (utilities/reward_config.py) of the reward function")
+    parser.add_argument("--experiment-group", type=str, default="default", help="experiment group identifier")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
@@ -202,6 +204,7 @@ if __name__ == "__main__":
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode (eager mode)")
     parser.add_argument("--no-monitor", action="store_true", help="dont use a monitor")
+
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
