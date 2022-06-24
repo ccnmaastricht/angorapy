@@ -5,7 +5,7 @@ import numpy
 import numpy as np
 import pandas as pd
 import scipy
-from bokeh import embed
+from bokeh import embed, layouts
 from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource, HoverTool
 from bokeh.plotting import figure
 from scipy import stats
@@ -221,14 +221,19 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
     return embed.components(p)
 
 
-def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], reward_threshold=None):
+def make_grouped_reward_progress_figure(
+        rewards: Dict[str, Tuple[int, Dict[str, list]]],
+        reward_threshold,
+        title=None,
+        no_y_label=False
+):
     y_min = 0
     y_max = 0
     x_all = []
 
-    p = figure(title="Average Rewards per Cycle",
+    p = figure(title="Average Rewards per Cycle" if title is None else title,
                x_axis_label='Cycle',
-               y_axis_label='Total Episode Return',
+               y_axis_label='Total Episode Return' if not no_y_label else "",
                **plot_styling)
     p.x_range.start = 0
 
@@ -294,7 +299,8 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
 
     # REWARD THRESHOLD
     if reward_threshold is not None:
-        p.line(x_all, [reward_threshold for _ in x_all], line_color="green", line_width=2, line_alpha=0.7, line_dash="dashed",
+        p.line(x_all, [reward_threshold for _ in x_all], line_color="green", line_width=2, line_alpha=0.7,
+               line_dash="dashed",
                legend_label="Solution Threshold")
 
     p.y_range = bokeh.models.Range1d(y_min, y_max)
@@ -303,9 +309,36 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
     p.add_layout(legend, "below")
 
     style_plot(p)
+
+    return p
+
+
+def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], reward_threshold=None):
+    p = make_grouped_reward_progress_figure(rewards, reward_threshold)
     p.height = 750
 
     return embed.components(p)
+
+
+def group_preview(groups: Dict[str, Dict[str, list]]):
+    figures = []
+    for i, group in enumerate(groups.keys()):
+        ids_with_rewards = groups[group]
+
+        p = make_grouped_reward_progress_figure(
+            {id: ("", progress["rewards"]) for id, progress in ids_with_rewards.items()},
+            None,
+            title=group,
+            no_y_label=(i != 0)
+        )
+
+        p.legend.visible = False
+
+        figures.append(p)
+
+    gp = layouts.gridplot(figures, ncols=4, sizing_mode="scale_width")
+
+    return embed.components(gp)
 
 
 def plot_length_progress(lengths: Dict[str, list], cycles_loaded):

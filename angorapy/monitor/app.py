@@ -19,7 +19,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
 from angorapy.utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
     plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress, \
-    grouped_reward_progress
+    grouped_reward_progress, group_preview
 from angorapy.utilities.statistics import ignore_none
 
 from angorapy.monitor import app
@@ -173,6 +173,7 @@ def show_group():
     progress_reports = {}
     metas = {}
     environments = []
+
     for exp_id in ids:
         path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
         with open(os.path.join(path, "progress.json"), "r") as f:
@@ -197,6 +198,64 @@ def show_group():
     )
 
     return flask.render_template("group_analysis.html", info=info)
+
+
+@app.route("/make_group_preview", methods=("POST", "GET"))
+def make_group_preview():
+    """Analyze the summarized results of a group of experiments."""
+    group_names = request.json['names']
+    group_names = group_names.split(",")
+
+    environments = []
+
+    exp_dir = PATH_TO_EXPERIMENTS
+    experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]
+
+    experiments_by_groups = {}
+    envs_available = set()
+    for exp_path in experiment_paths:
+
+        eid_m = re.match("[0-9]+", str(exp_path.split("/")[-1]))
+        if eid_m:
+            eid = eid_m.group(0)
+            model_path = os.path.join(BASE_SAVE_PATH, eid)
+
+            if os.path.isfile(os.path.join(exp_path, "progress.json")):
+                with open(os.path.join(exp_path, "progress.json"), "r") as f:
+                    progress = json.load(f)
+
+                with open(os.path.join(exp_path, "meta.json"), "r") as f:
+                    meta = json.load(f)
+
+                exp_group = meta.get("experiment_group", "n/a")
+
+                if exp_group not in group_names:
+                    continue
+
+                if not exp_group in experiments_by_groups.keys():
+                    experiments_by_groups[exp_group] = {}
+
+                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(meta["environment"]["reward_threshold"])
+                iterations = len(progress["rewards"]["mean"])
+                max_performance = ignore_none(max, progress["rewards"]["mean"])
+                is_success = False
+                if iterations >= 0 and reward_threshold is None:
+                    is_success = "maybe"
+                elif max_performance is not None and max_performance > reward_threshold:
+                    is_success = True
+
+                envs_available.add(meta["environment"]["name"])
+
+                experiments_by_groups[exp_group].update({
+                    eid: progress
+                })
+
+    environments = set(environments)
+    environment_reward_threshold = None
+    if len(environments) == 1:
+        environment_reward_threshold = meta["environment"].get("reward_threshold", None)  # take last exps threshold
+
+    return flask.render_template("update_group_preview.html", plot=group_preview(experiments_by_groups))
 
 
 @app.route("/benchmarks")

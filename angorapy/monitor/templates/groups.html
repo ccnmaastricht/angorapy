@@ -49,6 +49,14 @@
             </tbody>
         </table>
     </div>
+
+    <div class="topic-group" id="selected-groups-preview" style="font-size: 0.7vw;">
+
+        <div class="main-title">
+            <h3 class="justify-content-center">Select Groups to See Preview</h3>
+        </div>
+
+    </div>
 {% endblock %}
 
 {% block js_footer %}
@@ -82,6 +90,24 @@
             ],
             select: true
         });
+
+        exp_dt.on("select", function (e, dt, type, indexes) {
+                if (type === 'row') {
+                    let rows = dt.rows({selected: true});
+                    let group_names = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText)
+
+                    $.ajax({
+                        type: 'POST',
+                        url: "{{ url_for("make_group_preview") }}",
+                        contentType: 'application/json;charset=UTF-8',
+                        data: JSON.stringify({'names': group_names.join(",")}),
+                        success: function (ret) {
+                            $("#selected-groups-preview").html(ret)
+                        }
+                    });
+                }
+            }
+        )
 
     </script>
 {% endblock %}
