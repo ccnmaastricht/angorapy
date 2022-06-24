@@ -247,7 +247,7 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
         stds = np.std([d["mean"] for d in datas], axis=0)
 
         y_min = min(min(means), y_min)
-        y_max = max(max(means), y_max)
+        y_max = max(max(means + stds), y_max)
 
         x = list(range(len(means)))
         if len(x) > len(x_all):
@@ -259,8 +259,6 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
         tooltip_parts.append((f"Group {group}", "@y"))
 
         range_max = max(df["upper"]) + value_range * 0.1
-        if reward_threshold is not None:
-            range_max = max(range_max, reward_threshold * 1.1)
 
         # ERROR BAND
         error_band = bokeh.models.Band(
@@ -282,13 +280,13 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
 
         i += 1
 
-    # tooltip_parts.append(("Cycle", "@x"))
-    # tooltip = HoverTool(
-    #     tooltips=tooltip_parts,
-    #     mode="vline"
-    # )
-    #
-    # p.add_tools(tooltip)
+    tooltip_parts.append(("Cycle", "@x"))
+    tooltip = HoverTool(
+        tooltips=tooltip_parts,
+        mode="vline"
+    )
+
+    p.add_tools(tooltip)
 
     p.add_tools(bokeh.models.BoxZoomTool())
     p.add_tools(bokeh.models.ResetTool())

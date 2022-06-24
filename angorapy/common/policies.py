@@ -48,7 +48,7 @@ class BasePolicyDistribution(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def act_deterministic(self, *args, **kwargs):
+    def act_deterministic(self, *args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
         pass
 
     @abc.abstractmethod
@@ -169,10 +169,10 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
 class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy distribution for multi-discrete action spaces."""
 
-    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> np.ndarray:
+    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         action = tf.argmax(log_probabilities, axis=-1)
 
-        return tf.squeeze(action).numpy()
+        return tf.squeeze(action).numpy(), tf.reduce_max(log_probabilities, axis=-1).numpy()
 
     @property
     def short_name(self):
@@ -277,8 +277,11 @@ class BaseContinuousPolicyDistribution(BasePolicyDistribution, abc.ABC):
 class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
     """Gaussian Probability Distribution."""
 
-    def act_deterministic(self, *args, **kwargs):
-        raise NotImplementedError("Act deterministic not defined for Gaussian Distribution.")
+    def act_deterministic(self, means, log_stdevs):
+        actions = means
+        probabilities = self.log_probability(actions, means=means, log_stdevs=log_stdevs)
+
+        return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
     @property
     def short_name(self):
@@ -430,7 +433,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
 
-        return actions
+        return actions, self.log_probability(actions, alphas, betas)
 
     def sample(self, alphas: tf.Tensor, betas: tf.Tensor):
         """Sample from the Beta distribution."""

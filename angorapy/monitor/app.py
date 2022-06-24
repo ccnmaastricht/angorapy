@@ -94,6 +94,111 @@ def overview():
     return flask.render_template("overview.html", exps=experiments, envs_available=envs_available)
 
 
+@app.route("/groups")
+def view_groups():
+    """Build group view page."""
+    exp_dir = PATH_TO_EXPERIMENTS
+    experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]
+
+    experiments_by_groups = {}
+    envs_available = set()
+    for exp_path in experiment_paths:
+
+        eid_m = re.match("[0-9]+", str(exp_path.split("/")[-1]))
+        if eid_m:
+            eid = eid_m.group(0)
+            model_path = os.path.join(BASE_SAVE_PATH, eid)
+
+            if os.path.isfile(os.path.join(exp_path, "progress.json")):
+                with open(os.path.join(exp_path, "progress.json"), "r") as f:
+                    progress = json.load(f)
+
+                with open(os.path.join(exp_path, "meta.json"), "r") as f:
+                    meta = json.load(f)
+
+                exp_group = meta.get("experiment_group", "n/a")
+
+                if not exp_group in experiments_by_groups.keys():
+                    experiments_by_groups[exp_group] = {}
+
+                model_available = False
+                if os.path.isfile(os.path.join(model_path, "best/weights.index")):
+                    model_available = True
+
+                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
+                    meta["environment"]["reward_threshold"])
+                iterations = len(progress["rewards"]["mean"])
+                max_performance = ignore_none(max, progress["rewards"]["mean"])
+                is_success = False
+                if iterations >= 0 and reward_threshold is None:
+                    is_success = "maybe"
+                elif max_performance is not None and max_performance > reward_threshold:
+                    is_success = True
+
+                architecture = "Any" if "architecture" not in meta["hyperparameters"] else meta["hyperparameters"]["architecture"]
+                model = "Any" if "model" not in meta["hyperparameters"] else meta["hyperparameters"]["model"]
+
+                experiments_by_groups[exp_group].update({
+                    eid: {
+                        "env": meta["environment"]["name"],
+                        "date": meta["date"],
+                        "host": meta["host"] if "host" in meta else "unknown",
+                        "iterations": iterations,
+                        "max_reward": max_performance if iterations > 0 else "N/A",
+                        "is_success": is_success,
+                        "bookmark": meta["bookmark"] if "bookmark" in meta else False,
+                        "config_name": meta["config"] if "config" in meta else "unknown",
+                        "reward": meta["reward_function"] if "reward_function" in meta else "None",
+                        "model": architecture + "[" + model + "]",
+                        "model_available": model_available
+                    }
+                })
+
+                envs_available.add(meta["environment"]["name"])
+
+    return flask.render_template("groups.html", exps=experiments_by_groups, envs_available=envs_available)
+
+
+@app.route("/group/", methods=("POST", "GET"))
+def show_group():
+    """Analyze the summarized results of a group of experiments."""
+    ids = request.args.getlist('ids')
+    group_name = request.args.get('group')
+    info = {
+        "ids": ids,
+        "group_name": group_name,
+        "plots": {}
+    }
+
+    progress_reports = {}
+    metas = {}
+    environments = []
+    for exp_id in ids:
+        path = f"{PATH_TO_EXPERIMENTS}/{exp_id}"
+        with open(os.path.join(path, "progress.json"), "r") as f:
+            progress = json.load(f)
+
+        with open(os.path.join(path, "meta.json"), "r") as f:
+            meta = json.load(f)
+
+        progress_reports.update({f"{exp_id}": progress})
+        metas[str(exp_id)] = meta
+
+        environments.append(meta["environment"]["name"])
+
+    environments = set(environments)
+    environment_reward_threshold = None
+    if len(environments) == 1:
+        environment_reward_threshold = meta["environment"].get("reward_threshold", None)  # take last exps threshold
+
+    info["plots"]["reward_grouped"] = grouped_reward_progress(
+        {id: (group_name, progress["rewards"]) for id, progress in progress_reports.items()},
+        environment_reward_threshold
+    )
+
+    return flask.render_template("group_analysis.html", info=info)
+
+
 @app.route("/benchmarks")
 def benchmarks():
     """Write Benchmark page."""
@@ -338,6 +443,25 @@ def delete_experiment():
             eid = request.json['id']
             eid = int(eid)  # make sure its a number
             shutil.rmtree(os.path.join(PATH_TO_EXPERIMENTS, str(eid)))
+        except Exception:
+            return {"success": False}
+    else:
+        return {"success": False}
+
+    return {"success": True}
+
+
+@app.route('/delete_experiments', methods=['GET', 'POST'])
+def delete_experiments():
+    """Delete multiple experiments of posted ids."""
+    if request.method == "POST":
+        try:
+            ids = request.json['ids']
+            ids = ids.split(",")
+            ids = list(map(int, ids))
+
+            for id in ids:
+                shutil.rmtree(os.path.join(PATH_TO_EXPERIMENTS, str(id)))
         except Exception:
             return {"success": False}
     else:

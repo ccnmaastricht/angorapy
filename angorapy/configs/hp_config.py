@@ -265,11 +265,11 @@ manipulate_discrete = derive_config(manipulate, dict(
 
 recommended_config = dict(
     **dict.fromkeys(
-        ["CartPole-v2", "CartPole-v1"], discrete_no_norms
+        ["CartPole-v0", "CartPole-v1"], discrete_no_norms
     ), **dict.fromkeys(
         ["Acrobot-v1", "MountainCar-v0", "LunarLander-v2"], discrete
     ), **dict.fromkeys(
-        ["Pendulum-v0"], pendulum_beta
+        ["Pendulum-v1"], pendulum_beta
     ), **dict.fromkeys(
         ["LunarLanderContinuous-v2", "BipedalWalker-v3", "BipedalWalkerHardcore-v2"], continuous_beta
     ), **dict.fromkeys(

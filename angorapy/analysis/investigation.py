@@ -190,7 +190,7 @@ class Investigator:
             probabilities = flatten(self.network(prepared_state, training=False))
 
             if act_confidently:
-                action = self.distribution.act_deterministic(*probabilities)
+                action, _ = self.distribution.act_deterministic(*probabilities)
             else:
                 action, _ = self.distribution.act(*probabilities)
 

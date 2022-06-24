@@ -229,6 +229,28 @@
                         }
 
                     }
+                },
+                {
+                    extend: 'selected',
+                    text: 'Delete Selected',
+
+                    action: function (e, dt, node, config) {
+                        let rows = dt.rows({selected: true});
+                        let ids = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText)
+
+                        if (confirm("Are you sure you want to delete " + ids.length() + " experiments from your disk?")) {
+                            $.ajax({
+                                type: 'POST',
+                                url: "{{ url_for("delete_experiments") }}",
+                                contentType: 'application/json;charset=UTF-8',
+                                data: JSON.stringify({'ids': ids.join(",")}),
+                                success: function (ret) {
+                                    dt.ajax.reload();
+                                }
+                            });
+                        }
+
+                    }
                 }
             ],
             select: true

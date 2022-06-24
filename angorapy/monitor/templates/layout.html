@@ -9,10 +9,7 @@
     <title>{% block title %}{% endblock %}</title>
     <!-- Font -->
     <link href="https://fonts.googleapis.com/css?family=Fira+Sans&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css"
-          integrity="sha256-46qynGAkLSFpVbEBog43gvNhfrOj+BmwXdxFgVK/Kvc=" crossorigin="anonymous"/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/js/all.js"
-            integrity="sha256-2JRzNxMJiS0aHOJjG+liqsEOuBb6++9cY4dSOyiijX4=" crossorigin="anonymous"></script>
+    <script src="https://kit.fontawesome.com/dbe862d6ca.js" crossorigin="anonymous"></script>
 
     <!-- Bootstrap -->
 <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.1/css/bootstrap.min.css"/>
@@ -46,12 +43,19 @@
         <ul class="list-unstyled CTAs">
             <li>
                 <a href="{{ url_for("overview") }}" class="button-control">
-                    <i class="fas fa-list"></i> Overview
+                    <i class="fas fa-list"></i>&nbsp;&nbsp; Overview
                 </a>
             </li>
+
+            <li>
+                <a href="{{ url_for("view_groups") }}" class="button-control">
+                    <i class="fa-solid fa-folder-tree"></i>&nbsp;&nbsp; Grouped View
+                </a>
+            </li>
+
             <li>
                 <a href="https://github.com/ccnmaastricht/dexterous-robot-hand" class="button-control" target="_blank">
-                    <i class="fab fa-github"></i> Repository
+                    <i class="fab fa-github"></i>&nbsp;&nbsp; Repository
                 </a>
             </li>
         </ul>
