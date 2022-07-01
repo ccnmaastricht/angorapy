@@ -1,13 +1,22 @@
 """Example script showcasing how to train an agent."""
 import os
+
+from angorapy.analysis.investigation import Investigator
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-from dexterity.agent.ppo_agent import PPOAgent
-from dexterity.common.policies import BetaPolicyDistribution
-from dexterity.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from dexterity.common.wrappers import make_env
+try:
+    from mpi4py import MPI
+    is_root = MPI.COMM_WORLD.rank == 0
+except:
+    is_root = True
 
-from dexterity.models import get_model_builder
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.common.policies import BetaPolicyDistribution
+from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from angorapy.common.wrappers import make_env
+
+from angorapy.models import get_model_builder
 
 # For most envs, PPO needs to normalize states and rewards; to add this functionality we wrap the environment
 # with transformers fulfilling this task. You can also add your own custom transformers this way.
@@ -27,7 +36,11 @@ agent = PPOAgent(build_models, env, horizon=1024, workers=12, distribution=distr
 print(f"My Agent's ID: {agent.agent_id}")
 
 # ... and then train that agent for n cycles
-agent.drill(n=100, epochs=3, batch_size=64)
+agent.drill(n=10, epochs=3, batch_size=64)
 
-# after training, we can save the agent for analysis or the like
-agent.save_agent_state()
+if is_root:
+    # after training, we can save the agent for analysis or the like
+    agent.save_agent_state()
+
+    # render one episode after training
+    Investigator.from_agent(agent).render_episode(agent.env, act_confidently=True)

@@ -1,144 +1,111 @@
-<img src="docs/img/logo.png" width=15% align="right" />
+![](https://img.shields.io/pypi/pyversions/angorapy)
+![](https://img.shields.io/pypi/v/angorapy)
+![](https://img.shields.io/github/license/ccnmaastricht/angorapy)
+![](https://img.shields.io/github/stars/ccnmaastricht/angorapy)
 
-# Anthropomorphic Robotic Control with Biologically Plausible Networks
 
-![](https://img.shields.io/github/license/ccnmaastricht/dexterous-robot-hand)
-![](https://img.shields.io/github/issues/ccnmaastricht/dexterous-robot-hand)
-![](https://img.shields.io/github/forks/ccnmaastricht/dexterous-robot-hand)
-![](https://img.shields.io/github/stars/ccnmaastricht/dexterous-robot-hand)
+<br />
+<br />
+
+<p align="center"><img src="docs/img/angorapy.svg" width=25% align="center" /></p>
+<h3> <p align="center"> Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling </p> </h3>
+
+<br />
+   
+**AngoraPy** is an open source modeling library for [goal-oriented research](https://pubmed.ncbi.nlm.nih.gov/26906502/) in **neuroscience**. It provides a simple interface to train deep neural network models of the human brain on various, customizable, sensorimotor tasks, using reinforcement learning. It thereby empowers goal-driven modeling to surpass the sensory domain and enter that of sensori_motor_ control, closing the perception-action loop. 
+
+**AngoraPy** is designed to require no deeper understanding of reinforcement learning. It employs state-of-the-art machine learning techniques, optimized for distributed computation scaling from local workstations to high-performance computing clusters. We aim to hide as much of this under the hood of an intuitive, high-level API but preserve the option for customizing most aspects of the pipeline.
+
+This library is developed as part of the [Human Brain Project](https://www.humanbrainproject.eu/) at [CCN Maastricht](https://www.ccnmaastricht.com/). It is an effort to build software by neuroscientists, for neuroscientists. If you have suggestions, requests or questions, feel free to [open an issue](https://github.com/ccnmaastricht/angorapy/issues/new/choose).
 
 ![Manipulation Gif](docs/gifs/manipulate_best.gif)
 
-## Installation
+## 📥 Installation
 
-### Requirements
-
-![Python 3.8](https://img.shields.io/badge/python-3.8%2B-blue) ![MuJoCo 2.1.0](https://img.shields.io/badge/MuJoCo-2.1.0-green) 
-
-To install all required python packages run
+AngoraPy is available on PyPI. 
 
 ```bash
-pip install -r requirements.txt
+pip install angorapy
 ```
 
-#### MuJoCo and MuJoCo-Py
+### MuJoCo and MuJoCo-Py
 To train on any MuJoCo-based environment, you will need MuJoCo. As of late 2021, MuJoCo is free and can be [downloaded here](https://mujoco.org/download). 
 As an interface to python, we use mujoco-py, [available here](https://github.com/openai/mujoco-py). To install both, follow their respective instructions.
 
 If you do not want/can install MuJoCo and/or mujoco-py you can use this framework without MuJoCo. Our implementation automatically checks for a `.mujoco` directory in you home directory. If it does not exist, it will try to avoid loading MuJoCo. However, you can then not load any environments that rely on MuJoCo!
 
-## Other READMEs
-Documentation on specific modules is provided in their respective READMEs.
-
- - <a href="analysis/README.md">Analysis</a>
- - <a href="monitor/README.md">Monitoring</a>
-
-## Usage
+## 🚀 Getting Started
 The scripts `train.py`, `evaluate.py` and `observe.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.
 
 ### Training an Agent
-By using `train.py`, you can train an agent on any environment with optional hyperparameter. Additionally, a monitor will be automatically added to the drilling of the agent, s.t. you can inspect
-the training progress. For more detail consult the <a href="monitor/README.md">README on monitoring</a>.
+The `train.py` commandline interface provides a convenient entry-point for running all sorts of experiments using the builtin models and environments in angorapy. You can train an agent on any environment with optional hyperparameters. Additionally, a monitor will be automatically linked to the training of the agent. For more detail consult the <a href="monitor/README.md">README on monitoring</a>.
 
-The `train.py` commandline parameters are as follows:
+Base usage of `train.py` is as follows:
 
-```
-usage: train.py [-h] [--architecture {simple,deeper,wider,shadow}] [--model {ffn,rnn,lstm,gru}] [--distribution {categorical,gaussian,beta,multi-categorical}] [--shared]
-                [--iterations ITERATIONS] [--pcon PCON] [--rcon RCON] [--cpu] [--sequential] [--load-from LOAD_FROM] [--preload PRELOAD] [--export-file EXPORT_FILE] [--eval]
-                [--radical-evaluation] [--save-every SAVE_EVERY] [--monitor-frequency MONITOR_FREQUENCY] [--gif-every GIF_EVERY] [--debug] [--no-monitor] [--workers WORKERS]
-                [--horizon HORIZON] [--discount DISCOUNT] [--lam LAM] [--no-state-norming] [--no-reward-norming] [--epochs EPOCHS] [--batch-size BATCH_SIZE] [--lr-pi LR_PI]
-                [--lr-schedule {None,exponential}] [--clip CLIP] [--c-entropy C_ENTROPY] [--c-value C_VALUE] [--tbptt TBPTT] [--grad-norm GRAD_NORM] [--clip-values] [--stop-early]
-                [env]
+    python train.py ENV --architecture MODEL
+    
+For instance, training `LunarLanderContinuous-v2` using the `deeper` architecture is possible by running:
 
-Train a PPO Agent on some task.
+    python train.py LunarLanderContinuous-v2 --architecture deeper
+    
+For more advanced options like custom hyperparameters, consult
 
-positional arguments:
-  env                   the target gym environment
+    python train.py -h
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --architecture {simple,deeper,wider,shadow}
-                        architecture of the policy
-  --model {ffn,rnn,lstm,gru}
-                        model type if architecture allows for choices
-  --distribution {categorical,gaussian,beta,multi-categorical}
-  --shared              make the model share part of the network for policy and value
-  --iterations ITERATIONS
-                        number of iterations before training ends
-  --pcon PCON           config name (utilities/hp_config.py) to be loaded
-  --rcon RCON           config (utilities/reward_config.py) of the reward function
-  --cpu                 use cpu only
-  --sequential          run worker sequentially workers
-  --load-from LOAD_FROM
-                        load from given agent id
-  --preload PRELOAD     load visual component weights from pretraining
-  --export-file EXPORT_FILE
-                        save policy to be loaded in workers into file
-  --eval                evaluate additionally to have at least 5 eps
-  --radical-evaluation  only record stats from seperate evaluation
-  --save-every SAVE_EVERY
-                        save agent every given number of iterations
-  --monitor-frequency MONITOR_FREQUENCY
-                        update the monitor every n iterations.
-  --gif-every GIF_EVERY
-                        make a gif every n iterations.
-  --debug               run in debug mode (eager mode)
-  --no-monitor          dont use a monitor
-  --workers WORKERS     the number of workers exploring the environment
-  --horizon HORIZON     number of time steps one worker generates per cycle
-  --discount DISCOUNT   discount factor for future rewards
-  --lam LAM             lambda parameter in the GAE algorithm
-  --no-state-norming    do not normalize states
-  --no-reward-norming   do not normalize rewards
-  --epochs EPOCHS       the number of optimization epochs in each cycle
-  --batch-size BATCH_SIZE
-                        minibatch size during optimization
-  --lr-pi LR_PI         learning rate of the policy
-  --lr-schedule {None,exponential}
-                        lr schedule type
-  --clip CLIP           clipping range around 1 for the objective function
-  --c-entropy C_ENTROPY
-                        entropy factor in objective function
-  --c-value C_VALUE     value factor in objective function
-  --tbptt TBPTT         length of subsequences in truncated BPTT
-  --grad-norm GRAD_NORM
-                        norm for gradient clipping, 0 deactivates
-  --clip-values         clip value objective
-  --stop-early          stop early if threshold of env was surpassed
+
+### Evaluating and Observing an Agent
+There are two more entry points for evaluating and observing an agent: `evaluate.py` and `observe.py`. General usage is as follows
+
+    python evaluate.py ID
+
+Where ID is the agent's ID given when its created (`train.py` prints this outt, in custom scripts get it with `agent.agent_id`).
+
+### Writing a Training Script
+To train agents with custom models, environments, etc. you write your own script. The following is a minimal example:
+
+```python
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.common.policies import BetaPolicyDistribution
+from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
+from angorapy.common.wrappers import make_env
+from angorapy.models import get_model_builder
+
+wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+env = make_env("LunarLanderContinuous-v2", reward_config=None, transformers=wrappers)
+
+# make policy distribution
+distribution = BetaPolicyDistribution(env)
+
+# the agent needs to create the model itself, so we build a method that builds a model
+build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
+
+# given the model builder and the environment we can create an agent
+agent = PPOAgent(build_models, env, horizon=1024, workers=12, distribution=distribution)
+
+# let's check the agents ID, so we can find its saved states after training
+print(f"My Agent's ID: {agent.agent_id}")
+
+# ... and then train that agent for n cycles
+agent.drill(n=100, epochs=3, batch_size=64)
+
+# after training, we can save the agent for analysis or the like
+agent.save_agent_state()
 ```
 
-### Pretraining a Component
-The python script `pretrain.py` can be used to train the visual component on one of three bootstrapping tasks: classification, pose estimation and reconstruction. Usage is as follows:
+For more details, consult the [examples](examples).
 
-    usage: pretrain.py [-h] [--name NAME] [--load LOAD] [--epochs EPOCHS]
-                       [{classify,reconstruct,hands,c,r,h}]
+## 🎓 Documentation
+Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs: 
 
-    Pretrain a visual component on classification or reconstruction.
+ - [Agent](angorapy/agent) [WIP]
+ - [Environments](angorapy/environments)
+ - [Models](angorapy/models)
+ - [Analysis](angorapy/analysis)
+ - [Monitoring](angorapy/monitoring)
 
-    positional arguments:
-      {classify,reconstruct,hands,c,r,h}
+If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
 
-    optional arguments:
-      -h, --help            show this help message and exit
-      --name NAME           Name the pretraining to uniquely identify it.
-      --load LOAD           load the weights from checkpoint path
-      --epochs EPOCHS       number of pretraining epochs
-
-### Evaluating an Agent
-Use the `evaluate.py` script to easily evaluate a trained agent. Agents are identified by their ID stated in the beginning of a training. You can also find agent IDs in the monitor. Use the script as follows:
-
-    usage: evaluate.py [-h] [-n N] [id]
-
-    Evaluate an agent.
-
-    positional arguments:
-      id          id of the agent, defaults to newest
-
-    optional arguments:
-      -h, --help  show this help message and exit
-      -n N        number of evaluation episodes
-
-## Distributed Computation
+## 🔀 Distributed Computation
 PPO is an asynchronous algorithm, allowing multiple parallel workers to generate experience independently. 
 We allow parallel gathering and optimization through MPI. Agents will automatically distribute their workers evenly on 
 the available CPU cores, while optimization is distributed over all available GPUs. If no GPUs are available, all CPUs 
@@ -146,7 +113,7 @@ share the task of optimizing.
 
 Distribution is possible locally on your workstation and on HPC sites. 
 
-### Local Distributed Computing with MPI
+### 💻 Local Distributed Computing with MPI
 To use MPI locally, you need to have a running MPI implementation, e.g. Open MPI 4 on Ubuntu.
 To execute `train.py` via MPI, run
 
@@ -157,7 +124,7 @@ mpirun -np 12 --use-hwthread-cpus python3 train.py ...
 where, in this example, 12 is the number of locally available CPU threads and `--use-hwthread-cpus`
 makes available threads (as opposed to only cores). Usage of `train.py` is as described previously.
 
-### Distributed Training on SLURM-based HPC clusters
+### :cloud: Distributed Training on SLURM-based HPC clusters
 *Please note that the following is optimized and tested on the specific cluster we use, but should extend to at least 
 any SLURM based setup.*
 
@@ -165,7 +132,7 @@ On any SLURM-based HPC cluster you may submit your job with sbatch usising the f
 
 ```bash
 #!/bin/bash -l
-#SBATCH --job-name="dexterity"
+#SBATCH --job-name="angorapy"
 #SBATCH --account=xxx
 #SBATCH --time=24:00:00
 #SBATCH --nodes=32
@@ -189,37 +156,17 @@ srun python3 -u train.py ...
 The number of parallel workers will equal the number of nodes times the number of CPUs per node 
 (32 x 12 = 384 in the template above).
 
+## 🔗 Citing AngoraPy
 
-## Customized Usage
-We've build this framework with modularity in mind. Many aspects of the training process can be customized through your own implementations. The most common customization is the usage of your own network architecture. The distributed reinforcement learning pipeline requires your model's implementation to follow specific rules. These are specified [here]() alongside a tutorial on how to incorporate your own model into the training process.
+If you use AngoraPy for your research, please cite us as follows
 
-### Custom Policy Distributions
-Currently, four builtin policy distributions are supported, the Gaussian and the Beta distribution for *continuous* and the (multi-)categorical distribution for *discrete* environments. 
+    Weidler, T., & Senden, M. (2020). AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
 
-To implement new policy distributions, extend the *BasePolicyDistribution* abstract class.
+Or using bibtex
 
-### Custom Environments
-
-### Custom Reward Functions
-
-### Custom Input and Output Transformers
-
-### Custom Hyperparameters Configurations
-Last, and somewhat least, you can add your own preset hyperparameter configuration. 
-
-```python
-from dexterity.configs.hp_config import make_config, derive_config
-
-my_conf = make_config(
-    batch_size=128,
-    workers=8,
-    model="lstm",
-    architecture="wider"
-)
-
-my_sub_conf = derive_config(my_conf,
-    {"model": "gru"}
-)
-```
-
-Hyperparameter configurations created `make_config(...)` automatically assign default values to all required parameters and let you specify only those you want to change. With the help of `derive_config(...)` you can build variants of other configurations, including your own created by either `make_config(...)` or `derive_config(...)`.
+    @software{angorapy2020,
+        author = {Weidler, Tonio and Senden, Mario},
+        month = {3},
+        title = {{AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling}},
+        year = {2020}
+    }
