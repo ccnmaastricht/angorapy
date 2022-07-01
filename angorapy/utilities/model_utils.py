@@ -169,10 +169,6 @@ def calc_max_memory_usage(model: tf.keras.Model):
         if not isinstance(activation_shapes[0], tuple):
             activation_shapes = [tuple(activation_shapes)]
 
-        print(activation_shapes)
-
-    print(n_activations)
-
     total_memory = (n_shapes + n_parameters + n_activations) * 32
 
     return total_memory * 1.1641532182693481 * 10 ** -10

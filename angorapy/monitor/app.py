@@ -206,11 +206,11 @@ def make_group_preview():
     group_names = request.json['names']
     group_names = group_names.split(",")
 
-    environments = []
-
     exp_dir = PATH_TO_EXPERIMENTS
     experiment_paths = [os.path.join(exp_dir, p) for p in os.listdir(exp_dir)]
 
+    environments = {}
+    reward_thresholds = {}
     experiments_by_groups = {}
     envs_available = set()
     for exp_path in experiment_paths:
@@ -232,17 +232,12 @@ def make_group_preview():
                 if exp_group not in group_names:
                     continue
 
+                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(meta["environment"]["reward_threshold"])
+
                 if not exp_group in experiments_by_groups.keys():
                     experiments_by_groups[exp_group] = {}
-
-                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(meta["environment"]["reward_threshold"])
-                iterations = len(progress["rewards"]["mean"])
-                max_performance = ignore_none(max, progress["rewards"]["mean"])
-                is_success = False
-                if iterations >= 0 and reward_threshold is None:
-                    is_success = "maybe"
-                elif max_performance is not None and max_performance > reward_threshold:
-                    is_success = True
+                    reward_thresholds[exp_group] = reward_threshold
+                    environments[exp_group] = meta["environment"]["name"]
 
                 envs_available.add(meta["environment"]["name"])
 
@@ -250,12 +245,10 @@ def make_group_preview():
                     eid: progress
                 })
 
-    environments = set(environments)
-    environment_reward_threshold = None
-    if len(environments) == 1:
-        environment_reward_threshold = meta["environment"].get("reward_threshold", None)  # take last exps threshold
-
-    return flask.render_template("update_group_preview.html", plot=group_preview(experiments_by_groups))
+    return flask.render_template("update_group_preview.html",
+                                 plot=group_preview(experiments_by_groups,
+                                                    alt_titles=environments,
+                                                    reward_thresholds=reward_thresholds))
 
 
 @app.route("/benchmarks")

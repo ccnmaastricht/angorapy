@@ -31,7 +31,7 @@ echo "FROM $BASE_DIRECTORY"
 
 if [ "$REMOVE" = true ]; then
   echo "Deleting existing storage zip file."
-  ssh daint "rm ~/storage.zip"
+  ssh daint "rm $BASE_DIRECTORY/storage.zip"
 fi
 
 # zip on server and pull

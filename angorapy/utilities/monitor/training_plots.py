@@ -228,7 +228,7 @@ def make_grouped_reward_progress_figure(
         no_y_label=False
 ):
     y_min = 0
-    y_max = 0
+    y_max = 0 if reward_threshold is None else reward_threshold
     x_all = []
 
     p = figure(title="Average Rewards per Cycle" if title is None else title,
@@ -320,15 +320,15 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
     return embed.components(p)
 
 
-def group_preview(groups: Dict[str, Dict[str, list]]):
+def group_preview(groups: Dict[str, Dict[str, list]], alt_titles=None, reward_thresholds=None):
     figures = []
     for i, group in enumerate(groups.keys()):
         ids_with_rewards = groups[group]
 
         p = make_grouped_reward_progress_figure(
             {id: ("", progress["rewards"]) for id, progress in ids_with_rewards.items()},
-            None,
-            title=group,
+            None if reward_thresholds is None else reward_thresholds[group],
+            title=group if alt_titles is None else alt_titles[group],
             no_y_label=(i != 0)
         )
 
@@ -431,12 +431,17 @@ def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
     hist_glyph = p.rect(x=edges, y=hist / 2, height=hist, width=width, line_color="white", fill_color=palette[color])
 
     x, mean, sigma = np.linspace(min(metric), max(metric), 50), np.mean(metric), np.std(metric)
-    pdf = stats.gaussian_kde(metric, bw_method=0.4).pdf(x)
-    p.line(x, pdf, line_color=palette[color], line_width=4, alpha=0.7, )
+
+    tooltips = [("Reward", "@x")]
+    try:
+        pdf = stats.gaussian_kde(metric, bw_method=0.4).pdf(x)
+        p.line(x, pdf, line_color=palette[color], line_width=4, alpha=0.7, )
+        tooltips.append(("Density", "@y"))
+    except np.linalg.LinAlgError as e:
+        pass
 
     tooltip = HoverTool(
-        tooltips=[("Reward", "@x"),
-                  ("Density", "@y")],
+        tooltips=tooltips,
         mode="vline",
         renderers=[hist_glyph]
     )

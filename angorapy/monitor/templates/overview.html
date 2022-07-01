@@ -34,59 +34,8 @@
                 </button>
             </div>
 
-            <div>
-                {#                <label for="filter-env">Show</label>#}
-                <select class="custom-select" id="filter-env">
-                    <option selected>Show All</option>
-                    {% for env in envs_available|sort(reverse=true) %}
-                        <option value="{{ env }}">{{ env }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
         </div>
     </nav>
-
-    {#    <div class="topic-group"  id="bookmark-view">#}
-    {##}
-    {#        <table class="table table-hover">#}
-    {#            <thead class="thead-dark bookmarked">#}
-    {#                <tr>#}
-    {#                    <th scope="col">#</th>#}
-    {#                    <th scope="col">Agent ID</th>#}
-    {#                    <th scope="col">Environment</th>#}
-    {#                    <th scope="col">Config</th>#}
-    {#                    <th scope="col">Reward</th>#}
-    {#                    <th scope="col">Date</th>#}
-    {#                    <th scope="col">Host</th>#}
-    {#                    <th scope="col">Iterations</th>#}
-    {#                    <th scope="col">Maximum Reward</th>#}
-    {#                    <th scope="col">Actions</th>#}
-    {#                </tr>#}
-    {#            </thead>#}
-    {##}
-    {#            <tbody>#}
-    {##}
-    {#            {% for exp, info in exps.items()|sort(reverse=true) if info.bookmark%}#}
-    {#                <tr class="exp-row {{ "table-success" if info.is_success else ("table-info" if info.success == "maybe" else "") }}">#}
-    {#                    <th scope="row">{{ loop.index }}</th>#}
-    {#                    <td class="id-col">{{ exp }}</td>#}
-    {#                    <td class="name-col">{{ info.env }}</td>#}
-    {#                    <td>{{ info.config_name }}</td>#}
-    {#                    <td>{{ info.reward.identifier }}</td>#}
-    {#                    <td>{{ info.date }}</td>#}
-    {#                    <td>{{ info.host }}</td>#}
-    {#                    <td>{{ info.iterations }}</td>#}
-    {#                    <td>{{ info.max_reward }}</td>#}
-    {#                    <td class="actions">#}
-    {#                        <span class="pin-item active"><i class="far fa-bookmark"></i></span>#}
-    {#                    </td>#}
-    {#                </tr>#}
-    {#            {% endfor %}#}
-    {##}
-    {#            </tbody>#}
-    {#        </table>#}
-    {#    </div>#}
 
     <div class="topic-group" id="all-view" style="font-size: 0.7vw;">
 
@@ -163,21 +112,6 @@
             });
         });
 
-        $("#filter-env").on("change", function () {
-            let env = $(this).val();
-            $(".exp-row").each(function () {
-                if (env === "Show All") {
-                    $(this).show();
-                } else {
-                    if ($(this).find("td.name-col").text() !== env) {
-                        $(this).hide();
-                    } else {
-                        $(this).show();
-                    }
-                }
-            });
-        });
-
         // ACTIONS
         $(".delete-item").on("click", function () {
             let eid = $(this).parent().parent().find("td.id-col").text();
@@ -210,8 +144,23 @@
         // DATA TABLE
         let experiment_table = $("#experiment-table");
         let exp_dt = experiment_table.DataTable({
-            dom: 'Bfrtip',
+            dom: 'BPfrtip',
+            columnDefs: [
+                {
+                    searchPanes: {
+                        show: false
+                    },
+                    targets: [0, 1, 6, 7, 8, 9, 5, 10]
+                },
+                {
+                    searchPanes: {
+                        show: true
+                    },
+                    targets: [2]
+                }
+            ],
             pageLength: 300,
+
             buttons: [
                 'columnsToggle',
                 {

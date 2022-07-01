@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     layer_names = chiefinvesti.get_layer_names()
     gru_weights = chiefinvesti.weights # weights are a list inputweights, recurrent weights and biases
-    print(layer_names)
+
     # collect data from episodes
     n_episodes = 5
     activations_over_all_episodes, inputs_over_all_episodes, \
