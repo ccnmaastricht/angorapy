@@ -1,8 +1,8 @@
-from dexterity.analysis.investigators import Predictability
+from angorapy.analysis.investigators import Predictability
 
 import tensorflow as tf
 
-from dexterity.common.policies import BasePolicyDistribution
+from angorapy.common.policies import BasePolicyDistribution
 import tensorflow_probability as tfp
 
 

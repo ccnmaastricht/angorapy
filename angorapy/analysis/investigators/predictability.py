@@ -1,14 +1,16 @@
 from typing import List
 
 import numpy as np
+import sklearn.linear_model
 import tensorflow as tf
 import tqdm
+from sklearn.linear_model import Ridge
 
-from dexterity.analysis.investigators import base_investigator
-from dexterity.common.policies import BasePolicyDistribution
-from dexterity.common.senses import stack_sensations
-from dexterity.common.wrappers import BaseWrapper
-from dexterity.utilities.util import flatten, stack_dicts
+from angorapy.analysis.investigators import base_investigator
+from angorapy.common.policies import BasePolicyDistribution
+from angorapy.common.senses import stack_sensations
+from angorapy.common.wrappers import BaseWrapper
+from angorapy.utilities.util import flatten, stack_dicts
 
 
 class Predictability(base_investigator.Investigator):
@@ -36,12 +38,15 @@ class Predictability(base_investigator.Investigator):
             }
 
             prepared_state = state.with_leading_dims(time=self.is_recurrent).dict()
-            activation_collection.append(self.get_layer_activations(
+            activations = self.get_layer_activations(
                 layers,
                 prepared_state
-            ))
+            )
+            activation_collection.append({
+                l: prepared_state["proprioception"] for l in layers
+            })
 
-            probabilities = flatten(activation_collection[-1]["output"])
+            probabilities = flatten(activations["output"])
             action, _ = self.distribution.act(*probabilities)
 
             observation, reward, done, info = env.step(action)
@@ -67,6 +72,28 @@ class Predictability(base_investigator.Investigator):
         self.prepared = True
 
     def measure(self, source_layer: str, target_information: str):
+        """Measure the predictability of target_information based on the information in source_layer's activation."""
+        assert self.prepared, "Need to prepare before investigating."
+        assert source_layer in self.list_layer_names(only_para_layers=False) + ["noise"]
+        assert target_information in self._data.as_numpy_iterator().__next__().keys()
+
+        output_dim = self._data.as_numpy_iterator().__next__()[target_information].shape[-1]
+
+        predictor = Ridge()
+
+        base_shape = np.squeeze(list(self._data.as_numpy_iterator().__next__().values())[0]).shape
+        X = list(self.train_data.map(lambda x: (tf.random.normal(base_shape) if source_layer == "noise" else tf.squeeze(x[source_layer]))).as_numpy_iterator())
+        Y = list(self.train_data.map(lambda x: (tf.random.normal(base_shape) if source_layer == "noise" else tf.squeeze(x[target_information]))).as_numpy_iterator())
+        X_test = list(self.val_data.map(lambda x: (tf.random.normal(base_shape) if source_layer == "noise" else tf.squeeze(
+            x[source_layer]))).as_numpy_iterator())
+        Y_test = list(self.val_data.map(lambda x: (tf.random.normal(base_shape) if source_layer == "noise" else tf.squeeze(
+            x[target_information]))).as_numpy_iterator())
+
+        predictor.fit(X, Y)
+
+        print(f"{target_information} from {source_layer} has an R2 of {predictor.score(X_test, Y_test)}.")
+
+    def measure_nn(self, source_layer: str, target_information: str):
         """Measure the predictability of target_information based on the information in source_layer's activation."""
         assert self.prepared, "Need to prepare before investigating."
         assert source_layer in self.list_layer_names(only_para_layers=False) + ["noise"]

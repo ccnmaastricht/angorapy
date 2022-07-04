@@ -1,3 +1,3 @@
-from dexterity.analysis.investigators.base_investigator import Investigator
-from dexterity.analysis.investigators.predictability import Predictability
-from dexterity.analysis.investigators.correlation import Correlation
+from angorapy.analysis.investigators.base_investigator import Investigator
+from angorapy.analysis.investigators.predictability import Predictability
+from angorapy.analysis.investigators.correlation import Correlation
