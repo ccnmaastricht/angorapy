@@ -28,6 +28,19 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         """Warmup the environment."""
         pass
 
+    def reset(self, **kwargs):
+        """Resets the environment, returning a modified observation using :meth:`self.observation`."""
+        if kwargs.get("return_info", False):
+            obs, info = self.env.reset(**kwargs)
+            return self.observation(obs), self.info(info)
+        else:
+            return self.observation(self.env.reset(**kwargs))
+
+    def step(self, action):
+        """Returns a modified observation using :meth:`self.observation` after calling :meth:`env.step`."""
+        observation, reward, done, info = self.env.step(action)
+        return self.observation(observation), reward, done, self.info(info)
+
     def observation(self, observation):
         """Process an observation to be of type 'Sensation'."""
         if isinstance(observation, Sensation):
@@ -43,6 +56,9 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
                 return Sensation(**observation["observation"])
 
         return Sensation(proprioception=observation)
+
+    def info(self, info):
+        return info
 
     # SYNCHRONIZATION
 
@@ -78,8 +94,9 @@ class TransformationWrapper(BaseWrapper):
         return item in self.transformers
 
     def step(self, action):
-        """PErform a step and transform the results."""
+        """Perform a step and transform the results."""
         step_tuple = super().step(action)
+
         # include original reward in info
         step_tuple[-1]["original_reward"] = step_tuple[1]
 

@@ -190,7 +190,7 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
         sample_probability = tf.gather_nd(tf.squeeze(log_probabilities),
                                           tf.stack([tf.range(len(action)), action], axis=-1))
 
-        return action.astype(np.int), tf.math.reduce_sum(sample_probability, axis=-1)
+        return action.astype(int), tf.math.reduce_sum(sample_probability, axis=-1)
 
     def sample(self, log_probabilities: tf.Tensor) -> np.ndarray:
         """Sample an step_tuple from the distribution."""

@@ -27,10 +27,10 @@ investigator.prepare(env,
                          "PMC_activation",
                          "M1_activation",
                      ],
-                     n_states=1000)
+                     n_states=2000)
 
 
-for information in ["proprioception", "vision", "somatosensation"]:
+for information in ["proprioception", "vision", "somatosensation", "reward", "fingertip_positions", "goal", "translation"]:
     print(f"Predicting {information} from activity.\n-----------------------")
 
     investigator.measure("noise", information)
@@ -43,5 +43,8 @@ for information in ["proprioception", "vision", "somatosensation"]:
     investigator.measure("IPS_activation", information)
     investigator.measure("PMC_activation", information)
     investigator.measure("M1_activation", information)
+    investigator.measure("proprioception", information)
+    investigator.measure("vision", information)
+    investigator.measure("somatosensation", information)
 
     print("\n\n")

@@ -63,8 +63,7 @@ class Reach(BaseShadowHandEnv):
         assert set(REACH_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete free reach reward configuration."
 
     def _get_achieved_goal(self):
-        goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
-        return np.array(goal).flatten()
+        return self.get_fingertip_positions()
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
