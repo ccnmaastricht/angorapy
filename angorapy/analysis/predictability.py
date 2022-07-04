@@ -5,7 +5,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.analysis import investigators
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
-parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1656335587945136)
+parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1653053413)
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="best")
 
 args = parser.parse_args()
@@ -17,20 +17,31 @@ env = agent.env
 
 investigator.prepare(env,
                      layers=[
-                         "LPFC_activation",
-                         "SSC_1",
-                         "SSC_2",
-                         "SSC_activation_2",
                          "SSC_activation_1",
-                         "M1_activation",
+                         "SSC_activation_2",
+                         "LPFC_activation",
+                         "MCC_activation",
+                         "IPL_activation",
+                         "SPL_activation",
                          "IPS_activation",
-                         "PMC_activation"],
+                         "PMC_activation",
+                         "M1_activation",
+                     ],
                      n_states=1000)
 
-investigator.measure("noise", "proprioception")
-investigator.measure("SSC_1", "proprioception")
-investigator.measure("SSC_2", "proprioception")
-investigator.measure("LPFC_activation", "proprioception")
-investigator.measure("IPS_activation", "proprioception")
-investigator.measure("PMC_activation", "proprioception")
-investigator.measure("M1_activation", "proprioception")
+
+for information in ["proprioception", "vision", "somatosensation"]:
+    print(f"Predicting {information} from activity.\n-----------------------")
+
+    investigator.measure("noise", information)
+    investigator.measure("SSC_activation_1", information)
+    investigator.measure("SSC_activation_2", information)
+    investigator.measure("LPFC_activation", information)
+    investigator.measure("MCC_activation", information)
+    investigator.measure("IPL_activation", information)
+    investigator.measure("SPL_activation", information)
+    investigator.measure("IPS_activation", information)
+    investigator.measure("PMC_activation", information)
+    investigator.measure("M1_activation", information)
+
+    print("\n\n")

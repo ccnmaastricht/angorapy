@@ -42,9 +42,7 @@ class Predictability(base_investigator.Investigator):
                 layers,
                 prepared_state
             )
-            activation_collection.append({
-                l: prepared_state["proprioception"] for l in layers
-            })
+            activation_collection.append(activations)
 
             probabilities = flatten(activations["output"])
             action, _ = self.distribution.act(*probabilities)
@@ -66,7 +64,7 @@ class Predictability(base_investigator.Investigator):
         self._data = tf.data.Dataset.from_tensor_slices({
             **stack_dicts(activation_collection),
             **stack_sensations(state_collection).dict(),
-        }).shuffle(n_states)
+        }).shuffle(n_states, reshuffle_each_iteration=False)
 
         self.train_data, self.val_data = self._data.skip(int(0.2 * n_states)), self._data.take(int(0.2 * n_states))
         self.prepared = True
