@@ -120,6 +120,13 @@ class Gatherer(BaseGatherer):
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
             policy_out = flatten(joint(prepared_state))
+            for i, e in enumerate(policy_out):
+                if np.any(np.isnan(e)):
+                    print(i)
+                    print(e)
+                    print(joint.weights)
+                    exit()
+
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
 
             # from the action distribution sample an action and remember both the action and its probability
@@ -217,7 +224,7 @@ class Gatherer(BaseGatherer):
                         np.array(achieved_goals))
 
         # postprocessing steps
-        buffer = self.postprocess(buffer, joint)
+        buffer = self.postprocess(buffer, joint, env)
 
         # convert buffer to dataset and save it to tf record
         dataset, stats = make_dataset_and_stats(buffer)
@@ -237,7 +244,7 @@ class Gatherer(BaseGatherer):
 
         return stats
 
-    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model):
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: BaseWrapper):
         """Postprocess the gathered data."""
         buffer.normalize_advantages()
 

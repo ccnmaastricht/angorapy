@@ -46,7 +46,7 @@ class ExperienceBuffer:
 
     def fill(self, s: List[Sensation], a: arr, ap: arr, adv: arr, ret: arr, v: arr, dones: arr, achieved_goals: arr):
         """Fill (and thereby overwrite) the buffer with a 5-tuple of experience."""
-        assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), "Inconsistent input sizes."
+        assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), f"Inconsistent input sizes: {np.array(list(map(len, [s, a, ap, ret, adv, v])))}"
 
         self.capacity = len(adv)
 
