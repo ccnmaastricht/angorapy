@@ -53,8 +53,11 @@ def overview():
                 with open(os.path.join(exp_path, "progress.json"), "r") as f:
                     progress = json.load(f)
 
-                with open(os.path.join(exp_path, "meta.json"), "r") as f:
-                    meta = json.load(f)
+                try:
+                    with open(os.path.join(exp_path, "meta.json"), "r") as f:
+                        meta = json.load(f)
+                except:
+                    print(eid_m)
 
                 model_available = False
                 if os.path.isfile(os.path.join(model_path, "best/weights.index")):
