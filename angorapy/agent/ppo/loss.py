@@ -23,6 +23,11 @@ def policy_loss(action_prob: tf.Tensor,
       the value of the objective function
 
     """
+
+    tf.debugging.assert_all_finite(action_prob, "action_prob is not all finite!")
+    tf.debugging.assert_all_finite(old_action_prob, "old_action_prob is not all finite!")
+    tf.debugging.assert_all_finite(advantage, "advantage is not all finite!")
+
     ratio = tf.exp(action_prob - old_action_prob)
     clipped = tf.maximum(
         tf.math.multiply(ratio, -advantage),
@@ -58,6 +63,10 @@ def value_loss(value_predictions: tf.Tensor,
     Returns:
       squared error between prediction and return
     """
+    tf.debugging.assert_all_finite(value_predictions, "value_predictions is not all finite!")
+    tf.debugging.assert_all_finite(old_values, "old_values is not all finite!")
+    tf.debugging.assert_all_finite(returns, "returns is not all finite!")
+
     error = tf.square(value_predictions - returns)
 
     if clip:
@@ -87,4 +96,5 @@ def entropy_bonus(policy_output: tf.Tensor, distribution) -> tf.Tensor:
     Returns:
       entropy bonus
     """
+
     return tf.reduce_mean(distribution.entropy(policy_output))

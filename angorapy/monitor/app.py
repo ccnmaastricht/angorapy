@@ -88,7 +88,8 @@ def overview():
                         "config_name": meta["config"] if "config" in meta else "unknown",
                         "reward": meta["reward_function"] if "reward_function" in meta else "None",
                         "model": architecture + "[" + model + "]",
-                        "model_available": model_available
+                        "model_available": model_available,
+                        "gatherer": meta["hyperparameters"].get("gatherer", "default")
                     }
                 })
 
@@ -259,7 +260,10 @@ def show_comparison():
             progress = json.load(f)
 
         with open(os.path.join(path, "meta.json"), "r") as f:
-            meta = json.load(f)
+            try:
+                meta = json.load(f)
+            except:
+                continue
 
         progress_reports.update({f"{exp_id}": progress})
         metas[str(exp_id)] = meta

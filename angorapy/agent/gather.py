@@ -122,9 +122,8 @@ class Gatherer(BaseGatherer):
             policy_out = flatten(joint(prepared_state))
             for i, e in enumerate(policy_out):
                 if np.any(np.isnan(e)):
-                    print(i)
-                    print(e)
-                    print(joint.weights)
+                    print(f"{i}: {e}")
+                    print(state)
                     exit()
 
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
