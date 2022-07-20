@@ -28,7 +28,7 @@ class BaseGatherer(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model) -> ExperienceBuffer:
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: BaseWrapper) -> ExperienceBuffer:
         pass
 
     @abc.abstractmethod
