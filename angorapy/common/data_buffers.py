@@ -21,10 +21,13 @@ class ExperienceBuffer:
         self.returns = np.empty((capacity,), dtype=np.float32)
         self.advantages = np.empty((capacity,), dtype=np.float32)
         self.values = np.empty((capacity,), dtype=np.float32)
+        self.dones = np.zeros((capacity,), dtype=np.bool)
 
         # only here to be compatible with TimeDistributed, no functionality in this implementation
-        self.dones = np.zeros((capacity,), dtype=np.bool)
         self.mask = np.ones((capacity,), dtype=np.bool)
+
+        # data not stored but buffered (for postprocessing etc.)
+        self.achieved_goals = []
 
         # secondary data
         self.episode_lengths = []
@@ -41,9 +44,9 @@ class ExperienceBuffer:
     def __repr__(self):
         return f"{self.__class__.__name__}[{self.filled}/{self.capacity}]"
 
-    def fill(self, s: List[Sensation], a: arr, ap: arr, adv: arr, ret: arr, v: arr):
+    def fill(self, s: List[Sensation], a: arr, ap: arr, adv: arr, ret: arr, v: arr, dones: arr, achieved_goals: arr):
         """Fill (and thereby overwrite) the buffer with a 5-tuple of experience."""
-        assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), "Inconsistent input sizes."
+        assert np.all(np.array(list(map(len, [s, a, ap, ret, adv, v]))) == len(s)), f"Inconsistent input sizes: {np.array(list(map(len, [s, a, ap, ret, adv, v])))}"
 
         self.capacity = len(adv)
 
@@ -54,6 +57,11 @@ class ExperienceBuffer:
         self.returns = ret
         self.advantages = adv
         self.values = v
+        self.dones = dones
+        self.achieved_goals = achieved_goals
+
+        # update this to avoid incompatible sizes in the case of changing capacity
+        self.mask = np.ones((self.capacity,), dtype=np.bool)
 
     def normalize_advantages(self):
         """Normalize the buffered advantages using z-scores. This requires the sequences to be of equal lengths,

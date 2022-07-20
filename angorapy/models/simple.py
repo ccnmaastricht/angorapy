@@ -136,11 +136,11 @@ def build_rnn_models(env: BaseWrapper,
         x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
                            name="value_recurrent_layer")(x)
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
-                                          bias_initializer=tf.keras.initializers.Constant(0.0))(x)
+                                          bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
     else:
         out_value = tf.keras.layers.Dense(1, input_dim=x.shape[1:],
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
-                                          bias_initializer=tf.keras.initializers.Constant(0.0))(x)
+                                          bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
 
     value = tf.keras.Model(inputs=input_list, outputs=out_value, name="simple_rnn_value")
 

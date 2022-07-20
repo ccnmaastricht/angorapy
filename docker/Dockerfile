@@ -67,6 +67,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # INSTALL TOOL
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
+
 RUN pip install /ang_tmp \
     && pip install mujoco \
     && pip install imageio \

@@ -394,7 +394,12 @@ class PPOAgent:
                                                self.joint.trainable_variables))
             self.optimizer.set_weights(optimizer_weights)
 
-        actor = self._make_actor()
+        actor = self._make_actor(
+            horizon=self.horizon,
+            discount=self.discount,
+            lam=self.lam,
+            subseq_length=self.tbptt_length
+        )
 
         cycle_start = None
         full_drill_start_time = time.time()
@@ -413,8 +418,7 @@ class PPOAgent:
             worker_stats = []
 
             for i in worker_collection_ids:
-                stats = actor.collect(actor_joint, self.env, self.horizon, self.discount, self.lam, self.tbptt_length,
-                                      collector_id=i)
+                stats = actor.collect(actor_joint, self.env, collector_id=i)
                 worker_stats.append(stats)
 
             # merge gatherings from all workers
@@ -581,12 +585,16 @@ class PPOAgent:
         self.underflow_history.append(stats.tbptt_underflow)
         self.current_per_receptor_mean = {s: arr.tolist() for s, arr in stats.per_receptor_mean.items()}
 
-    def _make_actor(self) -> Gatherer:
+    def _make_actor(self, horizon, discount, lam, subseq_length) -> Gatherer:
         # create the Gatherer
         return self.gatherer_class(
             worker_id=MPI.COMM_WORLD.rank,
             exp_id=self.agent_id,
-            distribution=self.distribution
+            distribution=self.distribution,
+            horizon=horizon,
+            discount=discount,
+            lam=lam,
+            subseq_length=subseq_length
         )
 
     def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: Union[int, Tuple[int, int]]) -> None:

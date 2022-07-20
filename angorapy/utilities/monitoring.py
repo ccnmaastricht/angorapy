@@ -154,6 +154,7 @@ class Monitor:
                 state_norming=str(StateNormalizationTransformer in self.env.transformers),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name.split("_")[1],
+                gatherer=str(self.agent.gatherer_class),
                 **additional_hps
             ),
             reward_function=dict(self.agent.env.reward_config if hasattr(self.agent.env, "reward_config") else dict(),
