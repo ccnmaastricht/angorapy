@@ -120,11 +120,6 @@ class Gatherer(BaseGatherer):
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
             policy_out = flatten(joint(prepared_state))
-            for i, e in enumerate(policy_out):
-                if np.any(np.isnan(e)):
-                    print(f"{i}: {e}")
-                    print(state)
-                    exit()
 
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
 
