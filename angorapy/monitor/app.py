@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import sys
+from json import JSONDecodeError
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -118,7 +119,10 @@ def view_groups():
                     progress = json.load(f)
 
                 with open(os.path.join(exp_path, "meta.json"), "r") as f:
-                    meta = json.load(f)
+                    try:
+                        meta = json.load(f)
+                    except JSONDecodeError as jse:
+                        continue
 
                 exp_group = meta.get("experiment_group", "n/a")
 

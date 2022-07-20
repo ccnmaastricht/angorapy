@@ -4,9 +4,9 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from common.policies import BetaPolicyDistribution
+from angorapy.common.policies import BetaPolicyDistribution
 from angorapy.models import get_model_builder
-from utilities.model_utils import reset_states_masked, build_sub_model_from, get_layers_by_names
+from angorapy.utilities.model_utils import reset_states_masked, build_sub_model_from, get_layers_by_names
 
 
 class UtilTest(unittest.TestCase):

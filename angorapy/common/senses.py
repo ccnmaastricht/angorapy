@@ -84,6 +84,40 @@ class Sensation(dict):
         else:
             raise ValueError(f"{key} is not a sense")
 
+    # MAGIC MATH
+    def __add__(self, other):
+        new_sensation = Sensation(
+            vision=self.vision + other.vision if self.vision is not None else None,
+            proprioception=self.proprioception + other.proprioception if self.proprioception is not None else None,
+            somatosensation=self.somatosensation + other.somatosensation if self.somatosensation is not None else None,
+            goal=self.goal + other.goal if self.goal is not None else None,
+            asynchronous=self.asynchronous + other.asynchronous if self.asynchronous is not None else None,
+        )
+
+        return new_sensation
+
+    def __truediv__(self, other):
+        if isinstance(other, Sensation):
+            new_sensation = Sensation(
+                vision=self.vision / other.vision if self.vision is not None else None,
+                proprioception=self.proprioception / other.proprioception if self.proprioception is not None else None,
+                somatosensation=self.somatosensation / other.somatosensation if self.somatosensation is not None else None,
+                goal=self.goal / other.goal if self.goal is not None else None,
+                asynchronous=self.asynchronous / other.asynchronous if self.asynchronous is not None else None,
+            )
+        elif isinstance(other, (int, float)) or np.isscalar(other):
+            new_sensation = Sensation(
+                vision=self.vision / other if self.vision is not None else None,
+                proprioception=self.proprioception / other if self.proprioception is not None else None,
+                somatosensation=self.somatosensation / other if self.somatosensation is not None else None,
+                goal=self.goal / other if self.goal is not None else None,
+                asynchronous=self.asynchronous / other if self.asynchronous is not None else None,
+            )
+        else:
+            raise TypeError(f"Unsupported division of Sensation by {type(other)}")
+
+        return new_sensation
+
     # OTHER
 
     def inject_leading_dims(self, time=False):

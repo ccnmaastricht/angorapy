@@ -1,0 +1,124 @@
+import random
+import unittest
+
+import numpy as np
+
+from angorapy import make_env
+from angorapy.common.senses import Sensation
+from angorapy.common.transformers import RewardNormalizationTransformer, merge_transformers, \
+    StateNormalizationTransformer
+from angorapy.utilities.util import env_extract_dims
+
+
+class EnvironmentTest(unittest.TestCase):
+
+    def test_state_normalization(self):
+        env_name = "HumanoidManipulateBlockDiscreteAsynchronous-v0"
+        env = make_env(env_name)
+        normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+
+        env.reset()
+        inputs = [env.step(env.action_space.sample())[0] for _ in range(15)]
+
+        for sample in inputs:
+            o, _, _, _ = normalizer.transform((sample, 1.0, False, {}))
+
+        true_mean = np.mean(inputs, axis=0)
+        true_std = np.std(inputs, axis=0)
+
+        self.assertTrue(np.allclose(true_mean, normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["proprioception"])))
+
+    def test_state_normalization_non_anthropomorphic(self):
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+
+        inputs = [env.observation_space.sample() for _ in range(15)]
+        true_mean = np.mean(inputs, axis=0)
+        true_std = np.std(inputs, axis=0)
+
+        for sample in inputs:
+            o, _, _, _ = normalizer.transform((Sensation(proprioception=sample), 1.0, False, {}))
+
+        self.assertTrue(np.allclose(true_mean, normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["proprioception"])))
+
+    def test_reward_normalization(self):
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+
+        inputs = [random.random() * 10 for _ in range(1000)]
+        true_mean = np.mean(inputs, axis=0)
+        true_std = np.std(inputs, axis=0)
+
+        for sample in inputs:
+            o, _, _, _ = normalizer.transform((1, sample, 1, 1))
+
+        self.assertTrue(np.allclose(true_mean, normalizer.mean["reward"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["reward"])))
+
+    def test_state_normalization_adding(self):
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer_a = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_b = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_c = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+
+        inputs_a = [env.observation_space.sample() for _ in range(100)]
+        inputs_b = [env.observation_space.sample() for _ in range(100)]
+        inputs_c = [env.observation_space.sample() for _ in range(100)]
+
+        true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
+        true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
+
+        for sample in inputs_a:
+            normalizer_a.update({"proprioception": sample})
+
+        for sample in inputs_b:
+            normalizer_b.update({"proprioception": sample})
+
+        for sample in inputs_c:
+            normalizer_c.update({"proprioception": sample})
+
+        combined_normalizer = normalizer_a + normalizer_b + normalizer_c
+        merged_normalizer = merge_transformers([normalizer_a, normalizer_b, normalizer_c])
+
+        # print(normalizer_a.mean["proprioception"])
+        # print(normalizer_b.mean["proprioception"])
+        # print(normalizer_c.mean["proprioception"])
+        # print(true_mean)
+        # print(combined_normalizer.mean["proprioception"])
+
+        self.assertTrue(np.allclose(true_mean, combined_normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_mean, merged_normalizer.mean["proprioception"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance["proprioception"])))
+
+    def test_reward_normalization_adding(self):
+        env_name = "LunarLanderContinuous-v2"
+        env = make_env(env_name)
+        normalizer_a = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_b = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+        normalizer_c = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+
+        inputs_a = [random.random() * 10 for _ in range(1000)]
+        inputs_b = [random.random() * 20 for _ in range(1000)]
+        inputs_c = [random.random() * 5 for _ in range(1000)]
+
+        true_mean = np.mean(inputs_a + inputs_b + inputs_c, axis=0)
+        true_std = np.std(inputs_a + inputs_b + inputs_c, axis=0)
+
+        for sample in inputs_a:
+            normalizer_a.update({"reward": sample})
+
+        for sample in inputs_b:
+            normalizer_b.update({"reward": sample})
+
+        for sample in inputs_c:
+            normalizer_c.update({"reward": sample})
+
+        combined_normalizer = normalizer_a + normalizer_b + normalizer_c
+
+        self.assertTrue(np.allclose(true_mean, combined_normalizer.mean["reward"]))
+        self.assertTrue(np.allclose(true_std, np.sqrt(combined_normalizer.variance["reward"])))

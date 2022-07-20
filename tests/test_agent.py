@@ -98,6 +98,20 @@ class AgentTest(unittest.TestCase):
         except Exception:
             self.fail("FreeReachAbsolute drill raises error.")
 
+    def test_classic_control(self):
+        for env_name in ["CartPole-v1", "Acrobot-v1", "Pendulum-v1", "MountainCar-v0"]:
+            try:
+                _test_drill(env_name)
+            except Exception:
+                self.fail("Continuous drill raises error.")
+
+    def test_robotic_control(self):
+        for env_name in ["Ant-v4", "Walker2d-v4", "Humanoid-v4"]:
+            try:
+                _test_drill(env_name)
+            except Exception:
+                self.fail("Continuous drill raises error.")
+
 
 if __name__ == '__main__':
     unittest.main()
