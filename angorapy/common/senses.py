@@ -96,6 +96,28 @@ class Sensation(dict):
 
         return new_sensation
 
+    def __sub__(self, other):
+        new_sensation = Sensation(
+            vision=self.vision - other.vision if self.vision is not None else None,
+            proprioception=self.proprioception - other.proprioception if self.proprioception is not None else None,
+            somatosensation=self.somatosensation - other.somatosensation if self.somatosensation is not None else None,
+            goal=self.goal - other.goal if self.goal is not None else None,
+            asynchronous=self.asynchronous - other.asynchronous if self.asynchronous is not None else None,
+        )
+
+        return new_sensation
+
+    def __pow__(self, other):
+        new_sensation = Sensation(
+            vision=self.vision ** other if self.vision is not None else None,
+            proprioception=self.proprioception ** other if self.proprioception is not None else None,
+            somatosensation=self.somatosensation ** other if self.somatosensation is not None else None,
+            goal=self.goal ** other if self.goal is not None else None,
+            asynchronous=self.asynchronous ** other if self.asynchronous is not None else None,
+        )
+
+        return new_sensation
+
     def __truediv__(self, other):
         if isinstance(other, Sensation):
             new_sensation = Sensation(
@@ -115,6 +137,17 @@ class Sensation(dict):
             )
         else:
             raise TypeError(f"Unsupported division of Sensation by {type(other)}")
+
+        return new_sensation
+
+    def sqrt(self):
+        new_sensation = Sensation(
+            vision=np.sqrt(self.vision) if self.vision is not None else None,
+            proprioception=np.sqrt(self.proprioception) if self.proprioception is not None else None,
+            somatosensation=np.sqrt(self.somatosensation) if self.somatosensation is not None else None,
+            goal=np.sqrt(self.goal) if self.goal is not None else None,
+            asynchronous=np.sqrt(self.asynchronous) if self.asynchronous is not None else None,
+        )
 
         return new_sensation
 

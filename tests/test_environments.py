@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 
 from angorapy import make_env
+from angorapy.common.const import NP_FLOAT_PREC
 from angorapy.common.senses import Sensation
 from angorapy.common.transformers import RewardNormalizationTransformer, merge_transformers, \
     StateNormalizationTransformer
@@ -18,31 +19,33 @@ class EnvironmentTest(unittest.TestCase):
         normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 
         env.reset()
-        inputs = [env.step(env.action_space.sample())[0] for _ in range(15)]
+        inputs = [env.step(env.action_space.sample())[0] for _ in range(150)]
 
         for sample in inputs:
             o, _, _, _ = normalizer.transform((sample, 1.0, False, {}))
 
-        true_mean = np.mean(inputs, axis=0)
-        true_std = np.std(inputs, axis=0)
+        true_mean = np.sum(inputs, axis=0) / len(inputs)
+        true_std = np.mean([(i - Sensation(**normalizer.mean))**2 for i in inputs])
 
-        self.assertTrue(np.allclose(true_mean, normalizer.mean["proprioception"]))
-        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["proprioception"])))
+        for name in true_mean.dict().keys():
+            self.assertTrue(np.allclose(true_mean[name], normalizer.mean[name]), msg=f"{name}'s mean not equal.")
+            self.assertTrue(np.allclose(true_std[name], normalizer.variance[name], atol=1e-5), msg=f"{name}'s std not equal.")
 
     def test_state_normalization_non_anthropomorphic(self):
         env_name = "LunarLanderContinuous-v2"
         env = make_env(env_name)
         normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 
-        inputs = [env.observation_space.sample() for _ in range(15)]
-        true_mean = np.mean(inputs, axis=0)
-        true_std = np.std(inputs, axis=0)
+        inputs = [env.step(env.action_space.sample())[0] for _ in range(150)]
+        true_mean = np.sum(inputs, axis=0) / len(inputs)
+        true_std = np.mean([(i - true_mean)**2 for i in inputs])
 
         for sample in inputs:
-            o, _, _, _ = normalizer.transform((Sensation(proprioception=sample), 1.0, False, {}))
+            o, _, _, _ = normalizer.transform((sample, 1.0, False, {}))
 
-        self.assertTrue(np.allclose(true_mean, normalizer.mean["proprioception"]))
-        self.assertTrue(np.allclose(true_std, np.sqrt(normalizer.variance["proprioception"])))
+        for name in true_mean.dict().keys():
+            self.assertTrue(np.allclose(true_mean[name], normalizer.mean[name]), msg=f"{name}'s mean not equal.")
+            self.assertTrue(np.allclose(true_std[name], normalizer.variance[name], atol=1e-5), msg=f"{name}'s std not equal.")
 
     def test_reward_normalization(self):
         env_name = "LunarLanderContinuous-v2"
