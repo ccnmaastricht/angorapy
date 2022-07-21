@@ -64,18 +64,14 @@ Where ID is the agent's ID given when its created (`train.py` prints this outt, 
 To train agents with custom models, environments, etc. you write your own script. The following is a minimal example:
 
 ```python
-from angorapy.agent.ppo_agent import PPOAgent
-from angorapy.common.policies import BetaPolicyDistribution
-from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
 from angorapy.common.wrappers import make_env
 from angorapy.models import get_model_builder
+from angorapy.agent.ppo_agent import PPOAgent
 
-wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
-env = make_env("LunarLanderContinuous-v2", reward_config=None, transformers=wrappers)
-distribution = BetaPolicyDistribution(env)
-build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
-agent = PPOAgent(build_models, env, horizon=1024, workers=12, distribution=distribution)
-agent.drill(n=100, epochs=3, batch_size=64)
+env = make_env("LunarLanderContinuous-v2")
+model_builder = get_model_builder("simple", "ffn")
+agent = PPOAgent(model_builder, env)
+agent.drill(100, 10, 512)
 ```
 
 For more details, consult the [examples](examples).
