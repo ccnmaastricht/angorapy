@@ -2,7 +2,7 @@
 
 import abc
 import math
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 
 import gym
 import numpy as np
@@ -341,7 +341,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         Input Shape: (B, A) or (B, S, A) for recurrent
 
-        Since the given r.v.'serialization are independent, the subadditivity property of entropy narrows down to an equality
+        Since the given r.v.'s are independent, the sub-additivity property of entropy narrows down to an equality
         of the joint entropy and the sum of marginal entropies.
         """
         entropy = .5 * tf.math.log(2 * math.pi * math.e * tf.pow(stdevs, 2))
@@ -373,7 +373,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         return tf.reduce_sum(log_stdevs, axis=-1)
 
     @tf.function
-    def entropy(self, params: tf.Tensor):
+    def entropy(self, params: Tuple[tf.Tensor, tf.Tensor]):
         """Calculate the joint entropy of Gaussian random variables described by their log standard deviations.
 
         Input Shape: (B, A) or (B, S, A) for recurrent

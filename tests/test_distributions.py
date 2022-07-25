@@ -39,7 +39,7 @@ class ProbabilityTest(unittest.TestCase):
         sig = tf.convert_to_tensor([[1.0, 1.0], [1.0, 5.0]], dtype=tf.float32)
 
         result_reference = np.sum(norm.entropy(loc=mu, scale=sig), axis=-1)
-        result_log = distro.entropy(np.log(sig)).numpy()
+        result_log = distro.entropy([mu, np.log(sig)]).numpy()
         result = distro._entropy_from_params(sig).numpy()
 
         self.assertTrue(np.allclose(result_reference, result), msg="Gaussian entropy returns wrong result")
