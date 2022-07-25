@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.7.1',
+    version='0.8.0',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     long_description=long_description,
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
@@ -16,11 +16,11 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy==1.19.5",
+        "numpy==1.23.0",
         "Box2D",
         "gym==0.24.0",
         "mujoco",
-        "tensorflow==2.4.2",
+        "tensorflow==2.9.1",
         "mpi4py==3.1.3",
         "tqdm",
         "simplejson",
