@@ -90,7 +90,8 @@ def overview():
                         "reward": meta["reward_function"] if "reward_function" in meta else "None",
                         "model": architecture + "[" + model + "]",
                         "model_available": model_available,
-                        "gatherer": meta["hyperparameters"].get("gatherer", "default")
+                        "gatherer": meta["hyperparameters"].get("gatherer", "default"),
+                        "policy": meta["hyperparameters"].get("distribution", "default")
                     }
                 })
 
@@ -233,7 +234,10 @@ def make_group_preview():
                     progress = json.load(f)
 
                 with open(os.path.join(exp_path, "meta.json"), "r") as f:
-                    meta = json.load(f)
+                    try:
+                        meta = json.load(f)
+                    except JSONDecodeError as jserr:
+                        continue
 
                 exp_group = meta.get("experiment_group", "n/a")
 
@@ -525,6 +529,33 @@ def delete_experiments():
 
             for id in ids:
                 shutil.rmtree(os.path.join(PATH_TO_EXPERIMENTS, str(id)))
+        except Exception:
+            return {"success": False}
+    else:
+        return {"success": False}
+
+    return {"success": True}
+
+
+@app.route('/regroup_experiments', methods=['GET', 'POST'])
+def regroup_experiments():
+    """Assign new group to multiple experiments of posted ids."""
+    if request.method == "POST":
+        try:
+            ids = request.json['ids']
+            ids = ids.split(",")
+            ids = list(map(int, ids))
+            new_group = request.json['group']
+
+            for id in ids:
+                with open(os.path.join(PATH_TO_EXPERIMENTS, str(id), "meta.json"), "r") as f:
+                    data = json.load(f)
+
+                data.update({"experiment_group": new_group})
+
+                with open(os.path.join(PATH_TO_EXPERIMENTS, str(id), "meta.json"), "w") as f:
+                    json.dump(data, f)
+
         except Exception:
             return {"success": False}
     else:

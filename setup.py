@@ -8,6 +8,7 @@ setup(
     name='angorapy',
     version='0.8.0',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
+    long_description_content_type='text/markdown',
     long_description=long_description,
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',

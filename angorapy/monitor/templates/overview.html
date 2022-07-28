@@ -46,6 +46,7 @@
                 <th scope="col">Agent ID</th>
                 <th scope="col">Environment</th>
                 <th scope="col">Config</th>
+                <th scope="col">Policy</th>
                 <th scope="col">Gatherer</th>
                 <th scope="col">Model</th>
                 <th scope="col">Reward Function</th>
@@ -66,6 +67,7 @@
                     <td class="id-col">{{ exp }}</td>
                     <td class="name-col">{{ info.env }}</td>
                     <td>{{ info.config_name }}</td>
+                    <td>{{ info.policy }}</td>
                     <td>{{ info.gatherer }}</td>
                     <td>{{ info.model }}</td>
                     <td>{{ info.reward.identifier }}</td>
@@ -170,8 +172,8 @@
                     text: 'Analyse Selected',
                     action: function (e, dt, node, config) {
                         let rows = dt.rows({selected: true});
-                        let ids = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText)
-
+                        let ids = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText);
+                        console.log(ids);
                         if (ids.length > 1) {
                             let get_ids = ids.map(id => "ids=" + id + "&")
                             window.location = 'compare?' + get_ids.join("");
@@ -189,7 +191,7 @@
                         let rows = dt.rows({selected: true});
                         let ids = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText)
 
-                        if (confirm("Are you sure you want to delete " + ids.length() + " experiments from your disk?")) {
+                        if (confirm("Are you sure you want to delete " + ids.length + " experiments from your disk?")) {
                             $.ajax({
                                 type: 'POST',
                                 url: "{{ url_for("delete_experiments") }}",
@@ -201,6 +203,29 @@
                             });
                         }
 
+                    }
+                },
+                {
+                    extend: 'selected',
+                    text: 'Regroup Selected',
+
+                    action: function (e, dt, node, config) {
+                        let rows = dt.rows({selected: true});
+                        let ids = rows[0].map(i => $(exp_dt.row(i).node()).find(".id-col")[0].innerText)
+
+                        let new_group = prompt("Regroup " + ids.length + " experiments as:")
+
+                        if (new_group != null) {
+                            $.ajax({
+                                type: 'POST',
+                                url: "{{ url_for("regroup_experiments") }}",
+                                contentType: 'application/json;charset=UTF-8',
+                                data: JSON.stringify({'ids': ids.join(","), 'group': new_group}),
+                                success: function (ret) {
+                                    dt.ajax.reload();
+                                }
+                            });
+                        }
                     }
                 }
             ],

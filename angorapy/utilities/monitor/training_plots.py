@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy
 from bokeh import embed, layouts
+from bokeh.io import export_svg
 from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource, HoverTool
 from bokeh.plotting import figure
 from scipy import stats
