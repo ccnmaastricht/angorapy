@@ -33,6 +33,7 @@ class Predictability(base_investigator.Investigator):
         activation_collection = []
         other_collection = []
         prev_achieved_goals = [info["achieved_goal"]] * 50
+        prev_object_quats = [info["achieved_goal"][3:]] * 10
         for _ in tqdm.tqdm(range(n_states)):
             state_collection.append(state)
             other = {
@@ -52,13 +53,15 @@ class Predictability(base_investigator.Investigator):
             other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-1])
             other["translation_to_10"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-10])
             other["translation_to_50"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-50])
-            other["object_orientation"] = env.unwrapped.data.jnt('object:joint').qpos.copy()[:3]
+            other["object_orientation"] = env.unwrapped.data.jnt('object:joint').qpos.copy()[3:]
 
-            # prev_quat = transform.Rotation.from_quat(other_collection[-10]["object_orientation"])
-            # current_quat = transform.Rotation.from_quat(other["object_orientation"])
-            # change_in_orientation = (prev_quat * current_quat.inv()).as_quat()
-            #
-            # other["translation_matrix"] = quat2mat(change_in_orientation).flatten()  # todo
+            prev_quat = transform.Rotation.from_quat(prev_object_quats[-1])
+            prev_quat_10 = transform.Rotation.from_quat(prev_object_quats[-10])
+            current_quat = transform.Rotation.from_quat(other["object_orientation"])
+            change_in_orientation = (prev_quat_10 * current_quat.inv()).as_quat()
+
+            other["rotation_matrix"] = quat2mat((prev_quat * current_quat.inv()).as_quat()).flatten()  # todo
+            other["rotation_matrix_last_10"] = quat2mat(change_in_orientation).flatten()  # todo
             other["current_rotational_axis"] = 0  # todo
 
             other_collection.append(other)
