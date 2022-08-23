@@ -4,12 +4,14 @@ import numpy as np
 import sklearn.linear_model
 import tensorflow as tf
 import tqdm
+from scipy.spatial import transform
 from sklearn.linear_model import Ridge
 
 from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import stack_sensations
 from angorapy.common.wrappers import BaseWrapper
+from angorapy.environments.rotations import quat2mat
 from angorapy.utilities.util import flatten, stack_dicts
 
 
@@ -30,7 +32,7 @@ class Predictability(base_investigator.Investigator):
         state_collection = []
         activation_collection = []
         other_collection = []
-        prev_achieved_goal = info["achieved_goal"]
+        prev_achieved_goals = [info["achieved_goal"]] * 50
         for _ in tqdm.tqdm(range(n_states)):
             state_collection.append(state)
             other = {
@@ -38,10 +40,7 @@ class Predictability(base_investigator.Investigator):
             }
 
             prepared_state = state.with_leading_dims(time=self.is_recurrent).dict()
-            activations = self.get_layer_activations(
-                layers,
-                prepared_state
-            )
+            activations = self.get_layer_activations(layers, prepared_state)
             activation_collection.append(activations)
 
             probabilities = flatten(activations["output"])
@@ -50,10 +49,16 @@ class Predictability(base_investigator.Investigator):
             observation, reward, done, info = env.step(action)
 
             other["fingertip_positions"] = env.unwrapped.get_fingertip_positions()
-            other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goal)
-            other["translation_to_10"] = 0  # todo
-            other["translation_to_50"] = 0  # todo
-            other["translation_matrix"] = 0  # todo
+            other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-1])
+            other["translation_to_10"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-10])
+            other["translation_to_50"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-50])
+            other["object_orientation"] = env.unwrapped.data.jnt('object:joint').qpos.copy()[:3]
+
+            # prev_quat = transform.Rotation.from_quat(other_collection[-10]["object_orientation"])
+            # current_quat = transform.Rotation.from_quat(other["object_orientation"])
+            # change_in_orientation = (prev_quat * current_quat.inv()).as_quat()
+            #
+            # other["translation_matrix"] = quat2mat(change_in_orientation).flatten()  # todo
             other["current_rotational_axis"] = 0  # todo
 
             other_collection.append(other)
@@ -63,12 +68,24 @@ class Predictability(base_investigator.Investigator):
                 self.network.reset_states()
             else:
                 state = observation
-                prev_achieved_goal = info["achieved_goal"]
+                prev_achieved_goals.append(info["achieved_goal"])
+
+                if len(prev_achieved_goals) > 50:
+                    prev_achieved_goals.pop(0)
+
+        stacked_other_collection = stack_dicts(other_collection)
+        stacked_other_collection["translation"][:-1] = stacked_other_collection["translation"][1:]
+        stacked_other_collection["translation_to_10"][:-10] = stacked_other_collection["translation_to_10"][10:]
+        stacked_other_collection["translation_to_50"][:-50] = stacked_other_collection["translation_to_50"][50:]
+
+        stacked_other_collection["translation"][-1:] = stacked_other_collection["translation"][-1]
+        stacked_other_collection["translation_to_10"][-10:] = stacked_other_collection["translation"][-1]
+        stacked_other_collection["translation_to_50"][-50:] = stacked_other_collection["translation"][-1]
 
         self._data = tf.data.Dataset.from_tensor_slices({
             **stack_dicts(activation_collection),
             **stack_sensations(state_collection).dict(),
-            **stack_dicts(other_collection)
+            **stacked_other_collection
         }).shuffle(n_states, reshuffle_each_iteration=False)
 
         self.train_data, self.val_data = self._data.skip(int(0.2 * n_states)), self._data.take(int(0.2 * n_states))
@@ -129,5 +146,5 @@ class Predictability(base_investigator.Investigator):
         )
 
         print(
-            f"Trained predictability of {target_information} from {source_layer} to a loss of {min(history.history['val_loss'])}."
-            f"\n\n")
+            f"Trained predictability of {target_information} from {source_layer} to a loss of "
+            f"{min(history.history['val_loss'])}.\n\n")
