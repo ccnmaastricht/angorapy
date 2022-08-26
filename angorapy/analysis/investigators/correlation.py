@@ -11,7 +11,7 @@ class Correlation(Predictability):
     def __init__(self, network: tf.keras.Model, distribution: BasePolicyDistribution):
         super().__init__(network, distribution)
 
-    def measure(self, source_layer: str, target_information: str):
+    def fit(self, source_layer: str, target_information: str):
         """Measure the correlation of target_information with source_layer's activation."""
         assert self.prepared, "Need to prepare before investigating."
         assert source_layer in self.list_layer_names(only_para_layers=False) + ["noise"]

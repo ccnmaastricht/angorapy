@@ -11,7 +11,7 @@ from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import stack_sensations
 from angorapy.common.wrappers import BaseWrapper
-from angorapy.environments.rotations import quat2mat
+from angorapy.environments.rotations import quat2mat, quat2axisangle
 from angorapy.utilities.util import flatten, stack_dicts
 
 
@@ -60,9 +60,9 @@ class Predictability(base_investigator.Investigator):
             current_quat = transform.Rotation.from_quat(other["object_orientation"])
             change_in_orientation = (prev_quat_10 * current_quat.inv()).as_quat()
 
-            other["rotation_matrix"] = quat2mat((prev_quat * current_quat.inv()).as_quat()).flatten()  # todo
-            other["rotation_matrix_last_10"] = quat2mat(change_in_orientation).flatten()  # todo
-            other["current_rotational_axis"] = 0  # todo
+            other["rotation_matrix"] = quat2mat((prev_quat * current_quat.inv()).as_quat()).flatten()
+            other["rotation_matrix_last_10"] = quat2mat(change_in_orientation).flatten()
+            other["current_rotational_axis"] = quat2axisangle(change_in_orientation)[0]  # todo
 
             other_collection.append(other)
 
@@ -94,7 +94,7 @@ class Predictability(base_investigator.Investigator):
         self.train_data, self.val_data = self._data.skip(int(0.2 * n_states)), self._data.take(int(0.2 * n_states))
         self.prepared = True
 
-    def measure(self, source_layer: str, target_information: str):
+    def fit(self, source_layer: str, target_information: str):
         """Measure the predictability of target_information based on the information in source_layer's activation."""
         assert self.prepared, "Need to prepare before investigating."
         assert source_layer in list(self.train_data.element_spec.keys()) + ["noise"]
@@ -113,41 +113,3 @@ class Predictability(base_investigator.Investigator):
         predictor.fit(X, Y)
 
         print(f"{target_information} from {source_layer} has an R2 of {predictor.score(X_test, Y_test)}.")
-
-    def measure_nn(self, source_layer: str, target_information: str):
-        """Measure the predictability of target_information based on the information in source_layer's activation."""
-        assert self.prepared, "Need to prepare before investigating."
-        assert source_layer in self.list_layer_names(only_para_layers=False) + ["noise"]
-        assert target_information in self._data.as_numpy_iterator().__next__().keys()
-
-        output_dim = self._data.as_numpy_iterator().__next__()[target_information].shape[-1]
-
-        predictor = tf.keras.Sequential([
-            tf.keras.layers.Dense(128),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Dense(output_dim),
-        ])
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        predictor.compile(
-            optimizer,
-            loss="mse",
-            metrics=["mae"]
-        )
-
-        base_shape = list(self._data.as_numpy_iterator().__next__().values())[0].shape
-        map_fnc = lambda x: (tf.random.normal(base_shape) if source_layer == "noise" else x[source_layer], x[target_information])
-        history = predictor.fit(
-            self.train_data.map(map_fnc),
-            batch_size=128,
-            epochs=30,
-            shuffle=True,
-            callbacks=[
-                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
-            ],
-            validation_data=self.val_data.map(map_fnc)
-        )
-
-        print(
-            f"Trained predictability of {target_information} from {source_layer} to a loss of "
-            f"{min(history.history['val_loss'])}.\n\n")

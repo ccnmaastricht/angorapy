@@ -1,56 +1,23 @@
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
-from scipy.integrate import solve_ivp
-from sklearn.linear_model import Lasso
+#!/usr/bin/env python
+import argparse
 
-from pysindy.utils import enzyme
-from pysindy.utils import lorenz
-from pysindy.utils import lorenz_control
-import pysindy as ps
+from keras.utils import plot_model, model_to_dot
 
-# Initialize integrator keywords for solve_ivp to replicate the odeint defaults
-integrator_keywords = {}
-integrator_keywords['rtol'] = 1e-12
-integrator_keywords['method'] = 'LSODA'
-integrator_keywords['atol'] = 1e-12
-
-# Generate measurement data
-dt = .002
-
-t_train = np.arange(0, 10, dt)
-x0_train = [-8, 8, 27]
-t_train_span = (t_train[0], t_train[-1])
-x_train = solve_ivp(lorenz, t_train_span, x0_train,
-                    t_eval=t_train, **integrator_keywords).y.T
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.analysis import investigators
+import networkx as nx
 
 
-# Instantiate and fit the SINDy model
-model = ps.SINDy()
-model.fit(x_train, t=dt)
-model.print()
+parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
+parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1653053413)
+parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="best")
 
-# Evolve the Lorenz equations in time using a different initial condition
-t_test = np.arange(0, 15, dt)
-x0_test = np.array([8, 7, 15])
-t_test_span = (t_test[0], t_test[-1])
-x_test = solve_ivp(lorenz, t_test_span, x0_test, t_eval=t_test, **integrator_keywords).y.T
+args = parser.parse_args()
+args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
-# Compare SINDy-predicted derivatives with finite difference derivatives
-print('Model score: %f' % model.score(x_test, t=dt))
+agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../../")
+investigator = investigators.Dynamics.from_agent(agent)
+env = agent.env
 
-# Predict derivatives using the learned model
-x_dot_test_predicted = model.predict(x_test)
-
-# Compute derivatives with a finite difference method, for comparison
-x_dot_test_computed = model.differentiate(x_test, t=dt)
-
-fig, axs = plt.subplots(x_test.shape[1], 1, sharex=True, figsize=(7, 9))
-for i in range(x_test.shape[1]):
-    axs[i].plot(t_test, x_dot_test_computed[:, i],
-                'k', label='numerical derivative')
-    axs[i].plot(t_test, x_dot_test_predicted[:, i],
-                'r--', label='model prediction')
-    axs[i].legend()
-    axs[i].set(xlabel='t', ylabel='$\dot x_{}$'.format(i))
-fig.show()
+investigator.prepare(env, layer="pmc_recurrent_layer", n_states=100)
+investigator.fit()

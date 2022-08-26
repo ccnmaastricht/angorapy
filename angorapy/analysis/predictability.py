@@ -47,25 +47,26 @@ investigator.prepare(env,
                          "PMC_activation",
                          "M1_activation",
                      ],
-                     n_states=2000)
+                     n_states=100000)
 
 
 for information in ["proprioception", "vision", "somatosensation", "reward", "fingertip_positions", "goal", "translation",
-                    "translation_to_10", "translation_to_50", "object_orientation", "translation_matrix"]:
+                    "translation_to_10", "translation_to_50", "object_orientation", "rotation_matrix",
+                    "rotation_matrix_last_10", "current_rotational_axis"]:
     print(f"Predicting {information} from activity.\n-----------------------")
 
-    investigator.measure("noise", information)
-    investigator.measure("SSC_activation_1", information)
-    investigator.measure("SSC_activation_2", information)
-    investigator.measure("LPFC_activation", information)
-    investigator.measure("MCC_activation", information)
-    investigator.measure("IPL_activation", information)
-    investigator.measure("SPL_activation", information)
-    investigator.measure("IPS_activation", information)
-    investigator.measure("PMC_activation", information)
-    investigator.measure("M1_activation", information)
-    investigator.measure("proprioception", information)
-    investigator.measure("vision", information)
-    investigator.measure("somatosensation", information)
+    investigator.fit("noise", information)
+    investigator.fit("proprioception", information)
+    investigator.fit("vision", information)
+    investigator.fit("somatosensation", information)
+    investigator.fit("SSC_activation_1", information)
+    investigator.fit("SSC_activation_2", information)
+    investigator.fit("LPFC_activation", information)
+    investigator.fit("MCC_activation", information)
+    investigator.fit("IPL_activation", information)
+    investigator.fit("SPL_activation", information)
+    investigator.fit("IPS_activation", information)
+    investigator.fit("PMC_activation", information)
+    investigator.fit("M1_activation", information)
 
     print("\n\n")
