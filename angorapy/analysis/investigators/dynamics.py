@@ -6,6 +6,8 @@ from angorapy.analysis.investigators import base_investigator
 
 import tensorflow as tf
 
+from angorapy.analysis.sindy.autoencoder import SindyAutoencoder
+from angorapy.analysis.util.sindy import compute_z_derivatives, sindy_library_tf
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.wrappers import BaseWrapper
 from angorapy.utilities import util
@@ -62,13 +64,61 @@ class Dynamics(base_investigator.Investigator):
 
 
 class LatentDynamics(Dynamics):
+    """Discover dynamics in latent variables using the SINDy autoencoder algorithm."""
 
     def __init__(self, network: tf.keras.Model, distribution: BasePolicyDistribution):
         super().__init__(network, distribution)
 
-    def fit(self):
-        autoencoder = None
+        self.loss_weights = {
+            "x": 0.5,
+            "y": 0.5,
+            "regularization": 0.001
+        }
+
+    def fit(self, n_epochs: int = 10, batch_size: int = 128):
+        data = tf.squeeze(self.train_data)
+
+        sindy_autoencoder = SindyAutoencoder([256, 128, 32], z_dim=32, original_dim=data.shape[-1])
         optimizer = tf.keras.optimizers.Adam()
 
-    def sindy_ae_loss(self):
-        pass
+        dataset = tf.data.Dataset.from_tensor_slices((data, data))
+        dataset = dataset.batch(batch_size)
+
+        for epoch in range(n_epochs):
+
+            for step, (x_train_batch, y_train_batch) in enumerate(dataset):
+
+                with tf.GradientTape() as tape:
+                    z_coordinates, reconstruction, dz_prediction = sindy_autoencoder(x_train_batch)
+
+                    dx = np.gradient(x_train_batch, axis=1)  # todo axis=0 or 1?
+                    dz = compute_z_derivatives(
+                        x_train_batch,
+                        dx,
+                        weights=[layer.get_weights()[0] for layer in sindy_autoencoder.encoder.layers],
+                        biases=[layer.get_weights()[1] for layer in sindy_autoencoder.encoder.layers]
+                    )
+                    dx_decoded = compute_z_derivatives(
+                        z_coordinates,
+                        dz_prediction,
+                        weights=[layer.get_weights()[0] for layer in sindy_autoencoder.decoder.layers],
+                        biases=[layer.get_weights()[1] for layer in sindy_autoencoder.decoder.layers]
+                    )
+
+                    reconstruction_loss = tf.reduce_mean((x_train_batch - reconstruction) ** 2)
+                    sindy_x_loss = tf.reduce_mean((dx - dx_decoded) ** 2)
+                    sindy_z_loss = tf.reduce_mean((dz - dz_prediction) ** 2)
+                    sindy_regularization_loss = tf.reduce_mean(tf.abs(sindy_autoencoder.coefficients))
+
+                    loss_value = reconstruction_loss \
+                                 + sindy_x_loss * self.loss_weights["x"] \
+                                 + sindy_z_loss * self.loss_weights["y"] \
+                                 + sindy_regularization_loss * self.loss_weights["regularization"]
+
+                grads = tape.gradient(loss_value, sindy_autoencoder.trainable_weights)
+                optimizer.apply_gradients(zip(grads, sindy_autoencoder.trainable_weights))
+
+                if step % 16 == 0:
+                    print(f"Training loss (for one batch) at step {step}: {float(loss_value):.4f}. "
+                          f"Seen so far: {(step + 1) * batch_size} samples")
+
