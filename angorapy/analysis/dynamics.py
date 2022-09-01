@@ -15,5 +15,5 @@ agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="../../")
 investigator = investigators.LatentDynamics.from_agent(agent)
 env = agent.env
 
-investigator.prepare(env, layer="pmc_recurrent_layer", n_states=10 * 16 * 16)
-investigator.fit(batch_size=16)
+investigator.prepare(env, layer="pmc_recurrent_layer", n_states=25 * 1024)
+investigator.fit(batch_size=1024)

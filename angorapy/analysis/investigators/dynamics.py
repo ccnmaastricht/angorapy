@@ -70,9 +70,9 @@ class LatentDynamics(Dynamics):
         super().__init__(network, distribution)
 
         self.loss_weights = {
-            "x": 0.5,
-            "y": 0.5,
-            "regularization": 0.001
+            "x": 5e-4,
+            "y": 5e-5,
+            "regularization": 1e-5
         }
 
     def fit(self, n_epochs: int = 10, batch_size: int = 128):
@@ -86,6 +86,7 @@ class LatentDynamics(Dynamics):
 
         for epoch in range(n_epochs):
 
+            total_epoch_loss = 0
             for step, (x_train_batch, y_train_batch) in enumerate(dataset):
 
                 with tf.GradientTape() as tape:
@@ -118,7 +119,7 @@ class LatentDynamics(Dynamics):
                 grads = tape.gradient(loss_value, sindy_autoencoder.trainable_weights)
                 optimizer.apply_gradients(zip(grads, sindy_autoencoder.trainable_weights))
 
-                if step % 16 == 0:
-                    print(f"Training loss (for one batch) at step {step}: {float(loss_value):.4f}. "
-                          f"Seen so far: {(step + 1) * batch_size} samples")
+                total_epoch_loss += float(loss_value)
+
+            print(f"Current loss after {epoch} epochs: {total_epoch_loss}")
 
