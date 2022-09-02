@@ -3,7 +3,6 @@ from collections import OrderedDict
 from os import path
 from typing import Optional
 
-import mujoco_viewer
 import numpy as np
 import mujoco
 
