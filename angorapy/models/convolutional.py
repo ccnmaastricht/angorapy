@@ -2,6 +2,7 @@
 """Convolutional components/networks."""
 
 import tensorflow as tf
+from keras.layers import TimeDistributed
 
 
 def _residual_block(x, filters, kernel_size=3, stride=1, conv_shortcut=True, name=None):

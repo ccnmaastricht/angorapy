@@ -1,4 +1,6 @@
 """Generation of auxiliary datasets."""
+import os
+from typing import Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -9,17 +11,17 @@ from angorapy.common.wrappers import make_env
 from angorapy.environments import *
 
 
-def gen_cube_quats_prediction_data(n):
+def gen_cube_quats_prediction_data(n: int) -> Tuple[np.ndarray, np.ndarray]:
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    hand_env = gym.make("BaseShadowHandEnv-v0")
+    hand_env = gym.make("HumanoidVisualManipulateBlock-v0")
 
     sample = hand_env.observation_space.sample()
-    X, Y = np.empty((n,) + sample["observation"][0].shape), np.empty((n,) + sample["achieved_goal"].shape)
+    X, Y = np.empty((n,) + sample["observation"]["vision"].shape), np.empty((n,) + sample["achieved_goal"].shape)
 
     hand_env.reset()
     for i in tqdm(range(n), desc="Sampling Data"):
         sample, r, done, info = hand_env.step(hand_env.action_space.sample())
-        image = sample["observation"][0] / 255
+        image = sample["observation"]["vision"] / 255
         quaternion = sample["achieved_goal"]
         X[i] = image
         Y[i] = quaternion
@@ -27,7 +29,7 @@ def gen_cube_quats_prediction_data(n):
         if done:
             hand_env.reset()
 
-    return tf.convert_to_tensor(X.astype("float32")), tf.convert_to_tensor(Y.astype("float32"))
+    return X, Y
 
 
 def gen_hand_pos_prediction_data(n):

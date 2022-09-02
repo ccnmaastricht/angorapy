@@ -3,6 +3,7 @@ from collections import OrderedDict
 from os import path
 from typing import Optional
 
+import mujoco_viewer
 import numpy as np
 import mujoco
 
@@ -37,7 +38,7 @@ def convert_observation_to_space(observation):
 class AnthropomorphicEnv(gym.Env, ABC):
     """Superclass for all environments."""
 
-    def __init__(self, model_path, frame_skip, initial_qpos=None):
+    def __init__(self, model_path, frame_skip, initial_qpos=None, vision=False):
 
         if model_path.startswith("/"):
             fullpath = model_path
@@ -50,6 +51,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.data = mujoco.MjData(self.model)
         self._viewers = {}
         self.viewer = None
+        self.vision = vision
 
         self.frame_skip = frame_skip
         self.metadata = {

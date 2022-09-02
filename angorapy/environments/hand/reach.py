@@ -1,18 +1,14 @@
-import collections
 import random
-from typing import Union, Callable
 
 import numpy as np
-from angorapy.environments.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
 
-from angorapy.common import reward
 from angorapy.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from angorapy.common.senses import Sensation
-from angorapy.configs.reward_config import REACH_BASE, resolve_config_name
-from angorapy.environments.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
+from angorapy.configs.reward_config import REACH_BASE
+from angorapy.environments.hand.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
 from angorapy.common.const import N_SUBSTEPS, VISION_WH
-from angorapy.utilities.util import HiddenPrints
 
 
 class Reach(BaseShadowHandEnv):

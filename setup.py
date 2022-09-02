@@ -31,7 +31,7 @@ setup(
         "argcomplete",
         "matplotlib",
         "scikit-learn==0.24.1",
-        "pandas==1.0.4",
+        "pandas==1.4.4",
         "nvidia-ml-py3",
         "seaborn",
         "distance",

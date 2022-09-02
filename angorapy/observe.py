@@ -7,11 +7,9 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from environments.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
+from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
 
 import time
-import gym
-import numpy as np
 
 from agent.ppo_agent import PPOAgent
 from analysis.investigation import Investigator

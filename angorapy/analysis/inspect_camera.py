@@ -1,19 +1,16 @@
 import os
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import tensorflow as tf
-from environments import *
 
-from agent.ppo_agent import PPOAgent
-from common.wrappers import make_env
-from angorapy.models import get_model_builder
+from angorapy.common.wrappers import make_env
 
 import matplotlib.pyplot as plt
 
 tf.get_logger().setLevel('INFO')
 
-env = make_env("ReachAbsoluteVisual-v0")
-agent = PPOAgent(get_model_builder("shadow", "gru"), env, 1024, 8)
+env = make_env("HumanoidVisualManipulateBlock-v0")
 
 state = env.reset()
 

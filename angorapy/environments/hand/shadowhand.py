@@ -14,7 +14,7 @@ from angorapy.common import reward
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.configs.reward_config import resolve_config_name
-from angorapy.environments.mujoco_env import AnthropomorphicEnv
+from angorapy.environments.anthrobotics import AnthropomorphicEnv
 from angorapy.environments.utils import mj_get_category_names
 
 FINGERTIP_SITE_NAMES = [
@@ -52,9 +52,9 @@ DEFAULT_INITIAL_QPOS = {
     'robot0:THJ0': -0.7894883021600622,
 }
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand.xml')
 # MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
-MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand_manipulate.xml')
+MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand_manipulate.xml')
 
 
 def generate_random_sim_qpos(base: dict) -> dict:
@@ -91,7 +91,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
                  n_substeps=N_SUBSTEPS,
                  delta_t=0.002,
                  relative_control=True,
-                 model=MODEL_PATH):
+                 model=MODEL_PATH,
+                 vision=False
+                 ):
         gym.utils.EzPickle.__init__(**locals())
 
         self.relative_control = relative_control
@@ -107,7 +109,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
         self._always_render_mode = False
 
-        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos)
+        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos, vision=vision)
 
         self.model.opt.timestep = delta_t
         self.original_n_substeps = n_substeps
@@ -116,6 +118,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.initial_state = copy.deepcopy(self.get_state())
 
         obs = self._get_obs()
+
+        self.viewer_setup()
 
     def _set_action_space(self):
         if self.continuous:
@@ -323,12 +327,11 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         """
         pass
 
-    def _viewer_setup(self):
-        body_id = self.model.body_name2id('robot0:palm')
-        lookat = self.data.body_xpos[body_id]
-
-        for idx, value in enumerate(lookat):
-            self.viewer.cam.lookat[idx] = value
+    def viewer_setup(self):
+        # lookat = get_palm_position(self.model)
+        #
+        # for idx, value in enumerate(lookat):
+        #     self.viewer.cam.lookat[idx] = value
 
         # hand color
         self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
@@ -342,11 +345,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.viewpoint = "topdown"
 
         if self.viewpoint == "topdown":
+
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.4  # zoom in
+            self.viewer.cam.distance = 0.5  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
-            self.viewer.cam.lookat[1] -= 0.07  # slightly move forward
+            self.viewer.cam.lookat[1] += 0.03  # slightly move forward
         elif self.viewpoint == "side":
             # rotate camera to side view
             self.viewer.cam.distance = 0.35  # zoom in

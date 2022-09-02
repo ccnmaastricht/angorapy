@@ -1,10 +1,8 @@
 """Module for additional environments as well as registering modified environments."""
-import os
 
 import gym
 from mpi4py import MPI
 
-import panda_gym
 from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_STEPS, N_SUBSTEPS
 
 try:
@@ -23,10 +21,10 @@ except ImportError as e:
 if has_mujoco:
     from angorapy.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
         LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
-    from angorapy.environments.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
+    from angorapy.environments.hand.manipulate import ManipulateBlock, ManipulateEgg, ManipulateBlockDiscrete, OpenAIManipulate, \
         OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, \
         HumanoidManipulateBlockAsynchronous, HumanoidManipulateBlock
-    from angorapy.environments.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
+    from angorapy.environments.hand.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
 
     # SHADOW HAND
     gym.envs.register(
@@ -139,6 +137,8 @@ if has_mujoco:
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
+
+
         gym.envs.register(
             id=f'ManipulateBlockDiscrete{control_mode}-v0',
             entry_point='angorapy.environments:ManipulateBlockDiscrete',
@@ -205,6 +205,13 @@ if has_mujoco:
     )
 
     gym.envs.register(
+        id=f'HumanoidVisualManipulateBlockDiscreteAsynchronous-v0',
+        entry_point='angorapy.environments:HumanoidManipulateBlockDiscreteAsynchronous',
+        kwargs={"delta_t": 0.008, "vision": True},
+        max_episode_steps=50 * 100,
+    )
+
+    gym.envs.register(
         id=f'HumanoidManipulateBlockAsynchronous-v0',
         entry_point='angorapy.environments:HumanoidManipulateBlockAsynchronous',
         kwargs={"delta_t": 0.008},
@@ -215,6 +222,13 @@ if has_mujoco:
         id=f'HumanoidManipulateBlock-v0',
         entry_point='angorapy.environments:HumanoidManipulateBlock',
         kwargs={"delta_t": 0.008},
+        max_episode_steps=50 * 100,
+    )
+
+    gym.envs.register(
+        id=f'HumanoidVisualManipulateBlock-v0',
+        entry_point='angorapy.environments:HumanoidManipulateBlock',
+        kwargs={"delta_t": 0.008, "vision": True},
         max_episode_steps=50 * 100,
     )
 
