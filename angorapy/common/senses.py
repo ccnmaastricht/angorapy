@@ -185,12 +185,17 @@ class Sensation(dict):
         return {k: tf.convert_to_tensor(self.__dict__[k]) for k in Sensation.sense_names if self.__dict__[k] is not None}
 
 
-def stack_sensations(sensations: List[Sensation]):
+def stack_sensations(sensations: List[Sensation], add_batch_dim=False):
     """Stack Sensation objects over a prepended temporal domain."""
-    return Sensation(**{
-        sense: np.stack([s[sense] for s in sensations], axis=0) for sense in sensations[0].dict().keys()
-    })
-
+    if not add_batch_dim:
+        return Sensation(**{
+            sense: np.stack([s[sense] for s in sensations], axis=0) for sense in sensations[0].dict().keys()
+        })
+    else:
+        return Sensation(**{
+            sense: np.expand_dims(np.stack([s[sense] for s in sensations], axis=0), 0)
+            for sense in sensations[0].dict().keys()
+        })
 
 if __name__ == '__main__':
     ss = stack_sensations([

@@ -1,12 +1,13 @@
 """Example script showcasing how to train an agent."""
 import os
 
-from angorapy.analysis.investigation import Investigator
+from angorapy.common.senses import Sensation, stack_sensations
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 try:
     from mpi4py import MPI
+
     is_root = MPI.COMM_WORLD.rank == 0
 except:
     is_root = True
@@ -28,5 +29,8 @@ build_models = get_model_builder(model="shadow", model_type="gru", blind=False, 
 
 agent = PPOAgent(build_models, env, horizon=1024, workers=12, distribution=distribution)
 
-agent.drill(n=10, epochs=3, batch_size=64)
-Investigator.from_agent(agent).render_episode(agent.env, act_confidently=True)
+network, _, _ = agent.build_models(agent.joint.get_weights(), 1, 16)
+network(
+    stack_sensations([Sensation(**{k: v for k, v in env.observation_space.sample()["observation"].items()})] * 16,
+                     add_batch_dim=True).dict()
+)

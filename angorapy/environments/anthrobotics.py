@@ -9,9 +9,8 @@ import mujoco
 import gym
 from gym import error, logger, spaces
 
+from angorapy.common.const import VISION_WH
 from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector
-
-DEFAULT_SIZE = 480
 
 
 def convert_observation_to_space(observation):
@@ -168,8 +167,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def render(
         self,
         mode="human",
-        width=DEFAULT_SIZE,
-        height=DEFAULT_SIZE,
+        width=VISION_WH,
+        height=VISION_WH,
         camera_id=None,
         camera_name=None,
     ):
@@ -211,7 +210,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             self.viewer = None
             self._viewers = {}
 
-    def _get_viewer(self, mode, width=DEFAULT_SIZE, height=DEFAULT_SIZE):
+    def _get_viewer(self, mode, width=VISION_WH, height=VISION_WH):
         self.viewer = self._viewers.get(mode)
         if self.viewer is None:
             if mode == "human":

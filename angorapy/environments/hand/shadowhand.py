@@ -342,10 +342,14 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         # self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
+        if self.viewer is None:
+            return
+
+        print("Setting up camera.")
+
         self.viewpoint = "topdown"
 
         if self.viewpoint == "topdown":
-
             # rotate camera to top down view
             self.viewer.cam.distance = 0.5  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
@@ -359,6 +363,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
         else:
             raise NotImplementedError("Unknown Viewpoint.")
+
+        print("Camera setup finished.")
 
 
 if __name__ == '__main__':
