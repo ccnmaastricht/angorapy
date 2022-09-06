@@ -771,9 +771,9 @@ class PPOAgent:
             current_lr = self.lr_schedule
 
         # losses
-        pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
-        v_loss = "-" if len(self.value_loss_history) == 0 else f"{round(self.value_loss_history[-1], 2):8.2f}"
-        ent = "-" if len(self.entropy_history) == 0 else f"{round(self.entropy_history[-1], 2):6.2f}"
+        pi_loss = "  pi  " if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
+        v_loss = "  v     " if len(self.value_loss_history) == 0 else f"{round(self.value_loss_history[-1], 2):8.2f}"
+        ent = "  ent " if len(self.entropy_history) == 0 else f"{round(self.entropy_history[-1], 2):6.2f}"
 
         # tbptt underflow
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""
