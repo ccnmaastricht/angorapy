@@ -21,7 +21,7 @@ setup(
         "Box2D",
         "gym==0.24.0",
         "mujoco",
-        "tensorflow==2.9.1",
+        "tensorflow==2.10.0",
         "mpi4py==3.1.3",
         "tqdm",
         "simplejson",

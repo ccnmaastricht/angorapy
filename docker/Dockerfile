@@ -2,7 +2,7 @@ ARG UBUNTU_VERSION=18.04
 ARG ARCH=
 ARG CUDA=11.2
 
-FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}.1-cudnn8-runtime-ubuntu${UBUNTU_VERSION} as base
+FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}.2-cudnn8-runtime-ubuntu${UBUNTU_VERSION} as base
 
 ARG DEBIAN_FRONTEND=noninteractive
 
