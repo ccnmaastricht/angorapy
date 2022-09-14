@@ -254,7 +254,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self._render_callback(render_targets=True)
         if mode == 'rgb_array':
             self._get_viewer(mode).render(width, height)
-            # window size used for old mujoco-py:
             data = self._get_viewer(mode).read_pixels(width, height, depth=False)
             # original image is upside-down, so flip it
             return data[::-1, :, :]

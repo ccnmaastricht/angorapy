@@ -25,7 +25,7 @@ if has_mujoco:
         OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, \
         HumanoidManipulateBlockAsynchronous, HumanoidManipulateBlock
     from angorapy.environments.hand.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
-    # from angorapy.environments.hanoi import HanoiEnv
+    from angorapy.environments.hanoi import HanoiEnv
 
     # SHADOW HAND
     gym.envs.register(
@@ -278,7 +278,7 @@ if has_mujoco:
         reward_threshold=200,
     )
 
-    # gym.envs.register(
-    #     id="HanoiTower-v0",
-    #     entry_point="angorapy.environments:HanoiEnv",
-    # )
+    gym.envs.register(
+        id="HanoiTower-v0",
+        entry_point="angorapy.environments:HanoiEnv",
+    )

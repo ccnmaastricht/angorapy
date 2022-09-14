@@ -68,14 +68,6 @@ n_optimizers = int(mpi_comm.allreduce(is_optimization_process, op=MPI.SUM))
 
 
 class PPOAgent:
-    """Agent using the Proximal Policy Optimization Algorithm for learning.
-    
-    The default is an implementation using two independent models for the critic and the actor. This is of course more
-    expensive than using shared parameters because we need two forward and backward calculations
-    per batch however this is what is used in the original paper and most implementations. During development this also
-    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
-    to make any significant progress in more difficult environments such as LunarLander.
-    """
     policy: tf.keras.Model
     value: tf.keras.Model
     joint: tf.keras.Model
@@ -101,6 +93,14 @@ class PPOAgent:
                  debug: bool = False,
                  pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
+
+        Agent using the Proximal Policy Optimization Algorithm for learning.
+
+        The default is an implementation using two independent models for the critic and the actor. This is of course more
+        expensive than using shared parameters because we need two forward and backward calculations
+        per batch however this is what is used in the original paper and most implementations. During development this also
+        turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
+        to make any significant progress in more difficult environments such as LunarLander.
 
         Args:
             model_builder: a function creating a policy, value and joint model

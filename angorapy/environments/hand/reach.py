@@ -1,14 +1,15 @@
 import random
 
+import mujoco
 import numpy as np
-from angorapy.environments.hand.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
-from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
 
+from angorapy.common.const import N_SUBSTEPS, VISION_WH
 from angorapy.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import REACH_BASE
+from angorapy.environments.hand.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
 from angorapy.environments.hand.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
-from angorapy.common.const import N_SUBSTEPS, VISION_WH
+from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
 
 
 class Reach(BaseShadowHandEnv):
@@ -172,25 +173,25 @@ class Reach(BaseShadowHandEnv):
 
     def _render_callback(self, render_targets=False):
         if render_targets:
-            sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
-
             # Visualize targets.
+            sites_offset = (self.data.site_xpos - self.model.site_pos).copy()
             goal = self.goal.reshape(5, 3)
             for finger_idx in range(5):
-                site_name = 'target{}'.format(finger_idx)
-                site_id = self.sim.model.site_name2id(site_name)
-                self.sim.model.site_pos[site_id] = goal[finger_idx] - sites_offset[site_id]
-                self.sim.model.site_rgba[site_id][-1] = 0.2
+                site_name = f"target{finger_idx}"
+
+                site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+                self.model.site_rgba[site_id][-1] = 0.2
+                self.model.site_pos[site_id][:] = (goal[finger_idx] - sites_offset[site_id]).copy()
 
             # Visualize finger positions.
             achieved_goal = self._get_achieved_goal().reshape(5, 3)
             for finger_idx in range(5):
-                site_name = 'finger{}'.format(finger_idx)
-                site_id = self.sim.model.site_name2id(site_name)
-                self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
-                self.sim.model.site_rgba[site_id][-1] = 0.2
+                site_name = f"finger{finger_idx}"
+                site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+                self.model.site_rgba[site_id][-1] = 0.2
+                self.model.site_pos[site_id][:] = (achieved_goal[finger_idx] - sites_offset[site_id]).copy()
 
-        self.sim.forward()
+        mujoco.mj_forward(self.model, self.data)
 
     def step(self, action):
         """Step the environment."""
@@ -321,24 +322,25 @@ class FreeReach(Reach):
         return (d < self.distance_threshold).astype(np.float32)
 
     def _render_callback(self, render_targets=False):
-        if render_targets:
-            sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
+        sites_offset = (self.data.site_xpos - self.model.site_pos).copy()
 
-            # Visualize finger positions.
-            achieved_goal = self._get_achieved_goal().reshape(5, 3)
-            for finger_idx in range(5):
-                site_name = 'finger{}'.format(finger_idx)
-                site_id = self.sim.model.site_name2id(site_name)
+        # Visualize finger positions.
+        achieved_goal = self._get_achieved_goal().reshape(5, 3)
+        for finger_idx in range(5):
+            site_name = f"finger{finger_idx}"
+            site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
 
-                fname = FINGERTIP_SITE_NAMES[finger_idx]
-                if not (fname == self.thumb_name or finger_idx == np.where(self.goal == 1)[0].item()):
-                    self.sim.model.site_rgba[site_id][-1] = 0
-                    continue
+            fname = FINGERTIP_SITE_NAMES[finger_idx]
+            if not (fname == self.thumb_name or finger_idx == np.where(self.goal == 1)[0].item()):
+                self.model.site_rgba[site_id][-1] = 0
+                continue
 
-                self.sim.model.site_rgba[site_id][-1] = 0.2
-                self.sim.model.site_pos[site_id] = achieved_goal[finger_idx] - sites_offset[site_id]
+            self.model.site(site_name).rgba[-1] = 0.2
 
-        self.sim.forward()
+            self.model.site_pos[site_id] = (
+                    achieved_goal[finger_idx] - sites_offset[site_id]
+            )
+        mujoco.mj_forward(self.model, self.data)
 
 
 class FreeReachSequential(FreeReach):
@@ -419,7 +421,3 @@ class FreeReachSequential(FreeReach):
             self.goal = self._sample_goal()
 
         return observation, reward, done, info
-
-
-if __name__ == '__main__':
-    hand = Reach()
