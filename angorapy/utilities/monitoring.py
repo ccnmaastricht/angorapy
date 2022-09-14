@@ -23,8 +23,6 @@ from angorapy.common.wrappers import BaseWrapper
 from angorapy.models.mighty_maker import get_model_type
 from angorapy.utilities.util import add_state_dims, flatten
 
-matplotlib.use('Agg')
-
 
 def scale(vector):
     """Min Max scale a vector."""

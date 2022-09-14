@@ -105,7 +105,8 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         return True
 
     def act(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
-        """Sample an step_tuple from a discrete step_tuple distribution predicted by the given policy for a given state."""
+        """Sample a step_tuple from a discrete step_tuple distribution predicted by the given policy for a given state.
+        """
         action = self.sample(log_probabilities)
         return action, tf.squeeze(log_probabilities)[action]
 
@@ -190,10 +191,10 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
         sample_probability = tf.gather_nd(tf.squeeze(log_probabilities),
                                           tf.stack([tf.range(len(action)), action], axis=-1))
 
-        return action.astype(np.int), tf.math.reduce_sum(sample_probability, axis=-1)
+        return action.astype(int), tf.math.reduce_sum(sample_probability, axis=-1)
 
     def sample(self, log_probabilities: tf.Tensor) -> np.ndarray:
-        """Sample an step_tuple from the distribution."""
+        """Sample an action from the distribution."""
         assert isinstance(log_probabilities, tf.Tensor) or isinstance(log_probabilities, np.ndarray), \
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."

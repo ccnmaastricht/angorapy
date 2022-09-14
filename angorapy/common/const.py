@@ -43,7 +43,7 @@ SHADOWHAND_SEQUENCE_MAX_STEPS = 100
 # STORAGE
 BASE_SAVE_PATH = "storage/saved_models/"
 STORAGE_DIR = "storage/experience/"
-PRETRAINED_COMPONENTS_PATH = "storage/pretrained/"
+PRETRAINED_COMPONENTS_PATH = "storage/pretraining/"
 PATH_TO_EXPERIMENTS = "storage/experiments/"
 PATH_TO_BENCHMARKS = "docs/benchmarks/"
 

@@ -80,7 +80,7 @@ def plot_episode_box_plots(rewards: List[float], lengths: List[float]):
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def plot_per_receptor_mean(per_receptor_mean: Dict[str, List]):
@@ -100,4 +100,4 @@ def plot_per_receptor_mean(per_receptor_mean: Dict[str, List]):
 
     p = bokeh.layouts.column(plots)
     p.sizing_mode = "stretch_width"
-    return embed.components(p)
+    return p

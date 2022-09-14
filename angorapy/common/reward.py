@@ -2,9 +2,9 @@ from typing import List
 
 import numpy as np
 import tqdm
-from angorapy.environments.shadowhand import FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
 
-from angorapy.environments.shadowhand import get_fingertip_distance
+from angorapy.environments.hand.shadowhand import get_fingertip_distance
 
 
 # HELPER FUNCTIONS

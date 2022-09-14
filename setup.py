@@ -6,8 +6,9 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.8.0',
+    version='0.8.1',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
+    long_description_content_type='text/markdown',
     long_description=long_description,
     url='https://github.com/ccnmaastricht/dexterous-robot-hand',
     author='Tonio Weidler',
@@ -20,7 +21,7 @@ setup(
         "Box2D",
         "gym==0.24.0",
         "mujoco",
-        "tensorflow==2.9.1",
+        "tensorflow==2.10.0",
         "mpi4py==3.1.3",
         "tqdm",
         "simplejson",
@@ -30,7 +31,7 @@ setup(
         "argcomplete",
         "matplotlib",
         "scikit-learn==0.24.1",
-        "pandas==1.0.4",
+        "pandas==1.4.4",
         "nvidia-ml-py3",
         "seaborn",
         "distance",

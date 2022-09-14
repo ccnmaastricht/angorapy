@@ -2,18 +2,21 @@
 """Pretrain the visual component."""
 import argparse
 import os
+
+import numpy as np
+import sklearn.model_selection
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from typing import Union
+from typing import Union, Tuple
 
 import argcomplete
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from angorapy.models import _build_openai_encoder, _build_visual_decoder, _build_openai_small_encoder
+from angorapy.models import _build_visual_decoder, _build_openai_encoder
 from common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
 from utilities.data_generation import gen_cube_quats_prediction_data, gen_hand_pos_prediction_data
-from common.loss import EuclideanDistanceLoss
 
 
 def load_caltech():
@@ -115,12 +118,11 @@ def pretrain_on_classification(pretrainable_component: Union[tf.keras.Model, str
     print(results)
 
 
-def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_op"):
+def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str],
+                            epochs,
+                            name="visual_op",
+                            dataset: Tuple[np.ndarray, np.ndarray] = None):
     """Pretrain a visual component on prediction of cube position."""
-
-    # generate training data
-    X, Y = gen_cube_quats_prediction_data(1024 * 8)
-    X = tf.image.per_image_standardization(X)
 
     # model is constructed from visual component and regression output
     model = tf.keras.Sequential((
@@ -128,17 +130,45 @@ def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str], 
         tf.keras.layers.Dense(7, activation="linear"),
     ))
 
+    if dataset is None:
+        x, y = gen_cube_quats_prediction_data(1024 * 8)
+        x = tf.image.per_image_standardization(x).numpy()
+
+        os.makedirs("storage/data/pretraining", exist_ok=True)
+
+        with open("storage/data/pretraining/object_pose_x.npy", "wb") as f:
+            np.save(f, x)
+
+        with open("storage/data/pretraining/object_pose_y.npy", "wb") as f:
+            np.save(f, y)
+    else:
+        x, y = dataset
+
+    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(x, y,
+                                                                                train_size=0.8, shuffle=True)
+
+    x_test, x_val, y_test, y_val = sklearn.model_selection.train_test_split(x_test, y_test, train_size=0.8,
+                                                                            shuffle=True)
+
     if isinstance(pretrainable_component, tf.keras.Model):
+        # generate training data
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="mse", metrics=[EuclideanDistanceLoss])
+        model.compile(optimizer, loss="mse", metrics=[])
 
         # train and save encoder
-        model.fit(X, Y, epochs=epochs, callbacks=[], batch_size=128)
+        model.fit(x_train, y_train, epochs=epochs,
+                  callbacks=[tf.keras.callbacks.EarlyStopping(patience=3)],
+                  batch_size=128,
+                  validation_data=(x_val, y_val))
         pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
     elif isinstance(pretrainable_component, str):
+        print("Loading model...")
         model.load_weights(pretrainable_component)
     else:
         raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
+
+    print(f"A mean model would have an MSE of {np.mean((y_test - np.mean(y_train, axis=0)) ** 2)}")
+    print(f"This model achieves {model.evaluate(x_test, y_test)}")
 
 
 def pretrain_on_hand_pose(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_hp"):
@@ -190,7 +220,7 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hand", "object",
-                                                              "c", "r", "h", "o", "hp", "op"], default="h")
+                                                              "c", "r", "h", "o", "hp", "op"], default="o")
     parser.add_argument("--name", type=str, default="pretrained_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
@@ -200,7 +230,8 @@ if __name__ == "__main__":
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    visual_component = _build_openai_small_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15, name="visual_component")
+    visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15,
+                                             name="visual_component")
     visual_component(tf.random.normal((16, VISION_WH, VISION_WH, 3)))  # needed to initialize keras or whatever
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
@@ -213,5 +244,18 @@ if __name__ == "__main__":
         pretrain_on_reconstruction(visual_component, args.epochs, name=args.name)
     elif args.task in ["hand", "h"]:
         pretrain_on_hand_pose(visual_component, args.epochs, name=args.name)
+    elif args.task in ["object", "o"]:
+        try:
+            with open("storage/data/pretraining/object_pose_x.npy", "rb") as f:
+                x = np.load(f)
+
+            with open("storage/data/pretraining/object_pose_y.npy", "rb") as f:
+                y = np.load(f)
+
+            dataset = x, y
+        except:
+            dataset = None
+
+        pretrain_on_object_pose(visual_component, args.epochs, name=args.name, dataset=dataset)
     else:
         raise ValueError("I dont know that task type.")

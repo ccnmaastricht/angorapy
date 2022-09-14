@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy
 from bokeh import embed, layouts
+from bokeh.io import export_svg
 from bokeh.models import Span, Range1d, LinearAxis, ColumnDataSource, HoverTool
 from bokeh.plotting import figure
 from scipy import stats
@@ -30,7 +31,7 @@ def plot_memory_usage(memory_trace: List):
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def plot_execution_times(cycle_timings, optimization_timings=None, gathering_timings=None):
@@ -59,7 +60,7 @@ def plot_execution_times(cycle_timings, optimization_timings=None, gathering_tim
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_threshold=None):
@@ -145,7 +146,7 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_thresho
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshold=None):
@@ -218,7 +219,7 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
     style_plot(p)
     p.height = 750 + legend.glyph_height * len(rewards)
 
-    return embed.components(p)
+    return p
 
 
 def make_grouped_reward_progress_figure(
@@ -317,7 +318,7 @@ def grouped_reward_progress(rewards: Dict[str, Tuple[int, Dict[str, list]]], rew
     p = make_grouped_reward_progress_figure(rewards, reward_threshold)
     p.height = 750
 
-    return embed.components(p)
+    return p
 
 
 def group_preview(groups: Dict[str, Dict[str, list]], alt_titles=None, reward_thresholds=None):
@@ -338,7 +339,7 @@ def group_preview(groups: Dict[str, Dict[str, list]], alt_titles=None, reward_th
 
     gp = layouts.gridplot(figures, ncols=4, sizing_mode="scale_width")
 
-    return embed.components(gp)
+    return gp
 
 
 def plot_length_progress(lengths: Dict[str, list], cycles_loaded):
@@ -416,7 +417,7 @@ def plot_length_progress(lengths: Dict[str, list], cycles_loaded):
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
@@ -426,6 +427,9 @@ def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
                x_axis_label=name,
                y_range=(0, np.max(hist)),
                **plot_styling)
+
+    if len(metric) == 0:
+        return p
 
     width = (max(metric) - min(metric)) / len(hist) * 0.9
     hist_glyph = p.rect(x=edges, y=hist / 2, height=hist, width=width, line_color="white", fill_color=palette[color])
@@ -451,7 +455,7 @@ def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def plot_loss(loss, rewards, name, color_id=0):
@@ -480,7 +484,7 @@ def plot_loss(loss, rewards, name, color_id=0):
     p.legend.location = "bottom_right"
     style_plot(p)
 
-    return embed.components(p)
+    return p
 
 
 def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
@@ -512,4 +516,4 @@ def plot_preprocessor(preprocessor_data: Dict[str, List[Dict[str, float]]]):
 
     p = bokeh.layouts.row(plots)
     p.sizing_mode = "stretch_width"
-    return embed.components(p)
+    return p

@@ -11,6 +11,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 from angorapy.common.const import VISION_WH
 from angorapy.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
 from angorapy.common.wrappers import make_env
+from angorapy.models import _build_openai_encoder
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -99,12 +100,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         model_type]
 
     # inputs
-    if blind:
-        visual_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["vision"],),
-                                      name="vision")
-    else:
-        raise NotImplementedError("Currently Visual input is not Implemented")
-
+    visual_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["vision"],), name="vision")
     proprio_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["proprioception"],),
                                 name="proprioception")
     touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["somatosensation"],),
@@ -118,7 +114,12 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
         batch_input_shape=somatosensation.shape
     )(somatosensation)
 
-    vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(visual_input)
+    if blind:
+        vc = visual_input
+    else:
+        vc = TD(_build_openai_encoder(state_dimensionality["vision"], 7))(visual_input)
+
+    vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)
 
     ssc = build_ssc_module((bs, sequence_length,), (somatosensation_masked.shape[-1],))

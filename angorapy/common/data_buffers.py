@@ -21,10 +21,10 @@ class ExperienceBuffer:
         self.returns = np.empty((capacity,), dtype=np.float32)
         self.advantages = np.empty((capacity,), dtype=np.float32)
         self.values = np.empty((capacity,), dtype=np.float32)
-        self.dones = np.zeros((capacity,), dtype=np.bool)
+        self.dones = np.zeros((capacity,), dtype=bool)
 
         # only here to be compatible with TimeDistributed, no functionality in this implementation
-        self.mask = np.ones((capacity,), dtype=np.bool)
+        self.mask = np.ones((capacity,), dtype=bool)
 
         # data not stored but buffered (for postprocessing etc.)
         self.achieved_goals = []
@@ -61,7 +61,7 @@ class ExperienceBuffer:
         self.achieved_goals = achieved_goals
 
         # update this to avoid incompatible sizes in the case of changing capacity
-        self.mask = np.ones((self.capacity,), dtype=np.bool)
+        self.mask = np.ones((self.capacity,), dtype=bool)
 
     def normalize_advantages(self):
         """Normalize the buffered advantages using z-scores. This requires the sequences to be of equal lengths,
@@ -98,8 +98,8 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         self.true_number_of_transitions = 0
         self.number_of_subsequences_pushed = 0
 
-        self.dones = np.zeros((1, capacity, self.seq_length,), dtype=np.bool)
-        self.mask = np.zeros(self.advantages.shape, dtype=np.bool)
+        self.dones = np.zeros((1, capacity, self.seq_length,), dtype=bool)
+        self.mask = np.zeros(self.advantages.shape, dtype=bool)
 
         self.last_advantage_stop = 0
 

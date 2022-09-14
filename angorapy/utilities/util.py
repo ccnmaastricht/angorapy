@@ -53,6 +53,8 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], Tuple[int]]:
                                                   f"{type(env.observation_space['observation']).__name__}")
     elif isinstance(env.observation_space, gym.spaces.Box):  # standard observation in box form
         obs_dim = {"proprioception": env.observation_space.shape}
+    elif isinstance(env.observation_space, gym.spaces.tuple.Tuple):
+        obs_dim = {"proprioception": (len(env.observation_space),)}
     else:
         raise UninterpretableObservationSpace(
             f"Cannot interpret observation space of type {type(env.observation_space)}.")

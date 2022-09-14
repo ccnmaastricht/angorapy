@@ -25,7 +25,7 @@ from angorapy.agent.dataio import read_dataset_from_storage
 from angorapy.agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
 from angorapy.agent.ppo.optim import learn_on_batch
 from angorapy.common import policies, const
-from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
+from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR, PATH_TO_EXPERIMENTS
 from angorapy.common.const import MIN_STAT_EPS
 from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
@@ -68,14 +68,6 @@ n_optimizers = int(mpi_comm.allreduce(is_optimization_process, op=MPI.SUM))
 
 
 class PPOAgent:
-    """Agent using the Proximal Policy Optimization Algorithm for learning.
-    
-    The default is an implementation using two independent models for the critic and the actor. This is of course more
-    expensive than using shared parameters because we need two forward and backward calculations
-    per batch however this is what is used in the original paper and most implementations. During development this also
-    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
-    to make any significant progress in more difficult environments such as LunarLander.
-    """
     policy: tf.keras.Model
     value: tf.keras.Model
     joint: tf.keras.Model
@@ -101,6 +93,14 @@ class PPOAgent:
                  debug: bool = False,
                  pretrained_components: list = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
+
+        Agent using the Proximal Policy Optimization Algorithm for learning.
+
+        The default is an implementation using two independent models for the critic and the actor. This is of course more
+        expensive than using shared parameters because we need two forward and backward calculations
+        per batch however this is what is used in the original paper and most implementations. During development this also
+        turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
+        to make any significant progress in more difficult environments such as LunarLander.
 
         Args:
             model_builder: a function creating a policy, value and joint model
@@ -219,6 +219,7 @@ class PPOAgent:
         self.model_export_dir = "storage/saved_models/exports/"
         self.agent_id = mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
+        self.experiment_directory = f"{PATH_TO_EXPERIMENTS}/{self.agent_id}/"
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory, exist_ok=True)
@@ -771,9 +772,9 @@ class PPOAgent:
             current_lr = self.lr_schedule
 
         # losses
-        pi_loss = "-" if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
-        v_loss = "-" if len(self.value_loss_history) == 0 else f"{round(self.value_loss_history[-1], 2):8.2f}"
-        ent = "-" if len(self.entropy_history) == 0 else f"{round(self.entropy_history[-1], 2):6.2f}"
+        pi_loss = "  pi  " if len(self.policy_loss_history) == 0 else f"{round(self.policy_loss_history[-1], 2):6.2f}"
+        v_loss = "  v     " if len(self.value_loss_history) == 0 else f"{round(self.value_loss_history[-1], 2):8.2f}"
+        ent = "  ent " if len(self.entropy_history) == 0 else f"{round(self.entropy_history[-1], 2):6.2f}"
 
         # tbptt underflow
         underflow = f"w: {nc}{self.underflow_history[-1]}{ec}; " if self.underflow_history[-1] is not None else ""

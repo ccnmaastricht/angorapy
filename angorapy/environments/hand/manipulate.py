@@ -7,17 +7,17 @@ from angorapy.environments import rotations
 from angorapy.environments.utils import robot_get_obs
 from scipy.spatial import transform
 
-from angorapy.common.const import N_SUBSTEPS
+from angorapy.common.const import N_SUBSTEPS, VISION_WH
 from angorapy.common.reward import manipulate
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import MANIPULATE_BASE
-from angorapy.environments.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
-                                    "assets/hand",
+                                    "../assets/hand",
                                     'manipulate_block_touch_sensors.xml')
 MANIPULATE_EGG_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
-                                  "assets/hand",
+                                  "../assets/hand",
                                   'manipulate_egg_touch_sensors.xml')
 
 
@@ -114,7 +114,8 @@ class BaseManipulate(BaseShadowHandEnv):
                          n_substeps=n_substeps,
                          delta_t=delta_t,
                          relative_control=relative_control,
-                         model=model_path)
+                         model=model_path,
+                         vision=vision)
 
         # set touch sensors rgba values
         for _, site_id in self._touch_sensor_id_site_id:
@@ -459,8 +460,14 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
     def _get_obs(self):
         """Gather humanoid senses and asynchronous information."""
 
-        # vision
         object_qpos = self.data.jnt('object:joint').qpos.copy()
+
+        # vision
+        if not self.vision:
+            vision_input = object_qpos
+        else:
+
+            vision_input = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]
@@ -494,7 +501,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
 
         return {
             "observation": Sensation(
-                vision=object_qpos,
+                vision=vision_input,
                 proprioception=proprioception.copy(),
                 somatosensation=touch,
                 goal=target_orientation,
