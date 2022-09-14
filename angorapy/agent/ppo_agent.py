@@ -25,7 +25,7 @@ from angorapy.agent.dataio import read_dataset_from_storage
 from angorapy.agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
 from angorapy.agent.ppo.optim import learn_on_batch
 from angorapy.common import policies, const
-from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR
+from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR, PATH_TO_EXPERIMENTS
 from angorapy.common.const import MIN_STAT_EPS
 from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
@@ -219,6 +219,7 @@ class PPOAgent:
         self.model_export_dir = "storage/saved_models/exports/"
         self.agent_id = mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
+        self.experiment_directory = f"{PATH_TO_EXPERIMENTS}/{self.agent_id}/"
         if _make_dirs:
             os.makedirs(self.model_export_dir, exist_ok=True)
             os.makedirs(self.agent_directory, exist_ok=True)

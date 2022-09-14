@@ -5,6 +5,8 @@ import shutil
 import sys
 from json import JSONDecodeError
 
+from bokeh import embed
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from angorapy.utilities.monitor.statistical_plots import plot_episode_box_plots, plot_per_receptor_mean
@@ -370,35 +372,35 @@ def show_experiment(exp_id):
         ))
 
         if "used_memory" in stats:
-            plots["mem_usage"] = plot_memory_usage(stats["used_memory"])
+            plots["mem_usage"] = embed.components(plot_memory_usage(stats["used_memory"]))
 
         if "cycle_timings" in stats:
-            plots["timings"] = plot_execution_times(stats["cycle_timings"],
+            plots["timings"] = embed.components(plot_execution_times(stats["cycle_timings"],
                                                     stats.get("optimization_timings"),
-                                                    stats.get("gathering_timings"))
+                                                    stats.get("gathering_timings")))
 
     if "RewardNormalizationTransformer" in progress["preprocessors"]:
-        plots["normalization"]["reward"] = plot_preprocessor(progress["preprocessors"]["RewardNormalizationTransformer"])
+        plots["normalization"]["reward"] = embed.components(plot_preprocessor(progress["preprocessors"]["RewardNormalizationTransformer"]))
 
     if "StateNormalizationTransformer" in progress["preprocessors"]:
-        plots["normalization"]["state"] = plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"])
+        plots["normalization"]["state"] = embed.components(plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"]))
 
     reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
         meta["environment"]["reward_threshold"])
 
-    plots["reward_distribution"] = plot_distribution(progress["rewards"]["last_cycle"], "Rewards (Last Cycle)", color=0)
-    plots["length_distribution"] = plot_distribution(progress["lengths"]["last_cycle"], "Episode Lengths (Last Cycle)", color=1)
+    plots["reward_distribution"] = embed.components(plot_distribution(progress["rewards"]["last_cycle"], "Rewards (Last Cycle)", color=0))
+    plots["length_distribution"] = embed.components(plot_distribution(progress["lengths"]["last_cycle"], "Episode Lengths (Last Cycle)", color=1))
     cycles_loaded = []
     if "loaded_at" in stats.keys():
         cycles_loaded = stats["loaded_at"]
-    plots["reward_progress"] = plot_reward_progress(progress["rewards"], cycles_loaded, reward_threshold=reward_threshold)
-    plots["length_progress"] = plot_length_progress(progress["lengths"], cycles_loaded)
-    plots["policy_loss"] = plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0)
-    plots["value_loss"] = plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1)
-    plots["entropies"] = plot_loss(progress["entropies"], progress["rewards"]["mean"], "Entropy", color_id=2)
+    plots["reward_progress"] = embed.components(plot_reward_progress(progress["rewards"], cycles_loaded, reward_threshold=reward_threshold))
+    plots["length_progress"] = embed.components(plot_length_progress(progress["lengths"], cycles_loaded))
+    plots["policy_loss"] = embed.components(plot_loss(progress["ploss"], progress["rewards"]["mean"], "Policy Loss", color_id=0))
+    plots["value_loss"] = embed.components(plot_loss(progress["vloss"], progress["rewards"]["mean"], "Value Loss", color_id=1))
+    plots["entropies"] = embed.components(plot_loss(progress["entropies"], progress["rewards"]["mean"], "Entropy", color_id=2))
 
     if "per_receptor_mean" in stats.keys():
-        plots["per_receptor_mean"] = plot_per_receptor_mean(stats["per_receptor_mean"])
+        plots["per_receptor_mean"] = embed.components(plot_per_receptor_mean(stats["per_receptor_mean"]))
 
     info.update(dict(
         plots=plots
