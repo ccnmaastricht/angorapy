@@ -287,11 +287,11 @@ class PPOAgent:
               n: int,
               epochs: int,
               batch_size: int,
-              monitor: "Monitor"=None,
+              monitor: "Monitor" = None,
               save_every: int = 0,
               separate_eval: bool = False,
               stop_early: bool = False,
-              radical_evaluation=False) -> "PPOAgent":
+              radical_evaluation: object = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.

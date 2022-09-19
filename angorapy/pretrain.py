@@ -29,15 +29,6 @@ def top_5_accuracy(y_true, y_pred):
     return tf.keras.metrics.top_k_categorical_accuracy(y_true, y_pred, k=5)
 
 
-class TestCallback(tf.keras.callbacks.Callback):
-
-    def __init__(self, test_data):
-        self.test_data = test_data
-
-    def on_epoch_end(self, epoch, logs={}):
-        out = self.model.evaluate(self.test_data, )
-        print(f"\n{out}\n")
-
 
 def pretrain_on_reconstruction(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_r"):
     """Pretrain a visual component on the reconstruction of images."""
@@ -213,6 +204,8 @@ def pretrain_on_hand_pose(pretrainable_component: Union[tf.keras.Model, str], ep
 
 
 if __name__ == "__main__":
+    import keras_cortex as kc
+
     tf.get_logger().setLevel('INFO')
 
     # parse commandline arguments
@@ -230,8 +223,8 @@ if __name__ == "__main__":
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15,
-                                             name="visual_component")
+    # visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15, name="visual_component")
+    visual_component = kc.cornet.cornet_z.CORNetZ(output_dim=15)
     visual_component(tf.random.normal((16, VISION_WH, VISION_WH, 3)))  # needed to initialize keras or whatever
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)

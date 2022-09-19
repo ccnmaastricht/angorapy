@@ -138,8 +138,6 @@ if has_mujoco:
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
-
-
         gym.envs.register(
             id=f'ManipulateBlockDiscrete{control_mode}-v0',
             entry_point='angorapy.environments:ManipulateBlockDiscrete',
@@ -232,7 +230,6 @@ if has_mujoco:
         kwargs={"delta_t": 0.008, "vision": True},
         max_episode_steps=50 * 100,
     )
-
 
     # MODIFIED ENVIRONMENTS
 

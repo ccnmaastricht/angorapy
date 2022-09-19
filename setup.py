@@ -37,6 +37,7 @@ setup(
         "distance",
         "protobuf==3.19.0",
         "panda_gym",
+        "imageio"
 
         # webinterface
         "itsdangerous==2.0.1",
