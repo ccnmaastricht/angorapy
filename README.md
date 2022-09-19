@@ -68,10 +68,10 @@ from angorapy.common.wrappers import make_env
 from angorapy.models import get_model_builder
 from angorapy.agent.ppo_agent import PPOAgent
 
-env = make_env("LunarLanderContinuous-v2")
-model_builder = get_model_builder("simple", "ffn")
-agent = PPOAgent(model_builder, env)
-agent.drill(100, 10, 512)
+env = make_env("ReachAbsolute-v0")
+model_builder = get_model_builder("shadow", "lstm")
+agent = PPOAgent(model_builder, env, workers=24)
+agent.drill(n=100, epochs=10, batch_size=512)
 ```
 
 For more details, consult the [examples](examples).
