@@ -27,6 +27,7 @@ class Predictability(base_investigator.Investigator):
 
     def prepare(self, env: BaseWrapper, layers: List[str], n_states=1000):
         """Prepare samples to predict from."""
+        self.network.reset_states()
         state, info = env.reset(return_info=True)
 
         state_collection = []
@@ -111,5 +112,8 @@ class Predictability(base_investigator.Investigator):
             x[target_information]))).as_numpy_iterator())
 
         predictor.fit(X, Y)
+        score = predictor.score(X_test, Y_test)
 
         print(f"{target_information} from {source_layer} has an R2 of {predictor.score(X_test, Y_test)}.")
+
+        return score
