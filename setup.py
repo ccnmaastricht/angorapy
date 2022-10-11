@@ -37,7 +37,7 @@ setup(
         "distance",
         "protobuf==3.19.0",
         "panda_gym",
-        "imageio"
+        "imageio",
         
         "keras_cortex",
 
