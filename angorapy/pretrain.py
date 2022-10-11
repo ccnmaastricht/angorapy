@@ -151,7 +151,7 @@ def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str],
                   callbacks=[tf.keras.callbacks.EarlyStopping(patience=3)],
                   batch_size=128,
                   validation_data=(x_val, y_val))
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
+        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
     elif isinstance(pretrainable_component, str):
         print("Loading model...")
         model.load_weights(pretrainable_component)
@@ -159,6 +159,7 @@ def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str],
         raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
 
     print(f"A mean model would have an MSE of {np.mean((y_test - np.mean(y_train, axis=0)) ** 2)}")
+    print(f"A median model would have an MSE of {np.mean((y_test - np.median(y_train, axis=0)) ** 2)}")
     print(f"This model achieves {model.evaluate(x_test, y_test)}")
 
 
@@ -214,7 +215,7 @@ if __name__ == "__main__":
     # general parameters
     parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hand", "object",
                                                               "c", "r", "h", "o", "hp", "op"], default="o")
-    parser.add_argument("--name", type=str, default="pretrained_component",
+    parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
     parser.add_argument("--epochs", type=int, default=60, help=f"number of pretraining epochs")
@@ -224,8 +225,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15, name="visual_component")
-    visual_component = kc.cornet.cornet_z.CORNetZ(output_dim=15)
-    visual_component(tf.random.normal((16, VISION_WH, VISION_WH, 3)))  # needed to initialize keras or whatever
+    visual_component = kc.cornet.CORNetZ(output_dim=7, name=args.name)
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
 
@@ -246,6 +246,8 @@ if __name__ == "__main__":
                 y = np.load(f)
 
             dataset = x, y
+
+            print(f"Dataset [{x.shape}] was loaded from storage.")
         except:
             dataset = None
 

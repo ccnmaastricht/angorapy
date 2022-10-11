@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.8.1',
+    version='0.9.0',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     long_description_content_type='text/markdown',
     long_description=long_description,
@@ -38,6 +38,8 @@ setup(
         "protobuf==3.19.0",
         "panda_gym",
         "imageio"
+        
+        "keras_cortex",
 
         # webinterface
         "itsdangerous==2.0.1",

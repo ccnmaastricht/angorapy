@@ -3,6 +3,7 @@
 import os
 
 import gym
+import keras_cortex
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
@@ -117,7 +118,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     if blind:
         vc = visual_input
     else:
-        vc = TD(_build_openai_encoder(state_dimensionality["vision"], 7))(visual_input)
+        vc = TD(keras_cortex.cornet.CORNetZ(7), name="visual_component")(visual_input)
 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)

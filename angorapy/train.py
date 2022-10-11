@@ -43,7 +43,6 @@ from angorapy.environments import *
 from mpi4py import MPI
 
 
-
 class InconsistentArgumentError(Exception):
     """Arguments given to a process were inconsistent."""
     pass
@@ -135,6 +134,14 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         if is_root:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
+        # load pretrained components
+        agent.load_components(settings["component_dir"])
+
+        # freeze components
+        if settings["freeze_components"] is not None:
+            for component in settings["freeze_components"]:
+                agent.freeze_component(component)
+
     if len(tf.config.list_physical_devices('GPU')) > 0:
         agent.set_gpu(not settings["cpu"])
     else:
@@ -198,6 +205,7 @@ if __name__ == "__main__":
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
+    parser.add_argument("--component-dir", type=str, default=None, help=f"path to pretrained components")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate additionally to have at least 5 eps")
     parser.add_argument("--radical-evaluation", action="store_true", help=f"only record stats from seperate evaluation")
@@ -206,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode (eager mode)")
     parser.add_argument("--no-monitor", action="store_true", help="dont use a monitor")
-
+    parser.add_argument("--freeze-components", type=str, nargs="+", help=f"Components to freeze the weights of.")
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")

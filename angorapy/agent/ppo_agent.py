@@ -972,3 +972,27 @@ class PPOAgent:
         joint.set_weights(weights)
 
         return policy, value, joint
+
+    def load_components(self, path_to_components: str):
+        for directory in os.listdir(path_to_components):
+            pretrained_component_full_path = os.path.join(path_to_components, directory)
+            if os.path.isdir(pretrained_component_full_path):
+                pretrained_component = tf.keras.models.load_model(pretrained_component_full_path)
+
+                found_counterpart = False
+                for model_component in self.joint.layers:
+                    if model_component.name == pretrained_component.name:
+                        print(f"Loading weights of '{model_component.name}' from pretrained models.")
+                        model_component.set_weights(pretrained_component.get_weights())
+
+                        found_counterpart = True
+                        break
+
+                if not found_counterpart:
+                    print(f"No counterpart for pretrained component '{pretrained_component.name}' found in the model.")
+
+    def freeze_component(self, component: str):
+        for model_component in self.joint.layers:
+            if model_component.name == component:
+                print(f"Freezing '{model_component.name}'.")
+                model_component.trainable = False
