@@ -2,9 +2,12 @@
 """Pretrain the visual component."""
 import argparse
 import os
+import sys
 
 import numpy as np
 import sklearn.model_selection
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

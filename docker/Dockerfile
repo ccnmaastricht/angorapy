@@ -75,6 +75,7 @@ RUN pip install /ang_tmp \
 
 WORKDIR /
 COPY angorapy/train.py train.py
+COPY angorapy/pretrain.py pretrain.py
 
 # CLEANUP
 RUN pip cache purge
