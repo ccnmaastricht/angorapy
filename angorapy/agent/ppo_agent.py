@@ -978,7 +978,7 @@ class PPOAgent:
         for directory in os.listdir(path_to_components):
             pretrained_component_full_path = os.path.join(path_to_components, directory)
             if os.path.isdir(pretrained_component_full_path):
-                pretrained_component = tf.keras.models.load_model(pretrained_component_full_path)
+                pretrained_component = tf.keras.models.load_model(pretrained_component_full_path, compile=False)
 
                 found_counterpart = False
                 for model_component in self.joint.layers:
