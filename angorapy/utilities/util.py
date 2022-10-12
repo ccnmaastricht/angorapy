@@ -28,6 +28,12 @@ def mpi_flat_print(string: str):
         print(f"\r{string}", end="")
 
 
+def mpi_print(string: str):
+    """A bit of a workaround to no new line printing to have it work in PyCharm."""
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        print(string)
+
+
 def set_all_seeds(seed):
     """Set all random seeds (tf, np, random) to given value."""
     tf.random.set_seed(seed)

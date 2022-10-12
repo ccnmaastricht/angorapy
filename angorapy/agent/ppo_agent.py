@@ -36,7 +36,8 @@ from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
 from angorapy.utilities.statistics import ignore_none
-from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape
+from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
+    mpi_print
 
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
@@ -982,7 +983,7 @@ class PPOAgent:
                 found_counterpart = False
                 for model_component in self.joint.layers:
                     if model_component.name == pretrained_component.name:
-                        print(f"Loading weights of '{model_component.name}' from pretrained models.")
+                        mpi_print(f"Loading weights of '{model_component.name}' from pretrained models.")
                         model_component.set_weights(pretrained_component.get_weights())
 
                         found_counterpart = True
@@ -994,5 +995,5 @@ class PPOAgent:
     def freeze_component(self, component: str):
         for model_component in self.joint.layers:
             if model_component.name == component:
-                print(f"Freezing '{model_component.name}'.")
+                mpi_print(f"Freezing '{model_component.name}'.")
                 model_component.trainable = False
