@@ -70,8 +70,7 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
 
     tensor_slices.update(buffer.states)
 
-    with tf.device("/cpu:0"):
-        dataset = tf.data.TFRecordDataset.from_tensor_slices(tensor_slices)
+    dataset = tf.data.TFRecordDataset.from_tensor_slices(tensor_slices)
 
     # make statistics object
     underflow = None
