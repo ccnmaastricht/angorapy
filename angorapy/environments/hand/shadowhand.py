@@ -16,6 +16,7 @@ from angorapy.common.const import N_SUBSTEPS
 from angorapy.configs.reward_config import resolve_config_name
 from angorapy.environments.anthrobotics import AnthropomorphicEnv
 from angorapy.environments.utils import mj_get_category_names
+from angorapy.utilities.util import mpi_print
 
 FINGERTIP_SITE_NAMES = [
     'robot0:S_fftip',
@@ -344,7 +345,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         if self.viewer is None:
             return
 
-        print("Setting up camera.")
+        mpi_print("Setting up camera.")
 
         self.viewpoint = "topdown"
 
@@ -363,7 +364,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         else:
             raise NotImplementedError("Unknown Viewpoint.")
 
-        print("Camera setup finished.")
+        mpi_print("Camera setup finished.")
 
 
 if __name__ == '__main__':
