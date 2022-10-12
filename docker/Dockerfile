@@ -73,6 +73,8 @@ RUN pip install /ang_tmp \
     && pip install imageio \
     && rm -rf /ang_tmp
 
+RUN pip install tensorflow_datasets
+
 WORKDIR /
 COPY angorapy/train.py train.py
 COPY angorapy/pretrain.py pretrain.py

@@ -18,8 +18,8 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from angorapy.models import _build_visual_decoder, _build_openai_encoder
-from common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
-from utilities.data_generation import gen_cube_quats_prediction_data, gen_hand_pos_prediction_data
+from angorapy.common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
+from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, gen_hand_pos_prediction_data
 
 
 def load_caltech():
