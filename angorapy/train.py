@@ -4,6 +4,8 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 
 import sys
 import os
+
+os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pprint
@@ -135,7 +137,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
 
         # load pretrained components
-        agent.load_components(settings["component_dir"])
+        if settings["component_dir"] is not None:
+            agent.load_components(settings["component_dir"])
 
         # freeze components
         if settings["freeze_components"] is not None:
@@ -218,8 +221,7 @@ if __name__ == "__main__":
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--horizon", type=int, default=2048,
-                        help=f"number of time steps one worker generates per cycle")
+    parser.add_argument("--horizon", type=int, default=2048, help=f"number of time steps one worker generates per cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")
