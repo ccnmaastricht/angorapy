@@ -2,7 +2,7 @@ import re
 
 from matplotlib import pyplot as plt
 
-with open("results/predictability_10000.txt", "r") as f:
+with open("results/predictability_20000.txt", "r") as f:
     results = [re.match("(.*) from (.*) has an R2 of (.*)", line) for line in f.readlines()]
 
 results = [r.groups() for r in results if r is not None]
