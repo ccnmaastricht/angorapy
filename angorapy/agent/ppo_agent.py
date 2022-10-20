@@ -856,7 +856,10 @@ class PPOAgent:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
         """
         # TODO also load the state of the optimizers
-        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}"
+        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"
+        print(agent_path)
+        print(os.listdir(agent_path))
+
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(
                 "The given agent ID does not match any existing save history from your current path.")
@@ -865,7 +868,7 @@ class PPOAgent:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
         # determine loading point
-        latest_matches = PPOAgent.get_saved_iterations(agent_id)
+        latest_matches = PPOAgent.get_saved_iterations(agent_path)
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
@@ -922,7 +925,7 @@ class PPOAgent:
 
             loaded_agent.__dict__[p] = v
 
-        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
+        loaded_agent.joint.load_weights(f"{agent_path}/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
             if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
@@ -945,10 +948,8 @@ class PPOAgent:
         return loaded_agent
 
     @staticmethod
-    def get_saved_iterations(agent_id: int) -> list:
+    def get_saved_iterations(agent_path: int) -> list:
         """Return a list of iterations at which the agent of given ID has been saved."""
-        agent_path = BASE_SAVE_PATH + f"/{agent_id}"
-
         if not os.path.isdir(agent_path):
             raise FileNotFoundError("The given agent ID does not match any existing save history.")
 
