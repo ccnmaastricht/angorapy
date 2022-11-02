@@ -36,4 +36,4 @@ ax.set_ylim(0, 1)
 
 # plt.xticks(rotation="vertical")
 # plt.gcf().subplots_adjust(bottom=0.3)
-plt.show()
+plt.savefig("M1vsPMC.svg", format="svg", bbox_inches="tight")
