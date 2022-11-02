@@ -7,14 +7,6 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 
-def package_files(directory):
-    paths = []
-    for (path, directories, filenames) in os.walk(directory):
-        for filename in filenames:
-            paths.append(os.path.join('..', path, filename))
-    return paths
-
-
 setup(
     name='angorapy',
     version='0.9.0',
@@ -62,7 +54,7 @@ setup(
     ],
 
     package_data={
-        "angorapy": package_files("environments/assets/"),
+        "angorapy": ["environments/assets/**/*"],
     },
 
     classifiers=[

@@ -82,6 +82,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip install --upgrade pip
+
 # INSTALL MPI
 RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
 RUN tar xf mpich-3.1.4.tar.gz
@@ -122,7 +124,6 @@ COPY angorapy/train.py train.py
 COPY angorapy/pretrain.py pretrain.py
 
 # CLEANUP
-RUN pip install --upgrade pip
 RUN pip cache purge
 
 # FINAL
