@@ -356,7 +356,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
     def step(self, action):
         """Make step in environment."""
-        obs, reward, done, info = super().step(action)
+        obs, reward, terminated, truncated, info = super().step(action)
         self.steps_with_current_goal += 1
 
         success = self._is_success(self._get_achieved_goal(), self.goal)
@@ -371,13 +371,13 @@ class BaseManipulate(BaseShadowHandEnv):
             obs = self._get_obs()
 
         if self.steps_with_current_goal >= BaseManipulate.max_steps_per_goal:
-            done = True
+            terminated = True
 
         # determine if done
         dropped = self._is_dropped()
-        done = done or dropped or self.consecutive_goals_reached >= 50
+        terminated = terminated or dropped or self.consecutive_goals_reached >= 50
 
-        return obs, reward, done, info
+        return obs, reward, terminated, truncated, info
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):

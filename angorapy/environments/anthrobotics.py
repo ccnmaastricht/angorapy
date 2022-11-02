@@ -118,12 +118,11 @@ class AnthropomorphicEnv(gym.Env, ABC):
         super().reset(seed=seed)
 
         mujoco.mj_resetData(self.model, self.data)
+        self.reset_model()
 
-        ob = self.reset_model()
-        if not return_info:
-            return ob
-        else:
-            return ob, {}
+        obs = self._get_obs()["observation"]
+
+        return obs, {}
 
     def get_state(self):
         """Get the current state of the simulation."""

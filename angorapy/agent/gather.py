@@ -112,7 +112,7 @@ class Gatherer(BaseGatherer):
         states, rewards, actions, action_probabilities, values, advantages, dones = [], [], [], [], [], [], []
         episode_endpoints = []
         achieved_goals = []
-        state = env.reset()
+        state, info = env.reset()
 
         while t < self.horizon:
             current_subseq_length += 1
@@ -132,7 +132,8 @@ class Gatherer(BaseGatherer):
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
             # make a step based on the chosen action and collect the reward for this state
-            observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            done = terminated or truncated
             current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
             rewards.append(reward)
             dones.append(done)
@@ -171,7 +172,7 @@ class Gatherer(BaseGatherer):
                     advantages.append(episode_advantages)
 
                 # reset environment to receive next episodes initial state
-                state = env.reset()
+                state, info = env.reset()
 
                 if is_recurrent:
                     joint.reset_states()

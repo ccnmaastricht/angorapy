@@ -220,9 +220,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
 
-        return obs, reward, done, info
+        return obs, reward, done, False, info
 
-    def reset(self, return_info=False, **kwargs):
+    def reset(self, **kwargs):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
         # is possible to get into a state with numerical issues (e.g. due to penetration or
         # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
@@ -237,10 +237,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
-        if return_info:
-            return obs, {}
-        else:
-            return obs
+        return obs, {}
 
     def reset_model(self):
         self.set_state(**self.initial_state)
