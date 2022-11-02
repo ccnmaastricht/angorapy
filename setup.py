@@ -19,7 +19,7 @@ setup(
     install_requires=[
         "numpy==1.23.0",
         "Box2D",
-        "gym==0.24.0",
+        "gym==0.26.2",
         "mujoco",
         "tensorflow==2.10.0",
         "mpi4py==3.1.3",
