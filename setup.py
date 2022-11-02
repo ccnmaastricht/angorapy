@@ -51,7 +51,7 @@ setup(
     ],
 
     package_data={
-        "angorapy": ["environments/hand/assets/**/*"],
+        "angorapy": ["environments/assets/**/*"],
     },
 
     classifiers=[
