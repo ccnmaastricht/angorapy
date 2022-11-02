@@ -1,8 +1,19 @@
+import os
+
 from setuptools import setup, find_packages
 
 from pathlib import Path
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
+
+
+def package_files(directory):
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join('..', path, filename))
+    return paths
+
 
 setup(
     name='angorapy',
@@ -51,7 +62,7 @@ setup(
     ],
 
     package_data={
-        "angorapy": ["environments/assets/**/*"],
+        "angorapy": package_files("environments/assets/"),
     },
 
     classifiers=[
