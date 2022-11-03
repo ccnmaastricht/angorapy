@@ -111,7 +111,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         return action, tf.squeeze(log_probabilities)[action]
 
     def sample(self, log_probabilities):
-        """Sample an step_tuple from the distribution."""
+        """Sample an action from the distribution."""
         assert isinstance(log_probabilities, tf.Tensor) or isinstance(log_probabilities, np.ndarray), \
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."
@@ -324,15 +324,15 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         Output Shapes:
             - all: (B) or (B, S)
         """
-        tf.debugging.assert_all_finite(samples, "samples not all finite")
-        tf.debugging.assert_all_finite(means, "means not all finite")
-        tf.debugging.assert_all_finite(log_stdevs, "log_stdevs not all finite")
+        # tf.debugging.assert_all_finite(samples, "samples not all finite")
+        # tf.debugging.assert_all_finite(means, "means not all finite")
+        # tf.debugging.assert_all_finite(log_stdevs, "log_stdevs not all finite")
 
         log_likelihoods = (- tf.reduce_sum(log_stdevs, axis=-1)
                            - tf.math.log(2 * np.pi)
                            - (0.5 * tf.reduce_sum(tf.square(((samples - means) / tf.exp(log_stdevs))), axis=-1)))
 
-        tf.debugging.assert_all_finite(log_likelihoods, "log_likelihoods not all finite")
+        # tf.debugging.assert_all_finite(log_likelihoods, "log_likelihoods not all finite")
 
         return log_likelihoods
 

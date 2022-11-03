@@ -132,10 +132,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     def _set_observation_space(self, obs):
         # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
-            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
+            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape),
+            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape),
             observation=spaces.Dict(
-                {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape, dtype=float)
+                {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape)
                  for name, val in obs['observation'].dict().items()}
             ),
         ))
