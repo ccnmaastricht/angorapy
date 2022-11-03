@@ -82,8 +82,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip
-
 # INSTALL MPI
 RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
 RUN tar xf mpich-3.1.4.tar.gz
@@ -107,14 +105,20 @@ ENV VIRTUAL_ENV=/venv
 RUN virtualenv --python=python3.8 $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
+RUN pip install --upgrade pip
+
 # INSTALL TOOL
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
 
 RUN pip install /ang_tmp \
     && pip install mujoco \
-    && pip install imageio \
-    && rm -rf /ang_tmp
+    && pip install imageio
+
+# fix missing stls problem
+RUN cp -r /ang_tmp/angorapy/environments/assets/stls/ venv/lib/python3.8/site-packages/angorapy/environments/assets/
+
+RUN rm -rf /ang_tmp
 
 RUN pip install tensorflow_datasets
 RUN pip install gym[box2d]
