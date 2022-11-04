@@ -20,7 +20,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "numpy==1.23.0",
+        "numpy==1.19.2",
         "Box2D",
         "gym==0.26.2",
         "mujoco",
