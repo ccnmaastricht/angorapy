@@ -119,7 +119,7 @@ class Gatherer(BaseGatherer):
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = flatten(joint(prepared_state))
+            policy_out = flatten(joint(prepared_state, training=False))
 
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
 
@@ -190,7 +190,7 @@ class Gatherer(BaseGatherer):
             t += 1
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
+        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
