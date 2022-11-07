@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import mujoco
 import numpy as np
@@ -51,7 +52,8 @@ class BaseManipulate(BaseShadowHandEnv):
             delta_t=0.002,
             touch_get_obs="sensordata",
             vision=False,
-            touch=True
+            touch=True,
+            render_mode: Optional[str] = None
     ):
         """Initializes a new Hand manipulation environment.
 
@@ -115,7 +117,8 @@ class BaseManipulate(BaseShadowHandEnv):
                          delta_t=delta_t,
                          relative_control=relative_control,
                          model=model_path,
-                         vision=vision)
+                         vision=vision,
+                         render_mode=render_mode)
 
         # set touch sensors rgba values
         for _, site_id in self._touch_sensor_id_site_id:
@@ -389,7 +392,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  touch_get_obs='sensordata',
                  relative_control=True,
                  vision: bool = False,
-                 delta_t: float = 0.002):
+                 delta_t: float = 0.002,
+                 render_mode: Optional[str] = None):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -399,7 +403,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                                 vision=vision,
                                 relative_control=relative_control,
-                                delta_t=delta_t
+                                delta_t=delta_t,
+                                render_mode=render_mode
                                 )
 
 
@@ -467,7 +472,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
             vision_input = object_qpos
         else:
 
-            vision_input = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
+            vision_input = self.render()
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]

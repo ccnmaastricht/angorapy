@@ -70,7 +70,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     wrappers.append(RewardNormalizationTransformer) if not settings["no_reward_norming"] else None
 
     # setup environment and extract and report information
-    env = make_env(environment, reward_config=settings["rcon"], transformers=wrappers)
+    env = make_env(environment,
+                   reward_config=settings["rcon"],
+                   transformers=wrappers,
+                   render_mode="rgb_array")
     state_dim, number_of_actions = env_extract_dims(env)
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[

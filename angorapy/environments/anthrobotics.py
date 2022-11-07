@@ -1,7 +1,7 @@
 from abc import ABC
 from collections import OrderedDict
 from os import path
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import mujoco
@@ -36,7 +36,20 @@ def convert_observation_to_space(observation):
 class AnthropomorphicEnv(gym.Env, ABC):
     """Superclass for all environments."""
 
-    def __init__(self, model_path, frame_skip, initial_qpos=None, vision=False):
+    def __init__(
+            self,
+            model_path,
+            frame_skip,
+            initial_qpos=None,
+            vision=False,
+            render_mode: Optional[str] = None,
+            camera_id: Optional[int] = None,
+            camera_name: Optional[str] = None,
+    ):
+
+        self.render_mode = render_mode
+        self.camera_id = camera_id
+        self.camera_name = camera_name
 
         if model_path.startswith("/"):
             fullpath = model_path
@@ -46,7 +59,10 @@ class AnthropomorphicEnv(gym.Env, ABC):
             raise OSError(f"File {fullpath} does not exist")
 
         self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
+        self.model.vis.global_.offwidth = VISION_WH
+        self.model.vis.global_.offheight = VISION_WH
         self.data = mujoco.MjData(self.model)
+
         self._viewers = {}
         self.viewer = None
         self.vision = vision
@@ -163,15 +179,22 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def _step_callback(self):
         pass
 
-    def render(
-        self,
-        mode="human",
-        width=VISION_WH,
-        height=VISION_WH,
-        camera_id=None,
-        camera_name=None,
-    ):
-        if mode == "rgb_array" or mode == "depth_array":
+    def render(self):
+        if self.render_mode is None:
+            gym.logger.warn(
+                "You are calling render method without specifying any render mode. "
+                "You can specify the render_mode at initialization, "
+                f'e.g. gym("{self.spec.id}", render_mode="rgb_array")'
+            )
+            return
+
+        if self.render_mode in {
+            "rgb_array",
+            "depth_array",
+        }:
+            camera_id = self.camera_id
+            camera_name = self.camera_name
+
             if camera_id is not None and camera_name is not None:
                 raise ValueError(
                     "Both `camera_id` and `camera_name` cannot be"
@@ -189,38 +212,45 @@ class AnthropomorphicEnv(gym.Env, ABC):
                     camera_name,
                 )
 
-                self._get_viewer(mode).render(width, height, camera_id=camera_id)
+                self._get_viewer(self.render_mode).render(camera_id=camera_id)
 
-        if mode == "rgb_array":
-            data = self._get_viewer(mode).read_pixels(width, height, depth=False)
+        if self.render_mode == "rgb_array":
+            data = self._get_viewer(self.render_mode).read_pixels(depth=False)
             # original image is upside-down, so flip it
             return data[::-1, :, :]
-        elif mode == "depth_array":
-            self._get_viewer(mode).render(width, height)
+        elif self.render_mode == "depth_array":
+            self._get_viewer(self.render_mode).render()
             # Extract depth part of the read_pixels() tuple
-            data = self._get_viewer(mode).read_pixels(width, height, depth=True)[1]
+            data = self._get_viewer(self.render_mode).read_pixels(depth=True)[1]
             # original image is upside-down, so flip it
             return data[::-1, :]
-        elif mode == "human":
-            self._get_viewer(mode).render()
+        elif self.render_mode == "human":
+            self._get_viewer(self.render_mode).render()
 
     def close(self):
         if self.viewer is not None:
             self.viewer = None
             self._viewers = {}
 
-    def _get_viewer(self, mode, width=VISION_WH, height=VISION_WH):
+    def _get_viewer(
+        self, mode
+    ) -> Union[
+        "gym.envs.mujoco.mujoco_rendering.Viewer",
+        "gym.envs.mujoco.mujoco_rendering.RenderContextOffscreen",
+    ]:
         self.viewer = self._viewers.get(mode)
         if self.viewer is None:
             if mode == "human":
                 from gym.envs.mujoco.mujoco_rendering import Viewer
 
                 self.viewer = Viewer(self.model, self.data)
-            elif mode == "rgb_array" or mode == "depth_array":
+            elif mode in {"rgb_array", "depth_array"}:
                 from gym.envs.mujoco.mujoco_rendering import RenderContextOffscreen
 
-                self.viewer = RenderContextOffscreen(
-                    width, height, self.model, self.data
+                self.viewer = RenderContextOffscreen(self.model, self.data)
+            else:
+                raise AttributeError(
+                    f"Unexpected mode: {mode}, expected modes: {self.metadata['render_modes']}"
                 )
 
             self.viewer_setup()

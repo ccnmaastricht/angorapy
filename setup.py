@@ -42,7 +42,7 @@ setup(
         "panda_gym",
         "imageio",
         
-        # "keras_cortex",
+        "keras_cortex==0.0.4",
 
         # webinterface
         "itsdangerous==2.0.1",

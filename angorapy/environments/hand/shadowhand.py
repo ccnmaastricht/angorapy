@@ -4,7 +4,7 @@ import abc
 import copy
 import os
 import random
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 import gym
 import numpy as np
@@ -93,7 +93,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
                  delta_t=0.002,
                  relative_control=True,
                  model=MODEL_PATH,
-                 vision=False
+                 vision=False,
+                 render_mode: Optional[str] = None
                  ):
         gym.utils.EzPickle.__init__(**locals())
 
@@ -110,7 +111,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
         self._always_render_mode = False
 
-        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos, vision=vision)
+        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
+                                                vision=vision, render_mode=render_mode)
 
         self.model.opt.timestep = delta_t
         self.original_n_substeps = n_substeps
@@ -248,15 +250,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.viewer = None
             self._viewers = {}
 
-    def render(self, mode='human', width=500, height=500):
-        self._render_callback(render_targets=True)
-        if mode == 'rgb_array':
-            self._get_viewer(mode).render(width, height)
-            data = self._get_viewer(mode).read_pixels(width, height, depth=False)
-            # original image is upside-down, so flip it
-            return data[::-1, :, :]
-        elif mode == 'human':
-            self._get_viewer(mode).render()
+    def render(self):
+        return super().render()
 
     # Extension methods
     # ----------------------------

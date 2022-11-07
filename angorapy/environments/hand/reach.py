@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 import mujoco
 import numpy as np
@@ -21,7 +22,8 @@ class Reach(BaseShadowHandEnv):
                  relative_control=True,
                  vision=False,
                  touch=True,
-                 force_finger=None):
+                 force_finger=None,
+                 render_mode: Optional[str] = None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
         # reward function setup
@@ -46,7 +48,8 @@ class Reach(BaseShadowHandEnv):
             initial_qpos=initial_qpos,
             distance_threshold=self.reward_config["SUCCESS_DISTANCE"],
             n_substeps=n_substeps,
-            relative_control=relative_control
+            relative_control=relative_control,
+            render_mode=render_mode
         )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
