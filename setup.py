@@ -13,7 +13,7 @@ setup(
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     long_description_content_type='text/markdown',
     long_description=long_description,
-    url='https://github.com/ccnmaastricht/dexterous-robot-hand',
+    url='https://github.com/ccnmaastricht/angorapy',
     author='Tonio Weidler',
     author_email='research@tonioweidler.de',
     license='GPL-3.0',
