@@ -263,6 +263,8 @@ class PPOAgent:
                 {transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
                                                   "stdev": [transformer.simplified_stdev()]}})
 
+        self.n_optimizers = n_optimizers
+
     def record_wrapper_stats(self) -> None:
         """Records the stats from RunningMeanWrappers."""
         for transformer in self.env.transformers:

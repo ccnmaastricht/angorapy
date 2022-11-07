@@ -14,6 +14,7 @@ import simplejson as json
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
+from mpi4py import MPI
 
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common import const
@@ -119,6 +120,8 @@ class Monitor:
             date=str(datetime.datetime.now()).split(".")[0],
             config=self.config_name,
             host=socket.gethostname(),
+            n_cpus=MPI.COMM_WORLD.size,
+            n_gpus=self.agent.n_optimizers,
             angorapy_version=version("angorapy"),
             experiment_group=self.experiment_group,
             iterations=self.iterations,

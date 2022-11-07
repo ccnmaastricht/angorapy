@@ -73,7 +73,10 @@ RUN pip install /ang_tmp \
     && pip install imageio \
     && rm -rf /ang_tmp
 
+RUN pip install gym[box2d]
+
 WORKDIR /
+
 COPY angorapy/train.py train.py
 
 # CLEANUP
