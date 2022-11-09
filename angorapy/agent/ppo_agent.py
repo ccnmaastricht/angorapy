@@ -504,9 +504,11 @@ class PPOAgent:
                 subprocess_start = time.time()
 
                 mpi_flat_print("Optimizing...")
-                dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                    id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
-                                                    responsive_senses=self.policy.input_names)
+                dataset = read_dataset_from_storage(
+                    dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                    id_prefix=self.agent_id,
+                    worker_ids=optimizer_collection_ids,
+                    responsive_senses=self.policy.input_names)
                 self.optimize(dataset, epochs, effective_batch_size)
 
                 time_dict["optimizing"] = time.time() - subprocess_start
