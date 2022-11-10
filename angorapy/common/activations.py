@@ -11,13 +11,38 @@ def lif(x, tau_rc=0.02, tau_ref=0.004, v_th=1, gamma=0.1):
 
 
 class LiF(tf.keras.layers.Layer):
-    pass
+
+    def __init__(self, tau_rc=0.02, tau_ref=0.004, v_th=1, gamma=0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.v_th = v_th
+        self.tau_ref = tau_ref
+        self.tau_rc = tau_rc
+        self.gamma = gamma
+
+    def call(self, inputs, **kwargs):
+        return lif(inputs, self.tau_rc, self.tau_ref, self.v_th, self.gamma)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def get_config(self):
+        config = {
+            "v_th": self.v_th,
+            "tau_ref": self.tau_ref,
+            "tau_rc": self.tau_rc,
+            "gamma": self.gamma
+        }
+
+        base_config = super().get_config()
+
+        return dict(list(base_config.items()) + list(config.items()))
 
 
 if __name__ == '__main__':
     inputs = tf.linspace(0.7, 10, 100)
 
-    activation = tf.keras.layers.Activation(lif)
+    activation = LiF()
+    print(activation.get_config())
 
     outputs = activation(tf.expand_dims(inputs, 0))
 

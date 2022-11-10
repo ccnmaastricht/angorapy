@@ -9,6 +9,7 @@ from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
+from angorapy.common.activations import LiF
 from angorapy.common.const import VISION_WH
 from angorapy.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
 from angorapy.common.wrappers import make_env
@@ -16,13 +17,16 @@ from angorapy.models import _build_openai_encoder
 from angorapy.utilities.util import env_extract_dims
 
 
+ACTIVATION_FUNCTION = LiF
+
+
 def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape):
     """Build the model of the SSC."""
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + somatosensation_input_shape, name="SSCInput")
     ssc = TD(tf.keras.layers.Dense(128))(ssc_input)
-    ssc = tf.keras.layers.ReLU()(ssc)
+    ssc = ACTIVATION_FUNCTION()(ssc)
     ssc = TD(tf.keras.layers.Dense(64))(ssc)
-    ssc = tf.keras.layers.ReLU()(ssc)
+    ssc = ACTIVATION_FUNCTION()(ssc)
 
     return tf.keras.Model(inputs=ssc_input, outputs=ssc, name="SomatosensoryCortex")
 
@@ -34,14 +38,14 @@ def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape):
 
     spl_input = tf.keras.layers.concatenate([vc_input, ssc_input])
     spl = TD(tf.keras.layers.Dense(256, name="SPL"))(spl_input)
-    spl = tf.keras.layers.ReLU()(spl)
+    spl = ACTIVATION_FUNCTION()(spl)
 
     ipl = TD(tf.keras.layers.Dense(256, name="IPL"))(spl)
-    ipl = tf.keras.layers.ReLU()(ipl)
+    ipl = ACTIVATION_FUNCTION()(ipl)
 
     ips_input = tf.keras.layers.concatenate([ipl, ssc_input])
     ips = TD(tf.keras.layers.Dense(128, name="IPS"))(ips_input)
-    ips = tf.keras.layers.ReLU()(ips)
+    ips = ACTIVATION_FUNCTION()(ips)
 
     return tf.keras.Model(inputs=[vc_input, ssc_input], outputs=[spl, ipl, ips], name="PosteriorParietalCortex")
 
@@ -55,11 +59,11 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape
 
     mcc_input = tf.keras.layers.concatenate([goal_input, ssc_input])
     mcc = TD(tf.keras.layers.Dense(64))(mcc_input)
-    mcc = tf.keras.layers.ReLU()(mcc)
+    mcc = ACTIVATION_FUNCTION()(mcc)
 
     lpfc_input = tf.keras.layers.concatenate([mcc, goal_input, it_input])
     lpfc = TD(tf.keras.layers.Dense(128))(lpfc_input)
-    lpfc = tf.keras.layers.ReLU()(lpfc)
+    lpfc = ACTIVATION_FUNCTION()(lpfc)
 
     return tf.keras.Model(inputs=[goal_input, ssc_input, it_input], outputs=[mcc, lpfc], name="PrefrontalCortex")
 
@@ -74,7 +78,7 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
 
     pmc_input = tf.keras.layers.concatenate([lpfc_input, ipl_input])
     pmc = TD(tf.keras.layers.Dense(512))(pmc_input)
-    pmc = tf.keras.layers.ReLU()(pmc)
+    pmc = ACTIVATION_FUNCTION()(pmc)
     pmc, *_ = rnn_class(512,
                         stateful=True,
                         return_sequences=True,
@@ -84,7 +88,7 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
 
     m1_input = tf.keras.layers.concatenate([pmc, mcc_input, lpfc_input, ssc_input, ips_input])
     m1 = TD(tf.keras.layers.Dense(256))(m1_input)
-    m1 = tf.keras.layers.ReLU()(m1)
+    m1 = ACTIVATION_FUNCTION()(m1)
 
     return tf.keras.Model(inputs=[mcc_input, lpfc_input, ipl_input, ips_input, ssc_input],
                           outputs=[pmc, m1], name="MotorCortex")
@@ -150,9 +154,9 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
     value_in = tf.keras.layers.concatenate(value_inputs)
     value_out = tf.keras.layers.Dense(512)(value_in)
-    value_out = tf.keras.layers.Activation("relu")(value_out)
+    value_out = ACTIVATION_FUNCTION()(value_out)
     value_out = tf.keras.layers.Dense(512)(value_out)
-    value_out = tf.keras.layers.Activation("relu")(value_out)
+    value_out = ACTIVATION_FUNCTION()(value_out)
     value_out = tf.keras.layers.Dense(1, name="value")(value_out)
 
     # define models
