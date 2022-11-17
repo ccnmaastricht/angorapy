@@ -328,7 +328,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
         return {
             "observation": Sensation(
-                vision=None,
+                vision=object_qpos,
                 proprioception=proprioception.copy(),
                 somatosensation=None,
                 goal=target_orientation),
@@ -469,9 +469,8 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
 
         # vision
         if not self.vision:
-            vision_input = object_qpos
+            vision_input = object_qpos.astype(np.float32)
         else:
-
             vision_input = self.render()
 
         # goal
@@ -512,8 +511,8 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
                 goal=target_orientation,
                 asynchronous=None if not self.asynchronous else asynchronous
             ),
-            "achieved_goal": object_qpos.copy(),
-            "desired_goal": self.goal.ravel().copy(),
+            "achieved_goal": object_qpos.copy().astype(np.float32),
+            "desired_goal": self.goal.ravel().copy().astype(np.float32),
         }
 
 

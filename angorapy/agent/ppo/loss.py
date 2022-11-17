@@ -63,9 +63,9 @@ def value_loss(value_predictions: tf.Tensor,
     Returns:
       squared error between prediction and return
     """
-    # tf.debugging.assert_all_finite(value_predictions, "value_predictions is not all finite!")
-    # tf.debugging.assert_all_finite(old_values, "old_values is not all finite!")
-    # tf.debugging.assert_all_finite(returns, "returns is not all finite!")
+    tf.debugging.assert_all_finite(value_predictions, "value_predictions is not all finite!")
+    tf.debugging.assert_all_finite(old_values, "old_values is not all finite!")
+    tf.debugging.assert_all_finite(returns, "returns is not all finite!")
 
     error = tf.square(value_predictions - returns)
 

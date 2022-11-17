@@ -115,6 +115,7 @@ class Gatherer(BaseGatherer):
         state, info = env.reset()
 
         while t < self.horizon:
+
             current_subseq_length += 1
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
@@ -122,7 +123,6 @@ class Gatherer(BaseGatherer):
             policy_out = flatten(joint(prepared_state, training=False))
 
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
-
             # from the action distribution sample an action and remember both the action and its probability
             action, action_probability = self.select_action(predicted_distribution_parameters)
 
