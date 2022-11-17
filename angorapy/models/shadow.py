@@ -17,41 +17,37 @@ from angorapy.models import _build_openai_encoder
 from angorapy.utilities.util import env_extract_dims
 
 
-# ACTIVATION_FUNCTION = tf.keras.layers.ReLU
-ACTIVATION_FUNCTION = LiF
-
-
-def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape):
+def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape, activation=tf.keras.layers.ReLU):
     """Build the model of the SSC."""
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + somatosensation_input_shape, name="SSCInput")
     ssc = TD(tf.keras.layers.Dense(128))(ssc_input)
-    ssc = ACTIVATION_FUNCTION()(ssc)
+    ssc = activation()(ssc)
     ssc = TD(tf.keras.layers.Dense(64))(ssc)
-    ssc = ACTIVATION_FUNCTION()(ssc)
+    ssc = activation()(ssc)
 
     return tf.keras.Model(inputs=ssc_input, outputs=ssc, name="SomatosensoryCortex")
 
 
-def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape):
+def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape, activation=tf.keras.layers.ReLU):
     """Build the PPC model."""
     vc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + vc_input_shape, name="VCInput")
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSCInput")
 
     spl_input = tf.keras.layers.concatenate([vc_input, ssc_input])
     spl = TD(tf.keras.layers.Dense(256, name="SPL"))(spl_input)
-    spl = ACTIVATION_FUNCTION()(spl)
+    spl = activation()(spl)
 
     ipl = TD(tf.keras.layers.Dense(256, name="IPL"))(spl)
-    ipl = ACTIVATION_FUNCTION()(ipl)
+    ipl = activation()(ipl)
 
     ips_input = tf.keras.layers.concatenate([ipl, ssc_input])
     ips = TD(tf.keras.layers.Dense(128, name="IPS"))(ips_input)
-    ips = ACTIVATION_FUNCTION()(ips)
+    ips = activation()(ips)
 
     return tf.keras.Model(inputs=[vc_input, ssc_input], outputs=[spl, ipl, ips], name="PosteriorParietalCortex")
 
 
-def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape, it_input_shape):
+def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape, it_input_shape, activation=tf.keras.layers.ReLU):
     """Build the PFC model. Returns output of MCC, LPFC."""
 
     goal_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + goal_input_shape, name="Goal Input")
@@ -60,17 +56,17 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ssc_input_shape
 
     mcc_input = tf.keras.layers.concatenate([goal_input, ssc_input])
     mcc = TD(tf.keras.layers.Dense(64))(mcc_input)
-    mcc = ACTIVATION_FUNCTION()(mcc)
+    mcc = activation()(mcc)
 
     lpfc_input = tf.keras.layers.concatenate([mcc, goal_input, it_input])
     lpfc = TD(tf.keras.layers.Dense(128))(lpfc_input)
-    lpfc = ACTIVATION_FUNCTION()(lpfc)
+    lpfc = activation()(lpfc)
 
     return tf.keras.Model(inputs=[goal_input, ssc_input, it_input], outputs=[mcc, lpfc], name="PrefrontalCortex")
 
 
 def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape, ipl_input_shape,
-                    ips_input_shape, ssc_input_shape, rnn_class=tf.keras.layers.LSTM):
+                    ips_input_shape, ssc_input_shape, rnn_class=tf.keras.layers.LSTM, activation=tf.keras.layers.ReLU):
     mcc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + mcc_input_shape, name="GoalInput")
     lpfc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + lpfc_input_shape, name="LPFCInput")
     ipl_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ipl_input_shape, name="IPLInput")
@@ -79,7 +75,7 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
 
     pmc_input = tf.keras.layers.concatenate([lpfc_input, ipl_input])
     pmc = TD(tf.keras.layers.Dense(512))(pmc_input)
-    pmc = ACTIVATION_FUNCTION()(pmc)
+    pmc = activation()(pmc)
     pmc, *_ = rnn_class(512,
                         stateful=True,
                         return_sequences=True,
@@ -89,14 +85,14 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
 
     m1_input = tf.keras.layers.concatenate([pmc, mcc_input, lpfc_input, ssc_input, ips_input])
     m1 = TD(tf.keras.layers.Dense(256))(m1_input)
-    m1 = ACTIVATION_FUNCTION()(m1)
+    m1 = activation()(m1)
 
     return tf.keras.Model(inputs=[mcc_input, lpfc_input, ipl_input, ips_input, ssc_input],
                           outputs=[pmc, m1], name="MotorCortex")
 
 
 def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
-                            blind: bool = False, sequence_length=1, **kwargs):
+                            blind: bool = False, sequence_length=1, activation=tf.keras.layers.ReLU, **kwargs):
     """Build network for the shadow hand task, version 2."""
     state_dimensionality, n_actions = env_extract_dims(env)
 
@@ -128,18 +124,18 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)
 
-    ssc = build_ssc_module((bs, sequence_length,), (somatosensation_masked.shape[-1],))
+    ssc = build_ssc_module((bs, sequence_length,), (somatosensation_masked.shape[-1],), activation=activation)
     ssc_out = ssc(somatosensation_masked)
 
-    ppc = build_ppc_module((bs, sequence_length,), (vision_masked.shape[-1],), (ssc.output_shape[-1],))
+    ppc = build_ppc_module((bs, sequence_length,), (vision_masked.shape[-1],), (ssc.output_shape[-1],), activation=activation)
     spl_out, ipl_out, ips_out = ppc([vision_masked, ssc_out])
 
     pfc = build_pfc_module((bs, sequence_length,), (goal_masked.shape[-1],), (ssc.output_shape[-1],),
-                           (vision_masked.shape[-1],))
+                           (vision_masked.shape[-1],), activation=activation)
     mcc_out, lpfc_out = pfc([goal_masked, ssc_out, vision_masked])
 
     mc = build_mc_module((bs, sequence_length,), (mcc_out.shape[-1],), (lpfc_out.shape[-1],), (ipl_out.shape[-1],),
-                         (ips_out.shape[-1],), (ssc_out.shape[-1],), rnn_class=rnn_choice)
+                         (ips_out.shape[-1],), (ssc_out.shape[-1],), rnn_class=rnn_choice, activation=activation)
     pmc_out, m1_out = mc([mcc_out, lpfc_out, ipl_out, ips_out, ssc_out])
 
     # policy head
@@ -155,9 +151,9 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
     value_in = tf.keras.layers.concatenate(value_inputs)
     value_out = tf.keras.layers.Dense(512)(value_in)
-    value_out = ACTIVATION_FUNCTION()(value_out)
+    value_out = activation()(value_out)
     value_out = tf.keras.layers.Dense(512)(value_out)
-    value_out = ACTIVATION_FUNCTION()(value_out)
+    value_out = activation()(value_out)
     value_out = tf.keras.layers.Dense(1, name="value")(value_out)
 
     # define models
@@ -170,14 +166,15 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
 
 def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "lstm",
-                              blind: bool = False, **kwargs):
+                              blind: bool = False, activation=tf.keras.layers.ReLU, **kwargs):
     """Build shadow brain networks (policy, value, joint) for given parameter settings."""
 
     # this function is just a wrapper routing the requests for broader options to specific functions
     if model_type == "ffn":
         raise NotImplementedError("No non recurrent version of this ShadowBrain abailable.")
 
-    return build_shadow_brain_base(env=env, distribution=distribution, bs=bs, model_type=model_type, blind=blind)
+    return build_shadow_brain_base(env=env, distribution=distribution, bs=bs, model_type=model_type, blind=blind,
+                                   activation=activation)
 
 
 if __name__ == "__main__":

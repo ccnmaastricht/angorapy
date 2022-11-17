@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target gym environment")
-    parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow"], default="simple",
+    parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow", "shadowlif"], default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if architecture allows for choices")
