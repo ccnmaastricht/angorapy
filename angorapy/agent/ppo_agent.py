@@ -22,7 +22,7 @@ from psutil import NoSuchProcess
 
 from angorapy import models
 from angorapy.agent.dataio import read_dataset_from_storage
-from angorapy.agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
+from angorapy.agent.gather import Gatherer, evaluate
 from angorapy.agent.ppo.optim import learn_on_batch
 from angorapy.common import policies, const
 from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR, PATH_TO_EXPERIMENTS
@@ -37,7 +37,7 @@ from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, 
     requires_batch_size, requires_sequence_length
 from angorapy.utilities.statistics import ignore_none
 from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
-    mpi_print
+    mpi_print, keras_model_memory_usage_in_bytes
 
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
@@ -333,7 +333,8 @@ class PPOAgent:
         optimizer_base, optimizer_extra = divmod(self.n_workers, n_optimizers)
         optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(n_optimizers)]
         optimizer_collection_ids = list(range(self.n_workers))[
-                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(optimizer_split[:self.optimizer.comm.rank + 1])]
+                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(
+                                       optimizer_split[:self.optimizer.comm.rank + 1])]
 
         list_of_worker_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
         list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
@@ -355,10 +356,12 @@ class PPOAgent:
             n_chunks_per_batch_per_process = n_chunks_per_batch // n_optimizers
             n_trajectories_per_process = self.n_workers // n_optimizers
 
-            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = find_optimal_tile_shape(
-                (n_trajectories_per_process, n_chunks_per_trajectory),
-                n_chunks_per_batch_per_process
-            )
+            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = \
+                find_optimal_tile_shape(
+                    (n_trajectories_per_process, n_chunks_per_trajectory),
+                    n_chunks_per_batch_per_process,
+                    width_first=True  # TODO smartly adapt this to memory reqs or at least make parameter
+                )
 
             n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
             n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process
@@ -653,8 +656,11 @@ class PPOAgent:
                         # if the following line throws a CPU to GPU error this is most likely due to too little memory
                         # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
                         n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+                        # print(f"bs {batch_size} | split "
+                        #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
 
-                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for bk, bv in b.items()}
+                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for
+                                       bk, bv in b.items()}
                         for batch_i in range(len(split_batch["advantage"])):
                             batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
 
@@ -835,7 +841,8 @@ class PPOAgent:
         parameters = self.__dict__.copy()
         del parameters["env"]
         del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["gatherer_class"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters[
+            "gatherer_class"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
@@ -879,7 +886,8 @@ class PPOAgent:
             else:
                 from_iteration = "best"
         elif isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            assert from_iteration.lower() in ["best", "b",
+                                              "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
             if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):

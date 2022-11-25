@@ -74,7 +74,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     env = make_env(environment,
                    reward_config=settings["rcon"],
                    transformers=wrappers,
-                   render_mode="rgb_array" if re.match(".[Vv]is(ion|ual)", environment) else None)
+                   render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
     state_dim, number_of_actions = env_extract_dims(env)
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[

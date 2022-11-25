@@ -98,8 +98,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
     rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,
                   "lstm": tf.keras.layers.LSTM,
-                  "gru": tf.keras.layers.GRU}[
-        model_type]
+                  "gru": tf.keras.layers.GRU}[model_type]
 
     # inputs
     visual_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["vision"],), name="vision")
