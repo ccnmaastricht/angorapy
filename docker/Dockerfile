@@ -74,10 +74,12 @@ RUN pip install /ang_tmp \
     && rm -rf /ang_tmp
 
 RUN pip install gym[box2d]
+RUN pip install tensorflow_datasets
 
 WORKDIR /
 
 COPY angorapy/train.py train.py
+COPY angorapy/pretrain.py pretrain.py
 
 # CLEANUP
 RUN pip cache purge

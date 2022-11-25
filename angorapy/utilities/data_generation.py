@@ -13,7 +13,7 @@ from angorapy.environments import *
 
 def gen_cube_quats_prediction_data(n: int) -> Tuple[np.ndarray, np.ndarray]:
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    hand_env = gym.make("HumanoidVisualManipulateBlock-v0")
+    hand_env = gym.make("HumanoidVisualManipulateBlock-v0", render_mode="rgb_array")
 
     sample = hand_env.observation_space.sample()
     X, Y = np.empty((n,) + sample["observation"]["vision"].shape), np.empty((n,) + sample["achieved_goal"].shape)
