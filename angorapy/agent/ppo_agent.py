@@ -9,6 +9,7 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
+from json import JSONDecodeError
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -33,11 +34,12 @@ from angorapy.common.transformers import BaseRunningMeanTransformer, transformer
 from angorapy.common.validators import validate_env_model_compatibility
 from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle
+from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
 from angorapy.utilities.statistics import ignore_none
 from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
-    mpi_print, keras_model_memory_usage_in_bytes
+    mpi_print
 
 # get communicator and find optimization processes
 mpi_comm = MPI.COMM_WORLD
@@ -249,6 +251,7 @@ class PPOAgent:
         self.underflow_history = []
         self.loading_history = []
         self.current_per_receptor_mean = {}
+        self.auxiliary_performances = {}
 
         # training statistics
         self.cycle_timings = []
@@ -593,6 +596,11 @@ class PPOAgent:
         self.cycle_stat_n_history.append(stats.numb_completed_episodes)
         self.underflow_history.append(stats.tbptt_underflow)
         self.current_per_receptor_mean = {s: arr.tolist() for s, arr in stats.per_receptor_mean.items()}
+
+        for key, value in stats.auxiliary_performances.items():
+            if key not in self.auxiliary_performances:
+                self.auxiliary_performances[key] = []
+            self.auxiliary_performances[key].append(np.mean(value).item())
 
     def _make_actor(self, horizon, discount, lam, subseq_length) -> Gatherer:
         # create the Gatherer
@@ -991,7 +999,11 @@ class PPOAgent:
         for directory in os.listdir(path_to_components):
             pretrained_component_full_path = os.path.join(path_to_components, directory)
             if os.path.isdir(pretrained_component_full_path):
-                pretrained_component = tf.keras.models.load_model(pretrained_component_full_path, compile=False)
+                try:
+                    pretrained_component = tf.keras.models.load_model(pretrained_component_full_path, compile=False)
+                except JSONDecodeError as e:
+                    raise ComponentError("Could not load the pretrained model from given files. Likely, the saved model"
+                                         "files where created with a different incompatible TF version.")
 
                 found_counterpart = False
                 for model_component in self.joint.layers:

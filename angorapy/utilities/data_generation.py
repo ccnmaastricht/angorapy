@@ -26,7 +26,7 @@ def gen_cube_quats_prediction_data(n: int) -> Tuple[np.ndarray, np.ndarray]:
         X[i] = image
         Y[i] = quaternion
 
-        if done:
+        if done or i % 64 == 0:
             hand_env.reset()
 
     return X, Y

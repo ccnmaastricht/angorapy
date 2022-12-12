@@ -112,18 +112,14 @@ def pretrain_on_classification(pretrainable_component: Union[tf.keras.Model, str
     print(results)
 
 
-def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str],
+def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
                             epochs,
                             name="visual_op",
-                            dataset: Tuple[np.ndarray, np.ndarray] = None):
+                            dataset: Tuple[np.ndarray, np.ndarray] = None,
+                            load_from: str = None):
     """Pretrain a visual component on prediction of cube position."""
 
     # model is constructed from visual component and regression output
-    model = tf.keras.Sequential((
-        pretrainable_component,
-        tf.keras.layers.Dense(7, activation="linear"),
-    ))
-
     if dataset is None:
         x, y = gen_cube_quats_prediction_data(1024 * 8)
         x = tf.image.per_image_standardization(x).numpy()
@@ -144,26 +140,32 @@ def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str],
     x_test, x_val, y_test, y_val = sklearn.model_selection.train_test_split(x_test, y_test, train_size=0.8,
                                                                             shuffle=True)
 
-    if isinstance(pretrainable_component, tf.keras.Model):
-        # generate training data
+    if load_from is None:
+        model = pretrainable_component
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         model.compile(optimizer, loss="mse", metrics=[])
 
         # train and save encoder
         model.fit(x_train, y_train, epochs=epochs,
-                  callbacks=[tf.keras.callbacks.EarlyStopping(patience=3)],
+                  callbacks=[tf.keras.callbacks.EarlyStopping(patience=7)],
                   batch_size=128,
                   validation_data=(x_val, y_val))
         pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
-    elif isinstance(pretrainable_component, str):
-        print("Loading model...")
-        model.load_weights(pretrainable_component)
     else:
-        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
+        print("Loading model...")
+        model = tf.keras.models.load_model(load_from)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        model.compile(optimizer, loss="mse", metrics=[])
 
     print(f"A mean model would have an MSE of {np.mean((y_test - np.mean(y_train, axis=0)) ** 2)}")
     print(f"A median model would have an MSE of {np.mean((y_test - np.median(y_train, axis=0)) ** 2)}")
     print(f"This model achieves {model.evaluate(x_test, y_test)}")
+
+    for sample_x, sample_y in zip(x_test[:10], y_test[:10]):
+        np.set_printoptions(linewidth=np.inf)
+        print(f"\n\n{sample_y}\n"
+              f"{np.squeeze(model(tf.expand_dims(tf.convert_to_tensor(sample_x), 0)))}\n"
+              f"{np.mean(y_train, axis=0)}")
 
 
 def pretrain_on_hand_pose(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_hp"):
@@ -254,6 +256,6 @@ if __name__ == "__main__":
         except:
             dataset = None
 
-        pretrain_on_object_pose(visual_component, args.epochs, name=args.name, dataset=dataset)
+        pretrain_on_object_pose(visual_component, args.epochs, name=args.name, dataset=dataset, load_from=args.load)
     else:
         raise ValueError("I dont know that task type.")

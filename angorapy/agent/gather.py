@@ -172,10 +172,7 @@ class Gatherer(BaseGatherer):
                     advantages.append(episode_advantages)
 
                 # reset environment to receive next episodes initial state
-                state, info = env.reset()
 
-                if is_recurrent:
-                    joint.reset_states()
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
@@ -183,6 +180,18 @@ class Gatherer(BaseGatherer):
                 buffer.episodes_completed += 1
                 episode_steps = 1
                 current_episode_return = 0
+
+                if "auxiliary_performances" in info.keys():
+                    for key, value in info["auxiliary_performances"].items():
+                        if key not in buffer.auxiliary_performances.keys():
+                            buffer.auxiliary_performances[key] = []
+
+                        buffer.auxiliary_performances[key].append(value)
+
+                state, info = env.reset()
+
+                if is_recurrent:
+                    joint.reset_states()
             else:
                 state = observation
                 episode_steps += 1

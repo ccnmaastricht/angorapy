@@ -88,7 +88,8 @@ def make_dataset_and_stats(buffer: ExperienceBuffer) -> Tuple[tf.data.Dataset, S
             # todo ignore empty masked states
             sense: np.mean(buffer.states[sense], axis=tuple(range(len(buffer.states[sense].shape)))[:-1])
             for sense in buffer.states.keys()
-        }
+        },
+        auxiliary_performances=buffer.auxiliary_performances
     )
 
     return dataset, stats

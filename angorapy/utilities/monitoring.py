@@ -199,6 +199,7 @@ class Monitor:
             gathering_timings=self.agent.gathering_timings,
             loaded_at=self.agent.loading_history,
             per_receptor_mean=self.agent.current_per_receptor_mean,
+            auxiliary_performances=self.agent.auxiliary_performances
         )
 
         with open(f"{self.story_directory}/statistics.json", "w") as f:

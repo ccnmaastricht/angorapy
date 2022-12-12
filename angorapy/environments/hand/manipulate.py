@@ -380,6 +380,10 @@ class BaseManipulate(BaseShadowHandEnv):
         dropped = self._is_dropped()
         terminated = terminated or dropped or self.consecutive_goals_reached >= 50
 
+        if "auxiliary_performances" not in info.keys():
+            info["auxiliary_performances"] = {}
+        info["auxiliary_performances"]["consecutive_goals_reached"] = self.consecutive_goals_reached
+
         return obs, reward, terminated, truncated, info
 
 
