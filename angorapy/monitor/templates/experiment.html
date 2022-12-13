@@ -75,6 +75,19 @@
     </div>
 
     <div class="topic-group">
+        {% for p, v in info.plots.auxiliary_plots.items() %}
+        <div class="row justify-content-center">
+            <div class="col col-12">
+                <div id="{{ p }}-plot">
+                    {{ v[0]|safe }}
+                    {{ v[1]|safe }}
+                </div>
+            </div>
+        </div>
+    {%  endfor %}
+    </div>
+
+    <div class="topic-group">
         <!--  OBJECTIVE PLOTS  -->
         <div class="row justify-content-center mt-3">
             <h5 align="center" class="sub-title">Objectives</h5>

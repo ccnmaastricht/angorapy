@@ -599,8 +599,12 @@ class PPOAgent:
 
         for key, value in stats.auxiliary_performances.items():
             if key not in self.auxiliary_performances:
-                self.auxiliary_performances[key] = []
-            self.auxiliary_performances[key].append(np.mean(value).item())
+                self.auxiliary_performances[key] = {
+                    "mean": [],
+                    "std": []
+                }
+            self.auxiliary_performances[key]["mean"].append(np.mean(value).item())
+            self.auxiliary_performances[key]["std"].append(np.std(value).item())
 
     def _make_actor(self, horizon, discount, lam, subseq_length) -> Gatherer:
         # create the Gatherer

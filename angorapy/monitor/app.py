@@ -22,7 +22,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
 from angorapy.utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
     plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress, \
-    grouped_reward_progress, group_preview
+    grouped_reward_progress, group_preview, plot_aux_perf_progress
 from angorapy.utilities.statistics import ignore_none
 
 from angorapy.monitor import app
@@ -401,6 +401,12 @@ def show_experiment(exp_id):
 
     if "per_receptor_mean" in stats.keys():
         plots["per_receptor_mean"] = embed.components(plot_per_receptor_mean(stats["per_receptor_mean"]))
+
+    plots["auxiliary_plots"] = {}
+    if "auxiliary_performances" in stats.keys():
+        for aux_perf_key, aux_perf_values in stats["auxiliary_performances"].items():
+            plots["auxiliary_plots"][aux_perf_key] = embed.components(
+                plot_aux_perf_progress(aux_perf_values, cycles_loaded, perf_name=aux_perf_key))
 
     info.update(dict(
         plots=plots

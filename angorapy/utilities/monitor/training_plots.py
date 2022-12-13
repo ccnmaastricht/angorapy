@@ -149,6 +149,91 @@ def plot_reward_progress(rewards: Dict[str, list], cycles_loaded, reward_thresho
     return p
 
 
+def plot_aux_perf_progress(aux_perf: Dict[str, list], cycles_loaded, perf_name: str="Performance Metric"):
+    """Plot auxiliary performance measure."""
+    perf_name = " ".join([n.capitalize() for n in perf_name.split("_")])
+
+    if isinstance(aux_perf, list):
+        means = aux_perf
+        stds = np.zeros_like(aux_perf)
+    else:
+        means, stds = aux_perf["mean"], aux_perf["std"]
+    stds = np.array(stds)
+    stds[stds == None] = 0
+    stds = stds * 0.2
+    means = np.array(means)
+    means = mean_fill_nones(means)
+
+    x = list(range(len(means)))
+    df = pd.DataFrame(data=dict(x=x, y=means, lower=np.subtract(means, stds), upper=np.add(means, stds)))
+    value_range = max(df["upper"]) - min(df["lower"])
+
+    tooltip = HoverTool(
+        tooltips=[("Cycle", "@x"),
+                  ("Reward", "@y")],
+        mode="vline"
+    )
+
+    range_max = max(df["upper"]) + value_range * 0.2
+    p = figure(title=f"{perf_name} per Cycle",
+               x_axis_label='Cycle',
+               y_axis_label=perf_name,
+               y_range=(min(df["lower"]), range_max),
+               x_range=(0, max(x)),
+               **plot_styling)
+
+    p.add_tools(tooltip)
+    p.add_tools(bokeh.models.BoxZoomTool())
+    p.add_tools(bokeh.models.ResetTool())
+    p.add_tools(bokeh.models.SaveTool())
+
+    # ERROR BAND
+    error_band = bokeh.models.Band(
+        base="x", lower="lower", upper="upper",
+        source=ColumnDataSource(df.reset_index()),
+        fill_color=palette[0],
+        fill_alpha=0.2,
+        line_color=palette[0],
+        line_alpha=0.4,
+    )
+    p.add_layout(error_band)
+    p.renderers.extend([error_band])
+
+    # REWARD LINE
+    p.line(x, means, legend_label="Reward", line_width=2, color=palette[0])
+
+    # MAX VALUE MARKING
+    x_max = np.argmax(means)
+    y_max = np.max(means)
+    p.add_layout(bokeh.models.Arrow(end=bokeh.models.NormalHead(size=10,
+                                                                line_color="darkred",
+                                                                line_width=2,
+                                                                fill_color="red"),
+                                    line_color="darkred",
+                                    line_width=2,
+                                    x_start=x_max, y_start=y_max + value_range * 0.07,
+                                    x_end=x_max, y_end=y_max))
+    p.add_layout(bokeh.models.Label(x=x_max, y=y_max + value_range * 0.075, text=str(y_max),
+                                    border_line_color='black', border_line_alpha=0,
+                                    background_fill_color='white', background_fill_alpha=1.0, text_align="center",
+                                    text_line_height=1.5, text_font_size="10pt", text_color="darkred"
+
+                                    ))
+
+    load_markings = []
+    for load_timing in cycles_loaded:
+        load_markings.append(
+            Span(location=load_timing[0], dimension="height", line_color="red", line_width=2, line_dash=[6, 3])
+        )
+
+    p.renderers.extend(load_markings)
+
+    p.legend.location = "bottom_right"
+    style_plot(p)
+
+    return p
+
+
 def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshold=None):
     """Plot the execution times of a full cycle and optionally bot sub phases."""
     y_min = 0
