@@ -46,7 +46,7 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
 
     def step(self, action):
         """Returns a modified observation and info."""
-        observation, reward, done, info = self.env.step(action)
+        observation, reward, terminated, truncated, info = self.env.step(action)
 
         if hasattr(observation, "keys") and "achieved_goal" in observation.keys():
             info["achieved_goal"] = observation["achieved_goal"]
@@ -54,7 +54,7 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         if hasattr(observation, "keys") and "desired_goal" in observation.keys():
             info["desired_goal"] = observation["desired_goal"]
 
-        return self.observation(observation), reward, done, info
+        return self.observation(observation), reward, terminated, truncated, info
 
     # SYNCHRONIZATION
 

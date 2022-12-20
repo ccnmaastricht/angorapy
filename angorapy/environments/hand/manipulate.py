@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import mujoco
 import numpy as np
@@ -51,7 +52,8 @@ class BaseManipulate(BaseShadowHandEnv):
             delta_t=0.002,
             touch_get_obs="sensordata",
             vision=False,
-            touch=True
+            touch=True,
+            render_mode: Optional[str] = None
     ):
         """Initializes a new Hand manipulation environment.
 
@@ -115,7 +117,8 @@ class BaseManipulate(BaseShadowHandEnv):
                          delta_t=delta_t,
                          relative_control=relative_control,
                          model=model_path,
-                         vision=vision)
+                         vision=vision,
+                         render_mode=render_mode)
 
         # set touch sensors rgba values
         for _, site_id in self._touch_sensor_id_site_id:
@@ -325,7 +328,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
         return {
             "observation": Sensation(
-                vision=None,
+                vision=object_qpos,
                 proprioception=proprioception.copy(),
                 somatosensation=None,
                 goal=target_orientation),
@@ -356,7 +359,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
     def step(self, action):
         """Make step in environment."""
-        obs, reward, done, info = super().step(action)
+        obs, reward, terminated, truncated, info = super().step(action)
         self.steps_with_current_goal += 1
 
         success = self._is_success(self._get_achieved_goal(), self.goal)
@@ -371,13 +374,17 @@ class BaseManipulate(BaseShadowHandEnv):
             obs = self._get_obs()
 
         if self.steps_with_current_goal >= BaseManipulate.max_steps_per_goal:
-            done = True
+            terminated = True
 
         # determine if done
         dropped = self._is_dropped()
-        done = done or dropped or self.consecutive_goals_reached >= 50
+        terminated = terminated or dropped or self.consecutive_goals_reached >= 50
 
-        return obs, reward, done, info
+        if "auxiliary_performances" not in info.keys():
+            info["auxiliary_performances"] = {}
+        info["auxiliary_performances"]["consecutive_goals_reached"] = self.consecutive_goals_reached
+
+        return obs, reward, terminated, truncated, info
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
@@ -389,7 +396,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  touch_get_obs='sensordata',
                  relative_control=True,
                  vision: bool = False,
-                 delta_t: float = 0.002):
+                 delta_t: float = 0.002,
+                 render_mode: Optional[str] = None):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -399,7 +407,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                                 vision=vision,
                                 relative_control=relative_control,
-                                delta_t=delta_t
+                                delta_t=delta_t,
+                                render_mode=render_mode
                                 )
 
 
@@ -464,10 +473,9 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
 
         # vision
         if not self.vision:
-            vision_input = object_qpos
+            vision_input = object_qpos.astype(np.float32)
         else:
-
-            vision_input = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
+            vision_input = self.render()
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]
@@ -507,8 +515,8 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
                 goal=target_orientation,
                 asynchronous=None if not self.asynchronous else asynchronous
             ),
-            "achieved_goal": object_qpos.copy(),
-            "desired_goal": self.goal.ravel().copy(),
+            "achieved_goal": object_qpos.copy().astype(np.float32),
+            "desired_goal": self.goal.ravel().copy().astype(np.float32),
         }
 
 

@@ -145,11 +145,16 @@ def find_divisors(number: int):
     return list(sorted(set(divisors)))
 
 
-def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int) -> Tuple[int, int]:
+def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int, width_first=False) -> Tuple[int, int]:
     """For a given shape of a matrix (floor), find the shape of a tiles that fit the floor and contain
     exactly tile_size elements."""
-    height_divisors = list(reversed(find_divisors(floor_shape[0])))
+    height_divisors = find_divisors(floor_shape[0])
     width_divisors = find_divisors(floor_shape[1])
+
+    if not width_first:
+        height_divisors = list(reversed(height_divisors))
+    else:
+        width_divisors = list(reversed(width_divisors))
 
     for hd in height_divisors:
         for wd in width_divisors:
@@ -171,24 +176,70 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
+def keras_model_memory_usage_in_bytes(model, *, batch_size: int):
+    """
+    Return the estimated memory usage of a given Keras model in bytes.
+    This includes the model weights and layers, but excludes the dataset.
+    The model shapes are multipled by the batch size, but the weights are not.
+    Args:
+        model: A Keras model.
+        batch_size: The batch size you intend to run the model with. If you
+            have already specified the batch size in the model itself, then
+            pass `1` as the argument here.
+    Returns:
+        An estimate of the Keras model's memory usage in bytes.
+    """
+    default_dtype = tf.keras.backend.floatx()
+    shapes_mem_count = 0
+    internal_model_mem_count = 0
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.Model):
+            internal_model_mem_count += keras_model_memory_usage_in_bytes(
+                layer, batch_size=batch_size
+            )
+        single_layer_mem = tf.as_dtype(layer.dtype or default_dtype).size
+        out_shape = layer.output_shape
+        if isinstance(out_shape, list):
+            out_shape = out_shape[0]
+        for s in out_shape:
+            if s is None:
+                continue
+            single_layer_mem *= s
+        shapes_mem_count += single_layer_mem
+
+    trainable_count = sum(
+        [tf.keras.backend.count_params(p) for p in model.trainable_weights]
+    )
+    non_trainable_count = sum(
+        [tf.keras.backend.count_params(p) for p in model.non_trainable_weights]
+    )
+
+    total_memory = (
+        batch_size * shapes_mem_count
+        + internal_model_mem_count
+        + trainable_count
+        + non_trainable_count
+    )
+    return total_memory
+
+
 if __name__ == "__main__":
-    from configs import hp_config
+    from angorapy.configs import hp_config
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     conf = hp_config.manipulate
+    # conf["workers"] = 8
+    # conf["batch_size"] = 256
+
     n_optimizers = 32
 
-    total_tiling = find_optimal_tile_shape(
-        (conf["workers"], conf["horizon"] // conf["tbptt"]),
-        tile_size=conf["batch_size"] // conf["tbptt"]
-    )
+    for wf in [True, False]:
+        optimizer_tiling = find_optimal_tile_shape(
+            (conf["workers"] // n_optimizers, conf["horizon"] // conf["tbptt"] // n_optimizers),
+            tile_size=conf["batch_size"] // conf["tbptt"] // n_optimizers,
+            width_first=wf
+        )
 
-    optimizer_tiling = find_optimal_tile_shape(
-        (conf["workers"] // n_optimizers, conf["horizon"] // conf["tbptt"] // n_optimizers),
-        tile_size=conf["batch_size"] // conf["tbptt"] // n_optimizers
-    )
-
-    print(f"Total tiling: {total_tiling}\n"
-          f"Optimizer's Tiling: {optimizer_tiling}")
+        print(f"Optimizer's Tiling: {optimizer_tiling} with {['width', 'height'][wf]} first")

@@ -112,17 +112,17 @@ class Gatherer(BaseGatherer):
         states, rewards, actions, action_probabilities, values, advantages, dones = [], [], [], [], [], [], []
         episode_endpoints = []
         achieved_goals = []
-        state = env.reset()
+        state, info = env.reset()
 
         while t < self.horizon:
+
             current_subseq_length += 1
 
             # based on given state, predict action distribution and state value; need flatten due to tf eager bug
             prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = flatten(joint(prepared_state))
+            policy_out = flatten(joint(prepared_state, training=False))
 
             predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
-
             # from the action distribution sample an action and remember both the action and its probability
             action, action_probability = self.select_action(predicted_distribution_parameters)
 
@@ -132,7 +132,8 @@ class Gatherer(BaseGatherer):
             action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
             # make a step based on the chosen action and collect the reward for this state
-            observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            done = terminated or truncated
             current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
             rewards.append(reward)
             dones.append(done)
@@ -171,10 +172,7 @@ class Gatherer(BaseGatherer):
                     advantages.append(episode_advantages)
 
                 # reset environment to receive next episodes initial state
-                state = env.reset()
 
-                if is_recurrent:
-                    joint.reset_states()
 
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
@@ -182,6 +180,18 @@ class Gatherer(BaseGatherer):
                 buffer.episodes_completed += 1
                 episode_steps = 1
                 current_episode_return = 0
+
+                if "auxiliary_performances" in info.keys():
+                    for key, value in info["auxiliary_performances"].items():
+                        if key not in buffer.auxiliary_performances.keys():
+                            buffer.auxiliary_performances[key] = []
+
+                        buffer.auxiliary_performances[key].append(value)
+
+                state, info = env.reset()
+
+                if is_recurrent:
+                    joint.reset_states()
             else:
                 state = observation
                 episode_steps += 1
@@ -189,7 +199,7 @@ class Gatherer(BaseGatherer):
             t += 1
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
+        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:

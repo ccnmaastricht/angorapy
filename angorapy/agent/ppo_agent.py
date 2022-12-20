@@ -9,6 +9,7 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
+from json import JSONDecodeError
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -22,7 +23,7 @@ from psutil import NoSuchProcess
 
 from angorapy import models
 from angorapy.agent.dataio import read_dataset_from_storage
-from angorapy.agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
+from angorapy.agent.gather import Gatherer, evaluate
 from angorapy.agent.ppo.optim import learn_on_batch
 from angorapy.common import policies, const
 from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR, PATH_TO_EXPERIMENTS
@@ -33,6 +34,7 @@ from angorapy.common.transformers import BaseRunningMeanTransformer, transformer
 from angorapy.common.validators import validate_env_model_compatibility
 from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle
+from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
 from angorapy.utilities.statistics import ignore_none
@@ -249,6 +251,7 @@ class PPOAgent:
         self.underflow_history = []
         self.loading_history = []
         self.current_per_receptor_mean = {}
+        self.auxiliary_performances = {}
 
         # training statistics
         self.cycle_timings = []
@@ -262,6 +265,8 @@ class PPOAgent:
             self.wrapper_stat_history.update(
                 {transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
                                                   "stdev": [transformer.simplified_stdev()]}})
+
+        self.n_optimizers = n_optimizers
 
     def record_wrapper_stats(self) -> None:
         """Records the stats from RunningMeanWrappers."""
@@ -331,7 +336,8 @@ class PPOAgent:
         optimizer_base, optimizer_extra = divmod(self.n_workers, n_optimizers)
         optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(n_optimizers)]
         optimizer_collection_ids = list(range(self.n_workers))[
-                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(optimizer_split[:self.optimizer.comm.rank + 1])]
+                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(
+                                       optimizer_split[:self.optimizer.comm.rank + 1])]
 
         list_of_worker_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
         list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
@@ -353,10 +359,12 @@ class PPOAgent:
             n_chunks_per_batch_per_process = n_chunks_per_batch // n_optimizers
             n_trajectories_per_process = self.n_workers // n_optimizers
 
-            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = find_optimal_tile_shape(
-                (n_trajectories_per_process, n_chunks_per_trajectory),
-                n_chunks_per_batch_per_process
-            )
+            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = \
+                find_optimal_tile_shape(
+                    (n_trajectories_per_process, n_chunks_per_trajectory),
+                    n_chunks_per_batch_per_process,
+                    width_first=True  # TODO smartly adapt this to memory reqs or at least make parameter
+                )
 
             n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
             n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process
@@ -502,9 +510,11 @@ class PPOAgent:
                 subprocess_start = time.time()
 
                 mpi_flat_print("Optimizing...")
-                dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                    id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
-                                                    responsive_senses=self.policy.input_names)
+                dataset = read_dataset_from_storage(
+                    dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                    id_prefix=self.agent_id,
+                    worker_ids=optimizer_collection_ids,
+                    responsive_senses=self.policy.input_names)
                 self.optimize(dataset, epochs, effective_batch_size)
 
                 time_dict["optimizing"] = time.time() - subprocess_start
@@ -587,6 +597,15 @@ class PPOAgent:
         self.underflow_history.append(stats.tbptt_underflow)
         self.current_per_receptor_mean = {s: arr.tolist() for s, arr in stats.per_receptor_mean.items()}
 
+        for key, value in stats.auxiliary_performances.items():
+            if key not in self.auxiliary_performances:
+                self.auxiliary_performances[key] = {
+                    "mean": [],
+                    "std": []
+                }
+            self.auxiliary_performances[key]["mean"].append(np.mean(value).item())
+            self.auxiliary_performances[key]["std"].append(np.std(value).item())
+
     def _make_actor(self, horizon, discount, lam, subseq_length) -> Gatherer:
         # create the Gatherer
         return self.gatherer_class(
@@ -649,8 +668,11 @@ class PPOAgent:
                         # if the following line throws a CPU to GPU error this is most likely due to too little memory
                         # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
                         n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+                        # print(f"bs {batch_size} | split "
+                        #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
 
-                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for bk, bv in b.items()}
+                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for
+                                       bk, bv in b.items()}
                         for batch_i in range(len(split_batch["advantage"])):
                             batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
 
@@ -831,7 +853,8 @@ class PPOAgent:
         parameters = self.__dict__.copy()
         del parameters["env"]
         del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["gatherer_class"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters[
+            "gatherer_class"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
@@ -856,7 +879,10 @@ class PPOAgent:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
         """
         # TODO also load the state of the optimizers
-        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}"
+        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"
+        print(agent_path)
+        print(os.listdir(agent_path))
+
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(
                 "The given agent ID does not match any existing save history from your current path.")
@@ -865,14 +891,15 @@ class PPOAgent:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
         # determine loading point
-        latest_matches = PPOAgent.get_saved_iterations(agent_id)
+        latest_matches = PPOAgent.get_saved_iterations(agent_path)
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
             else:
                 from_iteration = "best"
         elif isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            assert from_iteration.lower() in ["best", "b",
+                                              "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
             if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):
@@ -922,7 +949,7 @@ class PPOAgent:
 
             loaded_agent.__dict__[p] = v
 
-        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
+        loaded_agent.joint.load_weights(f"{agent_path}/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
             if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
@@ -945,10 +972,8 @@ class PPOAgent:
         return loaded_agent
 
     @staticmethod
-    def get_saved_iterations(agent_id: int) -> list:
+    def get_saved_iterations(agent_path: int) -> list:
         """Return a list of iterations at which the agent of given ID has been saved."""
-        agent_path = BASE_SAVE_PATH + f"/{agent_id}"
-
         if not os.path.isdir(agent_path):
             raise FileNotFoundError("The given agent ID does not match any existing save history.")
 
@@ -978,7 +1003,11 @@ class PPOAgent:
         for directory in os.listdir(path_to_components):
             pretrained_component_full_path = os.path.join(path_to_components, directory)
             if os.path.isdir(pretrained_component_full_path):
-                pretrained_component = tf.keras.models.load_model(pretrained_component_full_path, compile=False)
+                try:
+                    pretrained_component = tf.keras.models.load_model(pretrained_component_full_path, compile=False)
+                except JSONDecodeError as e:
+                    raise ComponentError("Could not load the pretrained model from given files. Likely, the saved model"
+                                         "files where created with a different incompatible TF version.")
 
                 found_counterpart = False
                 for model_component in self.joint.layers:

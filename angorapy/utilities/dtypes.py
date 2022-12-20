@@ -4,4 +4,4 @@ import numpy
 
 from angorapy.common.senses import Sensation
 
-StepTuple = Tuple[Sensation, Union[float, numpy.ndarray], bool, dict]
+StepTuple = Tuple[Sensation, Union[float, numpy.ndarray], bool, bool, dict]

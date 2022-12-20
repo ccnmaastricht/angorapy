@@ -7,7 +7,7 @@ import numpy as np
 
 from angorapy.common.senses import Sensation
 from angorapy.common.const import NP_FLOAT_PREC, EPSILON
-from angorapy.utilities.types import StepTuple
+from angorapy.utilities.dtypes import StepTuple
 from angorapy.utilities.util import env_extract_dims
 
 from angorapy.environments import *
@@ -162,7 +162,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
     def transform(self, step_result: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
-        o, r, done, info = step_result
+        o, r, terminated, truncated, info = step_result
 
         if update:
             self.update(o.dict())
@@ -179,7 +179,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
         normed_o = Sensation(**normed_o)
 
-        return normed_o, r, done, info
+        return normed_o, r, terminated, truncated, info
 
     def warmup(self, env: "BaseWrapper", n_steps=10):
         """Warmup the transformer by sampling the observation space."""
@@ -201,10 +201,10 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
 
     def transform(self, step_tuple: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
-        o, r, done, info = step_tuple
+        o, r, terminated, truncated, info = step_tuple
 
         if r is None:
-            return o, r, done, info  # skip
+            return o, r, terminated, truncated, info  # skip
 
         # update based on cumulative discounted reward
         if update:
@@ -214,13 +214,13 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
         # normalize
         r = np.clip(r / (np.sqrt(self.variance["reward"] + EPSILON)), -10., 10.)
 
-        if done:
+        if terminated or truncated:
             self.ret = 0.
 
-        return o, r, done, info
+        return o, r, terminated, truncated, info
 
     def warmup(self, env: "BaseWrapper", n_steps=10):
-        """Warmup the transformer by randomly stepping the environment through step_tuple space sampling."""
+        """Warmup the transformer by randomly stepping the environment through action space sampling."""
         env.reset()
         for i in range(n_steps):
             self.update({"reward": env.step(env.action_space.sample())[1]})

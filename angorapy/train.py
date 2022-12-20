@@ -1,4 +1,5 @@
 import logging
+import re
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 
@@ -70,7 +71,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     wrappers.append(RewardNormalizationTransformer) if not settings["no_reward_norming"] else None
 
     # setup environment and extract and report information
-    env = make_env(environment, reward_config=settings["rcon"], transformers=wrappers)
+    env = make_env(environment,
+                   reward_config=settings["rcon"],
+                   transformers=wrappers,
+                   render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
     state_dim, number_of_actions = env_extract_dims(env)
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[
@@ -189,7 +193,7 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target gym environment")
-    parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow"], default="simple",
+    parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow", "shadowlif"], default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if architecture allows for choices")

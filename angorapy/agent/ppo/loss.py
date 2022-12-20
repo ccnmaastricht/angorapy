@@ -24,9 +24,9 @@ def policy_loss(action_prob: tf.Tensor,
 
     """
 
-    tf.debugging.assert_all_finite(action_prob, "action_prob is not all finite!")
-    tf.debugging.assert_all_finite(old_action_prob, "old_action_prob is not all finite!")
-    tf.debugging.assert_all_finite(advantage, "advantage is not all finite!")
+    # tf.debugging.assert_all_finite(action_prob, "action_prob is not all finite!")
+    # tf.debugging.assert_all_finite(old_action_prob, "old_action_prob is not all finite!")
+    # tf.debugging.assert_all_finite(advantage, "advantage is not all finite!")
 
     ratio = tf.exp(action_prob - old_action_prob)
     clipped = tf.maximum(

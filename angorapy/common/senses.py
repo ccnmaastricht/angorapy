@@ -72,6 +72,9 @@ class Sensation(dict):
     def __len__(self):
         return 5
 
+    def __list__(self):
+        return list(self.dict())
+
     def __contains__(self, item):
         return item in self.dict()
 
@@ -139,6 +142,9 @@ class Sensation(dict):
             raise TypeError(f"Unsupported division of Sensation by {type(other)}")
 
         return new_sensation
+
+    def keys(self):
+        return self.dict().keys()
 
     def sqrt(self):
         new_sensation = Sensation(

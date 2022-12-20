@@ -4,7 +4,7 @@ import abc
 import copy
 import os
 import random
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 import gym
 import numpy as np
@@ -93,7 +93,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
                  delta_t=0.002,
                  relative_control=True,
                  model=MODEL_PATH,
-                 vision=False
+                 vision=False,
+                 render_mode: Optional[str] = None
                  ):
         gym.utils.EzPickle.__init__(**locals())
 
@@ -110,7 +111,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
         self._always_render_mode = False
 
-        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos, vision=vision)
+        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
+                                                vision=vision, render_mode=render_mode)
 
         self.model.opt.timestep = delta_t
         self.original_n_substeps = n_substeps
@@ -132,10 +134,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     def _set_observation_space(self, obs):
         # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
-            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape, dtype=float),
+            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape),
+            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape),
             observation=spaces.Dict(
-                {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape, dtype=float)
+                {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape)
                  for name, val in obs['observation'].dict().items()}
             ),
         ))
@@ -220,9 +222,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
 
-        return obs, reward, done, info
+        return obs, reward, done, False, info
 
-    def reset(self, return_info=False, **kwargs):
+    def reset(self, **kwargs):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
         # is possible to get into a state with numerical issues (e.g. due to penetration or
         # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
@@ -237,10 +239,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
-        if return_info:
-            return obs, {}
-        else:
-            return obs
+        return obs, {}
 
     def reset_model(self):
         self.set_state(**self.initial_state)
@@ -251,15 +250,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.viewer = None
             self._viewers = {}
 
-    def render(self, mode='human', width=500, height=500):
-        self._render_callback(render_targets=True)
-        if mode == 'rgb_array':
-            self._get_viewer(mode).render(width, height)
-            data = self._get_viewer(mode).read_pixels(width, height, depth=False)
-            # original image is upside-down, so flip it
-            return data[::-1, :, :]
-        elif mode == 'human':
-            self._get_viewer(mode).render()
+    def render(self):
+        return super().render()
 
     # Extension methods
     # ----------------------------
