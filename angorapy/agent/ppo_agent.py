@@ -880,8 +880,6 @@ class PPOAgent:
         """
         # TODO also load the state of the optimizers
         agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"
-        print(agent_path)
-        print(os.listdir(agent_path))
 
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(

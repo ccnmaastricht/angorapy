@@ -510,7 +510,7 @@ def plot_distribution(metric: List[float], name="Metric", color=0) -> Tuple:
 
     p = figure(title=f"Distribution of {name}",
                x_axis_label=name,
-               y_range=(0, np.max(hist)s),
+               y_range=(0, np.max(hist)),
                **plot_styling)
 
     if len(metric) == 0:
