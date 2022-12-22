@@ -27,15 +27,12 @@ def build_ffn_models(env: BaseWrapper,
     state_dimensionality, n_actions = env_extract_dims(env)
 
     input_list = []
-    proprio = tf.keras.Input(shape=state_dimensionality["proprioception"], name="proprioception")
-    input_list.append(proprio)
+    for sense_name in state_dimensionality.keys():
+        if sense_name == "asynchronous":
+            continue
 
-    if "somatosensation" in state_dimensionality.keys():
-        somato = tf.keras.Input(shape=state_dimensionality["somatosensation"], name="somatosensation")
-        input_list.append(somato)
-    if "goal" in state_dimensionality.keys():
-        goal = tf.keras.Input(shape=state_dimensionality["goal"], name="goal")
-        input_list.append(goal)
+        input_node = tf.keras.Input(shape=state_dimensionality[sense_name], name=sense_name)
+        input_list.append(input_node)
 
     if len(input_list) > 1:
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
@@ -49,6 +46,10 @@ def build_ffn_models(env: BaseWrapper,
     policy = tf.keras.Model(inputs=input_list, outputs=out_policy, name="policy")
 
     # value network
+    if "asynchronous" in state_dimensionality.keys():
+        asymmetric_inputs = tf.keras.Input(shape=state_dimensionality["asynchronous"], name="asymmetric")
+        inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
+        input_list.append(asymmetric_inputs)
     if not shared:
         value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes,
                                                  name="value_encoder")(inputs)
@@ -81,20 +82,24 @@ def build_rnn_models(env: BaseWrapper,
     state_dimensionality, n_actions = env_extract_dims(env)
 
     input_list = []
-    proprio = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["proprioception"], name="proprioception")
-    input_list.append(proprio)
+    for sense_name in state_dimensionality.keys():
+        if sense_name == "asynchronous":
+            continue
 
-    if "somatosensation" in state_dimensionality.keys():
-        somato = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["somatosensation"], name="somatosensation")
-        input_list.append(somato)
-    if "goal" in state_dimensionality.keys():
-        goal = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["goal"], name="goal")
-        input_list.append(goal)
+        input_node = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality[sense_name], name=sense_name)
+        input_list.append(input_node)
 
     if len(input_list) > 1:
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
     else:
         inputs = input_list[0]
+
+    if "asynchronous" in state_dimensionality.keys():
+        asymmetric_inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asynchronous"], name="asynchronous")
+        value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
+        input_list.append(asymmetric_inputs)
+    else:
+        value_inputs = inputs
 
     masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (inputs.shape[-1], ))(inputs)
 
@@ -125,12 +130,13 @@ def build_rnn_models(env: BaseWrapper,
 
     # value network
     if not shared:
+        value_inputs_masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (inputs.shape[-1],))(inputs)
         x = TimeDistributed(
-            _build_encoding_sub_model(inputs.shape[-1],
+            _build_encoding_sub_model(value_inputs_masked.shape[-1],
                                       bs * sequence_length,
                                       layer_sizes=layer_sizes[:-1],
                                       name="value_encoder"),
-            name="TD_value")(masked)
+            name="TD_value")(value_inputs_masked)
         x.set_shape([bs] + x.shape[1:])
 
         x, *_ = rnn_choice(layer_sizes[-1], stateful=True, return_sequences=True, return_state=True, batch_size=bs,
