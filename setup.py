@@ -30,7 +30,7 @@ setup(
         "simplejson",
         "psutil",
         "scipy",
-        "sklearn",
+        "scikit-learn",
         "argcomplete",
         "matplotlib",
         "scikit-learn==0.24.1",
