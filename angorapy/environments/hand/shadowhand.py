@@ -158,35 +158,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self._freeze_wrist = not self._freeze_wrist
         print("Wrist movements are now frozen.")
 
-    def compute_reward(self, achieved_goal, goal, info):
-        """Compute reward with additional success bonus."""
-        return self.reward_function(self, achieved_goal, goal, info)
-
-    @abc.abstractmethod
-    def assert_reward_setup(self):
-        pass
-
-    def set_reward_function(self, function: Union[str, Callable]):
-        """Set the environment reward function by its config identifier or a callable."""
-        if isinstance(function, str):
-            try:
-                function = getattr(reward, function.split(".")[0])
-            except AttributeError:
-                raise AttributeError("Reward function unknown.")
-
-        self.reward_function = function
-
-    def set_reward_config(self, new_config: Union[str, dict]):
-        """Set the environment's reward configuration by its identifier or a dict."""
-        if isinstance(new_config, str):
-            new_config: dict = resolve_config_name(new_config)
-
-        self.reward_config = new_config
-        if "SUCCESS_DISTANCE" in self.reward_config.keys():
-            self.distance_threshold = self.reward_config["SUCCESS_DISTANCE"]
-
-        self.assert_reward_setup()
-
     # INFORMATION METHODS
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,

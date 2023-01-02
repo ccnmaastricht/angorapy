@@ -1,7 +1,8 @@
+import abc
 from abc import ABC
 from collections import OrderedDict
 from os import path
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 
 import numpy as np
 import mujoco
@@ -10,7 +11,9 @@ import gym
 from gym import error, logger, spaces
 
 from angorapy.common.const import VISION_WH
+from angorapy.configs.reward_config import resolve_config_name
 from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector
+from angorapy.common import reward
 
 
 def convert_observation_to_space(observation):
@@ -122,7 +125,34 @@ class AnthropomorphicEnv(gym.Env, ABC):
         Optionally implement this method, if you need to tinker with camera position and so forth.
         """
 
-    # -----------------------------
+    def compute_reward(self, achieved_goal, goal, info):
+        """Compute reward with additional success bonus."""
+        return self.reward_function(self, achieved_goal, goal, info)
+
+    def set_reward_function(self, function: Union[str, Callable]):
+        """Set the environment reward function by its config identifier or a callable."""
+        if isinstance(function, str):
+            try:
+                function = getattr(reward, function.split(".")[0])
+            except AttributeError:
+                raise AttributeError("Reward function unknown.")
+
+        self.reward_function = function
+
+    def set_reward_config(self, new_config: Union[str, dict]):
+        """Set the environment's reward configuration by its identifier or a dict."""
+        if isinstance(new_config, str):
+            new_config: dict = resolve_config_name(new_config)
+
+        self.reward_config = new_config
+        if "SUCCESS_DISTANCE" in self.reward_config.keys():
+            self.distance_threshold = self.reward_config["SUCCESS_DISTANCE"]
+
+        self.assert_reward_setup()
+
+    @abc.abstractmethod
+    def assert_reward_setup(self):
+        pass
 
     def reset(
         self,
