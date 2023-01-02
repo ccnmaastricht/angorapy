@@ -240,6 +240,8 @@ def compare_reward_progress(rewards: Dict[str, Dict[str, list]], reward_threshol
     y_max = 0
     x_all = []
 
+    print(rewards)
+
     p = figure(title="Average Rewards per Cycle",
                x_axis_label='Cycle',
                y_axis_label='Total Episode Return',

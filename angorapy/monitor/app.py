@@ -441,15 +441,15 @@ def show_comparison():
         progress_reports.update({f"{exp_id}": progress})
         metas[str(exp_id)] = meta
 
-    info["plots"]["reward"] = compare_reward_progress(
+    info["plots"]["reward"] = embed.components(compare_reward_progress(
         {id: progress["rewards"] for id, progress in progress_reports.items()},
         None
-    )
+    ))
 
-    info["plots"]["reward_grouped"] = grouped_reward_progress(
+    info["plots"]["reward_grouped"] = embed.components(grouped_reward_progress(
         {id: (metas[str(id)]["hyperparameters"]["epochs_per_cycle"], progress["rewards"]) for id, progress in progress_reports.items() if metas[str(id)]["hyperparameters"]["epochs_per_cycle"] > 30},
         None
-    )
+    ))
 
     return flask.render_template("compare.html", info=info)
 

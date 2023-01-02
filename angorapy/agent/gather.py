@@ -171,9 +171,6 @@ class Gatherer(BaseGatherer):
                 else:
                     advantages.append(episode_advantages)
 
-                # reset environment to receive next episodes initial state
-
-
                 # update/reset some statistics and trackers
                 buffer.episode_lengths.append(episode_steps)
                 buffer.episode_rewards.append(current_episode_return)
@@ -188,6 +185,7 @@ class Gatherer(BaseGatherer):
 
                         buffer.auxiliary_performances[key].append(value)
 
+                # reset environment to receive next episodes initial state
                 state, info = env.reset()
 
                 if is_recurrent:
@@ -197,6 +195,12 @@ class Gatherer(BaseGatherer):
                 episode_steps += 1
 
             t += 1
+
+        # add auxiliary performance to buffer even if no episode is finished
+        if "auxiliary_performances" in info.keys():
+            for key, value in info["auxiliary_performances"].items():
+                if key not in buffer.auxiliary_performances.keys():
+                    buffer.auxiliary_performances[key] = []
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
         values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
