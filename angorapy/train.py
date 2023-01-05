@@ -54,7 +54,7 @@ class InconsistentArgumentError(Exception):
 def run_experiment(environment, settings: dict, verbose=True, use_monitor=False):
     """Run an experiment with the given settings ."""
     if settings["cpu"]:
-        tf.config.experimental.set_visible_devices([], "GPU")
+        tf.config.set_visible_devices([], "GPU")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     mpi_rank = MPI.COMM_WORLD.rank
@@ -126,7 +126,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     if settings["load_from"] is not None:
         if verbose and is_root:
             print(f"{wn}Loading{ec} from state {settings['load_from']}")
-        agent = PPOAgent.from_agent_state(settings["load_from"], from_iteration="last")
+        agent = PPOAgent.from_agent_state(settings["load_from"], from_iteration="last",
+                                          n_optimizers=settings["n_optimizers"])
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
@@ -135,7 +136,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                          gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
                          tbptt_length=settings["tbptt"], lr_schedule=settings["lr_schedule"], distribution=distribution,
                          reward_configuration=settings["rcon"], debug=settings["debug"],
-                         pretrained_components=None if settings["preload"] is None else [settings["preload"]])
+                         pretrained_components=None if settings["preload"] is None else [settings["preload"]],
+                         n_optimizers=settings["n_optimizers"])
 
         if is_root:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
@@ -222,6 +224,8 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode (eager mode)")
     parser.add_argument("--no-monitor", action="store_true", help="dont use a monitor")
     parser.add_argument("--freeze-components", type=str, nargs="+", help=f"Components to freeze the weights of.")
+    parser.add_argument("--n-optimizers", type=int, default=None, help=f"number of optimizers; "
+                                                                       f"default is all GPUs or CPUs (if no GPUs found)")
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")

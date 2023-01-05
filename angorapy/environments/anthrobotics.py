@@ -106,9 +106,6 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def _env_setup(self, initial_state):
         raise NotImplementedError
 
-    # methods to override:
-    # ----------------------------
-
     def _get_obs(self):
         raise NotImplementedError
 

@@ -41,34 +41,6 @@ from angorapy.utilities.statistics import ignore_none
 from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
     mpi_print
 
-# get communicator and find optimization processes
-mpi_comm = MPI.COMM_WORLD
-gpus = tf.config.list_physical_devices('GPU')
-is_root = mpi_comm.rank == 0
-
-if is_root:
-    print(f"Detected {len(gpus)} GPU devices.")
-
-if len(gpus) > 0:
-    node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
-    node_comm = mpi_comm.Split(color=node_names.index(MPI.Get_processor_name()))
-    node_optimizer_rank = node_comm.allreduce(mpi_comm.rank, op=MPI.MIN)
-
-    # TODO make this work for multiple GPUs per node?
-    is_optimization_process = MPI.COMM_WORLD.rank == node_optimizer_rank
-else:
-    is_optimization_process = True
-
-if not is_optimization_process:
-    tf.config.experimental.set_visible_devices([], "GPU")
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-else:
-    if len(gpus) > 0:
-        tf.config.experimental.set_memory_growth(gpus[0], True)
-
-optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
-n_optimizers = int(mpi_comm.allreduce(is_optimization_process, op=MPI.SUM))
-
 
 class PPOAgent:
     policy: tf.keras.Model
@@ -94,7 +66,8 @@ class PPOAgent:
                  reward_configuration: str = None,
                  _make_dirs=True,
                  debug: bool = False,
-                 pretrained_components: list = None):
+                 pretrained_components: list = None,
+                 n_optimizers: int = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Agent using the Proximal Policy Optimization Algorithm for learning.
@@ -125,6 +98,16 @@ class PPOAgent:
         """
         super().__init__()
         self.debug = debug
+
+        # setup distributed computation
+        self.mpi_comm = MPI.COMM_WORLD
+        self.gpus = tf.config.list_physical_devices('GPU')
+        self.is_root = self.mpi_comm.rank == 0
+
+        self.optimization_comm, self.is_optimization_process = self.get_optimization_comm(
+            limit_to_n_optimizers=n_optimizers
+        )
+        self.n_optimizers = int(self.mpi_comm.allreduce(self.is_optimization_process, op=MPI.SUM))
 
         # checkups
         assert lr_schedule is None or isinstance(lr_schedule, str)
@@ -206,7 +189,7 @@ class PPOAgent:
                 else:
                     print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-        self.optimizer: MpiAdam = MpiAdam(comm=optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.optimizer: MpiAdam = MpiAdam(comm=self.optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -220,7 +203,7 @@ class PPOAgent:
         self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
-        self.agent_id = mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
+        self.agent_id = self.mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         self.experiment_directory = f"{PATH_TO_EXPERIMENTS}/{self.agent_id}/"
         if _make_dirs:
@@ -266,7 +249,40 @@ class PPOAgent:
                 {transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
                                                   "stdev": [transformer.simplified_stdev()]}})
 
-        self.n_optimizers = n_optimizers
+    @staticmethod
+    def get_optimization_comm(limit_to_n_optimizers: int = None):
+        mpi_comm = MPI.COMM_WORLD
+        gpus = tf.config.list_logical_devices('GPU')
+        is_root = mpi_comm.rank == 0
+
+        if is_root:
+            print(f"Detected {len(gpus)} GPU devices.")
+        if len(gpus) > 0:
+            node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
+            node_comm = mpi_comm.Split(color=node_names.index(MPI.Get_processor_name()))
+            node_optimizer_rank = node_comm.allreduce(mpi_comm.rank, op=MPI.MIN)
+
+            # TODO make this work for multiple GPUs per node?
+            is_optimization_process = MPI.COMM_WORLD.rank == node_optimizer_rank
+        else:
+            is_optimization_process = True
+
+        if not is_optimization_process:
+            tf.config.set_visible_devices([], "GPU")
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        else:
+            if len(gpus) > 0:
+                tf.config.experimental.set_memory_growth(gpus[0], True)
+
+        optimization_ranks = [r for r in mpi_comm.allgather(MPI.COMM_WORLD.rank if is_optimization_process else -1) if r != -1]
+        if limit_to_n_optimizers is not None and limit_to_n_optimizers != 0:
+            optimization_ranks = optimization_ranks[:limit_to_n_optimizers]
+            is_optimization_process = mpi_comm.rank in optimization_ranks
+
+        print(f"{mpi_comm.rank}: {is_optimization_process}")
+        optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
+
+        return optimization_comm, is_optimization_process
 
     def record_wrapper_stats(self) -> None:
         """Records the stats from RunningMeanWrappers."""
@@ -320,7 +336,7 @@ class PPOAgent:
         """
 
         # start monitor
-        if is_root and monitor is not None:
+        if self.is_root and monitor is not None:
             monitor.make_metadata(additional_hps={
                 "epochs_per_cycle": epochs,
                 "batch_size": batch_size,
@@ -330,22 +346,22 @@ class PPOAgent:
         worker_base, worker_extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
         worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
         worker_collection_ids = list(range(self.n_workers))[
-                                sum(worker_split[:mpi_comm.rank]):sum(worker_split[:mpi_comm.rank + 1])]
+                                sum(worker_split[:self.mpi_comm.rank]):sum(worker_split[:self.mpi_comm.rank + 1])]
 
         # determine the split of worker outputs over optimizers
-        optimizer_base, optimizer_extra = divmod(self.n_workers, n_optimizers)
-        optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(n_optimizers)]
+        optimizer_base, optimizer_extra = divmod(self.n_workers, self.n_optimizers)
+        optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(self.n_optimizers)]
         optimizer_collection_ids = list(range(self.n_workers))[
                                    sum(optimizer_split[:self.optimizer.comm.rank]):sum(
                                        optimizer_split[:self.optimizer.comm.rank + 1])]
 
-        list_of_worker_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
+        list_of_worker_collection_id_lists = self.mpi_comm.gather(worker_collection_ids, root=0)
         list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
 
-        if is_root:
+        if self.is_root:
             print(
                 f"\n\nDrill started using {MPI.COMM_WORLD.size} processes for {self.n_workers} workers of which "
-                f"{n_optimizers} are optimizers."
+                f"{self.n_optimizers} are optimizers."
                 f" Worker distribution: {[worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
                 f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
                 f"IDs over Optimizers: {list_of_optimizer_collection_id_lists}")
@@ -356,8 +372,8 @@ class PPOAgent:
 
             n_chunks_per_trajectory = self.horizon // self.tbptt_length
             n_chunks_per_batch = batch_size // self.tbptt_length
-            n_chunks_per_batch_per_process = n_chunks_per_batch // n_optimizers
-            n_trajectories_per_process = self.n_workers // n_optimizers
+            n_chunks_per_batch_per_process = n_chunks_per_batch // self.n_optimizers
+            n_trajectories_per_process = self.n_workers // self.n_optimizers
 
             n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = \
                 find_optimal_tile_shape(
@@ -366,10 +382,10 @@ class PPOAgent:
                     width_first=True  # TODO smartly adapt this to memory reqs or at least make parameter
                 )
 
-            n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
+            n_trajectories_per_batch = n_trajectories_per_batch_per_process * self.n_optimizers
             n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process
 
-            if is_root:
+            if self.is_root:
                 print(f"\nThe policy is recurrent and the batch size is interpreted as the number of transitions "
                       f"per policy update. Given the batch size of {batch_size} this results in: \n"
                       f"\t{n_chunks_per_batch} chunks per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch\n"
@@ -382,7 +398,7 @@ class PPOAgent:
 
         else:
             assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-            batch_size = batch_size // n_optimizers
+            batch_size = batch_size // self.n_optimizers
             effective_batch_size = batch_size
 
         # rebuild model with desired batch size
@@ -420,7 +436,7 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # distribute parameters from rank 0 to all goal ranks
-            joint_weights = mpi_comm.bcast(joint_weights, root=0)
+            joint_weights = self.mpi_comm.bcast(joint_weights, root=0)
             self.joint.set_weights(joint_weights)
             actor_joint.set_weights(joint_weights)
 
@@ -433,7 +449,7 @@ class PPOAgent:
 
             # merge gatherings from all workers
             stats = mpi_condense_stats(worker_stats)
-            stats = mpi_comm.bcast(stats, root=0)
+            stats = self.mpi_comm.bcast(stats, root=0)
 
             # sync the environments to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -458,7 +474,7 @@ class PPOAgent:
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
             # RECORD STATS, SAVE MODEL AND REPORT
-            if is_root:
+            if self.is_root:
                 self.record_wrapper_stats()
                 self.record_stats(stats_with_evaluation)
 
@@ -482,7 +498,7 @@ class PPOAgent:
                         pass
 
                 used_gpu_memory = 0
-                if len(gpus) > 0:
+                if len(self.gpus) > 0:
                     nvidia_smi.nvmlInit()
                     nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
                     procs = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(nvidia_handle)
@@ -506,7 +522,7 @@ class PPOAgent:
                     break
 
             # OPTIMIZATION PHASE
-            if is_optimization_process:
+            if self.is_optimization_process:
                 subprocess_start = time.time()
 
                 mpi_flat_print("Optimizing...")
@@ -520,7 +536,7 @@ class PPOAgent:
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 # FINALIZE
-                if is_root:
+                if self.is_root:
                     mpi_flat_print("Finalizing...")
                     self.total_frames_seen += stats.numb_processed_frames
                     self.total_episodes_seen += stats.numb_completed_episodes
@@ -568,7 +584,7 @@ class PPOAgent:
             weights=joint_weights, batch_size=batch_size, sequence_length=self.tbptt_length
         )
 
-        if is_root:
+        if self.is_root:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
 
         return self
@@ -717,7 +733,7 @@ class PPOAgent:
             value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
             entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
-        optimization_comm.Barrier()
+        self.optimization_comm.Barrier()
 
         # store statistics in agent history
         self.policy_loss_history.append(statistics.mean(policy_loss_history))
@@ -745,7 +761,7 @@ class PPOAgent:
         for i in range(n):
             gathered_evaluation_result.append(evaluate(policy, self.env, self.distribution, act_confidently))
 
-        # gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
+        # gathered_evaluation_result = self.mpi_comm.gather(evaluation_result, root=0)
 
         lengths, rewards, classes = zip(*gathered_evaluation_result)
         stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0, per_receptor_mean={})
@@ -808,7 +824,7 @@ class PPOAgent:
             time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
 
         total_gpu_memory = 0
-        if len(gpus) > 0:
+        if len(self.gpus) > 0:
             nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
             nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
             total_gpu_memory = nvidia_info.total
@@ -819,7 +835,7 @@ class PPOAgent:
             years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
 
         # print the report
-        if is_root:
+        if self.is_root:
             pass
         mpi_flat_print(
             f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
@@ -855,6 +871,8 @@ class PPOAgent:
         del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
         del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters[
             "gatherer_class"]
+        del parameters["mpi_comm"], parameters["optimization_comm"], parameters["is_optimization_process"], \
+            parameters["n_optimizers"], parameters["gpus"], parameters["is_root"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
@@ -866,8 +884,12 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None, force_env_name=None,
-                         path_modifier="") -> "PPOAgent":
+    def from_agent_state(
+            agent_id: int,
+            from_iteration: Union[int, str] = None,
+            force_env_name=None,
+            path_modifier="",
+            n_optimizers: int = None) -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
@@ -878,6 +900,14 @@ class PPOAgent:
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
         """
+        mpi_comm = MPI.COMM_WORLD
+        gpus = tf.config.list_physical_devices('GPU')
+        is_root = mpi_comm.rank == 0
+
+        optimization_comm, is_optimization_process = PPOAgent.get_optimization_comm(
+            limit_to_n_optimizers=n_optimizers
+        )
+
         # TODO also load the state of the optimizers
         agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"
 
@@ -939,7 +969,8 @@ class PPOAgent:
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False,
-                                reward_configuration=parameters["reward_configuration"])
+                                reward_configuration=parameters["reward_configuration"],
+                                n_optimizers=n_optimizers)
 
         for p, v in parameters.items():
             if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
