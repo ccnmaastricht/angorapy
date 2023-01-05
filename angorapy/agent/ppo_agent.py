@@ -252,7 +252,7 @@ class PPOAgent:
     @staticmethod
     def get_optimization_comm(limit_to_n_optimizers: int = None):
         mpi_comm = MPI.COMM_WORLD
-        gpus = tf.config.list_logical_devices('GPU')
+        gpus = tf.config.list_physical_devices('GPU')
         is_root = mpi_comm.rank == 0
 
         if is_root:
@@ -279,7 +279,6 @@ class PPOAgent:
             optimization_ranks = optimization_ranks[:limit_to_n_optimizers]
             is_optimization_process = mpi_comm.rank in optimization_ranks
 
-        print(f"{mpi_comm.rank}: {is_optimization_process}")
         optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
 
         return optimization_comm, is_optimization_process
