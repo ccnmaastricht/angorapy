@@ -12,7 +12,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
     MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.models.components import _build_encoding_sub_model
 from angorapy.utilities.util import env_extract_dims
 
@@ -130,7 +130,7 @@ def build_rnn_models(env: BaseWrapper,
 
     # value network
     if not shared:
-        value_inputs_masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (inputs.shape[-1],))(inputs)
+        value_inputs_masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (value_inputs.shape[-1],))(value_inputs)
         x = TimeDistributed(
             _build_encoding_sub_model(value_inputs_masked.shape[-1],
                                       bs * sequence_length,
@@ -144,6 +144,9 @@ def build_rnn_models(env: BaseWrapper,
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
     else:
+        if "asynchronous" in state_dimensionality.keys():
+            x = tf.keras.layers.Concatenate()([x, asymmetric_inputs])
+
         out_value = tf.keras.layers.Dense(1, input_dim=x.shape[1:],
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
@@ -207,26 +210,30 @@ def build_wider_models(env: BaseWrapper,
 if __name__ == '__main__':
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    cont_env = gym.make("FetchReachDense-v1")
+    cont_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
     discrete_env = gym.make("LunarLander-v2")
     multi_discrete_env = gym.make("ManipulateBlockDiscreteRelative-v0")
 
-    model = build_simple_models(cont_env, RBetaPolicyDistribution(cont_env), False, 1, 1, "gru")
-    print(f"Simple model has {model[0].count_params()} parameters.")
-    plot_model(model[2], show_shapes=True, to_file="simple.png", expand_nested=True)
+    # model = build_simple_models(cont_env, RBetaPolicyDistribution(cont_env), False, 1, 1, "gru")
+    # print(f"Simple model has {model[0].count_params()} parameters.")
+    # plot_model(model[2], show_shapes=True, to_file="simple.png", expand_nested=True)
+    #
+    # model = build_simple_models(discrete_env, CategoricalPolicyDistribution(discrete_env), False, 1, 1, "gru")
+    # print(f"Simple model has {model[0].count_params()} parameters.")
+    # plot_model(model[2], show_shapes=True, to_file="model_graph_simple_discrete.png", expand_nested=True)
+    #
+    # model = build_simple_models(multi_discrete_env, MultiCategoricalPolicyDistribution(multi_discrete_env), False, 1, 1, "gru")
+    # print(f"Simple model has {model[0].count_params()} parameters.")
+    # plot_model(model[2], show_shapes=True, to_file="model_graph_simple_multidiscrete.png", expand_nested=True)
+    #
+    # model = build_deeper_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
+    # print(f"Deeper model has {model[0].count_params()} parameters.")
+    # plot_model(model[2], show_shapes=True, to_file="model_graph_deeper.png", expand_nested=True)
 
-    model = build_simple_models(discrete_env, CategoricalPolicyDistribution(discrete_env), False, 1, 1, "gru")
-    print(f"Simple model has {model[0].count_params()} parameters.")
-    plot_model(model[2], show_shapes=True, to_file="model_graph_simple_discrete.png", expand_nested=True)
+    model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), False, 1, 1, "gru")
+    print(f"Wider model has {model[2].count_params()} parameters.")
+    plot_model(model[2], show_shapes=True, to_file="model_graph_wider_unshared.png", expand_nested=True)
 
-    model = build_simple_models(multi_discrete_env, MultiCategoricalPolicyDistribution(multi_discrete_env), False, 1, 1, "gru")
-    print(f"Simple model has {model[0].count_params()} parameters.")
-    plot_model(model[2], show_shapes=True, to_file="model_graph_simple_multidiscrete.png", expand_nested=True)
-
-    model = build_deeper_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
-    print(f"Deeper model has {model[0].count_params()} parameters.")
-    plot_model(model[2], show_shapes=True, to_file="model_graph_deeper.png", expand_nested=True)
-
-    model = build_wider_models(cont_env, BetaPolicyDistribution(cont_env), False, 1, 1, "gru")
-    print(f"Wider model has {model[0].count_params()} parameters.")
-    plot_model(model[2], show_shapes=True, to_file="model_graph_wider.png", expand_nested=True)
+    model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), True, 1, 1, "gru")
+    print(f"Wider model has {model[2].count_params()} parameters.")
+    plot_model(model[2], show_shapes=True, to_file="model_graph_wider_shared.png", expand_nested=True)
