@@ -28,11 +28,24 @@ AngoraPy is available on PyPI.
 pip install angorapy
 ```
 
-### MuJoCo
-To train on any MuJoCo-based environment, you will need MuJoCo. As of late 2021, MuJoCo is free and can be [downloaded here](https://mujoco.org/download). 
-As an interface to python, we use mujoco-py, [available here](https://github.com/openai/mujoco-py). To install both, follow their respective instructions.
+### From source
+Alternatively, you can download this repository or the source code of any previous release or branch and install from source, using pip.
 
-If you do not want/can install MuJoCo and/or mujoco-py you can use this framework without MuJoCo. Our implementation automatically checks for a `.mujoco` directory in you home directory. If it does not exist, it will try to avoid loading MuJoCo. However, you can then not load any environments that rely on MuJoCo!
+```bash
+pip install -e .
+```
+
+This way, if you make changes to the source code, thse will be recognized in the installation (without the need to reinstall).
+
+### Docker
+Alternatively, you can install AngoraPy and all its dependencies in a docker container using the Dockerfile provided in this repository (/docker/Dockerfile). To this end, download the repository and build the docker image from the /docker directory:
+
+```bash
+sudo docker build -t angorapy:dev https://github.com/ccnmaastricht/angorapy.git#master -f - < Dockerfile
+```
+
+To install different versions, replace `#master` in the source by the tag/branch of the respective version you want to install.
+
 
 ## 🚀 Getting Started
 The scripts `train.py`, `evaluate.py` and `observe.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.
