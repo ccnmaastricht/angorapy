@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
+import code
 import datetime
 import os
 import socket
@@ -151,8 +152,8 @@ class Monitor:
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
-                reward_norming=str(RewardNormalizationTransformer in self.env.transformers),
-                state_norming=str(StateNormalizationTransformer in self.env.transformers),
+                reward_norming=str(any([isinstance(t, RewardNormalizationTransformer) for t in self.env.transformers])),
+                state_norming=str(any([isinstance(t, StateNormalizationTransformer) for t in self.env.transformers])),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name.split("_")[1],
                 gatherer=str(self.agent.gatherer_class),
