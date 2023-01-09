@@ -41,7 +41,7 @@ This way, if you make changes to the source code, thse will be recognized in the
 Alternatively, you can install AngoraPy and all its dependencies in a docker container using the Dockerfile provided in this repository (/docker/Dockerfile). To this end, download the repository and build the docker image from the /docker directory:
 
 ```bash
-sudo docker build -t angorapy:dev https://github.com/ccnmaastricht/angorapy.git#master -f - < Dockerfile
+sudo docker build -t angorapy:master https://github.com/ccnmaastricht/angorapy.git#master -f - < Dockerfile
 ```
 
 To install different versions, replace `#master` in the source by the tag/branch of the respective version you want to install.
