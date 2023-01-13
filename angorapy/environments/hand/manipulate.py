@@ -330,7 +330,7 @@ class BaseManipulate(BaseShadowHandEnv):
             "observation": Sensation(
                 vision=object_qpos,
                 proprioception=proprioception.copy(),
-                somatosensation=None,
+                touch=None,
                 goal=target_orientation),
             "achieved_goal": object_qpos.copy(),
             "desired_goal": self.goal.ravel().copy(),
@@ -455,7 +455,7 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
             "observation": Sensation(
                 vision=None,
                 proprioception=proprioception.copy(),
-                somatosensation=None,
+                touch=None,
                 goal=target_orientation),
             "achieved_goal": object_qpos.copy(),
             "desired_goal": self.goal.ravel().copy(),
@@ -511,9 +511,9 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
             "observation": Sensation(
                 vision=vision_input,
                 proprioception=proprioception.copy(),
-                somatosensation=touch,
+                touch=touch,
                 goal=target_orientation,
-                asynchronous=None if not self.asynchronous else asynchronous
+                asymmetric=None if not self.asynchronous else asynchronous
             ),
             "achieved_goal": object_qpos.copy().astype(np.float32),
             "desired_goal": self.goal.ravel().copy().astype(np.float32),

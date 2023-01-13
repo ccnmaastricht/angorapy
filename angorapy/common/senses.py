@@ -10,20 +10,20 @@ class Sensation(dict):
     encapsulated too. The convention is to refer to any non-sensory data as proprioception, following the intuition
     that it represents inner states."""
 
-    sense_names = ["vision", "somatosensation", "proprioception", "goal", "asynchronous"]
+    sense_names = ["vision", "touch", "proprioception", "goal", "asymmetric"]
 
-    def __init__(self, vision: np.ndarray = None, proprioception: np.ndarray = None, somatosensation: np.ndarray = None,
-                 goal: np.ndarray = None, asynchronous: np.ndarray = None):
+    def __init__(self, vision: np.ndarray = None, proprioception: np.ndarray = None, touch: np.ndarray = None,
+                 goal: np.ndarray = None, asymmetric: np.ndarray = None):
         super().__init__()
 
-        assert not all(s is None for s in (vision, somatosensation, proprioception, goal)), \
+        assert not all(s is None for s in (vision, touch, proprioception, goal)), \
             "Sensation requires data for at least on sense (or 'goal')."
 
         self.vision = vision.astype(np.float32) if vision is not None else None
-        self.somatosensation = somatosensation.astype(np.float32) if somatosensation is not None else None
+        self.touch = touch.astype(np.float32) if touch is not None else None
         self.proprioception = proprioception.astype(np.float32) if proprioception is not None else None
         self.goal = goal.astype(np.float32) if goal is not None else None
-        self.asynchronous = asynchronous.astype(np.float32) if asynchronous is not None else None
+        self.asymmetric = asymmetric.astype(np.float32) if asymmetric is not None else None
 
     def __repr__(self):
         return str(self.__dict__)
@@ -41,18 +41,13 @@ class Sensation(dict):
 
     @property
     def s(self):
-        """Shortcut for somatosensation."""
-        return self.somatosensation
-
-    @property
-    def touch(self):
-        """Shortcut for somatosensation."""
-        return self.somatosensation
+        """Shortcut for touch."""
+        return self.touch
 
     @property
     def t(self):
-        """Shortcut for somatosensation."""
-        return self.somatosensation
+        """Shortcut for touch."""
+        return self.touch
 
     @property
     def p(self):
@@ -67,7 +62,7 @@ class Sensation(dict):
     # MAGIC
 
     def __iter__(self):
-        return iter((self.vision, self.somatosensation, self.proprioception, self.goal, self.asynchronous))
+        return iter((self.vision, self.touch, self.proprioception, self.goal, self.asymmetric))
 
     def __len__(self):
         return 5
@@ -92,9 +87,9 @@ class Sensation(dict):
         new_sensation = Sensation(
             vision=self.vision + other.vision if self.vision is not None else None,
             proprioception=self.proprioception + other.proprioception if self.proprioception is not None else None,
-            somatosensation=self.somatosensation + other.somatosensation if self.somatosensation is not None else None,
+            touch=self.touch + other.touch if self.touch is not None else None,
             goal=self.goal + other.goal if self.goal is not None else None,
-            asynchronous=self.asynchronous + other.asynchronous if self.asynchronous is not None else None,
+            asymmetric=self.asymmetric + other.asymmetric if self.asymmetric is not None else None,
         )
 
         return new_sensation
@@ -103,9 +98,9 @@ class Sensation(dict):
         new_sensation = Sensation(
             vision=self.vision - other.vision if self.vision is not None else None,
             proprioception=self.proprioception - other.proprioception if self.proprioception is not None else None,
-            somatosensation=self.somatosensation - other.somatosensation if self.somatosensation is not None else None,
+            touch=self.touch - other.touch if self.touch is not None else None,
             goal=self.goal - other.goal if self.goal is not None else None,
-            asynchronous=self.asynchronous - other.asynchronous if self.asynchronous is not None else None,
+            asymmetric=self.asymmetric - other.asymmetric if self.asymmetric is not None else None,
         )
 
         return new_sensation
@@ -114,9 +109,9 @@ class Sensation(dict):
         new_sensation = Sensation(
             vision=self.vision ** other if self.vision is not None else None,
             proprioception=self.proprioception ** other if self.proprioception is not None else None,
-            somatosensation=self.somatosensation ** other if self.somatosensation is not None else None,
+            touch=self.touch ** other if self.touch is not None else None,
             goal=self.goal ** other if self.goal is not None else None,
-            asynchronous=self.asynchronous ** other if self.asynchronous is not None else None,
+            asymmetric=self.asymmetric ** other if self.asymmetric is not None else None,
         )
 
         return new_sensation
@@ -126,17 +121,17 @@ class Sensation(dict):
             new_sensation = Sensation(
                 vision=self.vision / other.vision if self.vision is not None else None,
                 proprioception=self.proprioception / other.proprioception if self.proprioception is not None else None,
-                somatosensation=self.somatosensation / other.somatosensation if self.somatosensation is not None else None,
+                touch=self.touch / other.touch if self.touch is not None else None,
                 goal=self.goal / other.goal if self.goal is not None else None,
-                asynchronous=self.asynchronous / other.asynchronous if self.asynchronous is not None else None,
+                asymmetric=self.asymmetric / other.asymmetric if self.asymmetric is not None else None,
             )
         elif isinstance(other, (int, float)) or np.isscalar(other):
             new_sensation = Sensation(
                 vision=self.vision / other if self.vision is not None else None,
                 proprioception=self.proprioception / other if self.proprioception is not None else None,
-                somatosensation=self.somatosensation / other if self.somatosensation is not None else None,
+                touch=self.touch / other if self.touch is not None else None,
                 goal=self.goal / other if self.goal is not None else None,
-                asynchronous=self.asynchronous / other if self.asynchronous is not None else None,
+                asymmetric=self.asymmetric / other if self.asymmetric is not None else None,
             )
         else:
             raise TypeError(f"Unsupported division of Sensation by {type(other)}")
@@ -150,9 +145,9 @@ class Sensation(dict):
         new_sensation = Sensation(
             vision=np.sqrt(self.vision) if self.vision is not None else None,
             proprioception=np.sqrt(self.proprioception) if self.proprioception is not None else None,
-            somatosensation=np.sqrt(self.somatosensation) if self.somatosensation is not None else None,
+            touch=np.sqrt(self.touch) if self.touch is not None else None,
             goal=np.sqrt(self.goal) if self.goal is not None else None,
-            asynchronous=np.sqrt(self.asynchronous) if self.asynchronous is not None else None,
+            asymmetric=np.sqrt(self.asymmetric) if self.asymmetric is not None else None,
         )
 
         return new_sensation
@@ -202,6 +197,7 @@ def stack_sensations(sensations: List[Sensation], add_batch_dim=False):
             sense: np.expand_dims(np.stack([s[sense] for s in sensations], axis=0), 0)
             for sense in sensations[0].dict().keys()
         })
+
 
 if __name__ == '__main__':
     ss = stack_sensations([

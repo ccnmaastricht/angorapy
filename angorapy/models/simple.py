@@ -28,7 +28,7 @@ def build_ffn_models(env: BaseWrapper,
 
     input_list = []
     for sense_name in state_dimensionality.keys():
-        if sense_name == "asynchronous":
+        if sense_name == "asymmetric":
             continue
 
         input_node = tf.keras.Input(shape=state_dimensionality[sense_name], name=sense_name)
@@ -46,8 +46,8 @@ def build_ffn_models(env: BaseWrapper,
     policy = tf.keras.Model(inputs=input_list, outputs=out_policy, name="policy")
 
     # value network
-    if "asynchronous" in state_dimensionality.keys():
-        asymmetric_inputs = tf.keras.Input(shape=state_dimensionality["asynchronous"], name="asymmetric")
+    if "asymmetric" in state_dimensionality.keys():
+        asymmetric_inputs = tf.keras.Input(shape=state_dimensionality["asymmetric"], name="asymmetric")
         inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
         input_list.append(asymmetric_inputs)
     if not shared:
@@ -83,7 +83,7 @@ def build_rnn_models(env: BaseWrapper,
 
     input_list = []
     for sense_name in state_dimensionality.keys():
-        if sense_name == "asynchronous":
+        if sense_name == "asymmetric":
             continue
 
         input_node = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality[sense_name], name=sense_name)
@@ -94,8 +94,8 @@ def build_rnn_models(env: BaseWrapper,
     else:
         inputs = input_list[0]
 
-    if "asynchronous" in state_dimensionality.keys():
-        asymmetric_inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asynchronous"], name="asynchronous")
+    if "asymmetric" in state_dimensionality.keys():
+        asymmetric_inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asymmetric"], name="asymmetric")
         value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
         input_list.append(asymmetric_inputs)
     else:
@@ -144,7 +144,7 @@ def build_rnn_models(env: BaseWrapper,
         out_value = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
     else:
-        if "asynchronous" in state_dimensionality.keys():
+        if "asymmetric" in state_dimensionality.keys():
             x = tf.keras.layers.Concatenate()([x, asymmetric_inputs])
 
         out_value = tf.keras.layers.Dense(1, input_dim=x.shape[1:],
@@ -231,9 +231,9 @@ if __name__ == '__main__':
     # plot_model(model[2], show_shapes=True, to_file="model_graph_deeper.png", expand_nested=True)
 
     model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), False, 1, 1, "gru")
-    print(f"Wider model has {model[2].count_params()} parameters.")
+    print(f"Wider model without weight sharing has {model[2].count_params()} parameters.")
     plot_model(model[2], show_shapes=True, to_file="model_graph_wider_unshared.png", expand_nested=True)
 
     model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), True, 1, 1, "gru")
-    print(f"Wider model has {model[2].count_params()} parameters.")
+    print(f"Wider model with weight sharing has {model[2].count_params()} parameters.")
     plot_model(model[2], show_shapes=True, to_file="model_graph_wider_shared.png", expand_nested=True)

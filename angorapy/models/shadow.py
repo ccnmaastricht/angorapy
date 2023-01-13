@@ -17,9 +17,9 @@ from angorapy.models import _build_openai_encoder
 from angorapy.utilities.util import env_extract_dims
 
 
-def build_ssc_module(batch_and_sequence_shape, somatosensation_input_shape, activation=tf.keras.layers.ReLU):
+def build_ssc_module(batch_and_sequence_shape, touch_input_shape, activation=tf.keras.layers.ReLU):
     """Build the model of the SSC."""
-    ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + somatosensation_input_shape, name="SSCInput")
+    ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + touch_input_shape, name="SSCInput")
     ssc = TD(tf.keras.layers.Dense(128))(ssc_input)
     ssc = activation()(ssc)
     ssc = TD(tf.keras.layers.Dense(64))(ssc)
@@ -104,16 +104,16 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     visual_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["vision"],), name="vision")
     proprio_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["proprioception"],),
                                 name="proprioception")
-    touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["somatosensation"],),
-                              name="somatosensation")
+    touch_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["touch"],),
+                              name="touch")
     goal_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["goal"],), name="goal")
 
     input_list = [visual_input, proprio_in, touch_in, goal_input]
 
-    somatosensation = tf.keras.layers.concatenate([proprio_in, touch_in])
-    somatosensation_masked = tf.keras.layers.Masking(
-        batch_input_shape=somatosensation.shape
-    )(somatosensation)
+    touch = tf.keras.layers.concatenate([proprio_in, touch_in])
+    touch_masked = tf.keras.layers.Masking(
+        batch_input_shape=touch.shape
+    )(touch)
 
     if blind:
         vc = visual_input
@@ -123,8 +123,8 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)
 
-    ssc = build_ssc_module((bs, sequence_length,), (somatosensation_masked.shape[-1],), activation=activation)
-    ssc_out = ssc(somatosensation_masked)
+    ssc = build_ssc_module((bs, sequence_length,), (touch_masked.shape[-1],), activation=activation)
+    ssc_out = ssc(touch_masked)
 
     ppc = build_ppc_module((bs, sequence_length,), (vision_masked.shape[-1],), (ssc.output_shape[-1],), activation=activation)
     spl_out, ipl_out, ips_out = ppc([vision_masked, ssc_out])
@@ -142,11 +142,11 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
 
     # value head
     value_inputs = [pmc_out, mcc_out, ips_out, lpfc_out, ssc_out]
-    if "asynchronous" in state_dimensionality.keys():
-        asynchronous = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asynchronous"],
-                                      name="asynchronous")
-        input_list.append(asynchronous)
-        value_inputs.append(asynchronous)
+    if "asymmetric" in state_dimensionality.keys():
+        asymmetric = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asymmetric"],
+                                      name="asymmetric")
+        input_list.append(asymmetric)
+        value_inputs.append(asymmetric)
 
     value_in = tf.keras.layers.concatenate(value_inputs)
     value_out = tf.keras.layers.Dense(512)(value_in)
@@ -194,7 +194,7 @@ if __name__ == "__main__":
     joint({
         "vision": tf.random.normal((batch_size, sequence_length, 7)),
         "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
-        "somatosensation": tf.random.normal((batch_size, sequence_length, 92)),
-        "asynchronous": tf.random.normal((batch_size, sequence_length, 25)),
+        "touch": tf.random.normal((batch_size, sequence_length, 92)),
+        "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
         "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })

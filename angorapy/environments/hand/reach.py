@@ -124,7 +124,7 @@ class Reach(BaseShadowHandEnv):
         return {
             'observation': Sensation(
                 proprioception=proprioception,
-                somatosensation=touch if self.touch else None,
+                touch=touch if self.touch else None,
                 vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else np.array([]),
                 goal=self.goal.copy()
             ),

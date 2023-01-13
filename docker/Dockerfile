@@ -68,7 +68,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
 
-RUN pip install /ang_tmp \
+RUN pip install /ang_tmp --default-timeout=100 \
     && pip install mujoco \
     && pip install imageio \
     && rm -rf /ang_tmp
