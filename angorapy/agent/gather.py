@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
 import abc
+import code
 import gc
 import random
 from typing import Tuple, Any
@@ -284,14 +285,14 @@ class EpsilonGreedyGatherer(Gatherer):
 
 
 def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution,
-             act_confidently=False) -> Tuple[int, int, Any]:
+             act_confidently=False) -> Tuple[int, int, Any, dict]:
     """Evaluate one episode of the given environment following the given policy."""
     policy.reset_states()
     is_recurrent = is_recurrent_model(policy)
     is_continuous = isinstance(env.action_space, Box)
 
     done = False
-    state = env.reset()
+    state, info = env.reset()
     cumulative_reward = 0
     steps = 0
     while not done:
@@ -301,17 +302,26 @@ def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyD
         if not act_confidently:
             action, _ = distribution.act(*probabilities)
         else:
-            action = distribution.act_deterministic(*probabilities)
-        observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            action, _ = distribution.act_deterministic(*probabilities)
+
+        observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
         cumulative_reward += info["original_reward"]
         observation = observation
-
+        done = terminated or truncated
         state = observation
         steps += 1
 
+    auxiliary_performances = {}
+    if "auxiliary_performances" in info.keys():
+        for key, value in info["auxiliary_performances"].items():
+            if key not in auxiliary_performances.keys():
+                auxiliary_performances[key] = []
+
+            auxiliary_performances[key].append(value)
+
     eps_class = env.unwrapped.current_target_finger if hasattr(env.unwrapped, "current_target_finger") else None
 
-    return steps, cumulative_reward, eps_class
+    return steps, cumulative_reward, eps_class, auxiliary_performances
 
 
 def fake_env_step(env: BaseWrapper):

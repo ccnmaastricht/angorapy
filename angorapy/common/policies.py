@@ -91,8 +91,8 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation of categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the step_tuple space is discrete and the agent thus predicts a pmf over the possible actions."""
 
-    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> np.ndarray:
-        return tf.squeeze(tf.argmax(log_probabilities, axis=-1)).numpy()
+    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+        return tf.squeeze(tf.argmax(log_probabilities, axis=-1)).numpy(), tf.reduce_max(log_probabilities, axis=-1).numpy()
 
     @property
     def short_name(self):
