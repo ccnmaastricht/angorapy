@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
+import code
 import gc
 import json
 import os
@@ -33,7 +34,7 @@ from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDi
 from angorapy.common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
 from angorapy.common.validators import validate_env_model_compatibility
 from angorapy.common.wrappers import BaseWrapper, make_env
-from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle
+from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
 from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
     requires_batch_size, requires_sequence_length
@@ -744,8 +745,7 @@ class PPOAgent:
         gc.collect()
 
     def evaluate(self, n: int, save: bool = False, act_confidently=False) -> Tuple[StatBundle, Any]:
-        """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
-        visually inspect the performance.
+        """Evaluate the current state of the policy on the given environment for n episodes.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
@@ -756,14 +756,19 @@ class PPOAgent:
         """
         policy, value, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
-        gathered_evaluation_result = []
+        stat_bundles = []
         for i in range(n):
-            gathered_evaluation_result.append(evaluate(policy, self.env, self.distribution, act_confidently))
+            lengths, rewards, classes, auxiliary_performances = evaluate(policy, self.env, self.distribution, act_confidently)
+            stat_bundles.append(
+                StatBundle(
+                    n, lengths, [rewards], [lengths],
+                    tbptt_underflow=0,
+                    per_receptor_mean={},
+                    auxiliary_performances=auxiliary_performances
+                )
+            )
 
-        # gathered_evaluation_result = self.mpi_comm.gather(evaluation_result, root=0)
-
-        lengths, rewards, classes = zip(*gathered_evaluation_result)
-        stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0, per_receptor_mean={})
+        stats = condense_stats(stat_bundles)
 
         if save and MPI.COMM_WORLD.rank == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)

@@ -60,7 +60,7 @@ def overview():
                     with open(os.path.join(exp_path, "meta.json"), "r") as f:
                         meta = json.load(f)
                 except:
-                    print(eid_m)
+                    pass
 
                 model_available = False
                 if os.path.isfile(os.path.join(model_path, "best/weights.index")):

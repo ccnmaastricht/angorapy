@@ -127,8 +127,15 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
         """Recover a running mean transformer from its serialization"""
         transformer = cls(env_id, state_dim, n_actions)
         transformer.n = np.array(data[0])
-        transformer.mean = {name: np.array(l) for name, l in data[1].items()}
-        transformer.variance = {name: np.array(l) for name, l in data[2].items()}
+
+        # backwards compatibility
+        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[1].items()}
+        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in data[2].items()}
+        compatible_data_means = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_means.items()}
+        compatible_data_variances = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_variances.items()}
+
+        transformer.mean = {name: np.array(l) for name, l in compatible_data_means.items()}
+        transformer.variance = {name: np.array(l) for name, l in compatible_data_variances.items()}
 
         return transformer
 
