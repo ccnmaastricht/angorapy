@@ -831,7 +831,7 @@ class PPOAgent:
         # years of experience
         years_of_experience_report = ""
         if self.years_of_experience is not None:
-            years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
+            years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.3f}{ec}; "
 
         # print the report
         if self.is_root:
