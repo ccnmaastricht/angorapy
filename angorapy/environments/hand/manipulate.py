@@ -563,4 +563,4 @@ class ManipulateEgg(BaseManipulate, utils.EzPickle):
 
 if __name__ == '__main__':
     hand = HumanoidManipulateBlockDiscrete()
-    print("bla")
+
