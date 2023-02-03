@@ -35,7 +35,7 @@ Alternatively, you can download this repository or the source code of any previo
 pip install -e .
 ```
 
-This way, if you make changes to the source code, thse will be recognized in the installation (without the need to reinstall).
+This way, if you make changes to the source code, these will be recognized in the installation (without the need to reinstall).
 
 ### Docker
 Alternatively, you can install AngoraPy and all its dependencies in a docker container using the Dockerfile provided in this repository (/docker/Dockerfile). To this end, download the repository and build the docker image from the /docker directory:
@@ -45,7 +45,6 @@ sudo docker build -t angorapy:master https://github.com/ccnmaastricht/angorapy.g
 ```
 
 To install different versions, replace `#master` in the source by the tag/branch of the respective version you want to install.
-
 
 ## 🚀 Getting Started
 The scripts `train.py`, `evaluate.py` and `observe.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.

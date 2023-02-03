@@ -8,12 +8,15 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+
 
 experiment_ids = [['1675028736765791', '1674983643322591'],
                   ['1674985163288377', '1674983177286330'],
-                  ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # compare distributions
+                  ['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # compare distributions
 names = ["beta", "gaussian", "multicategorical"]
-
+# names = ["beta", "multicategorical"]
 reward_developments = {}
 reward_bands = {}
 
@@ -62,12 +65,16 @@ for i, group in enumerate(experiment_ids):
 
 ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=2)
 ax2 = plt.subplot2grid((1, 3), (0, 2), colspan=1)
+axins = zoomed_inset_axes(ax1, 2, loc=1) # zoom = 2
 
 x_max = len(list(reward_developments.items())[0][1][0])
 for i, (name, rewards) in enumerate(reward_developments.items()):
     x_max = max(x_max, len(rewards[0]))
     ax1.plot(np.mean(cosucc_developments[name], axis=0), label=name, color=QUALITATIVE_COLOR_PALETTE[i])
     ax1.fill_between(range(len(cosucc_bands[name][0])), cosucc_bands[name][0], cosucc_bands[name][1], alpha=0.2)
+
+    axins.plot(np.mean(cosucc_developments[name], axis=0), label=name, color=QUALITATIVE_COLOR_PALETTE[i])
+    axins.fill_between(range(len(cosucc_bands[name][0])), cosucc_bands[name][0], cosucc_bands[name][1], alpha=0.2)
 
     # ax2.hist(
     #     evaluation_reward_histograms[name][1][:-1],
@@ -77,7 +84,12 @@ for i, (name, rewards) in enumerate(reward_developments.items()):
     # )
     # ax2.set_xlabel("Consecutive Goals Reached")
     # ax2.set_ylabel("Number of Episodes")
-
+axins.set_xlim(0, 100.)
+axins.set_ylim(-5., 10.)
+plt.xticks(visible=False)
+plt.yticks(visible=False)
+mark_inset(ax1, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+# plt.draw()
 df = pd.DataFrame(
     {"group": itertools.chain(*[[name] * len(dp) for name, dp in evaluation_rewards.items()]),
      "Consecutive Goals Reached": np.concatenate([dp for name, dp in evaluation_rewards.items()])}
@@ -94,6 +106,7 @@ ax1.set_ylabel("Avg. Consecutive Goals Reached")
 ax1.legend()
 
 ax1.set_xlim(0, x_max)
+ax1.set_ylim(-5)
 
 plt.gcf().set_size_inches(12, 4)
 plt.subplots_adjust(wspace=0.3, right=0.995, left=0.05, top=0.99)

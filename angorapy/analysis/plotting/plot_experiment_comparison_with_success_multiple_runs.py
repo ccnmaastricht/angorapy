@@ -6,15 +6,29 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
 # experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # only best setting
-experiment_ids = [['1674074113967956', '1673350499432390']]  # only best setting
+# experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # only best setting
+# experiment_ids = [['1674074113967956', '1673350499432390', '1674074113731734']]  # only best setting
+# names = ["asymmetric"]
+
 # experiment_ids = [['1673786170549564'], ['1673350499432390']]  # shared vs unshared
+# experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
+#                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # symmetric vs asymmetric
+# names = ["symmetric", "asymmetric"]
+
 # experiment_ids = [['1673350499432390']]
-names = ["asymmetric"]
-# names = ["asymmetric", "symmetric"]
+# names = ["asymmetric"]
+
+experiment_ids = [['1675028736765791', '1674983643322591'],
+                  ['1674985163288377', '1674983177286330'],
+                  ['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # compare distributions
+names = ["beta", "gaussian", "multicategorical"]
+# names = ["beta", "multicategorical"]
 reward_developments = {}
 reward_bands = {}
 
@@ -38,17 +52,25 @@ for i, group in enumerate(experiment_ids):
             progress = json.load(f)
         with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "statistics.json")) as f:
             statistics = json.load(f)
-        with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "evaluation.json")) as f:
-            evaluation = json.load(f)
+
+        try:
+            with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "evaluation.json")) as f:
+                evaluation = json.load(f)
+
+            evaluation_rewards[exp_name] += evaluation["auxiliary_performances"]["consecutive_goals_reached"]
+            evaluation_reward_histograms[exp_name].append(
+                np.histogram(evaluation["auxiliary_performances"]["consecutive_goals_reached"], bins=50))
+        except:
+            pass
 
         reward_developments[exp_name].append(progress["rewards"]["mean"])
         cosucc_developments[exp_name].append(statistics["auxiliary_performances"]["consecutive_goals_reached"]["mean"])
-        evaluation_rewards[exp_name] += evaluation["auxiliary_performances"]["consecutive_goals_reached"]
-        evaluation_reward_histograms[exp_name].append(
-            np.histogram(evaluation["auxiliary_performances"]["consecutive_goals_reached"], bins=50))
 
-    evaluation_reward_histograms[exp_name] = np.mean([c for c, b in evaluation_reward_histograms[exp_name]], axis=0), \
-        evaluation_reward_histograms[exp_name][0][1]
+    try:
+        evaluation_reward_histograms[exp_name] = np.mean([c for c, b in evaluation_reward_histograms[exp_name]], axis=0), \
+            evaluation_reward_histograms[exp_name][0][1]
+    except:
+        pass
     reward_developments[exp_name] = np.array(
         [trace[:min(map(len, reward_developments[exp_name]))] for trace in reward_developments[exp_name]])
     cosucc_developments[exp_name] = np.array(
@@ -61,17 +83,26 @@ for i, group in enumerate(experiment_ids):
     reward_bands[exp_name] = (rd_mean - rd_std, rd_mean + rd_std)
     cosucc_bands[exp_name] = (cd_mean - cd_std, cd_mean + cd_std)
 
-axes = [
-    plt.subplot2grid((1, 5), (0, 0), colspan=2),
-    plt.subplot2grid((1, 5), (0, 2), colspan=2),
-    plt.subplot2grid((1, 5), (0, 4), colspan=1),
-]
+if len(names) <= 2:
+    axes = [
+        plt.subplot2grid((1, 5), (0, 0), colspan=2),
+        plt.subplot2grid((1, 5), (0, 2), colspan=2),
+        plt.subplot2grid((1, 5), (0, 4), colspan=1),
+    ]
+else:
+    axes = [
+        plt.subplot2grid((1, 3), (0, 0), colspan=1),
+        plt.subplot2grid((1, 3), (0, 1), colspan=1),
+        plt.subplot2grid((1, 3), (0, 2), colspan=1),
+    ]
 
 x_max = len(list(reward_developments.items())[0][1][0])
+y_max_x0 = -np.inf
 for i, (name, rewards) in enumerate(reward_developments.items()):
-    x_max = min(x_max, len(rewards[0]))
+    x_max = max(x_max, len(rewards[0]))
     axes[0].plot(np.mean(rewards, axis=0), label=name, color=QUALITATIVE_COLOR_PALETTE[i])
     axes[0].fill_between(range(len(reward_bands[name][0])), reward_bands[name][0], reward_bands[name][1], alpha=0.2)
+    y_max_x0 = max(y_max_x0, np.max(reward_bands[name][1]))
 
     axes[1].plot(np.mean(cosucc_developments[name], axis=0), label=name, color=QUALITATIVE_COLOR_PALETTE[i])
     axes[1].fill_between(range(len(cosucc_bands[name][0])), cosucc_bands[name][0], cosucc_bands[name][1], alpha=0.2)
@@ -110,9 +141,12 @@ if len(names) > 1:
     axes[1].legend()
 
 axes[0].set_xlim(0, x_max)
+axes[0].set_ylim(top=y_max_x0 * 1.1)
 axes[1].set_xlim(0, x_max)
+axes[1].set_ylim(0, 50)
+axes[2].set_ylim(0, 50)
 
 plt.gcf().set_size_inches(12, 4)
 plt.subplots_adjust(wspace=0.5, right=0.995, left=0.05, top=0.99)
-# plt.show()
-plt.savefig("../../../docs/figures/manipulate-learning-curves.pdf", format="pdf", bbox="tight")
+plt.show()
+# plt.savefig("../../../docs/figures/manipulate-learning-curves.pdf", format="pdf", bbox="tight")

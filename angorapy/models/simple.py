@@ -51,8 +51,7 @@ def build_ffn_models(env: BaseWrapper,
         inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
         input_list.append(asymmetric_inputs)
     if not shared:
-        value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes,
-                                                 name="value_encoder")(inputs)
+        value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="value_encoder")(inputs)
         value_out = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(value_latent)
     else:
@@ -233,6 +232,10 @@ if __name__ == '__main__':
     model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), False, 1, 1, "gru")
     print(f"Wider model without weight sharing has {model[2].count_params()} parameters.")
     plot_model(model[2], show_shapes=True, to_file="model_graph_wider_unshared.png", expand_nested=True)
+
+    model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), False, 1, 1, "gru")
+    print(f"Wider model without weight sharing has {model[2].count_params()} parameters.")
+    plot_model(model[2], show_shapes=True, to_file="model_graph_wider_unshared_asymmetric.png", expand_nested=True)
 
     model = build_wider_models(cont_env, MultiCategoricalPolicyDistribution(cont_env), True, 1, 1, "gru")
     print(f"Wider model with weight sharing has {model[2].count_params()} parameters.")

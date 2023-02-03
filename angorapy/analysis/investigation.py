@@ -180,7 +180,7 @@ class Investigator:
         self.network.reset_states()
 
         done, step = False, 0
-        state = env.reset()
+        state, _ = env.reset()
         cumulative_reward = 0
         # env.render() if not to_gif else env.render(mode="rgb_array")
         while not done:
@@ -194,8 +194,9 @@ class Investigator:
             else:
                 action, _ = self.distribution.act(*probabilities)
 
-            observation, reward, done, info = env.step(action)
+            observation, reward, terminated, truncated, info = env.step(action)
             cumulative_reward += (reward if "original_reward" not in info else info["original_reward"])
+            done = terminated or truncated
 
             state = observation
 

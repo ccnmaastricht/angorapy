@@ -51,7 +51,7 @@ except:
     print("Could not create model plot.")
 
 investigator = Investigator.from_agent(agent)
-env = agent.env
+env = make_env(agent.env.spec.id, transformers=agent.env.transformers, render_mode="human")
 if args.freeze_wrist:
     env.env.toggle_wrist_freezing()
 

@@ -464,10 +464,10 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
 
 class HumanoidManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
-    asynchronous = False
+    asymmetric = False
 
     def _get_obs(self):
-        """Gather humanoid senses and asynchronous information."""
+        """Gather humanoid senses and asymmetric information."""
 
         object_qpos = self.data.jnt('object:joint').qpos.copy()
 
@@ -491,7 +491,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         # touch
         touch = self.data.sensordata[self._touch_sensor_id]
 
-        # asynchronous information
+        # asymmetric information
         finger_tip_positions = np.array([self.data.site(name).xpos for name in FINGERTIP_SITE_NAMES]).flatten()
         target_quat = transform.Rotation.from_quat(target_orientation)
         current_quat = transform.Rotation.from_quat((object_qpos[3:]))
@@ -500,7 +500,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         object_positional_velocity = self.data.body("object").cvel[3:]  # todo double check if correct part
         object_angular_velocity = self.data.body("object").cvel[:3]  # quaternions in OpenAI model
 
-        asynchronous = np.concatenate([
+        asymmetric = np.concatenate([
             finger_tip_positions,
             relative_target_orientation,
             object_positional_velocity,
@@ -513,7 +513,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
                 proprioception=proprioception.copy(),
                 touch=touch,
                 goal=target_orientation,
-                asymmetric=None if not self.asynchronous else asynchronous
+                asymmetric=None if not self.asymmetric else asymmetric
             ),
             "achieved_goal": object_qpos.copy().astype(np.float32),
             "desired_goal": self.goal.ravel().copy().astype(np.float32),
@@ -522,16 +522,16 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
 
 class HumanoidManipulateBlock(HumanoidManipulateBlockDiscrete):
     continuous = True
-    asynchronous = False
+    asymmetric = False
 
 
 class HumanoidManipulateBlockDiscreteAsynchronous(HumanoidManipulateBlockDiscrete):
-    asynchronous = True
+    asymmetric = True
     continuous = False
 
 
 class HumanoidManipulateBlockAsynchronous(HumanoidManipulateBlockDiscrete):
-    asynchronous = True
+    asymmetric = True
     continuous = True
 
 
