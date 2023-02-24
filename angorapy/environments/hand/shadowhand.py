@@ -212,20 +212,13 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
-<<<<<<< HEAD:angorapy/environments/hand/shadowhand.py
-        return obs, {}
-=======
-        if return_info:
-            info = {
-                'is_success': self._is_success(obs['achieved_goal'], self.goal),
-                "achieved_goal": obs["achieved_goal"],
-                "desired_goal": obs["desired_goal"]
-            }
+        info = {
+            'is_success': self._is_success(obs['achieved_goal'], self.goal),
+            "achieved_goal": obs["achieved_goal"],
+            "desired_goal": obs["desired_goal"]
+        }
 
-            return obs, info
-        else:
-            return obs
->>>>>>> analysis_module:angorapy/environments/shadowhand.py
+        return obs, info
 
     def reset_model(self):
         self.set_state(**self.initial_state)

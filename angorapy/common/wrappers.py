@@ -30,11 +30,8 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
 
     def reset(self, **kwargs):
         """Resets the environment, returning a modified observation using :meth:`self.observation`."""
-        if kwargs.get("return_info", False):
-            obs, info = self.env.reset(**kwargs)
-            return self.observation(obs), self.info(info)
-        else:
-            return self.observation(self.env.reset(**kwargs))
+        obs, info = self.env.reset(**kwargs)
+        return self.observation(obs), self.info(info)
 
     def observation(self, observation):
         """Process an observation to be of type 'Sensation'."""
