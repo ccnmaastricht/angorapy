@@ -5,7 +5,7 @@ from angorapy.utilities.error import IncompatibleModelException
 
 
 def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) -> bool:
-    """Validate whether the environments states can be processed by the model."""
+    """Validate whether the envs states can be processed by the model."""
     model_inputs = [ip.name for ip in model.inputs]
     env_outputs = list(env.reset()[0].dict().keys())
 

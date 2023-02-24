@@ -1,4 +1,4 @@
-"""Wrappers encapsulating environments to modulate n_steps, rewards, and control state initialization."""
+"""Wrappers encapsulating envs to modulate n_steps, rewards, and control state initialization."""
 import abc
 from pprint import pprint
 from typing import Union, List, Type, OrderedDict
@@ -28,6 +28,14 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         """Warmup the environment."""
         pass
 
+    def reset(self, **kwargs):
+        """Resets the environment, returning a modified observation using :meth:`self.observation`."""
+        if kwargs.get("return_info", False):
+            obs, info = self.env.reset(**kwargs)
+            return self.observation(obs), self.info(info)
+        else:
+            return self.observation(self.env.reset(**kwargs))
+
     def observation(self, observation):
         """Process an observation to be of type 'Sensation'."""
         if isinstance(observation, Sensation):
@@ -55,6 +63,9 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
             info["desired_goal"] = observation["desired_goal"]
 
         return self.observation(observation), reward, terminated, truncated, info
+
+    def info(self, info):
+        return info
 
     # SYNCHRONIZATION
 
@@ -90,8 +101,9 @@ class TransformationWrapper(BaseWrapper):
         return item in self.transformers
 
     def step(self, action):
-        """PErform a step and transform the results."""
+        """Perform a step and transform the results."""
         step_tuple = super().step(action)
+
         # include original reward in info
         step_tuple[-1]["original_reward"] = step_tuple[1]
 

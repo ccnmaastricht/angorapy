@@ -254,7 +254,7 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
         unflattened_shape = x.shape[1:-1].concatenate(n_actions)
         x = tf.keras.layers.Reshape(unflattened_shape)(x)
-        x = tf.nn.log_softmax(x, axis=-1, name="log_likelihoods")
+        x = tf.keras.layers.Activation(tf.nn.log_softmax, name="log_likelihoods")(x)
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 

@@ -44,6 +44,15 @@ from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_fin
 
 
 class PPOAgent:
+    """Agent using the Proximal Policy Optimization Algorithm for learning.
+    
+    The default is an implementation using two independent models for the critic and the actor. This is of course more
+    expensive than using shared parameters because we need two forward and backward calculations
+    per batch however this is what is used in the original paper and most implementations. During development this also
+    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
+    to make any significant progress in more difficult envs such as LunarLander.
+    """
+
     policy: tf.keras.Model
     value: tf.keras.Model
     joint: tf.keras.Model
@@ -328,7 +337,7 @@ class PPOAgent:
             separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
             stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
-                above the environments threshold
+                above the envs threshold
 
 
         Returns:
@@ -451,7 +460,7 @@ class PPOAgent:
             stats = mpi_condense_stats(worker_stats)
             stats = self.mpi_comm.bcast(stats, root=0)
 
-            # sync the environments to share statistics for transformers etc.
+            # sync the envs to share statistics for transformers etc.
             self.env.mpi_sync()
 
             time_dict["gathering"] = time.time() - subprocess_start
@@ -917,13 +926,15 @@ class PPOAgent:
 
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(
-                "The given agent ID does not match any existing save history from your current path.")
+                f"The given agent ID does not match any existing save history from your current path. Searched for "
+                f"{os.path.abspath(agent_path)}")
 
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
         # determine loading point
-        latest_matches = PPOAgent.get_saved_iterations(agent_path)
+        latest_matches = PPOAgent.get_saved_iterations(agent_id, path_modifier=path_modifier)
+
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
@@ -982,7 +993,7 @@ class PPOAgent:
 
             loaded_agent.__dict__[p] = v
 
-        loaded_agent.joint.load_weights(f"{agent_path}/{from_iteration}/weights")
+        loaded_agent.joint.load_weights(f"{path_modifier}/{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
             if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
@@ -1005,8 +1016,10 @@ class PPOAgent:
         return loaded_agent
 
     @staticmethod
-    def get_saved_iterations(agent_path: int) -> list:
+    def get_saved_iterations(agent_id: int, path_modifier="") -> list:
         """Return a list of iterations at which the agent of given ID has been saved."""
+        agent_path = os.path.join(path_modifier, BASE_SAVE_PATH, f"{agent_id}")
+
         if not os.path.isdir(agent_path):
             raise FileNotFoundError("The given agent ID does not match any existing save history.")
 

@@ -162,7 +162,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
         as such the output is a 15-D numpy array."""
-        goal = [self.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
         return np.array(goal).flatten()
 
     # ENV METHODS
@@ -189,6 +189,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         done = False
         info = {
             'is_success': self._is_success(obs['achieved_goal'], self.goal),
+            "achieved_goal": obs["achieved_goal"],
+            "desired_goal": obs["desired_goal"]
         }
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
@@ -210,7 +212,20 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
+<<<<<<< HEAD:angorapy/environments/hand/shadowhand.py
         return obs, {}
+=======
+        if return_info:
+            info = {
+                'is_success': self._is_success(obs['achieved_goal'], self.goal),
+                "achieved_goal": obs["achieved_goal"],
+                "desired_goal": obs["desired_goal"]
+            }
+
+            return obs, info
+        else:
+            return obs
+>>>>>>> analysis_module:angorapy/environments/shadowhand.py
 
     def reset_model(self):
         self.set_state(**self.initial_state)

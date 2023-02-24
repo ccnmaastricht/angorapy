@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-
 from utilities.datatypes import mpi_condense_stats
 import statistics
 import time

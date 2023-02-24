@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import copy
 import os
 from time import sleep
 from typing import List, Union
@@ -8,6 +9,7 @@ import tensorflow as tf
 
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
 from angorapy.utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
@@ -27,13 +29,14 @@ class Investigator:
         """
         self.network: tf.keras.Model = network
         self.distribution: BasePolicyDistribution = distribution
+        self.is_recurrent = is_recurrent_model(self.network)
 
-    @staticmethod
-    def from_agent(agent: PPOAgent):
+    @classmethod
+    def from_agent(cls, agent: PPOAgent):
         """Instantiate an investigator from an agent object."""
         agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(),
                                                                     batch_size=1, sequence_length=1)
-        return Investigator(agent.policy, agent.distribution)
+        return cls(agent.policy, agent.distribution)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
@@ -128,16 +131,24 @@ class Investigator:
         else:
             raise ValueError("Recurrent layer type not understood. Is it custom?")
 
-    def get_layer_activations(self, layer_name: str, input_tensor=None):
+    def get_layer_activations(self, layer_names: List[str], input_tensor=None):
         """Get activations of a layer. If no input tensor is given, a random tensor is used."""
+        activations = {}
 
-        # make a sub model to the requested layer
-        sub_model = build_sub_model_to(self.network, [layer_name])
+        def activation_hook(module, input, output):
+            activations[module.name] = output
 
+        register_hook(get_layers_by_names(self.network, layer_names), after_call=activation_hook)
         if input_tensor is None:
-            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(sub_model.input_shape))
+            input_tensor = tf.random.normal(insert_unknown_shape_dimensions(self.network.input_shape))
 
-        return sub_model.predict(input_tensor)
+        output = self.network(input_tensor, training=False)
+        activations["output"] = output
+
+        # release the hook to prevent infinite nesting
+        clear_hooks(self.network)
+
+        return activations
 
     def get_activations_over_episode(self, layer_names: Union[List[str], str], env: gym.Env, render: bool = False):
         """Run an episode using the network and get (serialization, activation, r) tuples for each timestep."""
@@ -182,7 +193,7 @@ class Investigator:
         done, step = False, 0
         state, _ = env.reset()
         cumulative_reward = 0
-        # env.render() if not to_gif else env.render(mode="rgb_array")
+        env.render() if not to_gif else env.render(mode="rgb_array")
         while not done:
             step += 1
 
@@ -190,7 +201,7 @@ class Investigator:
             probabilities = flatten(self.network(prepared_state, training=False))
 
             if act_confidently:
-                action, _ = self.distribution.act_deterministic(*probabilities)
+                action = self.distribution.act_deterministic(*probabilities)
             else:
                 action, _ = self.distribution.act(*probabilities)
 
@@ -211,7 +222,7 @@ class Investigator:
 
 if __name__ == "__main__":
     print("INVESTIGATING")
-    os.chdir("../../")
+    os.chdir("../../../")
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
