@@ -52,7 +52,7 @@ def extract_layers(network: tf.keras.Model, unfold_tds: bool = False) -> List[tf
         return [network]
 
     layers = []
-    for l in network.submodule:
+    for l in network.submodules:
         if isinstance(l, tf.keras.Model) or isinstance(l, tf.keras.Sequential):
             layers.append(extract_layers(l))
         elif isinstance(l, tf.keras.layers.TimeDistributed) and unfold_tds:

@@ -195,6 +195,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
 
+        if self.render_mode == "human":
+            self.render()
+
         return obs, reward, done, False, info
 
     def reset(self, **kwargs):

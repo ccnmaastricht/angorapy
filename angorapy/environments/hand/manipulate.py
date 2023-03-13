@@ -475,7 +475,10 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         if not self.vision:
             vision_input = object_qpos.astype(np.float32)
         else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
             vision_input = self.render()
+            self.render_mode = tmp_render_mode
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]

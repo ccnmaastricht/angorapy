@@ -94,7 +94,6 @@ def build_mc_module(batch_and_sequence_shape, mcc_input_shape, lpfc_input_shape,
     m1 = TD(tf.keras.layers.Dense(256, name="m1"), )(m1_input)
     m1 = activation(name="M1_activation")(m1)
 
-
     return tf.keras.Model(inputs=[mcc_input, lpfc_input, ipl_input, ips_input, ssc_input],
                           outputs=[pmc, m1], name="MotorCortex")
 
@@ -186,23 +185,41 @@ def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-    # tf.config.experimental.set_memory_growth("GPU:0", True)
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    tf.config.experimental.set_memory_growth(tf.config.list_physical_devices("GPU")[0], True)
 
-    batch_size = 256
+    batch_size = 16
     sequence_length = 16
 
+    optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
+
+    # without vision
     env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
 
-    optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
-
-    joint({
+    out = joint({
         "vision": tf.random.normal((batch_size, sequence_length, 7)),
         "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
         "touch": tf.random.normal((batch_size, sequence_length, 92)),
         "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
         "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })
+    print(out[0].shape)
+
+    # with vision
+    env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
+    _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=False,
+                                          sequence_length=sequence_length, model_type="gru")
+    plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
+
+    out = joint({
+        "vision": tf.random.normal((batch_size, sequence_length, VISION_WH, VISION_WH, 3)),
+        "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
+        "touch": tf.random.normal((batch_size, sequence_length, 92)),
+        "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
+        "goal": tf.random.normal((batch_size, sequence_length, 4)),
+    })
+    print(out[0].shape)
+

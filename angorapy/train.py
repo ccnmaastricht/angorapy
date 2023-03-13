@@ -16,10 +16,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from angorapy.utilities.defaults import autoselect_distribution
 
-mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
-if not mujoco_path:
-    mujoco_path = os.path.join(os.path.expanduser('~'), '.mujoco', 'mujoco210')
-
 import distance
 import numpy as np
 

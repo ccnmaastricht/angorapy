@@ -3,8 +3,9 @@
 import argparse
 import os
 import sys
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from angorapy.analysis.investigators import Investigator
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
@@ -12,7 +13,6 @@ from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
 import time
 
 from agent.ppo_agent import PPOAgent
-from analysis.investigation import Investigator
 from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 from common.wrappers import make_env
 import tensorflow as tf
@@ -76,14 +76,14 @@ if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
         investigator.render_episode(env,
                                     slow_down=False,
                                     act_confidently=not args.act_stochastic)
-else:
-    env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
-    if args.freeze_wrist:
-        env.env.toggle_wrist_freezing()
-
-    for i in range(1000):
-        print(f"\nNew Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
-        env.forced_finger = i % 4
-        env.env.forced_finger = i % 4
-        env.unwrapped.forced_finger = i % 4
-        investigator.render_episode(env, slow_down=False)
+# else:
+#     env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
+#     if args.freeze_wrist:
+#         env.env.toggle_wrist_freezing()
+#
+#     for i in range(1000):
+#         print(f"\nNew Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
+#         env.forced_finger = i % 4
+#         env.env.forced_finger = i % 4
+#         env.unwrapped.forced_finger = i % 4
+#         investigator.render_episode(env, slow_down=False)

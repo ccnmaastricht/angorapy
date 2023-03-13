@@ -48,7 +48,8 @@ class Predictability(base_investigator.Investigator):
             probabilities = flatten(activations["output"])
             action, _ = self.distribution.act(*probabilities)
 
-            observation, reward, done, info = env.step(action)
+            observation, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
 
             other["fingertip_positions"] = env.unwrapped.get_fingertip_positions()
             other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-1])

@@ -165,6 +165,9 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         obs = self._get_obs()["observation"]
 
+        if self.render_mode == "human":
+            self.render()
+
         return obs, {}
 
     def get_state(self):
@@ -282,6 +285,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
             self.viewer_setup()
             self._viewers[mode] = self.viewer
+
         return self.viewer
 
     def get_body_com(self, body_name):

@@ -191,9 +191,9 @@ class Investigator:
         self.network.reset_states()
 
         done, step = False, 0
+
         state, _ = env.reset()
         cumulative_reward = 0
-        env.render() if not to_gif else env.render(mode="rgb_array")
         while not done:
             step += 1
 
@@ -201,7 +201,7 @@ class Investigator:
             probabilities = flatten(self.network(prepared_state, training=False))
 
             if act_confidently:
-                action = self.distribution.act_deterministic(*probabilities)
+                action, _ = self.distribution.act_deterministic(*probabilities)
             else:
                 action, _ = self.distribution.act(*probabilities)
 
@@ -213,8 +213,6 @@ class Investigator:
 
             if slow_down:
                 sleep(0.1)
-
-            env.render() if not to_gif else env.render(mode="rgb_array")
 
         print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")

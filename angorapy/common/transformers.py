@@ -261,7 +261,7 @@ def merge_transformers(transformers: List[BaseTransformer]) -> BaseTransformer:
 def transformers_from_serializations(list_of_serializations: List[TransformerSerialization]) -> List[BaseTransformer]:
     """From a list of TransformerSerializations recover the respective transformers."""
     transformers = []
-    reference_env = gym.make(TransformerSerialization(*list_of_serializations[0]).env_id)  # todo could leak memory
+    reference_env = gym.make(TransformerSerialization(*list_of_serializations[0]).env_id, render_mode="rgb_array")  # todo could leak memory
     state_dim, n_actions = env_extract_dims(reference_env)
 
     for cereal in list_of_serializations:

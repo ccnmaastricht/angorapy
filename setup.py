@@ -25,7 +25,7 @@ setup(
         "gym==0.26.2",
         "mujoco",
         "tensorflow==2.4.2",
-        "tensorflow_probability"
+        "tensorflow_probability==12.2"
         "mpi4py==3.1.3",
         "tqdm",
         "simplejson",
