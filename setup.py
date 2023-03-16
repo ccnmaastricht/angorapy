@@ -23,7 +23,7 @@ setup(
         "numpy==1.19.2",
         "Box2D",
         "gym==0.26.2",
-        "mujoco",
+        "mujoco==2.2.2",
         "tensorflow==2.4.2",
         "tensorflow_probability==12.2"
         "mpi4py==3.1.3",
@@ -43,7 +43,7 @@ setup(
         "panda_gym",
         "imageio",
         
-        "keras_cortex==0.0.4",
+        "keras_cortex==0.0.5",
 
         # webinterface
         "itsdangerous==2.0.1",
