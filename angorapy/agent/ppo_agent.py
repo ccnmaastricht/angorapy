@@ -40,7 +40,7 @@ from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, 
     requires_batch_size, requires_sequence_length
 from angorapy.utilities.statistics import ignore_none
 from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
-    mpi_print
+    mpi_print, flatten
 
 
 class PPOAgent:
@@ -313,6 +313,24 @@ class PPOAgent:
 
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
+
+    def act(self, state):
+        """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
+        that can be directly given to an environment.
+
+        This method is mostly useful at inference time and serves as q quick wrapper around the steps required to
+        process the raw numpy states of the environment into a state readable by the policy network, followed by
+        sampling from the predicted distribution."""
+
+        # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+        prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
+        policy_out = flatten(self.joint(prepared_state, training=False))
+
+        predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
+        # from the action distribution sample an action and remember both the action and its probability
+        action, action_probability = self.distribution.act(*predicted_distribution_parameters)
+
+        return action
 
     def drill(self,
               n: int,

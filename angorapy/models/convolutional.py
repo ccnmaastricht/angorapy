@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Convolutional components/networks."""
-
+import keras_cortex.layers
 import tensorflow as tf
 
 
@@ -73,7 +73,7 @@ def _build_openai_encoder(shape, out_shape, name="visual_component", batch_size=
     x = _residual_block(x, 64, 3, 3, name="res4")
 
     # fully connected
-    x = tf.keras.layers.Activation("softmax")(x)
+    x = keras_cortex.layers.SpatialSoftmax()(x)
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(128)(x)
     x = tf.keras.layers.Activation("relu")(x)

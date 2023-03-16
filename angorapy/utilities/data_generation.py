@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
+from angorapy.agent import PPOAgent
 from angorapy.common.const import VISION_WH
 from angorapy.common.loss import multi_point_euclidean_distance
 from angorapy.common.wrappers import make_env
@@ -48,21 +49,24 @@ def load_dataset(path):
 
 def gen_cube_quats_prediction_data(n: int, save_path: str):
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    hand_env = gym.make("HumanoidVisualManipulateBlock-v0", render_mode="rgb_array")
+    agent = PPOAgent.from_agent_state(1670596186987840, "best", path_modifier="../")
+    agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1, sequence_length=1)
 
-    # sample = hand_env.observation_space.sample()
-    # X, Y = np.empty((n,) + sample["observation"]["vision"].shape, dtype=np.float16), \
-    #     np.empty((n,) + sample["achieved_goal"].shape, dtype=np.float16)
-
-    hand_env.reset()
+    hand_env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0",
+                        render_mode="rgb_array",
+                        transformers=agent.env.transformers)
 
     os.makedirs("storage/data/pretraining", exist_ok=True)
     with tf.io.TFRecordWriter(save_path) as writer:
+        state, _ = hand_env.reset()
         for i in tqdm(range(n), desc="Sampling Data"):
-            sample, r, terminated, truncated, info = hand_env.step(hand_env.action_space.sample())
+            state["vision"] = hand_env.data.jnt('object:joint').qpos.copy()
+
+            action = agent.act(state)
+            sample, r, terminated, truncated, info = hand_env.step(action)
             done = terminated or truncated
-            image = sample["observation"]["vision"] / 255
-            quaternion = sample["achieved_goal"]
+            image = sample["vision"] / 255
+            quaternion = info["achieved_goal"]
             # X[i] = image
             # Y[i] = quaternion
 
@@ -70,7 +74,9 @@ def gen_cube_quats_prediction_data(n: int, save_path: str):
             writer.write(example)
 
             if done or i % 64 == 0:
-                hand_env.reset()
+                sample, _ = hand_env.reset()
+
+            state = sample
 
     return load_dataset(save_path)
 
