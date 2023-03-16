@@ -89,7 +89,7 @@ def build_mc_module(batch_and_sequence_shape, lpfc_input_shape, spl_input_shape,
                           outputs=[pmc, m1], name="MotorCortex")
 
 
-def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
+def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
                             blind: bool = False, sequence_length=1, activation=tf.keras.layers.ReLU, **kwargs):
     """Build network for the shadow hand task, version 2."""
     state_dimensionality, n_actions = env_extract_dims(env)
@@ -118,7 +118,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     else:
         vc = TD(keras_cortex.cornet.CORNetZ(7), name="visual_component")(visual_input)
 
-    vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(vc)
+    vision_masked = tf.keras.layers.Masking(batch_input_shape=vc.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)
 
     ssc = build_ssc_module((bs, sequence_length,),
@@ -173,7 +173,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     return policy, value, joint
 
 
-def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "lstm",
+def build_shadow_v2_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "lstm",
                               blind: bool = False, activation=tf.keras.layers.ReLU, **kwargs):
     """Build shadow brain networks (policy, value, joint) for given parameter settings."""
 
@@ -181,7 +181,7 @@ def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution
     if model_type == "ffn":
         raise NotImplementedError("No non recurrent version of this ShadowBrain abailable.")
 
-    return build_shadow_brain_base(env=env, distribution=distribution, bs=bs, model_type=model_type, blind=blind,
+    return build_shadow_v2_brain_base(env=env, distribution=distribution, bs=bs, model_type=model_type, blind=blind,
                                    activation=activation)
 
 
@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     # without vision
     env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
-    _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
+    _, _, joint = build_shadow_v2_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
     # with vision
     env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
-    _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=False,
+    _, _, joint = build_shadow_v2_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=False,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
 
