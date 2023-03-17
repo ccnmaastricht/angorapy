@@ -20,6 +20,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        "imageio",
         "numpy==1.19.2",
         "Box2D",
         "gym==0.26.2",
@@ -41,9 +42,8 @@ setup(
         "distance",
         "protobuf==3.19.0",
         "panda_gym",
-        "imageio",
         
-        "keras_cortex==0.0.5",
+        "keras_cortex==0.0.7",
 
         # webinterface
         "itsdangerous==2.0.1",
