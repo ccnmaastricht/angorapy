@@ -125,7 +125,8 @@ def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistributio
     if blind:
         vc = visual_input
     else:
-        vc = TD(keras_cortex.cornet.CORNetZ(7), name="visual_component")(visual_input)
+        visual_component = keras_cortex.cornet.CORNetZ(7)
+        vc = TD(visual_component, name="visual_component")(visual_input)
 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=vc.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)
