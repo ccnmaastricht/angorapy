@@ -19,6 +19,7 @@ import nvidia_smi
 import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box, MultiDiscrete
+from tensorflow.keras import mixed_precision
 from mpi4py import MPI
 from psutil import NoSuchProcess
 
@@ -429,11 +430,14 @@ class PPOAgent:
             effective_batch_size = batch_size
 
         # rebuild model with desired batch size
+        mixed_precision.set_global_policy("mixed_float16")
         joint_weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size,
             sequence_length=self.tbptt_length)
+
+        mixed_precision.set_global_policy("float32")
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
         # reset optimizer to not be confused by the newly build models

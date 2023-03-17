@@ -17,13 +17,19 @@ from angorapy.models import _build_openai_encoder
 from angorapy.utilities.util import env_extract_dims
 
 
+class OrthogonalMP(tf.keras.initializers.Orthogonal):
+
+    def __call__(self, shape, dtype=None):
+        return super().__call__(shape, dtype=dtype)
+
+
 def build_ssc_module(batch_and_sequence_shape, touch_input_shape, activation=tf.keras.layers.ReLU):
     """Build the model of the SSC."""
 
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + touch_input_shape, name="SSCInput")
-    ssc = TD(tf.keras.layers.Dense(583, name="SSC_1"), name="TD_ssc_1")(ssc_input)
+    ssc = TD(tf.keras.layers.Dense(296, name="SSC_1"), name="TD_ssc_1")(ssc_input)
     ssc = activation(name="SSC_activation_1")(ssc)
-    ssc = TD(tf.keras.layers.Dense(583, name="SSC_2"), name="TD_ssc_2")(ssc)
+    ssc = TD(tf.keras.layers.Dense(296, name="SSC_2"), name="TD_ssc_2")(ssc)
     ssc = activation(name="SSC_activation_2")(ssc)
 
     return tf.keras.Model(inputs=ssc_input, outputs=ssc, name="SomatosensoryCortex")
@@ -34,15 +40,15 @@ def build_ppc_module(batch_and_sequence_shape, vc_input_shape, ssc_input_shape, 
     vc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + vc_input_shape, name="VCInput")
     ssc_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ssc_input_shape, name="SSCInput")
 
-    spl = TD(tf.keras.layers.Dense(906, name="SPL"), name="TD_SPL")(ssc_input)
+    spl = TD(tf.keras.layers.Dense(456, name="SPL"), name="TD_SPL")(ssc_input)
     spl = activation(name="SPL_activation")(spl)
 
     ipl_input = tf.keras.layers.concatenate([ssc_input, vc_input, spl])
-    ipl = TD(tf.keras.layers.Dense(1365, name="IPL"), name="TD_IPL")(ipl_input)
+    ipl = TD(tf.keras.layers.Dense(672, name="IPL"), name="TD_IPL")(ipl_input)
     ipl = activation(name="IPL_activation")(ipl)
 
     ips_input = tf.keras.layers.concatenate([ipl, ssc_input, vc_input, spl, ssc_input])
-    ips = TD(tf.keras.layers.Dense(691, name="IPS"), name="TD_IPS")(ips_input)
+    ips = TD(tf.keras.layers.Dense(344, name="IPS"), name="TD_IPS")(ips_input)
     ips = activation(name="IPS_activation")(ips)
 
     return tf.keras.Model(inputs=[vc_input, ssc_input], outputs=[spl, ipl, ips], name="PosteriorParietalCortex")
@@ -55,11 +61,11 @@ def build_pfc_module(batch_and_sequence_shape, goal_input_shape, ipl_input_shape
     ipl_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ipl_input_shape, name="IPL Input")
     ips_input = tf.keras.Input(batch_shape=batch_and_sequence_shape + ips_input_shape, name="IPS Input")
 
-    mcc = TD(tf.keras.layers.Dense(434, name="MCC"), name="TD_mcc")(goal_input)
+    mcc = TD(tf.keras.layers.Dense(216, name="MCC"), name="TD_mcc")(goal_input)
     mcc = activation(name="MCC_activation")(mcc)
 
     lpfc_input = tf.keras.layers.concatenate([mcc, ipl_input, ips_input])
-    lpfc = TD(tf.keras.layers.Dense(737, name="LPFC"), name="TD_lpfc")(lpfc_input)
+    lpfc = TD(tf.keras.layers.Dense(360, name="LPFC"), name="TD_lpfc")(lpfc_input)
     lpfc = activation(name="LPFC_activation")(lpfc)
 
     return tf.keras.Model(inputs=[goal_input, ipl_input, ips_input], outputs=[mcc, lpfc], name="PrefrontalCortex")
@@ -73,16 +79,19 @@ def build_mc_module(batch_and_sequence_shape, lpfc_input_shape, spl_input_shape,
 
     pmc_input = tf.keras.layers.concatenate([lpfc_input, spl_input, ssc_input])
 
-    pmc, *_ = rnn_class(512,
+    pmc, *_ = rnn_class(256,
                         stateful=True,
                         return_sequences=True,
                         batch_size=batch_and_sequence_shape[0],
                         return_state=True,
-                        name="pmc_recurrent_layer")(pmc_input)
+                        name="pmc_recurrent_layer",
+                        recurrent_initializer=OrthogonalMP(),
+                        dtype="float32"
+                        )(pmc_input)
 
     m1_input = tf.keras.layers.concatenate([pmc, ssc_input, spl_input])
 
-    m1 = TD(tf.keras.layers.Dense(192, name="m1"), )(m1_input)
+    m1 = TD(tf.keras.layers.Dense(96, name="m1"), )(m1_input)
     m1 = activation(name="M1_activation")(m1)
 
     return tf.keras.Model(inputs=[lpfc_input, spl_input, ssc_input],
@@ -162,7 +171,7 @@ def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistributio
     value_out = activation()(value_out)
     value_out = tf.keras.layers.Dense(512)(value_out)
     value_out = activation()(value_out)
-    value_out = tf.keras.layers.Dense(1, name="value")(value_out)
+    value_out = tf.keras.layers.Dense(1, name="value", dtype="float32")(value_out)
 
     # define models
     policy = tf.keras.Model(inputs=input_list, outputs=[policy_out], name="shadow_brain_policy")

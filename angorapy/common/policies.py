@@ -162,7 +162,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         x = tf.keras.layers.Dense(n_actions[0],
                                   kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
-        x = tf.nn.log_softmax(x, name="log_likelihoods")
+        x = tf.nn.log_softmax(x, name="log_likelihoods", dtype="float32")
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 
@@ -254,7 +254,7 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
         unflattened_shape = x.shape[1:-1].concatenate(n_actions)
         x = tf.keras.layers.Reshape(unflattened_shape)(x)
-        x = tf.keras.layers.Activation(tf.nn.log_softmax, name="log_likelihoods")(x)
+        x = tf.keras.layers.Activation(tf.nn.log_softmax, name="log_likelihoods", dtype="float32")(x)
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 
@@ -401,7 +401,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         else:
             stdevs = StdevLayer(n_actions, name="log_stdevs")(means)
 
-        return tf.keras.Model(inputs=inputs, outputs=[means, stdevs], name="gaussian_action_head")
+        return tf.keras.Model(inputs=inputs, outputs=[means, stdevs], name="gaussian_action_head", dtype="float32")
 
 
 class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
@@ -520,11 +520,11 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
-        alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus",
+        alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus", dtype="float32",
                                        kernel_initializer=tf.keras.initializers.Orthogonal(1),
                                        bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
 
-        betas = tf.keras.layers.Dense(n_actions, name="betas", activation="softplus",
+        betas = tf.keras.layers.Dense(n_actions, name="betas", activation="softplus", dtype="float32",
                                       kernel_initializer=tf.keras.initializers.Orthogonal(1),
                                       bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
 

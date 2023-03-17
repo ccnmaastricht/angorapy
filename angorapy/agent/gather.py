@@ -116,7 +116,7 @@ class Gatherer(BaseGatherer):
         achieved_goals = []
         state, info = env.reset()
 
-        with tqdm(total=self.horizon, disable=self.worker_id != 0, desc="Gathering experience...") as pbar:
+        with tqdm(total=self.horizon, disable=self.worker_id != 3, desc="Gathering experience...") as pbar:
             while t < self.horizon:
                 current_subseq_length += 1
 
