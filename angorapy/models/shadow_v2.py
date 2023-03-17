@@ -201,6 +201,8 @@ if __name__ == "__main__":
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
 
+    joint.summary()
+
     out = joint({
         "vision": tf.random.normal((batch_size, sequence_length, 7)),
         "proprioception": tf.random.normal((batch_size, sequence_length, 48)),
@@ -208,7 +210,6 @@ if __name__ == "__main__":
         "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
         "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })
-    print(out[0].shape)
 
     # with vision
     env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
@@ -223,5 +224,5 @@ if __name__ == "__main__":
         "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
         "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })
-    print(out[0].shape)
 
+    joint.summary()

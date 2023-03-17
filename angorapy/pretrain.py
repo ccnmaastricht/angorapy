@@ -52,38 +52,41 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
                             load_from: str = None):
     """Pretrain a visual component on prediction of cube position."""
     if dataset is None:
-        n_datapoints = 1000001
+        n_datapoints = 10
         dataset = gen_cube_quats_prediction_data(n_datapoints,
                                                  f"storage/data/pretraining/pose_data_{n_datapoints}.tfrecord")
 
-    dataset = dataset.shuffle(10000)
-
-    # extract mean and std from dataset (approx. on chunk)
-    # norm_chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
-    # norm_chunk_mean = np.mean(norm_chunk, axis=0)
-    # norm_chunk_std = np.std(norm_chunk, axis=0)
-
+    dataset = dataset.repeat(100000).shuffle(10000)
     dataset = dataset.map(lambda x, y: (tf.image.per_image_standardization(x), y))
 
     n_testset = 100000
-    n_valset = 10000
+    n_valset = 5000
 
     testset = dataset.take(n_testset)
     trainset = dataset.skip(n_testset)
     valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
 
     trainset = trainset.prefetch(AUTOTUNE)
-    trainset = trainset.batch(128)
+    trainset = trainset.batch(128, drop_remainder=True)
 
     valset = valset.prefetch(AUTOTUNE)
-    valset = valset.batch(128)
+    valset = valset.batch(128, drop_remainder=True)
 
     testset = testset.prefetch(AUTOTUNE)
-    testset = testset.batch(128)
+    testset = testset.batch(128, drop_remainder=True)
 
     if load_from is None:
         model = pretrainable_component
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
+        model(tf.expand_dims(next(iter(dataset))[0], 0))
+
+        chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
+        chunk_mean = np.mean(chunk, axis=0)
+        output_layer = model.get_layer("decoder").get_layer("output")
+        output_weights = output_layer.get_weights()
+        output_weights[1] = chunk_mean
+        output_layer.set_weights(output_weights)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         model.compile(optimizer, loss="mse", metrics=[])
 
         # train and save encoder
@@ -123,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=30, help=f"number of pretraining epochs")
+    parser.add_argument("--epochs", type=int, default=230, help=f"number of pretraining epochs")
 
     # read arguments
     argcomplete.autocomplete(parser)
@@ -139,5 +142,5 @@ if __name__ == "__main__":
     pretrain_on_object_pose(
         visual_component, args.epochs,
         name=args.name,
-        dataset=load_dataset("storage/data/pretraining/pose_data_1000000.tfrecord"),
+        dataset=None,  # load_dataset("storage/data/pretraining/pose_data_1000000.tfrecord"),
         load_from=args.load)

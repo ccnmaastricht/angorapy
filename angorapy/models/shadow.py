@@ -185,8 +185,8 @@ def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution
 
 if __name__ == "__main__":
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-    tf.config.experimental.set_memory_growth(tf.config.list_physical_devices("GPU")[0], True)
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    # tf.config.experimental.set_memory_growth(tf.config.list_physical_devices("GPU")[0], True)
 
     batch_size = 16
     sequence_length = 16
@@ -206,7 +206,8 @@ if __name__ == "__main__":
         "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
         "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })
-    print(out[0].shape)
+
+    joint.summary()
 
     # with vision
     env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
@@ -221,5 +222,5 @@ if __name__ == "__main__":
         "asymmetric": tf.random.normal((batch_size, sequence_length, 25)),
         "goal": tf.random.normal((batch_size, sequence_length, 4)),
     })
-    print(out[0].shape)
 
+    joint.summary()
