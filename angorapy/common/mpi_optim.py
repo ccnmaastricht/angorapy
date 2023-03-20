@@ -27,7 +27,7 @@ class MpiAdam(tf.keras.optimizers.Adam):
     def apply_gradients(self, grads_and_vars: Iterable[Tuple[tf.Tensor, tf.Variable]], name=None, **kwargs):
         """ Apply the gradients after averaging over processes."""
         if self.comm.size > 1:
-            grads_and_vars = [(tf.divide(self.comm.allreduce(g, op=MPI.SUM), self.comm.Get_size()), v)
+            grads_and_vars = [(self.comm.allreduce(g, op=MPI.SUM) / self.comm.Get_size(), v)
                               for g, v in grads_and_vars]
 
         context = super().apply_gradients(grads_and_vars)

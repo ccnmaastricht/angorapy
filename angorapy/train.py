@@ -51,6 +51,7 @@ class InconsistentArgumentError(Exception):
 def run_experiment(environment, settings: dict, verbose=True, use_monitor=False):
     """Run an experiment with the given settings ."""
     if settings["cpu"]:
+        print("Deactivating GPU")
         tf.config.set_visible_devices([], "GPU")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 

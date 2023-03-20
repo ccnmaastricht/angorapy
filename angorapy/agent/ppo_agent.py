@@ -687,93 +687,96 @@ class PPOAgent:
 
         _learn_on_batch = tf.function(learn_on_batch)
 
+        total_updates = (self.n_workers * self.horizon) // (batch_size[0] if self.is_recurrent else batch_size) * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        for epoch in tqdm(range(epochs), disable=not self.is_root, desc="Optimizing"):
+        with tqdm(total=total_updates, disable=self.mpi_comm.rank != 0, desc="Optimizing...") as pbar:
+            for epoch in range(epochs):
 
-            # shuffle to break correlation; not for recurrent data since that would break chunk dependence
-            if not self.is_recurrent:
-                dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+                # shuffle to break correlation; not for recurrent data since that would break chunk dependence
+                if not self.is_recurrent:
+                    dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
-            batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
+                # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
+                batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
 
-            policy_epoch_losses, value_epoch_losses, entropies = [], [], []
+                policy_epoch_losses, value_epoch_losses, entropies = [], [], []
 
-            with tf.device(self.device):
-                for b in batched_dataset:
-                    if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss = _learn_on_batch(
-                            batch=b, joint=self.joint, distribution=self.distribution,
-                            continuous_control=self.continuous_control, clip_values=self.clip_values,
-                            gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
-                            c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
-                    else:
-                        # truncated back propagation through time
-                        # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                        # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
-                        # fed into the model chronologically to adhere to statefulness
-                        # if the following line throws a CPU to GPU error this is most likely due to too little memory
-                        # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
-                        n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
-                        # print(f"bs {batch_size} | split "
-                        #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
-                        # print(sum([bv.dtype.size * tf.reduce_prod(bv.shape).numpy().item() for bv in b.values()]) / 1e9)
+                with tf.device(self.device):
+                    for b in batched_dataset:
+                        if not self.is_recurrent:
+                            grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                batch=b, joint=self.joint, distribution=self.distribution,
+                                continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
+                                c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        else:
+                            # truncated back propagation through time
+                            # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
+                            # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
+                            # fed into the model chronologically to adhere to statefulness
+                            # if the following line throws a CPU to GPU error this is most likely due to too little memory
+                            # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                            n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+                            # print(f"bs {batch_size} | split "
+                            #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
+                            # print(sum([bv.dtype.size * tf.reduce_prod(bv.shape).numpy().item() for bv in b.values()]) / 1e9)
 
-                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for
-                                       bk, bv in b.items()}
-                        for batch_i in range(len(split_batch["advantage"])):
-                            batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
+                            split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1)
+                                           for bk, bv in b.items()}
+                            for batch_i in range(len(split_batch["advantage"])):
+                                batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
 
-                            for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
-                                # extract chunks
-                                partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
+                                for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
+                                    # extract chunks
+                                    partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
 
-                                # find and apply the gradients
-                                # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
-                                # for v in self.joint.trainable_variables], 0, 0, 0
-                                grad, ent, pi_loss, v_loss = _learn_on_batch(
-                                    batch=partial_batch, joint=self.joint, distribution=self.distribution,
-                                    continuous_control=self.continuous_control, clip_values=self.clip_values,
-                                    gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
-                                    c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+                                    # find and apply the gradients
+                                    # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
+                                    # for v in self.joint.trainable_variables], 0, 0, 0
+                                    grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                        batch=partial_batch, joint=self.joint, distribution=self.distribution,
+                                        continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                        gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
+                                        c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
 
-                                if chunk_i == 0:
-                                    batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
-                                else:
-                                    batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
-                                    batch_ent += ent
-                                    batch_pi_loss += pi_loss
-                                    batch_v_loss += v_loss
+                                    if chunk_i == 0:
+                                        batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
+                                    else:
+                                        batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
+                                        batch_ent += ent
+                                        batch_pi_loss += pi_loss
+                                        batch_v_loss += v_loss
 
-                                # make partial RNN state resets
-                                reset_mask = detect_finished_episodes(partial_batch["done"])
-                                reset_states_masked(self.joint, reset_mask)
+                                    # make partial RNN state resets
+                                    reset_mask = detect_finished_episodes(partial_batch["done"])
+                                    reset_states_masked(self.joint, reset_mask)
+
+                                    # free memory
+                                    del partial_batch
+
+                                batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
+                                self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+                                pbar.update(1)
 
                                 # free memory
-                                del partial_batch
-
-                            batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
-                            self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+                                del batch_grad
 
                             # free memory
-                            del batch_grad
+                            del split_batch, b, batch_ent, batch_pi_loss, batch_v_loss
 
-                        # free memory
-                        del split_batch, b, batch_ent, batch_pi_loss, batch_v_loss
+                    # todo makes no sense with the split batches, need to average over them
+                    entropies.append(ent)
+                    policy_epoch_losses.append(pi_loss)
+                    value_epoch_losses.append(v_loss)
 
-                # todo makes no sense with the split batches, need to average over them
-                entropies.append(ent)
-                policy_epoch_losses.append(pi_loss)
-                value_epoch_losses.append(v_loss)
+                    # reset RNN states after each outer batch
+                    self.joint.reset_states()
 
-                # reset RNN states after each outer batch
-                self.joint.reset_states()
-
-            # remember some statistics
-            policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
-            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+                # remember some statistics
+                policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
+                value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+                entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         self.optimization_comm.Barrier()
 
