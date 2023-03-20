@@ -22,6 +22,7 @@ from gym.spaces import Discrete, Box, MultiDiscrete
 from tensorflow.keras import mixed_precision
 from mpi4py import MPI
 from psutil import NoSuchProcess
+from tqdm import tqdm
 
 from angorapy import models
 from angorapy.agent.dataio import read_dataset_from_storage
@@ -687,7 +688,7 @@ class PPOAgent:
         _learn_on_batch = tf.function(learn_on_batch)
 
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        for epoch in range(epochs):
+        for epoch in tqdm(range(epochs), disable=not self.is_root, desc="Optimizing"):
 
             # shuffle to break correlation; not for recurrent data since that would break chunk dependence
             if not self.is_recurrent:
