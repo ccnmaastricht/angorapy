@@ -717,6 +717,7 @@ class PPOAgent:
                         n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
                         # print(f"bs {batch_size} | split "
                         #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
+                        print(sum([bv.dtype.size * tf.reduce_prod(bv.shape).numpy().item() for bv in b.values()]) / 1e9)
 
                         split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for
                                        bk, bv in b.items()}
@@ -748,8 +749,17 @@ class PPOAgent:
                                 reset_mask = detect_finished_episodes(partial_batch["done"])
                                 reset_states_masked(self.joint, reset_mask)
 
+                                # free memory
+                                del partial_batch, batch_pi_loss, batch_v_loss, batch_ent
+
                             batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
                             self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+
+                            # free memory
+                            del batch_grad
+
+                        # free memory
+                        del split_batch, b
 
                 # todo makes no sense with the split batches, need to average over them
                 entropies.append(ent)
