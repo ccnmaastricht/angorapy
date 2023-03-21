@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from angorapy.analysis.investigators import Investigator
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
 
 import time
 
@@ -67,15 +67,13 @@ print(f"Environment has the following transformers: {env.transformers}")
 #     print(new_name)
 #     env = make_env(new_name, args.rcon)
 
-# if isinstance(env.unwrapped, BaseShadowHandEnv):
-#     env.env.set_delta_t_simulation(0.002)
-#     env.env._always_render_mode = True
+if isinstance(env.unwrapped, BaseShadowHandEnv):
+    env.env.set_delta_t_simulation(0.002)
 
+env.env.change_perspective("topdown-far")
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
-        investigator.render_episode(env,
-                                    slow_down=False,
-                                    act_confidently=not args.act_stochastic)
+        investigator.render_episode(env, act_confidently=not args.act_stochastic)
 # else:
 #     env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
 #     if args.freeze_wrist:

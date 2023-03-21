@@ -10,7 +10,7 @@ import mujoco
 import gym
 from gym import error, logger, spaces
 
-from angorapy.common.const import VISION_WH
+from angorapy.common.const import VISION_WH, N_SUBSTEPS
 from angorapy.configs.reward_config import resolve_config_name
 from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector
 from angorapy.common import reward
@@ -48,7 +48,14 @@ class AnthropomorphicEnv(gym.Env, ABC):
             render_mode: Optional[str] = None,
             camera_id: Optional[int] = None,
             camera_name: Optional[str] = None,
+            delta_t: float = 0.002,
+            n_substeps: int = N_SUBSTEPS,
     ):
+
+        # time control
+        self._delta_t_control: float = delta_t
+        self._delta_t_simulation: float = delta_t
+        self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
 
         self.render_mode = render_mode
         self.camera_id = camera_id
@@ -93,6 +100,9 @@ class AnthropomorphicEnv(gym.Env, ABC):
         observation = self._get_obs()
         self._set_observation_space(observation)
 
+        self.model.opt.timestep = delta_t
+        self.original_n_substeps = n_substeps
+
     def _set_action_space(self):
         bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
         low, high = bounds.T
@@ -102,6 +112,17 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def _set_observation_space(self, observation):
         self.observation_space = convert_observation_to_space(observation)
         return self.observation_space
+
+    def set_delta_t_simulation(self, new: float):
+        """Set new value for the simulation delta t."""
+        assert np.isclose(self._delta_t_control % new, 0, rtol=1.e-3, atol=1.e-4), \
+            f"Delta t of simulation must divide control delta t into integer " \
+            f"parts, but gives {self._delta_t_control % new}."
+
+        self._delta_t_simulation = new
+        self.model.opt.timestep = self._delta_t_simulation
+
+        self._simulation_steps_per_control_step = int(self._delta_t_control / self._delta_t_simulation * self.original_n_substeps)
 
     def _env_setup(self, initial_state):
         raise NotImplementedError

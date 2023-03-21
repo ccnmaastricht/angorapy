@@ -37,7 +37,7 @@ if args.id is None:
     args.id = max(ids)
 
 start = time.time()
-agent = PPOAgent.from_agent_state(args.id, "last", path_modifier="../")
+agent = PPOAgent.from_agent_state(args.id, "best", path_modifier="../")
 
 # if isinstance(agent.env.unwrapped, BaseShadowHandEnv):
 #     agent.env.env.set_delta_t_simulation(0.0005)

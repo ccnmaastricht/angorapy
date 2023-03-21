@@ -105,23 +105,15 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.reward_type = "dense"
         self._freeze_wrist = False
 
-        # time control
-        self._delta_t_control: float = delta_t
-        self._delta_t_simulation: float = delta_t
-        self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
-        self._always_render_mode = False
-
         super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
-                                                vision=vision, render_mode=render_mode)
-
-        self.model.opt.timestep = delta_t
-        self.original_n_substeps = n_substeps
+                                                vision=vision, render_mode=render_mode, delta_t=delta_t, n_substeps=n_substeps)
 
         self.seed()
         self.initial_state = copy.deepcopy(self.get_state())
 
         obs = self._get_obs()
 
+        self.viewpoint = "topdown"
         self.viewer_setup()
 
     def _set_action_space(self):
@@ -141,17 +133,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
                  for name, val in obs['observation'].dict().items()}
             ),
         ))
-
-    def set_delta_t_simulation(self, new: float):
-        """Set new value for the simulation delta t."""
-        assert np.isclose(self._delta_t_control % new, 0, rtol=1.e-3, atol=1.e-4), \
-            f"Delta t of simulation must divide control delta t into integer " \
-            f"parts, but gives {self._delta_t_control % new}."
-
-        self._delta_t_simulation = new
-        self.model.opt.timestep = self._delta_t_simulation
-
-        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation) * self.original_n_substeps
 
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
@@ -301,6 +282,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         """
         pass
 
+    def change_perspective(self, perspective: str):
+        assert perspective in ["topdown", "side", "topdown-far"], "This viewpoint has no settings available."
+
+        self.viewpoint = perspective
+        self.viewer_setup()
+
     def viewer_setup(self):
         # lookat = get_palm_position(self.model)
         #
@@ -308,11 +295,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         #     self.viewer.cam.lookat[idx] = value
 
         # hand color
-        self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
-        # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
+        # self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
+        self.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
 
         # background color
-        self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        # self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        self.model.mat_rgba[4] = np.array([0, 0, 0, 255]) / 255  # background
         # self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
@@ -321,11 +309,15 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         mpi_print("Setting up camera.")
 
-        self.viewpoint = "topdown"
-
         if self.viewpoint == "topdown":
             # rotate camera to top down view
             self.viewer.cam.distance = 0.3  # zoom in
+            self.viewer.cam.azimuth = -90.0  # wrist to the bottom
+            self.viewer.cam.elevation = -90.0  # top down view
+            self.viewer.cam.lookat[1] += 0.03  # slightly move forward
+        elif self.viewpoint == "topdown-far":
+            # rotate camera to top down view
+            self.viewer.cam.distance = 0.4  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[1] += 0.03  # slightly move forward

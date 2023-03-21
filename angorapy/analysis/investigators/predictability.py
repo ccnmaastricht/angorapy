@@ -99,7 +99,7 @@ class Predictability(base_investigator.Investigator):
     def fit(self, source_layer: str, target_information: str):
         """Measure the predictability of target_information based on the information in source_layer's activation."""
         assert self.prepared, "Need to prepare before investigating."
-        assert source_layer in list(self.train_data.element_spec.keys()) + ["noise"]
+        assert source_layer in list(self.train_data.element_spec.keys()) + ["noise"], f"{source_layer} not found"
         assert target_information in list(self.train_data.element_spec.keys())
 
         predictor = Ridge()

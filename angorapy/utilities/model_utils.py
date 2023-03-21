@@ -71,7 +71,8 @@ def get_layers_by_names(network: tf.keras.Model, layer_names: List[str]):
     layers = network.submodules
     all_layer_names = [l.name for l in layers]
 
-    assert all(ln in all_layer_names for ln in layer_names), "Cannot find layer name in network extraction."
+    assert all(ln in all_layer_names for ln in layer_names), \
+        f"Cannot find layers {list(filter(lambda ln: ln not in all_layer_names, layer_names))} in network extraction."
 
     return [layers[all_layer_names.index(layer_name)] for layer_name in layer_names]
 

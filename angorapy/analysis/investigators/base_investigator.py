@@ -145,6 +145,10 @@ class Investigator:
         output = self.network(input_tensor, training=False)
         activations["output"] = output
 
+        for key in activations.keys():
+            if isinstance(activations[key], list):
+                activations[key] = activations[key][0]
+
         # release the hook to prevent infinite nesting
         clear_hooks(self.network)
 
@@ -184,8 +188,7 @@ class Investigator:
 
         return [states, list(zip(*activations)), reward_trajectory, action_trajectory]
 
-    def render_episode(self, env: gym.Env, slow_down: bool = False, to_gif: bool = False, substeps_per_step=1,
-                       act_confidently=True) -> None:
+    def render_episode(self, env: gym.Env, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
@@ -211,9 +214,6 @@ class Investigator:
 
             state = observation
 
-            if slow_down:
-                sleep(0.1)
-
         print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
@@ -236,4 +236,4 @@ if __name__ == "__main__":
     # inv.get_activations_over_episode("policy_recurrent_layer", agent_007.env)
 
     for i in range(100):
-        inv.render_episode(agent_007.env, to_gif=False)
+        inv.render_episode(agent_007.env)
