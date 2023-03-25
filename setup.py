@@ -25,7 +25,7 @@ setup(
         "box2d-py",
         "gym==0.26.2",
         "mujoco==2.2.2",
-        "tensorflow==2.4.2",
+        "tensorflow==2.11.1",
         "tensorflow_probability==0.12.2",
         "mpi4py==3.1.3",
         "tqdm",
