@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 
 import angorapy
+from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.wrappers import BaseWrapper
 from angorapy.utilities.error import IncompatibleModelException
 from angorapy.utilities.util import flatten
@@ -201,10 +202,7 @@ def is_conv(layer):
 
 # Validators
 
-def validate_model_builder(model_function: Callable) -> None:
-    env = angorapy.make_env("LunarLanderContinuous-v2")
-    distribution = angorapy.policies.BetaPolicyDistribution(env)
-
+def validate_model_builder(model_function: Callable, env: BaseWrapper, distribution: BasePolicyDistribution) -> None:
     models = model_function(env, distribution)
 
     # validate model order
@@ -212,6 +210,8 @@ def validate_model_builder(model_function: Callable) -> None:
         raise ValueError("The model function returns a model tuple whose value network's output is not one-dimensional."
                          "Make sure your value function returns a valid one-dimensional scalar output and that the "
                          "model builder returns this network as the second element of the model-triple.")
+    if not models[2].output_shape:
+        pass
 
 
 def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) -> bool:

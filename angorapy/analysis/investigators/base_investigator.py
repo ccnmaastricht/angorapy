@@ -5,9 +5,11 @@ from time import sleep
 from typing import List, Union
 
 import gym
+import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from angorapy.common.policies import BasePolicyDistribution
+from angorapy.common.wrappers import BaseWrapper
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
@@ -216,6 +218,42 @@ class Investigator:
 
         print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
+
+    def render_episode_jupyter(self, env: BaseWrapper, substeps_per_step=1, act_confidently=True) -> None:
+        """Render an episode in the given environment."""
+        from IPython import display, core
+
+        is_recurrent = is_recurrent_model(self.network)
+        self.network.reset_states()
+
+        done, step = False, 0
+
+        state, _ = env.reset()
+        cumulative_reward = 0
+        img = plt.imshow(env.render())
+        while not done:
+            img.set_data(env.render())
+            plt.axis("off")
+            display.display(plt.gcf())
+            display.clear_output(wait=True)
+
+            step += 1
+
+            prepared_state = state.with_leading_dims(time=is_recurrent).dict()
+            probabilities = flatten(self.network(prepared_state, training=False))
+
+            if act_confidently:
+                action, _ = self.distribution.act_deterministic(*probabilities)
+            else:
+                action, _ = self.distribution.act(*probabilities)
+
+            observation, reward, terminated, truncated, info = env.step(action)
+            cumulative_reward += (reward if "original_reward" not in info else info["original_reward"])
+            done = terminated or truncated
+
+            state = observation
+
+        return
 
 
 if __name__ == "__main__":

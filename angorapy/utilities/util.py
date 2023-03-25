@@ -142,7 +142,7 @@ def find_divisors(number: int):
             divisors.append(i)
             divisors.append(number // i)
 
-    return list(sorted(set(divisors)))
+    return list(sorted(set(divisors))) + [number]
 
 
 def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int, width_first=False) -> Tuple[int, int]:

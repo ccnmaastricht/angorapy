@@ -22,7 +22,7 @@ setup(
     install_requires=[
         "imageio",
         "numpy==1.19.2",
-        "Box2D",
+        "box2d-py",
         "gym==0.26.2",
         "mujoco==2.2.2",
         "tensorflow==2.4.2",
@@ -50,7 +50,7 @@ setup(
         "werkzeug==2.0.3",
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
-        "bokeh",
+        "bokeh==2.3.3",
         "flask_jsglue",
     ],
 

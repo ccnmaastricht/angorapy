@@ -98,7 +98,7 @@ def build_mc_module(batch_and_sequence_shape, lpfc_input_shape, spl_input_shape,
                           outputs=[pmc, m1], name="MotorCortex")
 
 
-def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "rnn",
+def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int = 1, model_type: str = "rnn",
                             blind: bool = False, sequence_length=1, activation=tf.keras.layers.ReLU, **kwargs):
     """Build network for the shadow hand task, version 2."""
     state_dimensionality, n_actions = env_extract_dims(env)
@@ -183,7 +183,7 @@ def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistributio
     return policy, value, joint
 
 
-def build_shadow_v2_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int, model_type: str = "lstm",
+def build_shadow_v2_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int = 1, model_type: str = "lstm",
                               blind: bool = False, activation=tf.keras.layers.ReLU, **kwargs):
     """Build shadow brain networks (policy, value, joint) for given parameter settings."""
 

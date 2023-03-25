@@ -162,7 +162,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         x = tf.keras.layers.Dense(n_actions[0],
                                   kernel_initializer=tf.keras.initializers.Orthogonal(0.01),
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
-        x = tf.nn.log_softmax(x, name="log_likelihoods", dtype="float32")
+        x = tf.nn.log_softmax(x, name="log_likelihoods")
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 
@@ -401,7 +401,7 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         else:
             stdevs = StdevLayer(n_actions, name="log_stdevs")(means)
 
-        return tf.keras.Model(inputs=inputs, outputs=[means, stdevs], name="gaussian_action_head", dtype="float32")
+        return tf.keras.Model(inputs=inputs, outputs=[means, stdevs], name="gaussian_action_head")
 
 
 class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
@@ -436,7 +436,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
         """Get action by deterministically taking the mode of the distribution."""
-        actions = (alphas - 1) / (alphas + betas - 2)
+        actions = (alphas) / (alphas + betas)
 
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
 

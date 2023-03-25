@@ -20,7 +20,12 @@ import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box, MultiDiscrete
 from tensorflow.keras import mixed_precision
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except:
+    MPI = None
+
 from psutil import NoSuchProcess
 from tqdm import tqdm
 
@@ -180,7 +185,7 @@ class PPOAgent:
             **({"bs": 1} if requires_batch_size(model_builder) else {}),
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {}))
 
-        validate_model_builder(self.model_builder)
+        validate_model_builder(self.model_builder, self.env, self.distribution)
         validate_env_model_compatibility(self.env, self.joint)
 
         if pretrained_components is not None:
@@ -558,7 +563,6 @@ class PPOAgent:
             if self.is_optimization_process:
                 subprocess_start = time.time()
 
-                mpi_flat_print("Optimizing...")
                 dataset = read_dataset_from_storage(
                     dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                     id_prefix=self.agent_id,
@@ -688,7 +692,7 @@ class PPOAgent:
 
         _learn_on_batch = tf.function(learn_on_batch)
 
-        total_updates = (self.n_workers * self.horizon) // (batch_size[0] if self.is_recurrent else batch_size) * epochs
+        total_updates = (self.n_workers * self.horizon) // ((np.prod(batch_size) * self.tbptt_length) if self.is_recurrent else batch_size) * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         with tqdm(total=total_updates, disable=self.mpi_comm.rank != 0, desc="Optimizing...") as pbar:
             for epoch in range(epochs):
@@ -803,11 +807,11 @@ class PPOAgent:
         policy, value, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
         stat_bundles = []
-        for i in range(n):
+        for i in tqdm(range(n), disable=not self.is_root):
             lengths, rewards, classes, auxiliary_performances = evaluate(policy, self.env, self.distribution, act_confidently)
             stat_bundles.append(
                 StatBundle(
-                    n, lengths, [rewards], [lengths],
+                    1, lengths, [rewards], [lengths],
                     tbptt_underflow=0,
                     per_receptor_mean={},
                     auxiliary_performances=auxiliary_performances
