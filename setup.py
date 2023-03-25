@@ -47,7 +47,7 @@ setup(
 
         # webinterface
         "itsdangerous==2.0.1",
-        "werkzeug==2.0.3",
+        "werkzeug==2.2.3",
         "Flask~=1.1.2",
         "Jinja2==3.0.0",
         "bokeh==2.3.3",
