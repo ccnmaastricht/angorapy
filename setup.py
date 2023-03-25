@@ -40,7 +40,7 @@ setup(
         "nvidia-ml-py3",
         "seaborn",
         "distance",
-        "protobuf==3.19.0",
+        "protobuf==3.19.5",
         "panda_gym",
         
         "keras_cortex==0.0.7",

@@ -17,7 +17,7 @@ pandas==1.0.4
 nvidia-ml-py3
 seaborn
 distance
-protobuf==3.19.0
+protobuf==3.19.5
 
 # webinterface
 itsdangerous==2.0.1
