@@ -7,7 +7,7 @@ import numpy as np
 
 from angorapy.common.senses import Sensation
 from angorapy.common.const import NP_FLOAT_PREC, EPSILON
-from angorapy.utilities.types import StepTuple
+from angorapy.utilities.dtypes import StepTuple
 from angorapy.utilities.util import env_extract_dims
 
 from angorapy.environments import *
@@ -127,8 +127,15 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
         """Recover a running mean transformer from its serialization"""
         transformer = cls(env_id, state_dim, n_actions)
         transformer.n = np.array(data[0])
-        transformer.mean = {name: np.array(l) for name, l in data[1].items()}
-        transformer.variance = {name: np.array(l) for name, l in data[2].items()}
+
+        # backwards compatibility
+        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[1].items()}
+        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in data[2].items()}
+        compatible_data_means = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_means.items()}
+        compatible_data_variances = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_variances.items()}
+
+        transformer.mean = {name: np.array(l) for name, l in compatible_data_means.items()}
+        transformer.variance = {name: np.array(l) for name, l in compatible_data_variances.items()}
 
         return transformer
 
@@ -162,7 +169,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
     def transform(self, step_result: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
-        o, r, done, info = step_result
+        o, r, terminated, truncated, info = step_result
 
         if update:
             self.update(o.dict())
@@ -179,7 +186,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
         normed_o = Sensation(**normed_o)
 
-        return normed_o, r, done, info
+        return normed_o, r, terminated, truncated, info
 
     def warmup(self, env: "BaseWrapper", n_steps=10):
         """Warmup the transformer by sampling the observation space."""
@@ -201,10 +208,10 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
 
     def transform(self, step_tuple: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
-        o, r, done, info = step_tuple
+        o, r, terminated, truncated, info = step_tuple
 
         if r is None:
-            return o, r, done, info  # skip
+            return o, r, terminated, truncated, info  # skip
 
         # update based on cumulative discounted reward
         if update:
@@ -214,13 +221,13 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
         # normalize
         r = np.clip(r / (np.sqrt(self.variance["reward"] + EPSILON)), -10., 10.)
 
-        if done:
+        if terminated or truncated:
             self.ret = 0.
 
-        return o, r, done, info
+        return o, r, terminated, truncated, info
 
     def warmup(self, env: "BaseWrapper", n_steps=10):
-        """Warmup the transformer by randomly stepping the environment through step_tuple space sampling."""
+        """Warmup the transformer by randomly stepping the environment through action space sampling."""
         env.reset()
         for i in range(n_steps):
             self.update({"reward": env.step(env.action_space.sample())[1]})
@@ -254,7 +261,7 @@ def merge_transformers(transformers: List[BaseTransformer]) -> BaseTransformer:
 def transformers_from_serializations(list_of_serializations: List[TransformerSerialization]) -> List[BaseTransformer]:
     """From a list of TransformerSerializations recover the respective transformers."""
     transformers = []
-    reference_env = gym.make(TransformerSerialization(*list_of_serializations[0]).env_id)  # todo could leak memory
+    reference_env = gym.make(TransformerSerialization(*list_of_serializations[0]).env_id, render_mode="rgb_array")  # todo could leak memory
     state_dim, n_actions = env_extract_dims(reference_env)
 
     for cereal in list_of_serializations:

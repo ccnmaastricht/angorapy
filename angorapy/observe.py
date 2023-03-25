@@ -3,16 +3,16 @@
 import argparse
 import os
 import sys
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from angorapy.analysis.investigators import Investigator
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES, BaseShadowHandEnv
 
 import time
 
 from agent.ppo_agent import PPOAgent
-from analysis.investigation import Investigator
 from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 from common.wrappers import make_env
 import tensorflow as tf
@@ -51,9 +51,9 @@ except:
     print("Could not create model plot.")
 
 investigator = Investigator.from_agent(agent)
-env = agent.env
+env = make_env(agent.env.spec.id, transformers=agent.env.transformers, render_mode="human")
 if args.freeze_wrist:
-    env.env.toggle_wrist_freezing()
+    env.toggle_wrist_freezing()
 
 substeps = "" if not hasattr(env.unwrapped, "sim") else f" with {env.unwrapped.sim.nsubsteps} substeps"
 print(f"Evaluating on {env.unwrapped.spec.id}{substeps}.")
@@ -67,23 +67,22 @@ print(f"Environment has the following transformers: {env.transformers}")
 #     print(new_name)
 #     env = make_env(new_name, args.rcon)
 
-# if isinstance(env.unwrapped, BaseShadowHandEnv):
-#     env.env.set_delta_t_simulation(0.002)
-#     env.env._always_render_mode = True
-
+if isinstance(env.unwrapped, BaseShadowHandEnv):
+    env.set_delta_t_simulation(0.002)
+    env.set_original_n_substeps_to_sspcs()
+    env.change_color_scheme("default")
+    env.change_perspective("topdown-far")
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
-        investigator.render_episode(env,
-                                    slow_down=False,
-                                    act_confidently=not args.act_stochastic)
-else:
-    env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
-    if args.freeze_wrist:
-        env.env.toggle_wrist_freezing()
-
-    for i in range(1000):
-        print(f"\nNew Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
-        env.forced_finger = i % 4
-        env.env.forced_finger = i % 4
-        env.unwrapped.forced_finger = i % 4
-        investigator.render_episode(env, slow_down=False)
+        investigator.render_episode(env, act_confidently=not args.act_stochastic)
+# else:
+#     env = make_env("ReachFFAbsolute-v0", transformers=agent.env.transformers)
+#     if args.freeze_wrist:
+#         env.env.toggle_wrist_freezing()
+#
+#     for i in range(1000):
+#         print(f"\nNew Episode, finger {FINGERTIP_SITE_NAMES[i % 4]}")
+#         env.forced_finger = i % 4
+#         env.env.forced_finger = i % 4
+#         env.unwrapped.forced_finger = i % 4
+#         investigator.render_episode(env, slow_down=False)

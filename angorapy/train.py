@@ -1,9 +1,12 @@
 import logging
+import re
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 
 import sys
 import os
+
+os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pprint
@@ -13,14 +16,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from angorapy.utilities.defaults import autoselect_distribution
 
-mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
-if not mujoco_path:
-    mujoco_path = os.path.join(os.path.expanduser('~'), '.mujoco', 'mujoco210')
-
 import distance
 import numpy as np
 
 import tensorflow as tf
+from tensorflow.keras import mixed_precision
 
 import argparse
 import logging
@@ -30,7 +30,7 @@ from gym.spaces import Box, Discrete, MultiDiscrete
 
 from angorapy.configs import hp_config
 from angorapy.common.policies import get_distribution_by_short_name
-from angorapy.models import get_model_builder
+from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
 from angorapy.utilities.util import env_extract_dims
@@ -43,7 +43,6 @@ from angorapy.environments import *
 from mpi4py import MPI
 
 
-
 class InconsistentArgumentError(Exception):
     """Arguments given to a process were inconsistent."""
     pass
@@ -52,7 +51,8 @@ class InconsistentArgumentError(Exception):
 def run_experiment(environment, settings: dict, verbose=True, use_monitor=False):
     """Run an experiment with the given settings ."""
     if settings["cpu"]:
-        tf.config.experimental.set_visible_devices([], "GPU")
+        print("Deactivating GPU")
+        tf.config.set_visible_devices([], "GPU")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     mpi_rank = MPI.COMM_WORLD.rank
@@ -69,7 +69,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     wrappers.append(RewardNormalizationTransformer) if not settings["no_reward_norming"] else None
 
     # setup environment and extract and report information
-    env = make_env(environment, reward_config=settings["rcon"], transformers=wrappers)
+    env = make_env(environment,
+                   reward_config=settings["rcon"],
+                   transformers=wrappers,
+                   render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
     state_dim, number_of_actions = env_extract_dims(env)
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[
@@ -84,21 +87,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if settings["architecture"] == "shadow":
-        if settings["model"] == "ffn" and is_root:
-            print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
-            settings["model"] = "gru"
-
-        if "vision" in list(env.observation_space["observation"].keys()) and len(env.observation_space["observation"]["vision"].shape) > 1:
-            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
-                                             blind=False)
-
-        else:
-            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
-                                             blind=True)
-    else:
-        build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
-                                         shared=settings["shared"])
+    blind = not("vision" in list(env.observation_space["observation"].keys())
+                and len(env.observation_space["observation"]["vision"].shape) > 1)
+    build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"], shared=settings["shared"],
+                                     blind=blind)
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
@@ -121,7 +113,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     if settings["load_from"] is not None:
         if verbose and is_root:
             print(f"{wn}Loading{ec} from state {settings['load_from']}")
-        agent = PPOAgent.from_agent_state(settings["load_from"], from_iteration="last")
+        agent = PPOAgent.from_agent_state(settings["load_from"], from_iteration="last",
+                                          n_optimizers=settings["n_optimizers"])
     else:
         # set up the agent and a reporting module
         agent = PPOAgent(build_models, env, horizon=settings["horizon"], workers=settings["workers"],
@@ -130,10 +123,20 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                          gradient_clipping=settings["grad_norm"], clip_values=settings["clip_values"],
                          tbptt_length=settings["tbptt"], lr_schedule=settings["lr_schedule"], distribution=distribution,
                          reward_configuration=settings["rcon"], debug=settings["debug"],
-                         pretrained_components=None if settings["preload"] is None else [settings["preload"]])
+                         pretrained_components=None if settings["preload"] is None else [settings["preload"]],
+                         n_optimizers=settings["n_optimizers"])
 
         if is_root:
             print(f"{wn}Created agent{ec} with ID {bc}{agent.agent_id}{ec}")
+
+        # load pretrained components
+        if settings["component_dir"] is not None:
+            agent.load_components(settings["component_dir"])
+
+        # freeze components
+        if settings["freeze_components"] is not None:
+            for component in settings["freeze_components"]:
+                agent.freeze_component(component)
 
     if len(tf.config.list_physical_devices('GPU')) > 0:
         agent.set_gpu(not settings["cpu"])
@@ -179,7 +182,7 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target gym environment")
-    parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow"], default="simple",
+    parser.add_argument("--architecture", choices=MODELS_AVAILABLE, default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if architecture allows for choices")
@@ -198,6 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
     parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
+    parser.add_argument("--component-dir", type=str, default=None, help=f"path to pretrained components")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
     parser.add_argument("--eval", action="store_true", help=f"evaluate additionally to have at least 5 eps")
     parser.add_argument("--radical-evaluation", action="store_true", help=f"only record stats from seperate evaluation")
@@ -206,12 +210,13 @@ if __name__ == "__main__":
     parser.add_argument("--gif-every", type=int, default=0, help=f"make a gif every n iterations.")
     parser.add_argument("--debug", action="store_true", help=f"run in debug mode (eager mode)")
     parser.add_argument("--no-monitor", action="store_true", help="dont use a monitor")
-
+    parser.add_argument("--freeze-components", type=str, nargs="+", help=f"Components to freeze the weights of.")
+    parser.add_argument("--n-optimizers", type=int, default=None, help=f"number of optimizers; "
+                                                                       f"default is all GPUs or CPUs (if no GPUs found)")
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--horizon", type=int, default=2048,
-                        help=f"number of time steps one worker generates per cycle")
+    parser.add_argument("--horizon", type=int, default=2048, help=f"number of time steps one worker generates per cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")

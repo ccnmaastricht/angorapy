@@ -8,15 +8,10 @@ from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_
 try:
     import mujoco
     has_mujoco = True
-
-    if MPI.COMM_WORLD.rank == 0:
-        print("A MuJoCo path exists. MuJoCo is being loaded...")
-
 except ImportError as e:
     has_mujoco = False
+    print("No mujoco installation has been found. Some environments will be unavailable.")
 
-    if MPI.COMM_WORLD.rank == 0:
-        print("No MuJoCo path exists. MuJoCo is not going to be loaded...")
 
 if has_mujoco:
     from angorapy.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
@@ -138,8 +133,6 @@ if has_mujoco:
             max_episode_steps=SHADOWHAND_MAX_STEPS,
         )
 
-
-
         gym.envs.register(
             id=f'ManipulateBlockDiscrete{control_mode}-v0',
             entry_point='angorapy.environments:ManipulateBlockDiscrete',
@@ -232,7 +225,6 @@ if has_mujoco:
         kwargs={"delta_t": 0.008, "vision": True},
         max_episode_steps=50 * 100,
     )
-
 
     # MODIFIED ENVIRONMENTS
 

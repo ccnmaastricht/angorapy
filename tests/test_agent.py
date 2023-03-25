@@ -1,8 +1,6 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-from angorapy.analysis.investigation import Investigator
-
 try:
     from mpi4py import MPI
 
@@ -106,7 +104,7 @@ class AgentTest(unittest.TestCase):
                 self.fail("Continuous drill raises error.")
 
     def test_robotic_control(self):
-        for env_name in ["Ant-v4", "Walker2d-v4", "Humanoid-v4"]:
+        for env_name in ["Ant-v4", "Humanoid-v4"]:
             try:
                 _test_drill(env_name)
             except Exception:

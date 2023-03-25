@@ -1,1 +1,1 @@
-#!/usr/bin/env python
+from angorapy.analysis.investigators.base_investigator import Investigator

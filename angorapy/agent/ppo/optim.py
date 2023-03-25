@@ -72,6 +72,10 @@ def learn_on_batch(batch,
         entropy = loss.entropy_bonus(policy_output=policy_output,
                                      distribution=distribution)
 
+        tf.debugging.assert_all_finite(policy_loss, f"Policy loss is nan/inf")
+        tf.debugging.assert_all_finite(entropy, f"Entropy is nan/inf")
+        tf.debugging.assert_all_finite(value_loss, f"Value loss is nan/inf")
+
         # combine weighted losses
         total_loss = policy_loss + tf.multiply(c_value, value_loss) - tf.multiply(c_entropy, entropy)
 

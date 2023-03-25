@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Functions for gathering experience and communicating it to the main thread."""
 import abc
+import code
 import gc
 import random
 from typing import Tuple, Any
@@ -8,6 +9,7 @@ from typing import Tuple, Any
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Box
+from tqdm import tqdm
 
 from angorapy.agent.core import estimate_episode_advantages
 from angorapy.agent.dataio import tf_serialize_example, make_dataset_and_stats, serialize_sample
@@ -112,84 +114,102 @@ class Gatherer(BaseGatherer):
         states, rewards, actions, action_probabilities, values, advantages, dones = [], [], [], [], [], [], []
         episode_endpoints = []
         achieved_goals = []
-        state = env.reset()
+        state, info = env.reset()
 
-        while t < self.horizon:
-            current_subseq_length += 1
+        with tqdm(total=self.horizon, disable=self.worker_id != 0, desc="Gathering experience...") as pbar:
+            while t < self.horizon:
+                current_subseq_length += 1
 
-            # based on given state, predict action distribution and state value; need flatten due to tf eager bug
-            prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-            policy_out = flatten(joint(prepared_state))
+                # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+                prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
+                policy_out = flatten(joint(prepared_state, training=False))
 
-            predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
+                predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
+                # from the action distribution sample an action and remember both the action and its probability
+                action, action_probability = self.select_action(predicted_distribution_parameters)
 
-            # from the action distribution sample an action and remember both the action and its probability
-            action, action_probability = self.select_action(predicted_distribution_parameters)
+                states.append(state)
+                values.append(np.squeeze(value))
+                actions.append(action)
+                action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
-            states.append(state)
-            values.append(np.squeeze(value))
-            actions.append(action)
-            action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
+                # make a step based on the chosen action and collect the reward for this state
+                observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
+                done = terminated or truncated
+                current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
+                rewards.append(reward)
+                dones.append(done)
 
-            # make a step based on the chosen action and collect the reward for this state
-            observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
-            current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
-            rewards.append(reward)
-            dones.append(done)
+                if hasattr(info, "keys") and "achieved_goal" in info.keys():
+                    achieved_goals.append(info["achieved_goal"])
 
-            if hasattr(info, "keys") and "achieved_goal" in info.keys():
-                achieved_goals.append(info["achieved_goal"])
+                # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
+                if is_recurrent and (current_subseq_length == self.subseq_length or done):
+                    buffer.push_seq_to_buffer(states=states,
+                                              actions=actions,
+                                              action_probabilities=action_probabilities,
+                                              values=values[-current_subseq_length:],
+                                              episode_ended=done)
 
-            # if recurrent, at a subsequence breakpoint/episode end stack the n_steps and buffer them
-            if is_recurrent and (current_subseq_length == self.subseq_length or done):
-                buffer.push_seq_to_buffer(states=states,
-                                          actions=actions,
-                                          action_probabilities=action_probabilities,
-                                          values=values[-current_subseq_length:],
-                                          episode_ended=done)
+                    # clear the buffered information
+                    states, actions, action_probabilities = [], [], []
+                    current_subseq_length = 0
 
-                # clear the buffered information
-                states, actions, action_probabilities = [], [], []
-                current_subseq_length = 0
+                # depending on whether the state is terminal, choose the next state
+                if done:
+                    episode_endpoints.append(t)
 
-            # depending on whether the state is terminal, choose the next state
-            if done:
-                episode_endpoints.append(t)
+                    # calculate advantages for the finished episode, where the last value is 0 since it refers to the
+                    # terminal state that we just observed
+                    episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
+                                                                     values[-episode_steps:] + [0],
+                                                                     self.discount, self.lam)
+                    episode_returns = episode_advantages + values[-episode_steps:]
 
-                # calculate advantages for the finished episode, where the last value is 0 since it refers to the
-                # terminal state that we just observed
-                episode_advantages = estimate_episode_advantages(rewards[-episode_steps:],
-                                                                 values[-episode_steps:] + [0],
-                                                                 self.discount, self.lam)
-                episode_returns = episode_advantages + values[-episode_steps:]
+                    if is_recurrent:
+                        # skip as many steps as are missing to fill the subsequence, then push adv ant ret to buffer
+                        skip_steps = self.subseq_length - (t % self.subseq_length) - 1
+                        t += skip_steps
+                        pbar.update(skip_steps)
 
-                if is_recurrent:
-                    # skip as many steps as are missing to fill the subsequence, then push adv ant ret to buffer
-                    t += self.subseq_length - (t % self.subseq_length) - 1
-                    buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
+                        buffer.push_adv_ret_to_buffer(episode_advantages, episode_returns)
+                    else:
+                        advantages.append(episode_advantages)
+
+                    # update/reset some statistics and trackers
+                    buffer.episode_lengths.append(episode_steps)
+                    buffer.episode_rewards.append(current_episode_return)
+                    buffer.episodes_completed += 1
+                    episode_steps = 1
+                    current_episode_return = 0
+
+                    if "auxiliary_performances" in info.keys():
+                        for key, value in info["auxiliary_performances"].items():
+                            if key not in buffer.auxiliary_performances.keys():
+                                buffer.auxiliary_performances[key] = []
+
+                            buffer.auxiliary_performances[key].append(value)
+
+                    # reset environment to receive next episodes initial state
+                    state, info = env.reset()
+
+                    if is_recurrent:
+                        joint.reset_states()
                 else:
-                    advantages.append(episode_advantages)
+                    state = observation
+                    episode_steps += 1
 
-                # reset environment to receive next episodes initial state
-                state = env.reset()
+                t += 1
+                pbar.update(1)
 
-                if is_recurrent:
-                    joint.reset_states()
-
-                # update/reset some statistics and trackers
-                buffer.episode_lengths.append(episode_steps)
-                buffer.episode_rewards.append(current_episode_return)
-                buffer.episodes_completed += 1
-                episode_steps = 1
-                current_episode_return = 0
-            else:
-                state = observation
-                episode_steps += 1
-
-            t += 1
+        # add auxiliary performance to buffer even if no episode is finished
+        if "auxiliary_performances" in info.keys():
+            for key, value in info["auxiliary_performances"].items():
+                if key not in buffer.auxiliary_performances.keys():
+                    buffer.auxiliary_performances[key] = []
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict())[-1]))
+        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
@@ -270,14 +290,14 @@ class EpsilonGreedyGatherer(Gatherer):
 
 
 def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution,
-             act_confidently=False) -> Tuple[int, int, Any]:
+             act_confidently=False) -> Tuple[int, int, Any, dict]:
     """Evaluate one episode of the given environment following the given policy."""
     policy.reset_states()
     is_recurrent = is_recurrent_model(policy)
     is_continuous = isinstance(env.action_space, Box)
 
     done = False
-    state = env.reset()
+    state, info = env.reset()
     cumulative_reward = 0
     steps = 0
     while not done:
@@ -287,17 +307,26 @@ def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyD
         if not act_confidently:
             action, _ = distribution.act(*probabilities)
         else:
-            action = distribution.act_deterministic(*probabilities)
-        observation, reward, done, info = env.step(np.atleast_1d(action) if is_continuous else action)
+            action, _ = distribution.act_deterministic(*probabilities)
+
+        observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
         cumulative_reward += info["original_reward"]
         observation = observation
-
+        done = terminated or truncated
         state = observation
         steps += 1
 
+    auxiliary_performances = {}
+    if "auxiliary_performances" in info.keys():
+        for key, value in info["auxiliary_performances"].items():
+            if key not in auxiliary_performances.keys():
+                auxiliary_performances[key] = []
+
+            auxiliary_performances[key].append(value)
+
     eps_class = env.unwrapped.current_target_finger if hasattr(env.unwrapped, "current_target_finger") else None
 
-    return steps, cumulative_reward, eps_class
+    return steps, cumulative_reward, eps_class, auxiliary_performances
 
 
 def fake_env_step(env: BaseWrapper):
@@ -314,8 +343,3 @@ def fake_joint_output(joint):
     return np.float32(np.random.random(outshape[0])), \
            np.float32(np.random.random(outshape[1])), \
            np.float32(np.random.random(outshape[2]))
-
-
-if __name__ == '__main__':
-    environment = make_env("ReachAbsoluteVisual-v0")
-    fake_env_step(environment)

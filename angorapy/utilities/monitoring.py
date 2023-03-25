@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Methods for creating a story about a training process."""
+import code
 import datetime
 import os
 import socket
@@ -14,6 +15,7 @@ import simplejson as json
 import tensorflow as tf
 from gym.spaces import Box
 from matplotlib import animation
+from mpi4py import MPI
 
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common import const
@@ -119,6 +121,8 @@ class Monitor:
             date=str(datetime.datetime.now()).split(".")[0],
             config=self.config_name,
             host=socket.gethostname(),
+            n_cpus=MPI.COMM_WORLD.size,
+            n_gpus=self.agent.n_optimizers,
             angorapy_version=version("angorapy"),
             experiment_group=self.experiment_group,
             iterations=self.iterations,
@@ -148,10 +152,10 @@ class Monitor:
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
-                reward_norming=str(RewardNormalizationTransformer in self.env.transformers),
-                state_norming=str(StateNormalizationTransformer in self.env.transformers),
+                reward_norming=str(any([isinstance(t, RewardNormalizationTransformer) for t in self.env.transformers])),
+                state_norming=str(any([isinstance(t, StateNormalizationTransformer) for t in self.env.transformers])),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
-                architecture=self.agent.builder_function_name.split("_")[1],
+                architecture=self.agent.builder_function_name,
                 gatherer=str(self.agent.gatherer_class),
                 **additional_hps
             ),
@@ -196,6 +200,7 @@ class Monitor:
             gathering_timings=self.agent.gathering_timings,
             loaded_at=self.agent.loading_history,
             per_receptor_mean=self.agent.current_per_receptor_mean,
+            auxiliary_performances=self.agent.auxiliary_performances
         )
 
         with open(f"{self.story_directory}/statistics.json", "w") as f:

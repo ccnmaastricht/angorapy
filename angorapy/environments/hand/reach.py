@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 import mujoco
 import numpy as np
@@ -21,7 +22,8 @@ class Reach(BaseShadowHandEnv):
                  relative_control=True,
                  vision=False,
                  touch=True,
-                 force_finger=None):
+                 force_finger=None,
+                 render_mode: Optional[str] = None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
         # reward function setup
@@ -46,7 +48,8 @@ class Reach(BaseShadowHandEnv):
             initial_qpos=initial_qpos,
             distance_threshold=self.reward_config["SUCCESS_DISTANCE"],
             n_substeps=n_substeps,
-            relative_control=relative_control
+            relative_control=relative_control,
+            render_mode=render_mode
         )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
@@ -60,8 +63,7 @@ class Reach(BaseShadowHandEnv):
         assert set(REACH_BASE.keys()).issubset(self.reward_config.keys()), "Incomplete free reach reward configuration."
 
     def _get_achieved_goal(self):
-        goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
-        return np.array(goal).flatten()
+        return self.get_fingertip_positions()
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
@@ -121,7 +123,7 @@ class Reach(BaseShadowHandEnv):
         return {
             'observation': Sensation(
                 proprioception=proprioception,
-                somatosensation=touch if self.touch else None,
+                touch=touch if self.touch else None,
                 vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else np.array([]),
                 goal=self.goal.copy()
             ),
@@ -197,13 +199,13 @@ class Reach(BaseShadowHandEnv):
         """Step the environment."""
         self.previous_finger_positions = [self.get_finger_position(fname).copy() for fname in FINGERTIP_SITE_NAMES]
 
-        o, r, d, i = super().step(action)
+        o, r, d, truncated, i = super().step(action)
 
         # update memory
         i.update({"target_finger": self.current_target_finger})
         # self.state_memory_buffer.append(self.sim.get_state())
 
-        return o, r, d, i
+        return o, r, d, truncated, i
 
 
 class ReachSequential(Reach):
@@ -267,10 +269,10 @@ class ReachSequential(Reach):
 
         ret = super().reset()
 
-        return ret
+        return ret, {}
 
     def step(self, action):
-        observation, reward, done, info = super().step(action)
+        observation, reward, done, truncated, info = super().step(action)
 
         # set next subgoal if current one is achieved
         if info["is_success"]:
@@ -278,7 +280,7 @@ class ReachSequential(Reach):
             #     f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
             self.goal = self._sample_goal()
 
-        return observation, reward, done, info
+        return observation, reward, done, truncated, info
 
 
 class FreeReach(Reach):
@@ -391,7 +393,7 @@ class FreeReachSequential(FreeReach):
         self.exemplary_sequence = self.default_exemplary_sequence.copy()
 
         ret = super().reset()
-        return ret
+        return ret, {}
 
     def _render_callback(self):
         sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
@@ -412,7 +414,7 @@ class FreeReachSequential(FreeReach):
         self.sim.forward()
 
     def step(self, action):
-        observation, reward, done, info = super().step(action)
+        observation, reward, done, truncated, info = super().step(action)
 
         # set next subgoal if current one is achieved
         if info["is_success"]:
@@ -420,4 +422,4 @@ class FreeReachSequential(FreeReach):
                 f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
             self.goal = self._sample_goal()
 
-        return observation, reward, done, info
+        return observation, reward, done, truncated, info

@@ -1,17 +1,21 @@
 from inspect import getfullargspec as fargs
-from typing import List, Union
+from typing import List, Union, Callable
 
 import numpy
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 
+import angorapy
+from angorapy.common.policies import BasePolicyDistribution
+from angorapy.common.wrappers import BaseWrapper
+from angorapy.utilities.error import IncompatibleModelException
 from angorapy.utilities.util import flatten
 
 
 def is_recurrent_model(model: tf.keras.Model):
     """Check if given model is recurrent (i.e. contains a recurrent layer of any sort)"""
-    for layer in extract_layers(model):
+    for layer in model.submodules:
         if isinstance(layer, tf.keras.layers.RNN):
             return True
 
@@ -31,10 +35,13 @@ def requires_sequence_length(model_builder) -> bool:
 def list_layer_names(network, only_para_layers=True) -> List[str]:
     """Get a list of unique string representations of all layers in the network."""
     if only_para_layers:
-        return [layer.name for layer in extract_layers(network) if
-                not isinstance(layer, (tf.keras.layers.Activation, tf.keras.layers.InputLayer))]
+        return [layer.name for layer in network.submodules if
+                not isinstance(layer, (tf.keras.layers.Activation,
+                                       tf.keras.layers.InputLayer,
+                                       tf.keras.layers.Concatenate,
+                                       tf.keras.layers.Reshape))]
     else:
-        return [layer.name for layer in extract_layers(network) if
+        return [layer.name for layer in network.submodules if
                 not isinstance(layer, tf.keras.layers.InputLayer)]
 
 
@@ -49,7 +56,7 @@ def extract_layers(network: tf.keras.Model, unfold_tds: bool = False) -> List[tf
         return [network]
 
     layers = []
-    for l in network.layers:
+    for l in network.submodules:
         if isinstance(l, tf.keras.Model) or isinstance(l, tf.keras.Sequential):
             layers.append(extract_layers(l))
         elif isinstance(l, tf.keras.layers.TimeDistributed) and unfold_tds:
@@ -65,41 +72,49 @@ def extract_layers(network: tf.keras.Model, unfold_tds: bool = False) -> List[tf
 
 def get_layers_by_names(network: tf.keras.Model, layer_names: List[str]):
     """Get a list of layers identified by their names from a network."""
-    layers = extract_layers(network) + network.layers
+    layers = network.submodules
     all_layer_names = [l.name for l in layers]
 
-    assert all(ln in all_layer_names for ln in layer_names), "Cannot find layer name in network extraction."
+    assert all(ln in all_layer_names for ln in layer_names), \
+        f"Cannot find layers {list(filter(lambda ln: ln not in all_layer_names, layer_names))} in network extraction."
 
     return [layers[all_layer_names.index(layer_name)] for layer_name in layer_names]
+
+
+def get_parent_layer(child, network):
+    if child in network.layers:
+        return network
+
+    for layer in network.submodules:
+        if hasattr(layer, "layers") and child in layer.layers:
+            return layer
+
+    return None
 
 
 def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.keras.Model]], include_original=False):
     """Build a sub model of a given network that has (multiple) outputs at layer activations defined by a list of layer
     names."""
     layers = get_layers_by_names(network, tos) if isinstance(tos[0], str) else tos
-    outputs = []
+    layer = layers[0]
 
-    # probe layers to check if model can be build to them
-    for layer in layers:
-        success = False
-        layer_input_id = 0
-        while not success:
-            success = True
-            try:
-                tf.keras.Model(inputs=[network.input], outputs=[layer.get_output_at(layer_input_id)])
-            except ValueError as ve:
-                if len(ve.args) > 0 and ve.args[0].split(" ")[0] == "Graph":
-                    layer_input_id += 1
-                    success = False
-                else:
-                    raise ValueError(f"Cannot use layer {layer.name}. Error: {ve.args}")
-            else:
-                outputs.append([layer.get_output_at(layer_input_id)])
+    if not hasattr(layer, "layers") and layer in network.layers:
+        return tf.keras.Model(inputs=network.inputs, outputs=layer.output)
 
-    if include_original:
-        outputs = outputs + network.outputs
+    if hasattr(layer, "layers") and layer in network.layers:
+        layer = layer.layers[-1]
 
-    return tf.keras.Model(inputs=[network.input], outputs=outputs)
+    parent = get_parent_layer(layer, network)
+    inbound_layers = parent.inbound_nodes[0].inbound_layers
+    if not isinstance(inbound_layers, list):
+        inbound_layers = [inbound_layers]
+
+    outputs = [il.output if not hasattr(il, "layers") else build_sub_model_to(network, [il])(network.inputs) for il in inbound_layers]
+
+    subnetwork_to_parent = tf.keras.Model(inputs=network.inputs, outputs=outputs)
+    subnetwork_to_layer = tf.keras.Model(inputs=parent.inputs, outputs=layer.output)
+
+    return tf.keras.Model(inputs=subnetwork_to_parent.inputs, outputs=subnetwork_to_layer(subnetwork_to_parent.output))
 
 
 def build_sub_model_from(network: tf.keras.Model, from_layer_name: str):
@@ -132,13 +147,13 @@ def get_component(model: tf.keras.Model, name: str):
 
 
 def reset_states_masked(model: tf.keras.Model, mask: List):
-    """Reset a stateful model'serialization states only at the samples in the batch that are specified by the mask.
+    """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
 
     The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
     and zeros otherwise (booleans possible too)."""
 
     # extract recurrent layers by their superclass RNN
-    recurrent_layers = [layer for layer in extract_layers(model) if isinstance(layer, tf.keras.layers.RNN)]
+    recurrent_layers = [layer for layer in model.submodules if isinstance(layer, tf.keras.layers.RNN)]
 
     for layer in recurrent_layers:
         current_states = [state.numpy() for state in layer.states]
@@ -154,7 +169,7 @@ def reset_states_masked(model: tf.keras.Model, mask: List):
 
 def calc_max_memory_usage(model: tf.keras.Model):
     """Calculate memory requirement of a model per sample in bits."""
-    layers = extract_layers(model)
+    layers = model.submodules
     n_shapes = int(numpy.sum(
         [numpy.prod(numpy.array([s if isinstance(s, int) else 1 for s in l.output_shape])) for l in layers]))
     n_parameters = model.count_params()
@@ -174,9 +189,39 @@ def calc_max_memory_usage(model: tf.keras.Model):
     return total_memory * 1.1641532182693481 * 10 ** -10
 
 
+
+
+
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 
 
 def is_conv(layer):
     """Check if layer is convolutional."""
     return isinstance(layer, CONVOLUTION_BASE_CLASS)
+
+
+# Validators
+
+def validate_model_builder(model_function: Callable, env: BaseWrapper, distribution: BasePolicyDistribution) -> None:
+    models = model_function(env, distribution)
+
+    # validate model order
+    if not models[1].output_shape[-1] == 1:
+        raise ValueError("The model function returns a model tuple whose value network's output is not one-dimensional."
+                         "Make sure your value function returns a valid one-dimensional scalar output and that the "
+                         "model builder returns this network as the second element of the model-triple.")
+    if not models[2].output_shape:
+        pass
+
+
+def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) -> bool:
+    """Validate whether the envs states can be processed by the model."""
+    model_inputs = [ip.name for ip in model.inputs]
+    env_outputs = list(env.reset()[0].dict().keys())
+
+    if not sorted(model_inputs) == sorted(env_outputs):
+        raise IncompatibleModelException(
+            f"The model with inputs {model_inputs} cannot handle this environment's states with senses {env_outputs}."
+        )
+
+    return True

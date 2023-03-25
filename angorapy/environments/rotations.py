@@ -225,7 +225,7 @@ def subtract_euler(e1, e2):
 
 
 def quat2mat(quat):
-    """Convert Quaternion to Euler Angles.  See rotation.py for notes"""
+    """Convert Quaternion to rotation angle.  See rotation.py for notes"""
     quat = np.asarray(quat, dtype=np.float64)
     assert quat.shape[-1] == 4, "Invalid shape quat {}".format(quat)
 

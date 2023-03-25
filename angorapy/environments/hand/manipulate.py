@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import mujoco
 import numpy as np
@@ -51,7 +52,8 @@ class BaseManipulate(BaseShadowHandEnv):
             delta_t=0.002,
             touch_get_obs="sensordata",
             vision=False,
-            touch=True
+            touch=True,
+            render_mode: Optional[str] = None
     ):
         """Initializes a new Hand manipulation environment.
 
@@ -107,7 +109,6 @@ class BaseManipulate(BaseShadowHandEnv):
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
         self.previous_achieved_goal = self._get_achieved_goal()
-        self._set_default_reward_function_and_config()
 
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,
@@ -115,7 +116,8 @@ class BaseManipulate(BaseShadowHandEnv):
                          delta_t=delta_t,
                          relative_control=relative_control,
                          model=model_path,
-                         vision=vision)
+                         vision=vision,
+                         render_mode=render_mode)
 
         # set touch sensors rgba values
         for _, site_id in self._touch_sensor_id_site_id:
@@ -325,9 +327,9 @@ class BaseManipulate(BaseShadowHandEnv):
 
         return {
             "observation": Sensation(
-                vision=None,
+                vision=object_qpos,
                 proprioception=proprioception.copy(),
-                somatosensation=None,
+                touch=None,
                 goal=target_orientation),
             "achieved_goal": object_qpos.copy(),
             "desired_goal": self.goal.ravel().copy(),
@@ -356,7 +358,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
     def step(self, action):
         """Make step in environment."""
-        obs, reward, done, info = super().step(action)
+        obs, reward, terminated, truncated, info = super().step(action)
         self.steps_with_current_goal += 1
 
         success = self._is_success(self._get_achieved_goal(), self.goal)
@@ -371,13 +373,17 @@ class BaseManipulate(BaseShadowHandEnv):
             obs = self._get_obs()
 
         if self.steps_with_current_goal >= BaseManipulate.max_steps_per_goal:
-            done = True
+            terminated = True
 
         # determine if done
         dropped = self._is_dropped()
-        done = done or dropped or self.consecutive_goals_reached >= 50
+        terminated = terminated or dropped or self.consecutive_goals_reached >= 50
 
-        return obs, reward, done, info
+        if "auxiliary_performances" not in info.keys():
+            info["auxiliary_performances"] = {}
+        info["auxiliary_performances"]["consecutive_goals_reached"] = self.consecutive_goals_reached
+
+        return obs, reward, terminated, truncated, info
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
@@ -389,7 +395,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  touch_get_obs='sensordata',
                  relative_control=True,
                  vision: bool = False,
-                 delta_t: float = 0.002):
+                 delta_t: float = 0.002,
+                 render_mode: Optional[str] = None):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
                                 model_path=MODEL_PATH_MANIPULATE,
@@ -399,7 +406,8 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                                 vision=vision,
                                 relative_control=relative_control,
-                                delta_t=delta_t
+                                delta_t=delta_t,
+                                render_mode=render_mode
                                 )
 
 
@@ -446,7 +454,7 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
             "observation": Sensation(
                 vision=None,
                 proprioception=proprioception.copy(),
-                somatosensation=None,
+                touch=None,
                 goal=target_orientation),
             "achieved_goal": object_qpos.copy(),
             "desired_goal": self.goal.ravel().copy(),
@@ -455,19 +463,21 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
 
 class HumanoidManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
-    asynchronous = False
+    asymmetric = False
 
     def _get_obs(self):
-        """Gather humanoid senses and asynchronous information."""
+        """Gather humanoid senses and asymmetric information."""
 
         object_qpos = self.data.jnt('object:joint').qpos.copy()
 
         # vision
         if not self.vision:
-            vision_input = object_qpos
+            vision_input = object_qpos.astype(np.float32)
         else:
-
-            vision_input = self.render(mode="rgb_array", height=VISION_WH, width=VISION_WH)
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision_input = self.render()
+            self.render_mode = tmp_render_mode
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]
@@ -483,7 +493,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         # touch
         touch = self.data.sensordata[self._touch_sensor_id]
 
-        # asynchronous information
+        # asymmetric information
         finger_tip_positions = np.array([self.data.site(name).xpos for name in FINGERTIP_SITE_NAMES]).flatten()
         target_quat = transform.Rotation.from_quat(target_orientation)
         current_quat = transform.Rotation.from_quat((object_qpos[3:]))
@@ -492,7 +502,7 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         object_positional_velocity = self.data.body("object").cvel[3:]  # todo double check if correct part
         object_angular_velocity = self.data.body("object").cvel[:3]  # quaternions in OpenAI model
 
-        asynchronous = np.concatenate([
+        asymmetric = np.concatenate([
             finger_tip_positions,
             relative_target_orientation,
             object_positional_velocity,
@@ -503,27 +513,27 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
             "observation": Sensation(
                 vision=vision_input,
                 proprioception=proprioception.copy(),
-                somatosensation=touch,
+                touch=touch,
                 goal=target_orientation,
-                asynchronous=None if not self.asynchronous else asynchronous
+                asymmetric=None if not self.asymmetric else asymmetric
             ),
-            "achieved_goal": object_qpos.copy(),
-            "desired_goal": self.goal.ravel().copy(),
+            "achieved_goal": object_qpos.copy().astype(np.float32),
+            "desired_goal": self.goal.ravel().copy().astype(np.float32),
         }
 
 
 class HumanoidManipulateBlock(HumanoidManipulateBlockDiscrete):
     continuous = True
-    asynchronous = False
+    asymmetric = False
 
 
 class HumanoidManipulateBlockDiscreteAsynchronous(HumanoidManipulateBlockDiscrete):
-    asynchronous = True
+    asymmetric = True
     continuous = False
 
 
 class HumanoidManipulateBlockAsynchronous(HumanoidManipulateBlockDiscrete):
-    asynchronous = True
+    asymmetric = True
     continuous = True
 
 
@@ -555,3 +565,4 @@ class ManipulateEgg(BaseManipulate, utils.EzPickle):
 
 if __name__ == '__main__':
     hand = HumanoidManipulateBlockDiscrete()
+

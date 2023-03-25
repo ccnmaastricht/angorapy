@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
+import code
 import gc
 import json
 import os
@@ -9,6 +10,7 @@ import statistics
 import time
 from collections import OrderedDict
 from glob import glob
+from json import JSONDecodeError
 from typing import Union, Tuple, Any, Callable
 
 import gym
@@ -17,12 +19,19 @@ import nvidia_smi
 import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box, MultiDiscrete
-from mpi4py import MPI
+from tensorflow.keras import mixed_precision
+
+try:
+    from mpi4py import MPI
+except:
+    MPI = None
+
 from psutil import NoSuchProcess
+from tqdm import tqdm
 
 from angorapy import models
 from angorapy.agent.dataio import read_dataset_from_storage
-from angorapy.agent.gather import Gatherer, evaluate, EpsilonGreedyGatherer
+from angorapy.agent.gather import Gatherer, evaluate
 from angorapy.agent.ppo.optim import learn_on_batch
 from angorapy.common import policies, const
 from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR, PATH_TO_EXPERIMENTS
@@ -30,50 +39,32 @@ from angorapy.common.const import MIN_STAT_EPS
 from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from angorapy.common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
-from angorapy.common.validators import validate_env_model_compatibility
 from angorapy.common.wrappers import BaseWrapper, make_env
-from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle
+from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
+from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
-    requires_batch_size, requires_sequence_length
+    requires_batch_size, requires_sequence_length, validate_model_builder, validate_env_model_compatibility
 from angorapy.utilities.statistics import ignore_none
-from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape
-
-# get communicator and find optimization processes
-mpi_comm = MPI.COMM_WORLD
-gpus = tf.config.list_physical_devices('GPU')
-is_root = mpi_comm.rank == 0
-
-if is_root:
-    print(f"Detected {len(gpus)} GPU devices.")
-
-if len(gpus) > 0:
-    node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
-    node_comm = mpi_comm.Split(color=node_names.index(MPI.Get_processor_name()))
-    node_optimizer_rank = node_comm.allreduce(mpi_comm.rank, op=MPI.MIN)
-
-    # TODO make this work for multiple GPUs per node?
-    is_optimization_process = MPI.COMM_WORLD.rank == node_optimizer_rank
-else:
-    is_optimization_process = True
-
-if not is_optimization_process:
-    tf.config.experimental.set_visible_devices([], "GPU")
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-else:
-    if len(gpus) > 0:
-        tf.config.experimental.set_memory_growth(gpus[0], True)
-
-optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
-n_optimizers = int(mpi_comm.allreduce(is_optimization_process, op=MPI.SUM))
+from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
+    mpi_print, flatten
 
 
 class PPOAgent:
+    """Agent using the Proximal Policy Optimization Algorithm for learning.
+    
+    The default is an implementation using two independent models for the critic and the actor. This is of course more
+    expensive than using shared parameters because we need two forward and backward calculations
+    per batch however this is what is used in the original paper and most implementations. During development this also
+    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
+    to make any significant progress in more difficult envs such as LunarLander.
+    """
+
     policy: tf.keras.Model
     value: tf.keras.Model
     joint: tf.keras.Model
 
     def __init__(self,
-                 model_builder: Callable,
+                 model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
                  environment: BaseWrapper,
                  horizon: int = 1024,
                  workers: int = 8,
@@ -91,7 +82,8 @@ class PPOAgent:
                  reward_configuration: str = None,
                  _make_dirs=True,
                  debug: bool = False,
-                 pretrained_components: list = None):
+                 pretrained_components: list = None,
+                 n_optimizers: int = None):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Agent using the Proximal Policy Optimization Algorithm for learning.
@@ -122,6 +114,16 @@ class PPOAgent:
         """
         super().__init__()
         self.debug = debug
+
+        # setup distributed computation
+        self.mpi_comm = MPI.COMM_WORLD
+        self.gpus = tf.config.list_physical_devices('GPU')
+        self.is_root = self.mpi_comm.rank == 0
+
+        self.optimization_comm, self.is_optimization_process = self.get_optimization_comm(
+            limit_to_n_optimizers=n_optimizers
+        )
+        self.n_optimizers = int(self.mpi_comm.allreduce(self.is_optimization_process, op=MPI.SUM))
 
         # checkups
         assert lr_schedule is None or isinstance(lr_schedule, str)
@@ -182,6 +184,8 @@ class PPOAgent:
             distribution=self.distribution,
             **({"bs": 1} if requires_batch_size(model_builder) else {}),
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {}))
+
+        validate_model_builder(self.model_builder, self.env, self.distribution)
         validate_env_model_compatibility(self.env, self.joint)
 
         if pretrained_components is not None:
@@ -203,7 +207,7 @@ class PPOAgent:
                 else:
                     print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
-        self.optimizer: MpiAdam = MpiAdam(comm=optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
+        self.optimizer: MpiAdam = MpiAdam(comm=self.optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -217,7 +221,7 @@ class PPOAgent:
         self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
-        self.agent_id = mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
+        self.agent_id = self.mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         self.experiment_directory = f"{PATH_TO_EXPERIMENTS}/{self.agent_id}/"
         if _make_dirs:
@@ -248,6 +252,7 @@ class PPOAgent:
         self.underflow_history = []
         self.loading_history = []
         self.current_per_receptor_mean = {}
+        self.auxiliary_performances = {}
 
         # training statistics
         self.cycle_timings = []
@@ -261,6 +266,40 @@ class PPOAgent:
             self.wrapper_stat_history.update(
                 {transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
                                                   "stdev": [transformer.simplified_stdev()]}})
+
+    @staticmethod
+    def get_optimization_comm(limit_to_n_optimizers: int = None):
+        mpi_comm = MPI.COMM_WORLD
+        gpus = tf.config.list_physical_devices('GPU')
+        is_root = mpi_comm.rank == 0
+
+        if is_root:
+            print(f"Detected {len(gpus)} GPU devices.")
+        if len(gpus) > 0:
+            node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
+            node_comm = mpi_comm.Split(color=node_names.index(MPI.Get_processor_name()))
+            node_optimizer_rank = node_comm.allreduce(mpi_comm.rank, op=MPI.MIN)
+
+            # TODO make this work for multiple GPUs per node?
+            is_optimization_process = MPI.COMM_WORLD.rank == node_optimizer_rank
+        else:
+            is_optimization_process = True
+
+        if not is_optimization_process:
+            tf.config.set_visible_devices([], "GPU")
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        else:
+            if len(gpus) > 0:
+                tf.config.experimental.set_memory_growth(gpus[0], True)
+
+        optimization_ranks = [r for r in mpi_comm.allgather(MPI.COMM_WORLD.rank if is_optimization_process else -1) if r != -1]
+        if limit_to_n_optimizers is not None and limit_to_n_optimizers != 0:
+            optimization_ranks = optimization_ranks[:limit_to_n_optimizers]
+            is_optimization_process = mpi_comm.rank in optimization_ranks
+
+        optimization_comm = mpi_comm.Split(color=(1 if is_optimization_process else 0))
+
+        return optimization_comm, is_optimization_process
 
     def record_wrapper_stats(self) -> None:
         """Records the stats from RunningMeanWrappers."""
@@ -283,15 +322,33 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
+    def act(self, state):
+        """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
+        that can be directly given to an environment.
+
+        This method is mostly useful at inference time and serves as q quick wrapper around the steps required to
+        process the raw numpy states of the environment into a state readable by the policy network, followed by
+        sampling from the predicted distribution."""
+
+        # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+        prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
+        policy_out = flatten(self.joint(prepared_state, training=False))
+
+        predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
+        # from the action distribution sample an action and remember both the action and its probability
+        action, action_probability = self.distribution.act(*predicted_distribution_parameters)
+
+        return action
+
     def drill(self,
               n: int,
               epochs: int,
               batch_size: int,
-              monitor: "Monitor"=None,
+              monitor: "Monitor" = None,
               save_every: int = 0,
               separate_eval: bool = False,
               stop_early: bool = False,
-              radical_evaluation=False) -> "PPOAgent":
+              radical_evaluation: object = False) -> "PPOAgent":
         """Start a training loop of the agent.
         
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -306,7 +363,7 @@ class PPOAgent:
             separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
             stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
-                above the environments threshold
+                above the envs threshold
 
 
         Returns:
@@ -314,7 +371,7 @@ class PPOAgent:
         """
 
         # start monitor
-        if is_root and monitor is not None:
+        if self.is_root and monitor is not None:
             monitor.make_metadata(additional_hps={
                 "epochs_per_cycle": epochs,
                 "batch_size": batch_size,
@@ -324,21 +381,22 @@ class PPOAgent:
         worker_base, worker_extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
         worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
         worker_collection_ids = list(range(self.n_workers))[
-                                sum(worker_split[:mpi_comm.rank]):sum(worker_split[:mpi_comm.rank + 1])]
+                                sum(worker_split[:self.mpi_comm.rank]):sum(worker_split[:self.mpi_comm.rank + 1])]
 
         # determine the split of worker outputs over optimizers
-        optimizer_base, optimizer_extra = divmod(self.n_workers, n_optimizers)
-        optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(n_optimizers)]
+        optimizer_base, optimizer_extra = divmod(self.n_workers, self.n_optimizers)
+        optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(self.n_optimizers)]
         optimizer_collection_ids = list(range(self.n_workers))[
-                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(optimizer_split[:self.optimizer.comm.rank + 1])]
+                                   sum(optimizer_split[:self.optimizer.comm.rank]):sum(
+                                       optimizer_split[:self.optimizer.comm.rank + 1])]
 
-        list_of_worker_collection_id_lists = mpi_comm.gather(worker_collection_ids, root=0)
+        list_of_worker_collection_id_lists = self.mpi_comm.gather(worker_collection_ids, root=0)
         list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
 
-        if is_root:
+        if self.is_root:
             print(
                 f"\n\nDrill started using {MPI.COMM_WORLD.size} processes for {self.n_workers} workers of which "
-                f"{n_optimizers} are optimizers."
+                f"{self.n_optimizers} are optimizers."
                 f" Worker distribution: {[worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
                 f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
                 f"IDs over Optimizers: {list_of_optimizer_collection_id_lists}")
@@ -349,18 +407,20 @@ class PPOAgent:
 
             n_chunks_per_trajectory = self.horizon // self.tbptt_length
             n_chunks_per_batch = batch_size // self.tbptt_length
-            n_chunks_per_batch_per_process = n_chunks_per_batch // n_optimizers
-            n_trajectories_per_process = self.n_workers // n_optimizers
+            n_chunks_per_batch_per_process = n_chunks_per_batch // self.n_optimizers
+            n_trajectories_per_process = self.n_workers // self.n_optimizers
 
-            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = find_optimal_tile_shape(
-                (n_trajectories_per_process, n_chunks_per_trajectory),
-                n_chunks_per_batch_per_process
-            )
+            n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process = \
+                find_optimal_tile_shape(
+                    (n_trajectories_per_process, n_chunks_per_trajectory),
+                    n_chunks_per_batch_per_process,
+                    width_first=True  # TODO smartly adapt this to memory reqs or at least make parameter
+                )
 
-            n_trajectories_per_batch = n_trajectories_per_batch_per_process * n_optimizers
+            n_trajectories_per_batch = n_trajectories_per_batch_per_process * self.n_optimizers
             n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process
 
-            if is_root:
+            if self.is_root:
                 print(f"\nThe policy is recurrent and the batch size is interpreted as the number of transitions "
                       f"per policy update. Given the batch size of {batch_size} this results in: \n"
                       f"\t{n_chunks_per_batch} chunks per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch\n"
@@ -373,15 +433,18 @@ class PPOAgent:
 
         else:
             assert self.horizon * self.n_workers >= batch_size, "Batch Size is larger than the number of transitions."
-            batch_size = batch_size // n_optimizers
+            batch_size = batch_size // self.n_optimizers
             effective_batch_size = batch_size
 
         # rebuild model with desired batch size
+        # mixed_precision.set_global_policy("mixed_float16")
         joint_weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size,
             sequence_length=self.tbptt_length)
+
+        # mixed_precision.set_global_policy("float32")
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
         # reset optimizer to not be confused by the newly build models
@@ -411,7 +474,7 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # distribute parameters from rank 0 to all goal ranks
-            joint_weights = mpi_comm.bcast(joint_weights, root=0)
+            joint_weights = self.mpi_comm.bcast(joint_weights, root=0)
             self.joint.set_weights(joint_weights)
             actor_joint.set_weights(joint_weights)
 
@@ -424,9 +487,9 @@ class PPOAgent:
 
             # merge gatherings from all workers
             stats = mpi_condense_stats(worker_stats)
-            stats = mpi_comm.bcast(stats, root=0)
+            stats = self.mpi_comm.bcast(stats, root=0)
 
-            # sync the environments to share statistics for transformers etc.
+            # sync the envs to share statistics for transformers etc.
             self.env.mpi_sync()
 
             time_dict["gathering"] = time.time() - subprocess_start
@@ -449,7 +512,7 @@ class PPOAgent:
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
             # RECORD STATS, SAVE MODEL AND REPORT
-            if is_root:
+            if self.is_root:
                 self.record_wrapper_stats()
                 self.record_stats(stats_with_evaluation)
 
@@ -473,7 +536,7 @@ class PPOAgent:
                         pass
 
                 used_gpu_memory = 0
-                if len(gpus) > 0:
+                if len(self.gpus) > 0:
                     nvidia_smi.nvmlInit()
                     nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
                     procs = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(nvidia_handle)
@@ -497,19 +560,20 @@ class PPOAgent:
                     break
 
             # OPTIMIZATION PHASE
-            if is_optimization_process:
+            if self.is_optimization_process:
                 subprocess_start = time.time()
 
-                mpi_flat_print("Optimizing...")
-                dataset = read_dataset_from_storage(dtype_actions=tf.float32 if self.continuous_control else tf.int32,
-                                                    id_prefix=self.agent_id, worker_ids=optimizer_collection_ids,
-                                                    responsive_senses=self.policy.input_names)
+                dataset = read_dataset_from_storage(
+                    dtype_actions=tf.float32 if self.continuous_control else tf.int32,
+                    id_prefix=self.agent_id,
+                    worker_ids=optimizer_collection_ids,
+                    responsive_senses=self.policy.input_names)
                 self.optimize(dataset, epochs, effective_batch_size)
 
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 # FINALIZE
-                if is_root:
+                if self.is_root:
                     mpi_flat_print("Finalizing...")
                     self.total_frames_seen += stats.numb_processed_frames
                     self.total_episodes_seen += stats.numb_completed_episodes
@@ -557,7 +621,7 @@ class PPOAgent:
             weights=joint_weights, batch_size=batch_size, sequence_length=self.tbptt_length
         )
 
-        if is_root:
+        if self.is_root:
             print(f"Drill finished after {round(time.time() - full_drill_start_time, 2)}serialization.")
 
         return self
@@ -585,6 +649,15 @@ class PPOAgent:
         self.cycle_stat_n_history.append(stats.numb_completed_episodes)
         self.underflow_history.append(stats.tbptt_underflow)
         self.current_per_receptor_mean = {s: arr.tolist() for s, arr in stats.per_receptor_mean.items()}
+
+        for key, value in stats.auxiliary_performances.items():
+            if key not in self.auxiliary_performances:
+                self.auxiliary_performances[key] = {
+                    "mean": [],
+                    "std": []
+                }
+            self.auxiliary_performances[key]["mean"].append(np.mean(value).item())
+            self.auxiliary_performances[key]["std"].append(np.std(value).item())
 
     def _make_actor(self, horizon, discount, lam, subseq_length) -> Gatherer:
         # create the Gatherer
@@ -619,82 +692,98 @@ class PPOAgent:
 
         _learn_on_batch = tf.function(learn_on_batch)
 
+        total_updates = (self.n_workers * self.horizon) // ((np.prod(batch_size) * self.tbptt_length) if self.is_recurrent else batch_size) * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        for epoch in range(epochs):
+        with tqdm(total=total_updates, disable=self.mpi_comm.rank != 0, desc="Optimizing...") as pbar:
+            for epoch in range(epochs):
 
-            # shuffle to break correlation; not for recurrent data since that would break chunk dependence
-            if not self.is_recurrent:
-                dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+                # shuffle to break correlation; not for recurrent data since that would break chunk dependence
+                if not self.is_recurrent:
+                    dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
-            batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
+                # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
+                batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
 
-            policy_epoch_losses, value_epoch_losses, entropies = [], [], []
+                policy_epoch_losses, value_epoch_losses, entropies = [], [], []
 
-            with tf.device(self.device):
-                for b in batched_dataset:
-                    if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss = _learn_on_batch(
-                            batch=b, joint=self.joint, distribution=self.distribution,
-                            continuous_control=self.continuous_control, clip_values=self.clip_values,
-                            gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
-                            c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
-                    else:
-                        # truncated back propagation through time
-                        # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                        # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
-                        # fed into the model chronologically to adhere to statefulness
-                        # if the following line throws a CPU to GPU error this is most likely due to too little memory
-                        # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
-                        n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+                with tf.device(self.device):
+                    for b in batched_dataset:
+                        if not self.is_recurrent:
+                            grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                batch=b, joint=self.joint, distribution=self.distribution,
+                                continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
+                                c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        else:
+                            # truncated back propagation through time
+                            # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
+                            # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
+                            # fed into the model chronologically to adhere to statefulness
+                            # if the following line throws a CPU to GPU error this is most likely due to too little memory
+                            # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                            n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+                            # print(f"bs {batch_size} | split "
+                            #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
+                            # print(sum([bv.dtype.size * tf.reduce_prod(bv.shape).numpy().item() for bv in b.values()]) / 1e9)
 
-                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for bk, bv in b.items()}
-                        for batch_i in range(len(split_batch["advantage"])):
-                            batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
+                            split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1)
+                                           for bk, bv in b.items()}
+                            for batch_i in range(len(split_batch["advantage"])):
+                                batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
 
-                            for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
-                                # extract chunks
-                                partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
+                                for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
+                                    # extract chunks
+                                    partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
 
-                                # find and apply the gradients
-                                # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
-                                # for v in self.joint.trainable_variables], 0, 0, 0
-                                grad, ent, pi_loss, v_loss = _learn_on_batch(
-                                    batch=partial_batch, joint=self.joint, distribution=self.distribution,
-                                    continuous_control=self.continuous_control, clip_values=self.clip_values,
-                                    gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
-                                    c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+                                    # find and apply the gradients
+                                    # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
+                                    # for v in self.joint.trainable_variables], 0, 0, 0
+                                    grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                        batch=partial_batch, joint=self.joint, distribution=self.distribution,
+                                        continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                        gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
+                                        c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
 
-                                if chunk_i == 0:
-                                    batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
-                                else:
-                                    batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
-                                    batch_ent += ent
-                                    batch_pi_loss += pi_loss
-                                    batch_v_loss += v_loss
+                                    if chunk_i == 0:
+                                        batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
+                                    else:
+                                        batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
+                                        batch_ent += ent
+                                        batch_pi_loss += pi_loss
+                                        batch_v_loss += v_loss
 
-                                # make partial RNN state resets
-                                reset_mask = detect_finished_episodes(partial_batch["done"])
-                                reset_states_masked(self.joint, reset_mask)
+                                    # make partial RNN state resets
+                                    reset_mask = detect_finished_episodes(partial_batch["done"])
+                                    reset_states_masked(self.joint, reset_mask)
 
-                            batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
-                            self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+                                    # free memory
+                                    del partial_batch
 
-                # todo makes no sense with the split batches, need to average over them
-                entropies.append(ent)
-                policy_epoch_losses.append(pi_loss)
-                value_epoch_losses.append(v_loss)
+                                batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
+                                self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+                                pbar.update(1)
 
-                # reset RNN states after each outer batch
-                self.joint.reset_states()
+                                # free memory
+                                del batch_grad
 
-            # remember some statistics
-            policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
-            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+                            # free memory
+                            del split_batch, b, batch_ent, batch_pi_loss, batch_v_loss
 
-        optimization_comm.Barrier()
+                    # todo makes no sense with the split batches, need to average over them
+                    entropies.append(ent)
+                    policy_epoch_losses.append(pi_loss)
+                    value_epoch_losses.append(v_loss)
+
+                    # reset RNN states after each outer batch
+                    self.joint.reset_states()
+
+                # remember some statistics
+                policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
+                value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+                entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+
+        self.optimization_comm.Barrier()
 
         # store statistics in agent history
         self.policy_loss_history.append(statistics.mean(policy_loss_history))
@@ -706,8 +795,7 @@ class PPOAgent:
         gc.collect()
 
     def evaluate(self, n: int, save: bool = False, act_confidently=False) -> Tuple[StatBundle, Any]:
-        """Evaluate the current state of the policy on the given environment for n episodes. Optionally can render to
-        visually inspect the performance.
+        """Evaluate the current state of the policy on the given environment for n episodes.
 
         Args:
             n (int): integer value indicating the number of episodes that shall be run
@@ -718,14 +806,19 @@ class PPOAgent:
         """
         policy, value, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
-        gathered_evaluation_result = []
-        for i in range(n):
-            gathered_evaluation_result.append(evaluate(policy, self.env, self.distribution, act_confidently))
+        stat_bundles = []
+        for i in tqdm(range(n), disable=not self.is_root):
+            lengths, rewards, classes, auxiliary_performances = evaluate(policy, self.env, self.distribution, act_confidently)
+            stat_bundles.append(
+                StatBundle(
+                    1, lengths, [rewards], [lengths],
+                    tbptt_underflow=0,
+                    per_receptor_mean={},
+                    auxiliary_performances=auxiliary_performances
+                )
+            )
 
-        # gathered_evaluation_result = mpi_comm.gather(evaluation_result, root=0)
-
-        lengths, rewards, classes = zip(*gathered_evaluation_result)
-        stats = StatBundle(n, sum(lengths), rewards, lengths, tbptt_underflow=0, per_receptor_mean={})
+        stats = condense_stats(stat_bundles)
 
         if save and MPI.COMM_WORLD.rank == 0:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
@@ -785,7 +878,7 @@ class PPOAgent:
             time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
 
         total_gpu_memory = 0
-        if len(gpus) > 0:
+        if len(self.gpus) > 0:
             nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
             nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
             total_gpu_memory = nvidia_info.total
@@ -793,10 +886,10 @@ class PPOAgent:
         # years of experience
         years_of_experience_report = ""
         if self.years_of_experience is not None:
-            years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.5f}{ec}; "
+            years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.3f}{ec}; "
 
         # print the report
-        if is_root:
+        if self.is_root:
             pass
         mpi_flat_print(
             f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
@@ -830,7 +923,10 @@ class PPOAgent:
         parameters = self.__dict__.copy()
         del parameters["env"]
         del parameters["policy"], parameters["value"], parameters["joint"], parameters["distribution"]
-        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters["gatherer_class"]
+        del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters[
+            "gatherer_class"]
+        del parameters["mpi_comm"], parameters["optimization_comm"], parameters["is_optimization_process"], \
+            parameters["n_optimizers"], parameters["gpus"], parameters["is_root"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
@@ -842,8 +938,12 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None, force_env_name=None,
-                         path_modifier="") -> "PPOAgent":
+    def from_agent_state(
+            agent_id: int,
+            from_iteration: Union[int, str] = None,
+            force_env_name=None,
+            path_modifier="",
+            n_optimizers: int = None) -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
@@ -854,24 +954,36 @@ class PPOAgent:
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
         """
+        mpi_comm = MPI.COMM_WORLD
+        gpus = tf.config.list_physical_devices('GPU')
+        is_root = mpi_comm.rank == 0
+
+        optimization_comm, is_optimization_process = PPOAgent.get_optimization_comm(
+            limit_to_n_optimizers=n_optimizers
+        )
+
         # TODO also load the state of the optimizers
-        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}"
+        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"
+
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(
-                "The given agent ID does not match any existing save history from your current path.")
+                f"The given agent ID does not match any existing save history from your current path. Searched for "
+                f"{os.path.abspath(agent_path)}")
 
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
         # determine loading point
-        latest_matches = PPOAgent.get_saved_iterations(agent_id)
+        latest_matches = PPOAgent.get_saved_iterations(agent_id, path_modifier=path_modifier)
+
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
             else:
                 from_iteration = "best"
         elif isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b", "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            assert from_iteration.lower() in ["best", "b",
+                                              "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
             if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):
@@ -895,6 +1007,7 @@ class PPOAgent:
             except json.decoder.JSONDecodeError as e:
                 print(f"The parameter file of {from_iteration} seems to be corrupted. "
                       f"Falling back to {fallback_stack[0]}.")
+                print(e)
                 from_iteration = fallback_stack.pop(0)
 
         if is_root:
@@ -902,7 +1015,8 @@ class PPOAgent:
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
                        reward_config=parameters.get("reward_configuration"),
-                       transformers=transformers_from_serializations(parameters["transformers"]))
+                       transformers=transformers_from_serializations(parameters["transformers"]),
+                       render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
 
@@ -913,7 +1027,8 @@ class PPOAgent:
                                 gradient_clipping=parameters["gradient_clipping"],
                                 clip_values=parameters["clip_values"], tbptt_length=parameters["tbptt_length"],
                                 lr_schedule=parameters["lr_schedule_type"], distribution=distribution, _make_dirs=False,
-                                reward_configuration=parameters["reward_configuration"])
+                                reward_configuration=parameters["reward_configuration"],
+                                n_optimizers=n_optimizers)
 
         for p, v in parameters.items():
             if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
@@ -921,7 +1036,7 @@ class PPOAgent:
 
             loaded_agent.__dict__[p] = v
 
-        loaded_agent.joint.load_weights(f"{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
+        loaded_agent.joint.load_weights(f"./{path_modifier}/{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
             if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
@@ -944,9 +1059,9 @@ class PPOAgent:
         return loaded_agent
 
     @staticmethod
-    def get_saved_iterations(agent_id: int) -> list:
+    def get_saved_iterations(agent_id: int, path_modifier="") -> list:
         """Return a list of iterations at which the agent of given ID has been saved."""
-        agent_path = BASE_SAVE_PATH + f"/{agent_id}"
+        agent_path = os.path.join(path_modifier, BASE_SAVE_PATH, f"{agent_id}")
 
         if not os.path.isdir(agent_path):
             raise FileNotFoundError("The given agent ID does not match any existing save history.")
@@ -972,3 +1087,31 @@ class PPOAgent:
         joint.set_weights(weights)
 
         return policy, value, joint
+
+    def load_components(self, path_to_components: str):
+        for directory in os.listdir(path_to_components):
+            pretrained_component_full_path = os.path.join(path_to_components, directory)
+            if os.path.isdir(pretrained_component_full_path):
+                try:
+                    pretrained_component = tf.keras.models.load_model(pretrained_component_full_path, compile=False)
+                except JSONDecodeError as e:
+                    raise ComponentError("Could not load the pretrained model from given files. Likely, the saved model"
+                                         "files where created with a different incompatible TF version.")
+
+                found_counterpart = False
+                for model_component in self.joint.layers:
+                    if model_component.name == pretrained_component.name:
+                        mpi_print(f"Loading weights of '{model_component.name}' from pretrained models.")
+                        model_component.set_weights(pretrained_component.get_weights())
+
+                        found_counterpart = True
+                        break
+
+                if not found_counterpart:
+                    print(f"No counterpart for pretrained component '{pretrained_component.name}' found in the model.")
+
+    def freeze_component(self, component: str):
+        for model_component in self.joint.layers:
+            if model_component.name == component:
+                mpi_print(f"Freezing '{model_component.name}'.")
+                model_component.trainable = False

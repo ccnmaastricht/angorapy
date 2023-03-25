@@ -33,6 +33,7 @@ class ExperienceBuffer:
         self.episode_lengths = []
         self.episode_rewards = []
         self.episodes_completed = 0
+        self.auxiliary_performances = {}
 
         # indicators
         self.is_continuous = is_continuous

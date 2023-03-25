@@ -29,5 +29,5 @@ plt.xlim(0, 800)
 plt.ylim(0)
 
 plt.gcf().set_size_inches(16, 4)
-# plt.show()
-plt.savefig("../../../docs/figures/manipulate-progress.pdf", format="pdf", bbox_inches="tight")
+plt.show()
+# plt.savefig("../../../docs/figures/manipulate-progress.pdf", format="pdf", bbox_inches="tight")

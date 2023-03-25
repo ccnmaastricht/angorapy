@@ -1,13 +1,18 @@
 """Maker functions that generate model builder from parameters."""
+import functools
 import itertools
 from collections import OrderedDict
 from functools import partial
 
+from angorapy.common.activations import LiF
 from angorapy.models.shadow import build_shadow_brain_base
+from angorapy.models.shadow_v2 import build_shadow_v2_brain_base
 from angorapy.models.simple import build_simple_models, build_deeper_models, build_wider_models
 
+MODELS_AVAILABLE = ["simple", "deeper", "wider", "shadow", "shadowlif", "shadowv2"]
+
 arguments = OrderedDict(sorted([
-    ("model", ["simple", "deeper", "wider", "shadow"]),
+    ("model", MODELS_AVAILABLE),
     ("model_type", ["ffn", "rnn", "lstm", "gru"]),
     ("blind", [True, False]),
     ("shared", [True, False]),
@@ -21,6 +26,10 @@ for pd in parameter_dicts:
         base_function = build_simple_models
     elif pd["model"] == "shadow":
         base_function = build_shadow_brain_base
+    elif pd["model"] == "shadowv2":
+        base_function = build_shadow_v2_brain_base
+    elif pd["model"] == "shadowlif":
+        base_function = functools.partial(build_shadow_brain_base, activation=LiF)
     elif pd["model"] == "deeper":
         base_function = build_deeper_models
     elif pd["model"] == "wider":

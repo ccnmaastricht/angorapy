@@ -6,6 +6,9 @@ import sys
 from json import JSONDecodeError
 
 from bokeh import embed
+from tqdm import tqdm
+
+from angorapy.models import MODELS_AVAILABLE
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -22,7 +25,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import PATH_TO_EXPERIMENTS, BASE_SAVE_PATH
 from angorapy.utilities.monitor.training_plots import plot_memory_usage, plot_execution_times, plot_preprocessor, \
     plot_reward_progress, plot_loss, plot_length_progress, plot_distribution, compare_reward_progress, \
-    grouped_reward_progress, group_preview
+    grouped_reward_progress, group_preview, plot_aux_perf_progress
 from angorapy.utilities.statistics import ignore_none
 
 from angorapy.monitor import app
@@ -45,7 +48,7 @@ def overview():
 
     experiments = {}
     envs_available = set()
-    for exp_path in experiment_paths:
+    for exp_path in tqdm(experiment_paths):
 
         eid_m = re.match("[0-9]+", str(exp_path.split("/")[-1]))
         if eid_m:
@@ -60,11 +63,15 @@ def overview():
                     with open(os.path.join(exp_path, "meta.json"), "r") as f:
                         meta = json.load(f)
                 except:
-                    print(eid_m)
+                    pass
 
+                agent_parameters = {}
                 model_available = False
                 if os.path.isfile(os.path.join(model_path, "best/weights.index")):
                     model_available = True
+
+                    with open(os.path.join(model_path, "best/parameters.json")) as f:
+                        agent_parameters = json.load(f)
 
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])
@@ -78,6 +85,11 @@ def overview():
 
                 architecture = "Any" if "architecture" not in meta["hyperparameters"] else meta["hyperparameters"]["architecture"]
                 model = "Any" if "model" not in meta["hyperparameters"] else meta["hyperparameters"]["model"]
+                if model_available:
+                    architecture = agent_parameters.get("builder_function_name", architecture)
+                    for mname in MODELS_AVAILABLE:
+                        if mname in architecture:
+                            architecture = mname
 
                 experiments.update({
                     eid: {
@@ -402,6 +414,12 @@ def show_experiment(exp_id):
     if "per_receptor_mean" in stats.keys():
         plots["per_receptor_mean"] = embed.components(plot_per_receptor_mean(stats["per_receptor_mean"]))
 
+    plots["auxiliary_plots"] = {}
+    if "auxiliary_performances" in stats.keys():
+        for aux_perf_key, aux_perf_values in stats["auxiliary_performances"].items():
+            plots["auxiliary_plots"][aux_perf_key] = embed.components(
+                plot_aux_perf_progress(aux_perf_values, cycles_loaded, perf_name=aux_perf_key))
+
     info.update(dict(
         plots=plots
     ))
@@ -435,15 +453,15 @@ def show_comparison():
         progress_reports.update({f"{exp_id}": progress})
         metas[str(exp_id)] = meta
 
-    info["plots"]["reward"] = compare_reward_progress(
+    info["plots"]["reward"] = embed.components(compare_reward_progress(
         {id: progress["rewards"] for id, progress in progress_reports.items()},
         None
-    )
+    ))
 
-    info["plots"]["reward_grouped"] = grouped_reward_progress(
+    info["plots"]["reward_grouped"] = embed.components(grouped_reward_progress(
         {id: (metas[str(id)]["hyperparameters"]["epochs_per_cycle"], progress["rewards"]) for id, progress in progress_reports.items() if metas[str(id)]["hyperparameters"]["epochs_per_cycle"] > 30},
         None
-    )
+    ))
 
     return flask.render_template("compare.html", info=info)
 

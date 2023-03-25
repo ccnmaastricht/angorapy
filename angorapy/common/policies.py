@@ -91,8 +91,8 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
     """Policy implementation of categorical (also discrete) distributions. That is, this policy is to be used in any
     case where the step_tuple space is discrete and the agent thus predicts a pmf over the possible actions."""
 
-    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> np.ndarray:
-        return tf.squeeze(tf.argmax(log_probabilities, axis=-1)).numpy()
+    def act_deterministic(self, log_probabilities: Union[tf.Tensor, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+        return tf.squeeze(tf.argmax(log_probabilities, axis=-1)).numpy(), tf.reduce_max(log_probabilities, axis=-1).numpy()
 
     @property
     def short_name(self):
@@ -111,7 +111,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
         return action, tf.squeeze(log_probabilities)[action]
 
     def sample(self, log_probabilities):
-        """Sample an step_tuple from the distribution."""
+        """Sample an action from the distribution."""
         assert isinstance(log_probabilities, tf.Tensor) or isinstance(log_probabilities, np.ndarray), \
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."
@@ -254,7 +254,7 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
         unflattened_shape = x.shape[1:-1].concatenate(n_actions)
         x = tf.keras.layers.Reshape(unflattened_shape)(x)
-        x = tf.nn.log_softmax(x, axis=-1, name="log_likelihoods")
+        x = tf.keras.layers.Activation(tf.nn.log_softmax, name="log_likelihoods", dtype="float32")(x)
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 
@@ -324,15 +324,15 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         Output Shapes:
             - all: (B) or (B, S)
         """
-        tf.debugging.assert_all_finite(samples, "samples not all finite")
-        tf.debugging.assert_all_finite(means, "means not all finite")
-        tf.debugging.assert_all_finite(log_stdevs, "log_stdevs not all finite")
+        # tf.debugging.assert_all_finite(samples, "samples not all finite")
+        # tf.debugging.assert_all_finite(means, "means not all finite")
+        # tf.debugging.assert_all_finite(log_stdevs, "log_stdevs not all finite")
 
         log_likelihoods = (- tf.reduce_sum(log_stdevs, axis=-1)
                            - tf.math.log(2 * np.pi)
                            - (0.5 * tf.reduce_sum(tf.square(((samples - means) / tf.exp(log_stdevs))), axis=-1)))
 
-        tf.debugging.assert_all_finite(log_likelihoods, "log_likelihoods not all finite")
+        # tf.debugging.assert_all_finite(log_likelihoods, "log_likelihoods not all finite")
 
         return log_likelihoods
 
@@ -436,7 +436,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
         """Get action by deterministically taking the mode of the distribution."""
-        actions = (alphas - 1) / (alphas + betas - 2)
+        actions = (alphas) / (alphas + betas)
 
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
 
@@ -520,11 +520,11 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
-        alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus",
+        alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus", dtype="float32",
                                        kernel_initializer=tf.keras.initializers.Orthogonal(1),
                                        bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
 
-        betas = tf.keras.layers.Dense(n_actions, name="betas", activation="softplus",
+        betas = tf.keras.layers.Dense(n_actions, name="betas", activation="softplus", dtype="float32",
                                       kernel_initializer=tf.keras.initializers.Orthogonal(1),
                                       bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
 

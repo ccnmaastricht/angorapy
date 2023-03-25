@@ -1,219 +1,133 @@
 #!/usr/bin/env python
 """Pretrain the visual component."""
-import argparse
 import os
+import sys
+
+import keras_cortex
+
+from angorapy.models.convolutional import OpenAIEncoder
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import argparse
+import math
+
+from angorapy.utilities.util import mpi_flat_print
 
 import numpy as np
-import sklearn.model_selection
+import tensorflow_datasets as tfds
+from tensorflow.python.data import AUTOTUNE
+
+from angorapy.models import _build_openai_encoder
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from typing import Union, Tuple
+from typing import Tuple
 
 import argcomplete
 import tensorflow as tf
-import tensorflow_datasets as tfds
 
-from angorapy.models import _build_visual_decoder, _build_openai_encoder
-from common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
-from utilities.data_generation import gen_cube_quats_prediction_data, gen_hand_pos_prediction_data
+from angorapy.common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
+from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, load_dataset
 
-
-def load_caltech():
-    # load dataset
-    test_train = tfds.load("caltech101", shuffle_files=True)
-    return test_train["train"], test_train["test"], 102
+import tensorflow_graphics.geometry.transformation as tfg
 
 
-def top_5_accuracy(y_true, y_pred):
-    return tf.keras.metrics.top_k_categorical_accuracy(y_true, y_pred, k=5)
+def rotational_diff_metric(y_true, y_pred):
+    rot_true = y_true[..., 3:]
+    rot_pred = y_pred[..., 3:]
+
+    return tfg.quaternion.relative_angle(rot_true, rot_pred) * tf.constant(180. / math.pi)
 
 
-class TestCallback(tf.keras.callbacks.Callback):
+def positional_diff_metric(y_true, y_pred):
+    """Gives positional difference in millimeters."""
+    pos_true = y_true[..., :3]
+    pos_pred = y_pred[..., :3]
 
-    def __init__(self, test_data):
-        self.test_data = test_data
-
-    def on_epoch_end(self, epoch, logs={}):
-        out = self.model.evaluate(self.test_data, )
-        print(f"\n{out}\n")
+    return tf.linalg.norm(pos_true - pos_pred, axis=-1) * 1000
 
 
-def pretrain_on_reconstruction(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_r"):
-    """Pretrain a visual component on the reconstruction of images."""
-    input_shape = pretrainable_component.input_shape
-    spatial_dimensions = input_shape[1:3]
-
-    X, _ = gen_cube_quats_prediction_data(1024 * 8)
-
-    # model is constructed from visual component and a decoder
-    decoder = _build_visual_decoder(pretrainable_component.output_shape[-1])
-    model = tf.keras.Sequential((
-        pretrainable_component,
-        decoder
-    ))
-
-    if isinstance(pretrainable_component, tf.keras.Model):
-        checkpoint_path = PRETRAINED_COMPONENTS_PATH + "/ckpts/weights.ckpt"
-
-        # Create a callback that saves the model'serialization weights
-        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                         save_weights_only=True,
-                                                         verbose=1)
-
-        optimizer = tf.keras.optimizers.Adam()
-        model.compile(optimizer, loss="mse")
-
-        # train and save encoder
-        model.fit(x=X, y=X, epochs=epochs, callbacks=[cp_callback])
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
-        model.save(PRETRAINED_COMPONENTS_PATH + f"/{name}_full.h5")
-    elif isinstance(pretrainable_component, str):
-        model.load_weights(pretrainable_component)
-    else:
-        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
-
-
-def pretrain_on_classification(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_c"):
-    """Pretrain a visual component on the classification of images."""
-
-    input_shape = pretrainable_component.input_shape
-    spatial_dimensions = input_shape[1:3]
-
-    train_images, test_images, n_classes = load_caltech()
-
-    # resize and normalize images, extract one hot vectors from labels
-    train_images = train_images.map(
-        lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255,
-                     tf.one_hot(img["label"], depth=n_classes)))
-    train_images = train_images.batch(128)
-
-    test_images = test_images.map(
-        lambda img: (tf.image.resize(img["image"], spatial_dimensions) / 255,
-                     tf.one_hot(img["label"], depth=n_classes)))
-    test_images = test_images.batch(128)
-
-    # model is constructed from visual component and classification layer
-    model = tf.keras.Sequential((
-        pretrainable_component,
-        tf.keras.layers.Dense(n_classes),
-        tf.keras.layers.Activation("softmax")
-    ))
-
-    if isinstance(pretrainable_component, tf.keras.Model):
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
-
-        # train and save encoder
-        model.fit(train_images, epochs=epochs, callbacks=[])
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
-        model.save(PRETRAINED_COMPONENTS_PATH + f"/{name}_full.h5")
-    elif isinstance(pretrainable_component, str):
-        model.load_weights(pretrainable_component)
-    else:
-        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
-
-    # evaluate
-    results = model.evaluate(test_images)
-    print(results)
-
-
-def pretrain_on_object_pose(pretrainable_component: Union[tf.keras.Model, str],
-                            epochs,
+def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
+                            epochs: int,
+                            n_samples: int,
+                            n_cameras=1,
+                            load_data: bool = False,
                             name="visual_op",
-                            dataset: Tuple[np.ndarray, np.ndarray] = None):
+                            dataset: Tuple[np.ndarray, np.ndarray] = None,
+                            load_from: str = None):
     """Pretrain a visual component on prediction of cube position."""
-
-    # model is constructed from visual component and regression output
-    model = tf.keras.Sequential((
-        pretrainable_component,
-        tf.keras.layers.Dense(7, activation="linear"),
-    ))
-
-    if dataset is None:
-        x, y = gen_cube_quats_prediction_data(1024 * 8)
-        x = tf.image.per_image_standardization(x).numpy()
-
-        os.makedirs("storage/data/pretraining", exist_ok=True)
-
-        with open("storage/data/pretraining/object_pose_x.npy", "wb") as f:
-            np.save(f, x)
-
-        with open("storage/data/pretraining/object_pose_y.npy", "wb") as f:
-            np.save(f, y)
+    data_path = f"storage/data/pretraining/pose_data_{n_samples}_{n_cameras}c.tfrecord"
+    if not load_data:
+        dataset = gen_cube_quats_prediction_data(
+            n_samples,
+            data_path,
+            n_cameras=n_cameras
+        )
     else:
-        x, y = dataset
+        dataset = load_dataset(data_path)
 
-    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(x, y,
-                                                                                train_size=0.8, shuffle=True)
+    # dataset = dataset.repeat(100000).shuffle(10000)
+    # dataset = dataset.map(lambda x, y: (x, y))
 
-    x_test, x_val, y_test, y_val = sklearn.model_selection.train_test_split(x_test, y_test, train_size=0.8,
-                                                                            shuffle=True)
+    n_testset = 10000
+    n_valset = 5000
 
-    if isinstance(pretrainable_component, tf.keras.Model):
-        # generate training data
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="mse", metrics=[])
+    testset = dataset.take(n_testset)
+    trainset = dataset.skip(n_testset)
+    valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
+
+    trainset = trainset.batch(128, drop_remainder=True)
+    trainset = trainset.prefetch(AUTOTUNE)
+
+    valset = valset.batch(128, drop_remainder=True)
+    valset = valset.prefetch(AUTOTUNE)
+
+    testset = testset.batch(128, drop_remainder=True)
+    testset = testset.prefetch(AUTOTUNE)
+
+    if load_from is None:
+        model = pretrainable_component
+        model(tf.expand_dims(next(iter(dataset))[0], 0))
+
+        # chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
+        # chunk_mean = np.mean(chunk, axis=0)
+        # output_layer = model.get_layer("output")
+        # output_weights = output_layer.get_weights()
+        # output_weights[1] = chunk_mean
+        # output_layer.set_weights(output_weights)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
+        model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
 
         # train and save encoder
-        model.fit(x_train, y_train, epochs=epochs,
-                  callbacks=[tf.keras.callbacks.EarlyStopping(patience=3)],
-                  batch_size=128,
-                  validation_data=(x_val, y_val))
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
-    elif isinstance(pretrainable_component, str):
+        model.fit(x=trainset,
+                  epochs=epochs,
+                  validation_data=valset,
+                  callbacks=[
+                      tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
+                  ],
+                  shuffle=True)
+        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
+    else:
         print("Loading model...")
-        model.load_weights(pretrainable_component)
-    else:
-        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to model.")
+        model = tf.keras.models.load_model(load_from)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
+        print("Model loaded successfully.")
 
-    print(f"A mean model would have an MSE of {np.mean((y_test - np.mean(y_train, axis=0)) ** 2)}")
-    print(f"This model achieves {model.evaluate(x_test, y_test)}")
-
-
-def pretrain_on_hand_pose(pretrainable_component: Union[tf.keras.Model, str], epochs, name="visual_hp"):
-    """Pretrain a visual component on prediction of cube position."""
-
-    # model is constructed from visual component and regression output
-    model = pretrainable_component
-
-    if isinstance(pretrainable_component, tf.keras.Model):
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
-
-        for epoch_i in range(epochs):
-            print(f"Starting Epoch {epoch_i}")
-
-            # generate training data
-            X, Y = gen_hand_pos_prediction_data(1024 * 8)
-            X = tf.image.per_image_standardization(X)
-
-            dataset = tf.data.Dataset.from_tensor_slices((X, Y))
-            dataset = dataset.shuffle(buffer_size=1024).batch(128)
-
-            for step, (batch_x, batch_y) in enumerate(dataset):
-                with tf.GradientTape() as tape:
-                    output = model(batch_x, training=True)
-                    loss = tf.keras.losses.MSE(batch_y, output)
-
-                grads = tape.gradient(loss, model.trainable_weights)
-                optimizer.apply_gradients(zip(grads, model.trainable_weights))
-
-                if step % 4 == 0:
-                    print(f"Training loss (for one batch) at step {step}: {float(tf.reduce_mean(loss))}. "
-                          f"Seen so far: {((step + 1) * 128)} samples")
-
-            del dataset
-
-        # save encoder
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}.h5")
-    elif isinstance(pretrainable_component, str):
-        model.load_weights(pretrainable_component)
-    else:
-        raise ValueError("No clue what you think this is but it for sure ain't no model nor a path to a model.")
+    train_mean = np.mean(list(tfds.as_numpy(trainset.unbatch().take(5000).map(lambda x, y: y))), axis=0)
+    test_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
+    print(f"This model achieves {model.evaluate(testset)}")
+    print(f"A mean model would achieve {np.mean((test_numpy - train_mean) ** 2)}")
 
 
 if __name__ == "__main__":
+
     tf.get_logger().setLevel('INFO')
+    gpus = tf.config.list_physical_devices("GPU")
+    if gpus:
+        tf.config.experimental.set_memory_growth(gpus[0], True)
 
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
@@ -221,41 +135,32 @@ if __name__ == "__main__":
     # general parameters
     parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hand", "object",
                                                               "c", "r", "h", "o", "hp", "op"], default="o")
-    parser.add_argument("--name", type=str, default="pretrained_component",
+    parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=60, help=f"number of pretraining epochs")
+    parser.add_argument("--epochs", type=int, default=30, help=f"number of pretraining epochs")
 
     # read arguments
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    visual_component = _build_openai_encoder(shape=(VISION_WH, VISION_WH, 3), out_shape=15,
-                                             name="visual_component")
-    visual_component(tf.random.normal((16, VISION_WH, VISION_WH, 3)))  # needed to initialize keras or whatever
+    # parameters
+    n_cameras = 3
+    n_samples = 1000000
+
+    visual_component = OpenAIEncoder(shape=(VISION_WH, VISION_WH, 3), name=args.name, n_cameras=3)
+    # visual_component = keras_cortex.cornet.cornet_z.PoseCORNetZ(7, name=args.name)
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
 
     args.name = args.name + "_" + args.task[0]
 
-    if args.task in ["classify", "c"]:
-        pretrain_on_classification(visual_component, args.epochs, name=args.name)
-    elif args.task in ["reconstruct", "r"]:
-        pretrain_on_reconstruction(visual_component, args.epochs, name=args.name)
-    elif args.task in ["hand", "h"]:
-        pretrain_on_hand_pose(visual_component, args.epochs, name=args.name)
-    elif args.task in ["object", "o"]:
-        try:
-            with open("storage/data/pretraining/object_pose_x.npy", "rb") as f:
-                x = np.load(f)
-
-            with open("storage/data/pretraining/object_pose_y.npy", "rb") as f:
-                y = np.load(f)
-
-            dataset = x, y
-        except:
-            dataset = None
-
-        pretrain_on_object_pose(visual_component, args.epochs, name=args.name, dataset=dataset)
-    else:
-        raise ValueError("I dont know that task type.")
+    pretrain_on_object_pose(
+        visual_component,
+        epochs=args.epochs,
+        n_samples=n_samples,
+        n_cameras=n_cameras,
+        load_data=False,
+        name=args.name,
+        load_from=args.load,
+    )
