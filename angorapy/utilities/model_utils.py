@@ -1,11 +1,14 @@
 from inspect import getfullargspec as fargs
-from typing import List, Union
+from typing import List, Union, Callable
 
 import numpy
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 
+import angorapy
+from angorapy.common.wrappers import BaseWrapper
+from angorapy.utilities.error import IncompatibleModelException
 from angorapy.utilities.util import flatten
 
 
@@ -185,9 +188,40 @@ def calc_max_memory_usage(model: tf.keras.Model):
     return total_memory * 1.1641532182693481 * 10 ** -10
 
 
+
+
+
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 
 
 def is_conv(layer):
     """Check if layer is convolutional."""
     return isinstance(layer, CONVOLUTION_BASE_CLASS)
+
+
+# Validators
+
+def validate_model_builder(model_function: Callable) -> None:
+    env = angorapy.make_env("LunarLanderContinuous-v2")
+    distribution = angorapy.policies.BetaPolicyDistribution(env)
+
+    models = model_function(env, distribution)
+
+    # validate model order
+    if not models[1].output_shape[-1] == 1:
+        raise ValueError("The model function returns a model tuple whose value network's output is not one-dimensional."
+                         "Make sure your value function returns a valid one-dimensional scalar output and that the "
+                         "model builder returns this network as the second element of the model-triple.")
+
+
+def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) -> bool:
+    """Validate whether the envs states can be processed by the model."""
+    model_inputs = [ip.name for ip in model.inputs]
+    env_outputs = list(env.reset()[0].dict().keys())
+
+    if not sorted(model_inputs) == sorted(env_outputs):
+        raise IncompatibleModelException(
+            f"The model with inputs {model_inputs} cannot handle this environment's states with senses {env_outputs}."
+        )
+
+    return True

@@ -103,6 +103,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.model.opt.timestep = delta_t
         self.original_n_substeps = n_substeps
 
+        self._set_default_reward_function_and_config()
+
     def _set_action_space(self):
         bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
         low, high = bounds.T
@@ -123,6 +125,9 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.model.opt.timestep = self._delta_t_simulation
 
         self._simulation_steps_per_control_step = int(self._delta_t_control / self._delta_t_simulation * self.original_n_substeps)
+
+    def set_original_n_substeps_to_sspcs(self):
+        self.original_n_substeps = self._simulation_steps_per_control_step
 
     def _env_setup(self, initial_state):
         raise NotImplementedError
@@ -147,6 +152,10 @@ class AnthropomorphicEnv(gym.Env, ABC):
         """Compute reward with additional success bonus."""
         return self.reward_function(self, achieved_goal, goal, info)
 
+    @abc.abstractmethod
+    def _set_default_reward_function_and_config(self):
+        pass
+
     def set_reward_function(self, function: Union[str, Callable]):
         """Set the environment reward function by its config identifier or a callable."""
         if isinstance(function, str):
@@ -154,6 +163,10 @@ class AnthropomorphicEnv(gym.Env, ABC):
                 function = getattr(reward, function.split(".")[0])
             except AttributeError:
                 raise AttributeError("Reward function unknown.")
+        elif isinstance(function, Callable):
+            pass
+        else:
+            raise ValueError("Unknown format for given reward function. Provide a string or a Callable.")
 
         self.reward_function = function
 

@@ -8,7 +8,8 @@ import numpy
 from mpi4py import MPI
 
 from angorapy.common.senses import Sensation
-from angorapy.common.transformers import BaseTransformer, merge_transformers
+from angorapy.common.transformers import BaseTransformer, StateNormalizationTransformer, RewardNormalizationTransformer,\
+    merge_transformers
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -141,7 +142,8 @@ class TransformationWrapper(BaseWrapper):
 
 def make_env(env_name,
              reward_config: Union[str, dict] = None,
-             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = None,
+             reward_function: Union[str, dict] = None,
+             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = [StateNormalizationTransformer, RewardNormalizationTransformer],
              **kwargs) -> BaseWrapper:
     """Make environment, including a possible reward config and transformers."""
     base_env = gym.make(env_name, **kwargs)
@@ -156,8 +158,10 @@ def make_env(env_name,
 
     env = TransformationWrapper(base_env, transformers=transformers)
 
+    if reward_function is not None and hasattr(env, "reward_function"):
+        env.set_reward_function(reward_function)
+
     if reward_config is not None and hasattr(env, "reward_config"):
-        env.set_reward_function(reward_config)
         env.set_reward_config(reward_config)
 
     return env

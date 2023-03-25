@@ -8,15 +8,10 @@ from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_
 try:
     import mujoco
     has_mujoco = True
-
-    if MPI.COMM_WORLD.rank == 0:
-        print("A MuJoCo path exists. MuJoCo is being loaded...")
-
 except ImportError as e:
     has_mujoco = False
+    print("No mujoco installation has been found. Some environments will be unavailable.")
 
-    if MPI.COMM_WORLD.rank == 0:
-        print("No MuJoCo path exists. MuJoCo is not going to be loaded...")
 
 if has_mujoco:
     from angorapy.environments.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \

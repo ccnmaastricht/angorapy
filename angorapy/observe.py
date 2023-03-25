@@ -53,7 +53,7 @@ except:
 investigator = Investigator.from_agent(agent)
 env = make_env(agent.env.spec.id, transformers=agent.env.transformers, render_mode="human")
 if args.freeze_wrist:
-    env.env.toggle_wrist_freezing()
+    env.toggle_wrist_freezing()
 
 substeps = "" if not hasattr(env.unwrapped, "sim") else f" with {env.unwrapped.sim.nsubsteps} substeps"
 print(f"Evaluating on {env.unwrapped.spec.id}{substeps}.")
@@ -68,9 +68,10 @@ print(f"Environment has the following transformers: {env.transformers}")
 #     env = make_env(new_name, args.rcon)
 
 if isinstance(env.unwrapped, BaseShadowHandEnv):
-    env.env.set_delta_t_simulation(0.002)
-
-env.env.change_perspective("topdown-far")
+    env.set_delta_t_simulation(0.002)
+    env.set_original_n_substeps_to_sspcs()
+    env.change_color_scheme("default")
+    env.change_perspective("topdown-far")
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
         investigator.render_episode(env, act_confidently=not args.act_stochastic)

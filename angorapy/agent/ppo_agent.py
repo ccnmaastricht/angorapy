@@ -34,12 +34,11 @@ from angorapy.common.const import MIN_STAT_EPS
 from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from angorapy.common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
-from angorapy.common.validators import validate_env_model_compatibility
 from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
 from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
-    requires_batch_size, requires_sequence_length
+    requires_batch_size, requires_sequence_length, validate_model_builder, validate_env_model_compatibility
 from angorapy.utilities.statistics import ignore_none
 from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
     mpi_print, flatten
@@ -60,7 +59,7 @@ class PPOAgent:
     joint: tf.keras.Model
 
     def __init__(self,
-                 model_builder: Callable,
+                 model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
                  environment: BaseWrapper,
                  horizon: int = 1024,
                  workers: int = 8,
@@ -180,6 +179,8 @@ class PPOAgent:
             distribution=self.distribution,
             **({"bs": 1} if requires_batch_size(model_builder) else {}),
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {}))
+
+        validate_model_builder(self.model_builder)
         validate_env_model_compatibility(self.env, self.joint)
 
         if pretrained_components is not None:
@@ -1002,6 +1003,7 @@ class PPOAgent:
             except json.decoder.JSONDecodeError as e:
                 print(f"The parameter file of {from_iteration} seems to be corrupted. "
                       f"Falling back to {fallback_stack[0]}.")
+                print(e)
                 from_iteration = fallback_stack.pop(0)
 
         if is_root:

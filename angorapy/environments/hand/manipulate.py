@@ -109,7 +109,6 @@ class BaseManipulate(BaseShadowHandEnv):
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
         self.previous_achieved_goal = self._get_achieved_goal()
-        self._set_default_reward_function_and_config()
 
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,

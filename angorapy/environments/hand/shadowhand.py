@@ -104,6 +104,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
         self._freeze_wrist = False
+        self.color_scheme = "default"
+        self.viewpoint = "topdown"
 
         super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
                                                 vision=vision, render_mode=render_mode, delta_t=delta_t, n_substeps=n_substeps)
@@ -113,7 +115,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
-        self.viewpoint = "topdown"
         self.viewer_setup()
 
     def _set_action_space(self):
@@ -288,6 +289,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.viewpoint = perspective
         self.viewer_setup()
 
+    def change_color_scheme(self, color_scheme: str):
+        assert color_scheme in ["default", "inverted"]
+
+        self.color_scheme = color_scheme
+        self.viewer_setup()
+
     def viewer_setup(self):
         # lookat = get_palm_position(self.model)
         #
@@ -295,12 +302,16 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         #     self.viewer.cam.lookat[idx] = value
 
         # hand color
-        # self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
-        self.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
 
-        # background color
-        # self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
-        self.model.mat_rgba[4] = np.array([0, 0, 0, 255]) / 255  # background
+        if self.color_scheme == "default":
+            self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
+            self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        elif self.color_scheme == "inverted":
+            self.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
+            self.model.mat_rgba[4] = np.array([0, 0, 0, 255]) / 255  # background
+        else:
+            raise NotImplementedError(f"Unknown Color Scheme {self.color_scheme}.")
+
         # self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
@@ -311,7 +322,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.3  # zoom in
+            self.viewer.cam.distance = 0.30  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[1] += 0.03  # slightly move forward
@@ -328,7 +339,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.viewer.cam.elevation = -45.0  # top down view
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
         else:
-            raise NotImplementedError("Unknown Viewpoint.")
+            raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 
         mpi_print("Camera setup finished.")
 
@@ -338,3 +349,5 @@ if __name__ == '__main__':
         initial_qpos=DEFAULT_INITIAL_QPOS,
         distance_threshold=0.2
     )
+    pass
+    print()
