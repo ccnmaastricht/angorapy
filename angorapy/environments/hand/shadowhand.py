@@ -104,18 +104,11 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
         self._freeze_wrist = False
-
-        # time control
-        self._delta_t_control: float = delta_t
-        self._delta_t_simulation: float = delta_t
-        self._simulation_steps_per_control_step: int = int(self._delta_t_control // self._delta_t_simulation)
-        self._always_render_mode = False
+        self.color_scheme = "default"
+        self.viewpoint = "topdown"
 
         super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
-                                                vision=vision, render_mode=render_mode)
-
-        self.model.opt.timestep = delta_t
-        self.original_n_substeps = n_substeps
+                                                vision=vision, render_mode=render_mode, delta_t=delta_t, n_substeps=n_substeps)
 
         self.seed()
         self.initial_state = copy.deepcopy(self.get_state())
@@ -142,17 +135,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             ),
         ))
 
-    def set_delta_t_simulation(self, new: float):
-        """Set new value for the simulation delta t."""
-        assert np.isclose(self._delta_t_control % new, 0, rtol=1.e-3, atol=1.e-4), \
-            f"Delta t of simulation must divide control delta t into integer " \
-            f"parts, but gives {self._delta_t_control % new}."
-
-        self._delta_t_simulation = new
-        self.model.opt.timestep = self._delta_t_simulation
-
-        self._simulation_steps_per_control_step = int(self._delta_t_control // self._delta_t_simulation) * self.original_n_substeps
-
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
         self._freeze_wrist = not self._freeze_wrist
@@ -162,7 +144,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
         as such the output is a 15-D numpy array."""
-        goal = [self.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]
+        goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
         return np.array(goal).flatten()
 
     # ENV METHODS
@@ -189,9 +171,14 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         done = False
         info = {
             'is_success': self._is_success(obs['achieved_goal'], self.goal),
+            "achieved_goal": obs["achieved_goal"],
+            "desired_goal": obs["desired_goal"]
         }
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
+
+        if self.render_mode == "human":
+            self.render()
 
         return obs, reward, done, False, info
 
@@ -210,7 +197,13 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
-        return obs, {}
+        info = {
+            'is_success': self._is_success(obs['achieved_goal'], self.goal),
+            "achieved_goal": obs["achieved_goal"],
+            "desired_goal": obs["desired_goal"]
+        }
+
+        return obs, info
 
     def reset_model(self):
         self.set_state(**self.initial_state)
@@ -290,6 +283,18 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         """
         pass
 
+    def change_perspective(self, perspective: str):
+        assert perspective in ["topdown", "side", "topdown-far"], "This viewpoint has no settings available."
+
+        self.viewpoint = perspective
+        self.viewer_setup()
+
+    def change_color_scheme(self, color_scheme: str):
+        assert color_scheme in ["default", "inverted"]
+
+        self.color_scheme = color_scheme
+        self.viewer_setup()
+
     def viewer_setup(self):
         # lookat = get_palm_position(self.model)
         #
@@ -297,11 +302,16 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         #     self.viewer.cam.lookat[idx] = value
 
         # hand color
-        self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
-        # self.sim.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
 
-        # background color
-        self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        if self.color_scheme == "default":
+            self.model.mat_rgba[2] = np.array([29, 33, 36, 255]) / 255  # hand
+            self.model.mat_rgba[4] = np.array([255, 255, 255, 255]) / 255  # background
+        elif self.color_scheme == "inverted":
+            self.model.mat_rgba[2] = np.array([200, 200, 200, 255]) / 255  # hand
+            self.model.mat_rgba[4] = np.array([0, 0, 0, 255]) / 255  # background
+        else:
+            raise NotImplementedError(f"Unknown Color Scheme {self.color_scheme}.")
+
         # self.sim.model.mat_rgba[4] = np.array([159, 41, 54, 255]) / 255  # background
         # self.sim.model.geom_rgba[48] = np.array([0.5, 0.5, 0.5, 0])
 
@@ -310,11 +320,15 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         mpi_print("Setting up camera.")
 
-        self.viewpoint = "topdown"
-
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.5  # zoom in
+            self.viewer.cam.distance = 0.30  # zoom in
+            self.viewer.cam.azimuth = -90.0  # wrist to the bottom
+            self.viewer.cam.elevation = -90.0  # top down view
+            self.viewer.cam.lookat[1] += 0.03  # slightly move forward
+        elif self.viewpoint == "topdown-far":
+            # rotate camera to top down view
+            self.viewer.cam.distance = 0.4  # zoom in
             self.viewer.cam.azimuth = -90.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[1] += 0.03  # slightly move forward
@@ -325,7 +339,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.viewer.cam.elevation = -45.0  # top down view
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
         else:
-            raise NotImplementedError("Unknown Viewpoint.")
+            raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 
         mpi_print("Camera setup finished.")
 
@@ -335,3 +349,5 @@ if __name__ == '__main__':
         initial_qpos=DEFAULT_INITIAL_QPOS,
         distance_threshold=0.2
     )
+    pass
+    print()

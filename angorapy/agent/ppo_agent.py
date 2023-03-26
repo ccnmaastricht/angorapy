@@ -19,8 +19,15 @@ import nvidia_smi
 import psutil
 import tensorflow as tf
 from gym.spaces import Discrete, Box, MultiDiscrete
-from mpi4py import MPI
+from tensorflow.keras import mixed_precision
+
+try:
+    from mpi4py import MPI
+except:
+    MPI = None
+
 from psutil import NoSuchProcess
+from tqdm import tqdm
 
 from angorapy import models
 from angorapy.agent.dataio import read_dataset_from_storage
@@ -32,24 +39,32 @@ from angorapy.common.const import MIN_STAT_EPS
 from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from angorapy.common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
-from angorapy.common.validators import validate_env_model_compatibility
 from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
 from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
-    requires_batch_size, requires_sequence_length
+    requires_batch_size, requires_sequence_length, validate_model_builder, validate_env_model_compatibility
 from angorapy.utilities.statistics import ignore_none
 from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
-    mpi_print
+    mpi_print, flatten
 
 
 class PPOAgent:
+    """Agent using the Proximal Policy Optimization Algorithm for learning.
+    
+    The default is an implementation using two independent models for the critic and the actor. This is of course more
+    expensive than using shared parameters because we need two forward and backward calculations
+    per batch however this is what is used in the original paper and most implementations. During development this also
+    turned out to be beneficial for performance relative to episodes seen in easy tasks (e.g. CartPole) and crucial
+    to make any significant progress in more difficult envs such as LunarLander.
+    """
+
     policy: tf.keras.Model
     value: tf.keras.Model
     joint: tf.keras.Model
 
     def __init__(self,
-                 model_builder: Callable,
+                 model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
                  environment: BaseWrapper,
                  horizon: int = 1024,
                  workers: int = 8,
@@ -169,6 +184,8 @@ class PPOAgent:
             distribution=self.distribution,
             **({"bs": 1} if requires_batch_size(model_builder) else {}),
             **({"sequence_length": self.tbptt_length} if requires_sequence_length(model_builder) else {}))
+
+        validate_model_builder(self.model_builder, self.env, self.distribution)
         validate_env_model_compatibility(self.env, self.joint)
 
         if pretrained_components is not None:
@@ -305,6 +322,24 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
+    def act(self, state):
+        """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
+        that can be directly given to an environment.
+
+        This method is mostly useful at inference time and serves as q quick wrapper around the steps required to
+        process the raw numpy states of the environment into a state readable by the policy network, followed by
+        sampling from the predicted distribution."""
+
+        # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+        prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
+        policy_out = flatten(self.joint(prepared_state, training=False))
+
+        predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
+        # from the action distribution sample an action and remember both the action and its probability
+        action, action_probability = self.distribution.act(*predicted_distribution_parameters)
+
+        return action
+
     def drill(self,
               n: int,
               epochs: int,
@@ -328,7 +363,7 @@ class PPOAgent:
             separate_eval (bool): if false (default), use episodes from gathering for statistics, if true, evaluate 10
                 additional episodes.
             stop_early (bool): if true, stop the drill early if at least the previous 5 cycles achieved a performance
-                above the environments threshold
+                above the envs threshold
 
 
         Returns:
@@ -402,11 +437,14 @@ class PPOAgent:
             effective_batch_size = batch_size
 
         # rebuild model with desired batch size
+        # mixed_precision.set_global_policy("mixed_float16")
         joint_weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size,
             sequence_length=self.tbptt_length)
+
+        # mixed_precision.set_global_policy("float32")
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
         # reset optimizer to not be confused by the newly build models
@@ -451,7 +489,7 @@ class PPOAgent:
             stats = mpi_condense_stats(worker_stats)
             stats = self.mpi_comm.bcast(stats, root=0)
 
-            # sync the environments to share statistics for transformers etc.
+            # sync the envs to share statistics for transformers etc.
             self.env.mpi_sync()
 
             time_dict["gathering"] = time.time() - subprocess_start
@@ -525,7 +563,6 @@ class PPOAgent:
             if self.is_optimization_process:
                 subprocess_start = time.time()
 
-                mpi_flat_print("Optimizing...")
                 dataset = read_dataset_from_storage(
                     dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                     id_prefix=self.agent_id,
@@ -655,83 +692,96 @@ class PPOAgent:
 
         _learn_on_batch = tf.function(learn_on_batch)
 
+        total_updates = (self.n_workers * self.horizon) // ((np.prod(batch_size) * self.tbptt_length) if self.is_recurrent else batch_size) * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        for epoch in range(epochs):
+        with tqdm(total=total_updates, disable=self.mpi_comm.rank != 0, desc="Optimizing...") as pbar:
+            for epoch in range(epochs):
 
-            # shuffle to break correlation; not for recurrent data since that would break chunk dependence
-            if not self.is_recurrent:
-                dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
+                # shuffle to break correlation; not for recurrent data since that would break chunk dependence
+                if not self.is_recurrent:
+                    dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-            # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
-            batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
+                # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
+                batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
 
-            policy_epoch_losses, value_epoch_losses, entropies = [], [], []
+                policy_epoch_losses, value_epoch_losses, entropies = [], [], []
 
-            with tf.device(self.device):
-                for b in batched_dataset:
-                    if not self.is_recurrent:
-                        grad, ent, pi_loss, v_loss = _learn_on_batch(
-                            batch=b, joint=self.joint, distribution=self.distribution,
-                            continuous_control=self.continuous_control, clip_values=self.clip_values,
-                            gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
-                            c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-                        self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
-                    else:
-                        # truncated back propagation through time
-                        # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                        # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
-                        # fed into the model chronologically to adhere to statefulness
-                        # if the following line throws a CPU to GPU error this is most likely due to too little memory
-                        # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
-                        n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
-                        # print(f"bs {batch_size} | split "
-                        #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
+                with tf.device(self.device):
+                    for b in batched_dataset:
+                        if not self.is_recurrent:
+                            grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                batch=b, joint=self.joint, distribution=self.distribution,
+                                continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
+                                c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
+                        else:
+                            # truncated back propagation through time
+                            # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
+                            # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
+                            # fed into the model chronologically to adhere to statefulness
+                            # if the following line throws a CPU to GPU error this is most likely due to too little memory
+                            # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
+                            n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+                            # print(f"bs {batch_size} | split "
+                            #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
+                            # print(sum([bv.dtype.size * tf.reduce_prod(bv.shape).numpy().item() for bv in b.values()]) / 1e9)
 
-                        split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1) for
-                                       bk, bv in b.items()}
-                        for batch_i in range(len(split_batch["advantage"])):
-                            batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
+                            split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1)
+                                           for bk, bv in b.items()}
+                            for batch_i in range(len(split_batch["advantage"])):
+                                batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
 
-                            for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
-                                # extract chunks
-                                partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
+                                for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
+                                    # extract chunks
+                                    partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
 
-                                # find and apply the gradients
-                                # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
-                                # for v in self.joint.trainable_variables], 0, 0, 0
-                                grad, ent, pi_loss, v_loss = _learn_on_batch(
-                                    batch=partial_batch, joint=self.joint, distribution=self.distribution,
-                                    continuous_control=self.continuous_control, clip_values=self.clip_values,
-                                    gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
-                                    c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
+                                    # find and apply the gradients
+                                    # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
+                                    # for v in self.joint.trainable_variables], 0, 0, 0
+                                    grad, ent, pi_loss, v_loss = _learn_on_batch(
+                                        batch=partial_batch, joint=self.joint, distribution=self.distribution,
+                                        continuous_control=self.continuous_control, clip_values=self.clip_values,
+                                        gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
+                                        c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
 
-                                if chunk_i == 0:
-                                    batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
-                                else:
-                                    batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
-                                    batch_ent += ent
-                                    batch_pi_loss += pi_loss
-                                    batch_v_loss += v_loss
+                                    if chunk_i == 0:
+                                        batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
+                                    else:
+                                        batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
+                                        batch_ent += ent
+                                        batch_pi_loss += pi_loss
+                                        batch_v_loss += v_loss
 
-                                # make partial RNN state resets
-                                reset_mask = detect_finished_episodes(partial_batch["done"])
-                                reset_states_masked(self.joint, reset_mask)
+                                    # make partial RNN state resets
+                                    reset_mask = detect_finished_episodes(partial_batch["done"])
+                                    reset_states_masked(self.joint, reset_mask)
 
-                            batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
-                            self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+                                    # free memory
+                                    del partial_batch
 
-                # todo makes no sense with the split batches, need to average over them
-                entropies.append(ent)
-                policy_epoch_losses.append(pi_loss)
-                value_epoch_losses.append(v_loss)
+                                batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
+                                self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
+                                pbar.update(1)
 
-                # reset RNN states after each outer batch
-                self.joint.reset_states()
+                                # free memory
+                                del batch_grad
 
-            # remember some statistics
-            policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
-            value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-            entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+                            # free memory
+                            del split_batch, b, batch_ent, batch_pi_loss, batch_v_loss
+
+                    # todo makes no sense with the split batches, need to average over them
+                    entropies.append(ent)
+                    policy_epoch_losses.append(pi_loss)
+                    value_epoch_losses.append(v_loss)
+
+                    # reset RNN states after each outer batch
+                    self.joint.reset_states()
+
+                # remember some statistics
+                policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
+                value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+                entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         self.optimization_comm.Barrier()
 
@@ -757,11 +807,11 @@ class PPOAgent:
         policy, value, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
         stat_bundles = []
-        for i in range(n):
+        for i in tqdm(range(n), disable=not self.is_root):
             lengths, rewards, classes, auxiliary_performances = evaluate(policy, self.env, self.distribution, act_confidently)
             stat_bundles.append(
                 StatBundle(
-                    n, lengths, [rewards], [lengths],
+                    1, lengths, [rewards], [lengths],
                     tbptt_underflow=0,
                     per_receptor_mean={},
                     auxiliary_performances=auxiliary_performances
@@ -917,13 +967,15 @@ class PPOAgent:
 
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(
-                "The given agent ID does not match any existing save history from your current path.")
+                f"The given agent ID does not match any existing save history from your current path. Searched for "
+                f"{os.path.abspath(agent_path)}")
 
         if len(os.listdir(agent_path)) == 0:
             raise FileNotFoundError("The given agent ID'serialization save history is empty.")
 
         # determine loading point
-        latest_matches = PPOAgent.get_saved_iterations(agent_path)
+        latest_matches = PPOAgent.get_saved_iterations(agent_id, path_modifier=path_modifier)
+
         if from_iteration is None:
             if len(latest_matches) > 0:
                 from_iteration = max(latest_matches)
@@ -955,6 +1007,7 @@ class PPOAgent:
             except json.decoder.JSONDecodeError as e:
                 print(f"The parameter file of {from_iteration} seems to be corrupted. "
                       f"Falling back to {fallback_stack[0]}.")
+                print(e)
                 from_iteration = fallback_stack.pop(0)
 
         if is_root:
@@ -962,7 +1015,8 @@ class PPOAgent:
 
         env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
                        reward_config=parameters.get("reward_configuration"),
-                       transformers=transformers_from_serializations(parameters["transformers"]))
+                       transformers=transformers_from_serializations(parameters["transformers"]),
+                       render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
 
@@ -982,7 +1036,7 @@ class PPOAgent:
 
             loaded_agent.__dict__[p] = v
 
-        loaded_agent.joint.load_weights(f"{agent_path}/{from_iteration}/weights")
+        loaded_agent.joint.load_weights(f"./{path_modifier}/{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
             if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):
@@ -1005,8 +1059,10 @@ class PPOAgent:
         return loaded_agent
 
     @staticmethod
-    def get_saved_iterations(agent_path: int) -> list:
+    def get_saved_iterations(agent_id: int, path_modifier="") -> list:
         """Return a list of iterations at which the agent of given ID has been saved."""
+        agent_path = os.path.join(path_modifier, BASE_SAVE_PATH, f"{agent_id}")
+
         if not os.path.isdir(agent_path):
             raise FileNotFoundError("The given agent ID does not match any existing save history.")
 

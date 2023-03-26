@@ -1,8 +1,6 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-from angorapy.analysis.investigation import Investigator
-
 try:
     from mpi4py import MPI
 

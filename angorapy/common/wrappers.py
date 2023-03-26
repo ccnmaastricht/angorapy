@@ -1,4 +1,4 @@
-"""Wrappers encapsulating environments to modulate n_steps, rewards, and control state initialization."""
+"""Wrappers encapsulating envs to modulate n_steps, rewards, and control state initialization."""
 import abc
 from pprint import pprint
 from typing import Union, List, Type, OrderedDict
@@ -8,7 +8,8 @@ import numpy
 from mpi4py import MPI
 
 from angorapy.common.senses import Sensation
-from angorapy.common.transformers import BaseTransformer, merge_transformers
+from angorapy.common.transformers import BaseTransformer, StateNormalizationTransformer, RewardNormalizationTransformer,\
+    merge_transformers
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -27,6 +28,11 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
     def warmup(self, n_steps=10):
         """Warmup the environment."""
         pass
+
+    def reset(self, **kwargs):
+        """Resets the environment, returning a modified observation using :meth:`self.observation`."""
+        obs, info = self.env.reset(**kwargs)
+        return self.observation(obs), self.info(info)
 
     def observation(self, observation):
         """Process an observation to be of type 'Sensation'."""
@@ -55,6 +61,9 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
             info["desired_goal"] = observation["desired_goal"]
 
         return self.observation(observation), reward, terminated, truncated, info
+
+    def info(self, info):
+        return info
 
     # SYNCHRONIZATION
 
@@ -90,8 +99,9 @@ class TransformationWrapper(BaseWrapper):
         return item in self.transformers
 
     def step(self, action):
-        """PErform a step and transform the results."""
+        """Perform a step and transform the results."""
         step_tuple = super().step(action)
+
         # include original reward in info
         step_tuple[-1]["original_reward"] = step_tuple[1]
 
@@ -132,7 +142,8 @@ class TransformationWrapper(BaseWrapper):
 
 def make_env(env_name,
              reward_config: Union[str, dict] = None,
-             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = None,
+             reward_function: Union[str, dict] = None,
+             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = [StateNormalizationTransformer, RewardNormalizationTransformer],
              **kwargs) -> BaseWrapper:
     """Make environment, including a possible reward config and transformers."""
     base_env = gym.make(env_name, **kwargs)
@@ -147,8 +158,10 @@ def make_env(env_name,
 
     env = TransformationWrapper(base_env, transformers=transformers)
 
+    if reward_function is not None and hasattr(env, "reward_function"):
+        env.set_reward_function(reward_function)
+
     if reward_config is not None and hasattr(env, "reward_config"):
-        env.set_reward_function(reward_config)
         env.set_reward_config(reward_config)
 
     return env

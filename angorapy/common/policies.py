@@ -254,7 +254,7 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
                                   bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
         unflattened_shape = x.shape[1:-1].concatenate(n_actions)
         x = tf.keras.layers.Reshape(unflattened_shape)(x)
-        x = tf.nn.log_softmax(x, axis=-1, name="log_likelihoods")
+        x = tf.keras.layers.Activation(tf.nn.log_softmax, name="log_likelihoods", dtype="float32")(x)
 
         return tf.keras.Model(inputs=inputs, outputs=x, name="discrete_action_head")
 
@@ -436,7 +436,7 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
         """Get action by deterministically taking the mode of the distribution."""
-        actions = (alphas - 1) / (alphas + betas - 2)
+        actions = (alphas) / (alphas + betas)
 
         actions = self._scale_sample_to_action_range(np.reshape(actions, [-1])).numpy()
 
@@ -520,11 +520,11 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
         inputs = tf.keras.Input(batch_shape=(batch_size,) + tuple(input_shape))
 
-        alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus",
+        alphas = tf.keras.layers.Dense(n_actions, name="alphas", activation="softplus", dtype="float32",
                                        kernel_initializer=tf.keras.initializers.Orthogonal(1),
                                        bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
 
-        betas = tf.keras.layers.Dense(n_actions, name="betas", activation="softplus",
+        betas = tf.keras.layers.Dense(n_actions, name="betas", activation="softplus", dtype="float32",
                                       kernel_initializer=tf.keras.initializers.Orthogonal(1),
                                       bias_initializer=tf.keras.initializers.Constant(0.0))(inputs)
 

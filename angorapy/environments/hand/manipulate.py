@@ -109,7 +109,6 @@ class BaseManipulate(BaseShadowHandEnv):
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
         self.previous_achieved_goal = self._get_achieved_goal()
-        self._set_default_reward_function_and_config()
 
         super().__init__(initial_qpos=initial_qpos,
                          distance_threshold=0.1,
@@ -475,7 +474,10 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
         if not self.vision:
             vision_input = object_qpos.astype(np.float32)
         else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
             vision_input = self.render()
+            self.render_mode = tmp_render_mode
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]

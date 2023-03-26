@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-
 from utilities.datatypes import mpi_condense_stats
 import statistics
 import time
@@ -38,7 +37,7 @@ if args.id is None:
     args.id = max(ids)
 
 start = time.time()
-agent = PPOAgent.from_agent_state(args.id, "last", path_modifier="../")
+agent = PPOAgent.from_agent_state(args.id, "best", path_modifier="../")
 
 # if isinstance(agent.env.unwrapped, BaseShadowHandEnv):
 #     agent.env.env.set_delta_t_simulation(0.0005)
@@ -52,12 +51,8 @@ worker_base, worker_extra = divmod(args.n, MPI.COMM_WORLD.size)
 worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
 workers_n = worker_split[mpi_comm.rank]
 
-stat_bundles = []
-for _ in tqdm(range(workers_n), disable=not is_root):
-    stats, _ = agent.evaluate(1, act_confidently=args.act_confidently)
-    stat_bundles.append(stats)
-
-stats = mpi_condense_stats(stat_bundles)
+stat_bundles, _ = agent.evaluate(workers_n, act_confidently=args.act_confidently)
+stats = mpi_condense_stats([stat_bundles])
 
 if is_root:
     average_reward = round(statistics.mean(stats.episode_rewards), 2)

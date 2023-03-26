@@ -16,14 +16,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from angorapy.utilities.defaults import autoselect_distribution
 
-mujoco_path = os.getenv('MUJOCO_PY_MUJOCO_PATH')
-if not mujoco_path:
-    mujoco_path = os.path.join(os.path.expanduser('~'), '.mujoco', 'mujoco210')
-
 import distance
 import numpy as np
 
 import tensorflow as tf
+from tensorflow.keras import mixed_precision
 
 import argparse
 import logging
@@ -33,7 +30,7 @@ from gym.spaces import Box, Discrete, MultiDiscrete
 
 from angorapy.configs import hp_config
 from angorapy.common.policies import get_distribution_by_short_name
-from angorapy.models import get_model_builder
+from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
 from angorapy.utilities.util import env_extract_dims
@@ -54,6 +51,7 @@ class InconsistentArgumentError(Exception):
 def run_experiment(environment, settings: dict, verbose=True, use_monitor=False):
     """Run an experiment with the given settings ."""
     if settings["cpu"]:
+        print("Deactivating GPU")
         tf.config.set_visible_devices([], "GPU")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -89,21 +87,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    if settings["architecture"] == "shadow":
-        if settings["model"] == "ffn" and is_root:
-            print("Cannot use ffn with shadow architecture. Defaulting to GRU.")
-            settings["model"] = "gru"
-
-        if "vision" in list(env.observation_space["observation"].keys()) and len(env.observation_space["observation"]["vision"].shape) > 1:
-            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
-                                             blind=False)
-
-        else:
-            build_models = get_model_builder(model="shadow", model_type=settings["model"], shared=settings["shared"],
-                                             blind=True)
-    else:
-        build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
-                                         shared=settings["shared"])
+    blind = not("vision" in list(env.observation_space["observation"].keys())
+                and len(env.observation_space["observation"]["vision"].shape) > 1)
+    build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"], shared=settings["shared"],
+                                     blind=blind)
 
     # announce experiment
     bc, ec, wn = COLORS["HEADER"], COLORS["ENDC"], COLORS["WARNING"]
@@ -195,7 +182,7 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("env", nargs='?', type=str, default="ReachAbsolute-v0", help="the target gym environment")
-    parser.add_argument("--architecture", choices=["simple", "deeper", "wider", "shadow", "shadowlif"], default="simple",
+    parser.add_argument("--architecture", choices=MODELS_AVAILABLE, default="simple",
                         help="architecture of the policy")
     parser.add_argument("--model", choices=["ffn", "rnn", "lstm", "gru"], default="ffn",
                         help=f"model type if architecture allows for choices")

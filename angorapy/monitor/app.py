@@ -6,6 +6,9 @@ import sys
 from json import JSONDecodeError
 
 from bokeh import embed
+from tqdm import tqdm
+
+from angorapy.models import MODELS_AVAILABLE
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -45,7 +48,7 @@ def overview():
 
     experiments = {}
     envs_available = set()
-    for exp_path in experiment_paths:
+    for exp_path in tqdm(experiment_paths):
 
         eid_m = re.match("[0-9]+", str(exp_path.split("/")[-1]))
         if eid_m:
@@ -63,9 +66,13 @@ def overview():
                 except:
                     pass
 
+                agent_parameters = {}
                 model_available = False
                 if os.path.isfile(os.path.join(model_path, "best/weights.index")):
                     model_available = True
+
+                    with open(os.path.join(model_path, "best/parameters.json")) as f:
+                        agent_parameters = json.load(f)
 
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])
@@ -79,6 +86,11 @@ def overview():
 
                 architecture = "Any" if "architecture" not in meta["hyperparameters"] else meta["hyperparameters"]["architecture"]
                 model = "Any" if "model" not in meta["hyperparameters"] else meta["hyperparameters"]["model"]
+                if model_available:
+                    architecture = agent_parameters.get("builder_function_name", architecture)
+                    for mname in MODELS_AVAILABLE:
+                        if mname in architecture:
+                            architecture = mname
 
                 experiments.update({
                     eid: {
