@@ -101,6 +101,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.relative_control = relative_control
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
+        self._thumb_touch_sensor_id = []
         self.distance_threshold = distance_threshold
         self.reward_type = "dense"
         self._freeze_wrist = False
@@ -146,6 +147,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         as such the output is a 15-D numpy array."""
         goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
         return np.array(goal).flatten()
+
+    def is_thumb_tip_touching(self):
+        if sum(self.data.sensordata[self._touch_sensor_id]) > 0.0:
+            return True
 
     # ENV METHODS
 
@@ -268,6 +273,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             if b'robot0:TS_' in k:
                 # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_', 'robot0:T_')]))
                 self._touch_sensor_id.append(v)
+
+                if b'thtip' in k:
+                    self._thumb_touch_sensor_id.append(v)
 
         if initial_state is not None:
             self.set_state(**initial_state)
