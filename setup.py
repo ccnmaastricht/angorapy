@@ -20,6 +20,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        "swig",
         "imageio",
         "numpy==1.19.2",
         "box2d-py",
@@ -27,6 +28,7 @@ setup(
         "mujoco==2.2.2",
         "tensorflow==2.4.2",
         "tensorflow_probability==0.12.2",
+        "tensorflow_graphics",
         "mpi4py==3.1.3",
         "tqdm",
         "simplejson",

@@ -13,6 +13,7 @@ from angorapy.common.senses import stack_sensations
 from angorapy.common.wrappers import BaseWrapper
 from angorapy.environments.rotations import quat2mat, quat2axisangle
 from angorapy.utilities.util import flatten, stack_dicts
+import tensorflow_graphics.geometry.transformation as tfg
 
 
 class Predictability(base_investigator.Investigator):
@@ -35,6 +36,7 @@ class Predictability(base_investigator.Investigator):
         other_collection = []
         prev_achieved_goals = [info["achieved_goal"]] * 50
         prev_object_quats = [info["achieved_goal"][3:]] * 10
+        need_thump_this_episode = False
         for _ in tqdm.tqdm(range(n_states)):
             state_collection.append(state)
             other = {
@@ -51,12 +53,19 @@ class Predictability(base_investigator.Investigator):
             observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
+            if env.is_thumb_tip_touching():
+                need_thump_this_episode = True
+
+            other["needed_thumb"] = None
             other["fingertip_positions"] = env.unwrapped.get_fingertip_positions()
             other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-1])
             other["translation_to_10"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-10])
             other["translation_to_50"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-50])
             other["object_orientation"] = env.unwrapped.data.jnt('object:joint').qpos.copy()[3:]
-
+            other["relative_angle"] = tfg.quaternion.relative_angle(
+                tf.cast(env.unwrapped.data.jnt('object:joint').qpos.copy()[3:], dtype=tf.float64),
+                tf.cast(state["goal"], dtype=tf.float64)
+            )
             prev_quat = transform.Rotation.from_quat(prev_object_quats[-1])
             prev_quat_10 = transform.Rotation.from_quat(prev_object_quats[-10])
             current_quat = transform.Rotation.from_quat(other["object_orientation"])
@@ -65,15 +74,24 @@ class Predictability(base_investigator.Investigator):
             other["rotation_matrix"] = quat2mat((prev_quat * current_quat.inv()).as_quat()).flatten()
             other["rotation_matrix_last_10"] = quat2mat(change_in_orientation).flatten()
             other["current_rotational_axis"] = quat2axisangle(change_in_orientation)[0]  # todo
+            other["goals_achieved_so_far"] = env.consecutive_goals_reached
 
             other_collection.append(other)
 
             if done:
                 state, info = env.reset(return_info=True)
                 self.network.reset_states()
+
+                for ot in other_collection:
+                    ot["needed_thumb"] = ot["needed_thumb"] if ot["needed_thumb"] is not None else need_thump_this_episode
+
+                need_thump_this_episode = False
+
             else:
                 state = observation
                 prev_achieved_goals.append(info["achieved_goal"])
+                for ot in other_collection:
+                    ot["needed_thumb"] = ot["needed_thumb"] if ot["needed_thumb"] is not None else need_thump_this_episode
 
                 if len(prev_achieved_goals) > 50:
                     prev_achieved_goals.pop(0)

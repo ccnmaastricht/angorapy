@@ -9,6 +9,8 @@ from angorapy.models.shadow_v2 import build_shadow_v2_brain_models, build_shadow
 from angorapy.models.simple import build_ffn_models, build_deeper_models, build_rnn_models, _build_encoding_sub_model, \
     build_simple_models
 
+from angorapy.utilities.model_utils import make_input_layers
+
 
 def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = False, blind: bool = True) -> Callable:
     """Get a builder function for a model with the described parameters."""
@@ -20,3 +22,7 @@ def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = Fa
     params = [str(val) for key, val in sorted(params.items(), key=lambda x: x[0]) if val != ""]
 
     return globals()[f"build_{'_'.join(params)}_models"]
+
+
+def register_model(builder):
+    globals().update({builder.__name__: builder})

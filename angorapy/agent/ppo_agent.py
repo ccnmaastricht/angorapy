@@ -21,6 +21,8 @@ import tensorflow as tf
 from gym.spaces import Discrete, Box, MultiDiscrete
 from tensorflow.keras import mixed_precision
 
+from angorapy.common.senses import Sensation
+
 try:
     from mpi4py import MPI
 except:
@@ -322,7 +324,7 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
-    def act(self, state):
+    def act(self, state: Sensation):
         """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
         that can be directly given to an environment.
 
@@ -331,8 +333,10 @@ class PPOAgent:
         sampling from the predicted distribution."""
 
         # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+        _, _, joint = self.build_models(self.joint.get_weights(), 1, 1)
+
         prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
-        policy_out = flatten(self.joint(prepared_state, training=False))
+        policy_out = flatten(joint(prepared_state, training=False))
 
         predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
         # from the action distribution sample an action and remember both the action and its probability
