@@ -78,7 +78,7 @@ for i in range(args.repeats):
                              # "lstm_cell_1",
                              "M1_activation",
                          ],
-                         n_states=2000)
+                         n_states=200000)
 
     for information in targets:
         print(f"Predicting {information} from activity.\n-----------------------")

@@ -76,6 +76,8 @@ RUN pip install /ang_tmp --default-timeout=100 \
 RUN pip install gym[box2d]
 RUN pip install tensorflow_datasets
 
+RUN git clone
+
 WORKDIR /
 
 COPY angorapy/train.py train.py

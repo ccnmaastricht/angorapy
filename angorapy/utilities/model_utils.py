@@ -10,7 +10,7 @@ import angorapy
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.wrappers import BaseWrapper
 from angorapy.utilities.error import IncompatibleModelException
-from angorapy.utilities.util import flatten
+from angorapy.utilities.util import flatten, env_extract_dims
 
 
 def is_recurrent_model(model: tf.keras.Model):
@@ -198,6 +198,26 @@ CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 def is_conv(layer):
     """Check if layer is convolutional."""
     return isinstance(layer, CONVOLUTION_BASE_CLASS)
+
+
+# Building helpers
+
+def make_input_layers(env, bs, sequence_length = None):
+    """Build input layers for a model acting on the given environment.
+
+    If the model is not recurrent, provide None for the sequence_length (default)"""
+
+    state_dimensionality, n_actions = env_extract_dims(env)
+    inputs = []
+
+    for modality in state_dimensionality.keys():
+        shape = (bs, )
+        if sequence_length is not None:
+            shape += (sequence_length, )
+        shape += tuple(state_dimensionality[modality])
+        inputs.append(tf.keras.Input(batch_shape=shape, name=modality))
+
+    return inputs
 
 
 # Validators
