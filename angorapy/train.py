@@ -87,8 +87,11 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
     # setting appropriate model building function
-    blind = not("vision" in list(env.observation_space["observation"].keys())
-                and len(env.observation_space["observation"]["vision"].shape) > 1)
+    try:
+        blind = not("vision" in list(env.observation_space["observation"].keys())
+                    and len(env.observation_space["observation"]["vision"].shape) > 1)
+    except:
+        blind = True
     build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"], shared=settings["shared"],
                                      blind=blind)
 
