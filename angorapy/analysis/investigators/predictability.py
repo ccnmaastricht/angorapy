@@ -133,6 +133,6 @@ class Predictability(base_investigator.Investigator):
         predictor.fit(X, Y)
         score = predictor.score(X_test, Y_test)
 
-        print(f"{target_information} from {source_layer} has an R2 of {predictor.score(X_test, Y_test)}.")
+        # print(f"{target_information} from {source_layer} has an R2 of {predictor.score(X_test, Y_test)}.")
 
         return score
