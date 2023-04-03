@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import copy
 import json
 import os
 import sys
@@ -15,7 +16,7 @@ mpi_comm = MPI.COMM_WORLD
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
 parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1679142835973298)
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="best")
-parser.add_argument("--repeats", type=int, help="how many models per setting", default=10)
+parser.add_argument("--repeats", type=int, help="number of repetitions of the process", default=10)
 parser.add_argument("--n-states", type=int, help="states per repeat", default=200000)
 
 args = parser.parse_args()
@@ -27,7 +28,7 @@ workers_n = worker_split[mpi_comm.rank]
 
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
-agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="./")
+agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="./angorapy/")
 investigator = investigators.Predictability.from_agent(agent)
 env = agent.env
 
@@ -56,26 +57,29 @@ results = {
     "proprioception": {},
     "vision": {},
     "touch": {},
-    "goal": {},
-    "SSC_activation_1": {},
-    "SSC_activation_2": {},
-    "LPFC_activation": {},
-    "MCC_activation": {},
-    "IPL_activation": {},
-    "SPL_activation": {},
-    "IPS_activation": {},
-    "M1_activation": {},
+    # "goal": {},
+    # "SSC_activation_1": {},
+    # "SSC_activation_2": {},
+    # "LPFC_activation": {},
+    # "MCC_activation": {},
+    # "IPL_activation": {},
+    # "SPL_activation": {},
+    # "IPS_activation": {},
+    # "M1_activation": {},
     # "lstm_cell_1": {},
-    "pmc_recurrent_layer": {},
+    # "pmc_recurrent_layer": {},
 }
+
+merged_results = copy.deepcopy(results)
 
 for information in targets:
     for source in results.keys():
         results[source][information] = []
+        merged_results[source][information] = []
 
 for i in range(workers_n):
     if mpi_comm.rank == 0:
-        print(f"Collecting for repeat {i + 1}/{args.repeats}")
+        print(f"Collecting for repeat {i + 1}/{workers_n}")
     investigator.prepare(env,
                          layers=[
                              "SSC_activation_1",
@@ -100,17 +104,10 @@ for i in range(workers_n):
 results_collection = mpi_comm.gather(results)
 
 if mpi_comm.rank == 0:
-    merged_results = {}
     for result in results_collection:
-        for information in result.keys():
-            if information not in merged_results.keys():
-                merged_results[information] = {}
+        for source in result.keys():
+            for information in result[source].keys():
+                merged_results[source][information].extend(result[source][information])
 
-            for source in result[information].keys():
-                if source not in merged_results[information]:
-                    merged_results[information][source] = []
-
-                merged_results[information][source].extend(result[information][source])
-
-    with open("angorapy/analysis/results/predictability_repeated_mar28.json", "w") as f:
+    with open("angorapy/analysis/results/predictability_repeated_april03.json", "w") as f:
         json.dump(merged_results, f)
