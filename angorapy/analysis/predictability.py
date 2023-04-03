@@ -28,7 +28,7 @@ workers_n = worker_split[mpi_comm.rank]
 
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
-agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="./angorapy/")
+agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="./")
 investigator = investigators.Predictability.from_agent(agent)
 env = agent.env
 
@@ -57,17 +57,17 @@ results = {
     "proprioception": {},
     "vision": {},
     "touch": {},
-    # "goal": {},
-    # "SSC_activation_1": {},
-    # "SSC_activation_2": {},
-    # "LPFC_activation": {},
-    # "MCC_activation": {},
-    # "IPL_activation": {},
-    # "SPL_activation": {},
-    # "IPS_activation": {},
-    # "M1_activation": {},
+    "goal": {},
+    "SSC_activation_1": {},
+    "SSC_activation_2": {},
+    "LPFC_activation": {},
+    "MCC_activation": {},
+    "IPL_activation": {},
+    "SPL_activation": {},
+    "IPS_activation": {},
+    "M1_activation": {},
     # "lstm_cell_1": {},
-    # "pmc_recurrent_layer": {},
+    "pmc_recurrent_layer": {},
 }
 
 merged_results = copy.deepcopy(results)
