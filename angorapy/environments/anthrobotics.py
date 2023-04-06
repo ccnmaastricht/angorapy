@@ -2,7 +2,7 @@ import abc
 from abc import ABC
 from collections import OrderedDict
 from os import path
-from typing import Optional, Union, Callable
+from typing import Optional, Union, Callable, Dict, Any
 
 import numpy as np
 import mujoco
@@ -38,6 +38,7 @@ def convert_observation_to_space(observation):
 
 class AnthropomorphicEnv(gym.Env, ABC):
     """Superclass for all environments."""
+    metadata: Dict[str, Any] = {"render_modes": ["human", "rgb_array"]}
 
     def __init__(
             self,

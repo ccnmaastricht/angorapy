@@ -109,5 +109,5 @@ if mpi_comm.rank == 0:
             for information in result[source].keys():
                 merged_results[source][information].extend(result[source][information])
 
-    with open("angorapy/analysis/results/predictability_repeated_april03.json", "w") as f:
+    with open("storage/predictability_repeated_april03.json", "w") as f:
         json.dump(merged_results, f)
