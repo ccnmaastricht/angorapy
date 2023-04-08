@@ -22,9 +22,8 @@ matplotlib.rc('font', **font)
 #                   ['1674985163288377', '1674983177286330'],
 #                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # compare distributions
 experiment_ids = [['1679142835973298'],
-                  ['1673350499432390']]  # compare distributions
-names = ["brain-inspired architecture", "OpenAI (2018)"]
-
+                  ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # compare distributions
+names = ["FPN model", "OpenAI"]
 
 reward_developments = {}
 reward_bands = {}
@@ -77,7 +76,7 @@ ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=3)
 
 x_max = len(list(reward_developments.items())[0][1][0])
 for i, (name, rewards) in enumerate(reward_developments.items()):
-    x_max = max(x_max, np.argmax(rewards))
+    x_max = max(x_max, np.max(np.argmax(rewards, axis=-1)))
     ax1.plot(np.mean(cosucc_developments[name], axis=0)[:np.argmax(rewards)], label=name, color=QUALITATIVE_COLOR_PALETTE[i])
     ax1.fill_between(range(len(cosucc_bands[name][0])), cosucc_bands[name][0], cosucc_bands[name][1], alpha=0.2)
 
@@ -90,10 +89,10 @@ for i, (name, rewards) in enumerate(reward_developments.items()):
     # ax2.set_xlabel("Consecutive Goals Reached")
     # ax2.set_ylabel("Number of Episodes")
 
-df = pd.DataFrame(
-    {"group": itertools.chain(*[[name] * len(dp) for name, dp in evaluation_rewards.items()]),
-     "Consecutive Goals Reached": np.concatenate([dp for name, dp in evaluation_rewards.items()])}
-)
+# df = pd.DataFrame(
+#     {"group": itertools.chain(*[[name] * len(dp) for name, dp in evaluation_rewards.items()]),
+#      "Consecutive Goals Reached": np.concatenate([dp for name, dp in evaluation_rewards.items()])}
+# )
 
 # sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", medianprops={"color": "red"}, flierprops={"marker": "x"},
 #             fliersize=1, ax=ax2, palette={name: QUALITATIVE_COLOR_PALETTE[i] for i, name in enumerate(names)},
@@ -102,11 +101,14 @@ df = pd.DataFrame(
 
 
 ax1.set_xlabel("Cycle")
-ax1.set_ylabel("Avg. Consecutive Goals Reached")
-ax1.legend()
+ax1.set_ylabel("Consecutive Goals Reached")
+
+# legend with shorter lines but normal font
+ax1.legend(loc='upper left',  ncol=1, handlelength=.7, fontsize=18)
 
 ax1.set_xlim(0, x_max)
+ax1.set_ylim(0)
 
-plt.gcf().set_size_inches(16, 8)
-plt.subplots_adjust(wspace=0.3, right=0.995, left=0.05, top=0.99)
-plt.savefig("../../../docs/figures/brain-vs-openai.svg", format="svg", bbox="tight")
+plt.gcf().set_size_inches(8, 4)
+plt.subplots_adjust(wspace=0.3, right=0.995, left=0.1, top=0.9, bottom=0.2)
+plt.savefig("../../../docs/figures/brain-vs-openai.pdf", format="pdf", bbox="tight")
