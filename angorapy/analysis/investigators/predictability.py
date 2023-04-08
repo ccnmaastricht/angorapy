@@ -53,45 +53,47 @@ class Predictability(base_investigator.Investigator):
             observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
-            if env.is_thumb_tip_touching():
-                need_thump_this_episode = True
+            # if env.is_thumb_tip_touching():
+            #     need_thump_this_episode = True
 
-            other["needed_thumb"] = None
+            # other["needed_thumb"] = None
             other["fingertip_positions"] = env.unwrapped.get_fingertip_positions()
             other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-1])
             other["translation_to_10"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-10])
             other["translation_to_50"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-50])
             other["object_orientation"] = env.unwrapped.data.jnt('object:joint').qpos.copy()[3:]
-            other["relative_angle"] = tfg.quaternion.relative_angle(
-                tf.cast(env.unwrapped.data.jnt('object:joint').qpos.copy()[3:], dtype=tf.float64),
-                tf.cast(state["goal"], dtype=tf.float64)
-            )
-            prev_quat = transform.Rotation.from_quat(prev_object_quats[-1])
-            prev_quat_10 = transform.Rotation.from_quat(prev_object_quats[-10])
-            current_quat = transform.Rotation.from_quat(other["object_orientation"])
-            change_in_orientation = (prev_quat_10 * current_quat.inv()).as_quat()
+            # other["relative_angle"] = tfg.quaternion.relative_angle(
+            #     tf.cast(env.unwrapped.data.jnt('object:joint').qpos.copy()[3:], dtype=tf.float64),
+            #     tf.cast(state["goal"], dtype=tf.float64)
+            # )
+            # prev_quat = transform.Rotation.from_quat(prev_object_quats[-1])
+            # prev_quat_10 = transform.Rotation.from_quat(prev_object_quats[-10])
+            # current_quat = transform.Rotation.from_quat(other["object_orientation"])
+            # change_in_orientation = (prev_quat_10 * current_quat.inv()).as_quat()
 
-            other["rotation_matrix"] = quat2mat((prev_quat * current_quat.inv()).as_quat()).flatten()
-            other["rotation_matrix_last_10"] = quat2mat(change_in_orientation).flatten()
-            other["current_rotational_axis"] = quat2axisangle(change_in_orientation)[0]  # todo
+            # other["rotation_matrix"] = quat2mat((prev_quat * current_quat.inv()).as_quat()).flatten()
+            # other["rotation_matrix_last_10"] = quat2mat(change_in_orientation).flatten()
+            # other["current_rotational_axis"] = quat2axisangle(change_in_orientation)[0]  # todo
             other["goals_achieved_so_far"] = env.consecutive_goals_reached
 
             other_collection.append(other)
 
             if done:
                 state, info = env.reset(return_info=True)
+                prev_achieved_goals = [info["achieved_goal"]] * 50
+
                 self.network.reset_states()
 
-                for ot in other_collection:
-                    ot["needed_thumb"] = ot["needed_thumb"] if ot["needed_thumb"] is not None else need_thump_this_episode
+                # for ot in other_collection:
+                #     ot["needed_thumb"] = ot["needed_thumb"] if ot["needed_thumb"] is not None else need_thump_this_episode
 
-                need_thump_this_episode = False
+                # need_thump_this_episode = False
 
             else:
                 state = observation
                 prev_achieved_goals.append(info["achieved_goal"])
-                for ot in other_collection:
-                    ot["needed_thumb"] = ot["needed_thumb"] if ot["needed_thumb"] is not None else need_thump_this_episode
+                # for ot in other_collection:
+                #     ot["needed_thumb"] = ot["needed_thumb"] if ot["needed_thumb"] is not None else need_thump_this_episode
 
                 if len(prev_achieved_goals) > 50:
                     prev_achieved_goals.pop(0)

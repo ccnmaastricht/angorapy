@@ -21,7 +21,7 @@ matplotlib.rc('font', **font)
 # experiment_ids = [['1675028736765791', '1674983643322591'],
 #                   ['1674985163288377', '1674983177286330'],
 #                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # compare distributions
-experiment_ids = [['1679142835973298'],
+experiment_ids = [['1680268307741971', '1680267170902356', '1680266899101867', '1679765936722940', '1679142835973298'],
                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # compare distributions
 names = ["FPN model", "OpenAI"]
 
@@ -38,7 +38,7 @@ for i, group in enumerate(experiment_ids):
     exp_name = names[i]
     reward_developments[exp_name] = []
     cosucc_developments[exp_name] = []
-    evaluation_rewards[exp_name] = []
+    # evaluation_rewards[exp_name] = []
     evaluation_reward_histograms[exp_name] = []
 
     for id in group:
@@ -48,17 +48,17 @@ for i, group in enumerate(experiment_ids):
             progress = json.load(f)
         with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "statistics.json")) as f:
             statistics = json.load(f)
-        with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "evaluation.json")) as f:
-            evaluation = json.load(f)
+        # with open(os.path.join("../../../", PATH_TO_EXPERIMENTS, str(id), "evaluation.json")) as f:
+        #     evaluation = json.load(f)
 
         reward_developments[exp_name].append(progress["rewards"]["mean"])
         cosucc_developments[exp_name].append(statistics["auxiliary_performances"]["consecutive_goals_reached"]["mean"])
-        evaluation_rewards[exp_name] += evaluation["auxiliary_performances"]["consecutive_goals_reached"]
-        evaluation_reward_histograms[exp_name].append(
-            np.histogram(evaluation["auxiliary_performances"]["consecutive_goals_reached"], bins=50))
+        # evaluation_rewards[exp_name] += evaluation["auxiliary_performances"]["consecutive_goals_reached"]
+        # evaluation_reward_histograms[exp_name].append(
+        #     np.histogram(evaluation["auxiliary_performances"]["consecutive_goals_reached"], bins=50))
 
-    evaluation_reward_histograms[exp_name] = np.mean([c for c, b in evaluation_reward_histograms[exp_name]], axis=0), \
-    evaluation_reward_histograms[exp_name][0][1]
+    # evaluation_reward_histograms[exp_name] = np.mean([c for c, b in evaluation_reward_histograms[exp_name]], axis=0), \
+    # evaluation_reward_histograms[exp_name][0][1]
     reward_developments[exp_name] = np.array(
         [trace[:min(map(len, reward_developments[exp_name]))] for trace in reward_developments[exp_name]])
     cosucc_developments[exp_name] = np.array(

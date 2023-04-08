@@ -48,10 +48,22 @@ env = agent.env
 # make output
 # nx.drawing.nx_pydot.to_pydot(nx_model).write_png("sankey.png")
 
-targets = ["proprioception", "vision", "touch", "reward", "fingertip_positions", "goal", "translation",
-           "translation_to_10", "translation_to_50", "object_orientation", "rotation_matrix",
-           "rotation_matrix_last_10", "current_rotational_axis", "goals_achieved_so_far",
-           "needed_thumb"]
+targets = ["proprioception",
+           # "vision",
+           # "touch",
+           "reward",
+           "fingertip_positions",
+           "goal",
+           "translation",
+           "translation_to_10",
+           "translation_to_50",
+           "object_orientation",
+           # "rotation_matrix",
+           # "rotation_matrix_last_10",
+           # "current_rotational_axis",
+           "goals_achieved_so_far",
+           # "needed_thumb"
+]
 results = {
     "noise": {},
     "proprioception": {},
@@ -109,5 +121,5 @@ if mpi_comm.rank == 0:
             for information in result[source].keys():
                 merged_results[source][information].extend(result[source][information])
 
-    with open("storage/predictability_repeated_april03.json", "w") as f:
+    with open("storage/predictability_repeated_april08.json", "w") as f:
         json.dump(merged_results, f)

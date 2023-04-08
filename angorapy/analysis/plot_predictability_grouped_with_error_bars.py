@@ -4,7 +4,7 @@ import re
 import numpy as np
 from matplotlib import pyplot as plt
 
-with open("results/predictability_repeated_mar20.json", "r") as f:
+with open("../../storage/predictability_repeated_april03.json", "r") as f:
     results = json.load(f)
 
 included_regions = ["M1_activation", "pmc_recurrent_layer", "goal"]
