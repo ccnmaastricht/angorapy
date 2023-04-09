@@ -154,12 +154,12 @@ The number of parallel workers will equal the number of nodes times the number o
 
 If you use AngoraPy for your research, please cite us as follows
 
-    Weidler, T., & Senden, M. (2020). AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
+    Weidler, T., Goebel, R, & Senden, M. (2020). AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
 
 Or using bibtex
 
     @software{angorapy2020,
-        author = {Weidler, Tonio and Senden, Mario},
+        author = {Weidler, Tonio and Goebel, Rainer, and Senden, Mario},
         month = {3},
         title = {{AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling}},
         year = {2020}
