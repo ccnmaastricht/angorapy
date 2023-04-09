@@ -13,9 +13,9 @@ import statsmodels.stats.api as sms
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
 
-font = {'family' : 'Times New Roman',
+font = {'family' : 'Times',
         'weight' : 'normal',
-        'size'   : 22}
+        'size'   : 15}
 
 matplotlib.rc('font', **font)
 
@@ -117,12 +117,13 @@ ax1.set_xlabel("Cycle")
 ax1.set_ylabel("Consecutive Goals Reached")
 
 # legend with shorter lines but normal font
-ax1.legend(loc='upper left',  ncol=1, handlelength=.7, fontsize=18)
+ax1.legend(loc='upper left',  ncol=1, handlelength=.7)
 
 ax1.set_xlim(0, x_max)
 ax1.set_ylim(0, 50)
-ax1.set_yticks(np.arange(0, 60, 10))
+ax1.set_yticks(np.arange(0, 50, 10))
+ax1.set_xticks(np.arange(0, 1200, 200))
 
 plt.gcf().set_size_inches(8, 4)
-plt.subplots_adjust(wspace=0.3, right=0.995, left=0.1, top=0.9, bottom=0.2)
+plt.subplots_adjust(wspace=0., right=0.999, left=0.1, top=1, bottom=0.15)
 plt.savefig("../../../docs/figures/brain-vs-openai.pdf", format="pdf", bbox="tight")
