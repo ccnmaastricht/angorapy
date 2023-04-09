@@ -72,9 +72,8 @@ for i, group in enumerate(experiment_ids):
     rd_mean = np.mean(reward_developments[exp_name], axis=0)
     cd_mean = np.mean(cosucc_developments[exp_name], axis=0)
     rd_std = np.std(reward_developments[exp_name], axis=0)
-    cd_std = descm.tconfint_mean()
     reward_bands[exp_name] = (rd_mean - rd_std, rd_mean + rd_std)
-    cosucc_bands[exp_name] = (cd_mean - cd_std[0], cd_mean + cd_std[1])
+    cosucc_bands[exp_name] = descm.tconfint_mean()
 
 ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=3)
 # ax2 = plt.subplot2grid((1, 3), (0, 2), colspan=1)
@@ -82,8 +81,15 @@ ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=3)
 x_max = len(list(reward_developments.items())[0][1][0])
 for i, (name, rewards) in enumerate(reward_developments.items()):
     x_max = max(x_max, np.max(np.argmax(rewards, axis=-1)))
-    ax1.plot(np.mean(cosucc_developments[name], axis=0)[:np.argmax(rewards)], label=name, color=QUALITATIVE_COLOR_PALETTE[i])
+    mean_line = np.mean(cosucc_developments[name], axis=0)[:np.argmax(rewards)]
+    ax1.plot(mean_line, label=name, color=QUALITATIVE_COLOR_PALETTE[i])
     ax1.fill_between(range(len(cosucc_bands[name][0])), cosucc_bands[name][0], cosucc_bands[name][1], alpha=0.2)
+
+    # plot horizontal line indicating max performance with circles as markers
+    ax1.axhline(y=np.max(mean_line), color=QUALITATIVE_COLOR_PALETTE[i], linestyle="--", linewidth=1)
+
+    # plot horizontal line indicating max performance of best agent in group
+    ax1.axhline(y=np.max(np.max(cosucc_developments[name], axis=0)), linestyle=":", color=QUALITATIVE_COLOR_PALETTE[i], linewidth=0.5)
 
     # ax2.hist(
     #     evaluation_reward_histograms[name][1][:-1],
@@ -105,6 +111,8 @@ for i, (name, rewards) in enumerate(reward_developments.items()):
 # ax2.set_xlabel("")
 
 
+
+
 ax1.set_xlabel("Cycle")
 ax1.set_ylabel("Consecutive Goals Reached")
 
@@ -113,6 +121,7 @@ ax1.legend(loc='upper left',  ncol=1, handlelength=.7, fontsize=18)
 
 ax1.set_xlim(0, x_max)
 ax1.set_ylim(0, 50)
+ax1.set_yticks(np.arange(0, 60, 10))
 
 plt.gcf().set_size_inches(8, 4)
 plt.subplots_adjust(wspace=0.3, right=0.995, left=0.1, top=0.9, bottom=0.2)
