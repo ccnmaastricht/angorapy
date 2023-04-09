@@ -4,7 +4,7 @@ import re
 import numpy as np
 from matplotlib import pyplot as plt
 
-with open("../storage/predictability_repeated_april08.json", "r") as f:
+with open("../../storage/predictability_repeated_april08.json", "r") as f:
     results = json.load(f)
 
 x = results.keys()

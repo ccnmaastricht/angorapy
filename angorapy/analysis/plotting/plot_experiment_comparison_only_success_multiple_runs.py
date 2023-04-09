@@ -74,7 +74,7 @@ for i, group in enumerate(experiment_ids):
     rd_std = np.std(reward_developments[exp_name], axis=0)
     cd_std = descm.tconfint_mean()
     reward_bands[exp_name] = (rd_mean - rd_std, rd_mean + rd_std)
-    cosucc_bands[exp_name] = (cd_mean - cd_std[0], cd_mean + cd_std[1])
+    cosucc_bands[exp_name] = (cd_std[0], cd_std[1])
 
 ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=3)
 # ax2 = plt.subplot2grid((1, 3), (0, 2), colspan=1)
