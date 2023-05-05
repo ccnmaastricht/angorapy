@@ -324,7 +324,7 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
-    def act(self, state: Sensation):
+    def act(self, state: Sensation, joint: tf.keras.Model = None):
         """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
         that can be directly given to an environment.
 
@@ -332,8 +332,9 @@ class PPOAgent:
         process the raw numpy states of the environment into a state readable by the policy network, followed by
         sampling from the predicted distribution."""
 
-        # based on given state, predict action distribution and state value; need flatten due to tf eager bug
-        _, _, joint = self.build_models(self.joint.get_weights(), 1, 1)
+        if joint is None:
+            # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+            _, _, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
         prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
         policy_out = flatten(joint(prepared_state, training=False))

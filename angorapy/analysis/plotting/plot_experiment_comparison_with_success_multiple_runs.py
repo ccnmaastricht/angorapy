@@ -9,12 +9,15 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
+import statsmodels.stats.api as sms
+
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
 # experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # only best setting
-# experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # only best setting
+experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390', '1674074113731734'],
+                  ['1673350499432390']]  # only best setting
 # experiment_ids = [['1674074113967956', '1673350499432390', '1674074113731734']]  # only best setting
-# names = ["asymmetric"]
+names = ["mean (n=5)", "best"]
 
 # experiment_ids = [['1673786170549564'], ['1673350499432390']]  # shared vs unshared
 # experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
@@ -24,10 +27,10 @@ from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 # experiment_ids = [['1673350499432390']]
 # names = ["asymmetric"]
 
-experiment_ids = [['1675028736765791', '1674983643322591'],
-                  ['1674985163288377', '1674983177286330'],
-                  ['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # compare distributions
-names = ["beta", "gaussian", "multicategorical"]
+# experiment_ids = [['1675028736765791', '1674983643322591'],
+#                   ['1674985163288377', '1674983177286330'],
+#                   ['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # compare distributions
+# names = ["beta", "gaussian", "multicategorical"]
 # names = ["beta", "multicategorical"]
 reward_developments = {}
 reward_bands = {}
@@ -80,8 +83,14 @@ for i, group in enumerate(experiment_ids):
     cd_mean = np.mean(cosucc_developments[exp_name], axis=0)
     rd_std = np.std(reward_developments[exp_name], axis=0)
     cd_std = np.std(cosucc_developments[exp_name], axis=0)
-    reward_bands[exp_name] = (rd_mean - rd_std, rd_mean + rd_std)
-    cosucc_bands[exp_name] = (cd_mean - cd_std, cd_mean + cd_std)
+
+    descm = sms.DescrStatsW(reward_developments[exp_name])
+    rd_mean = np.mean(reward_developments[exp_name], axis=0)
+    reward_bands[exp_name] = descm.tconfint_mean()
+
+    descm = sms.DescrStatsW(cosucc_developments[exp_name])
+    cd_mean = np.mean(cosucc_developments[exp_name], axis=0)
+    cosucc_bands[exp_name] = descm.tconfint_mean()
 
 if len(names) <= 2:
     axes = [

@@ -9,9 +9,13 @@ from matplotlib import pyplot as plt
 
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
-experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
-                  ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
-names = ["symmetric", "asymmetric"]
+# experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
+#                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
+# names = ["symmetric", "asymmetric"]
+
+experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
+names = ["IHOM Agents"]
+
 reward_developments = {}
 reward_bands = {}
 
@@ -69,8 +73,8 @@ for i, group in enumerate(experiment_ids):
     # cosucc_developments[exp_name] = np.array(
     #     [trace[:min(map(len, cosucc_developments[exp_name]))] for trace in cosucc_developments[exp_name]])
 
-ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=2)
-ax2 = plt.subplot2grid((1, 3), (0, 2), colspan=1)
+ax1 = plt.subplot2grid((1, 3), (0, 0), colspan=3)
+# ax2 = plt.subplot2grid((1, 3), (0, 2), colspan=1)
 
 for i, (name, rewards) in enumerate(cosucc_developments.items()):
     for j in range(len(cosucc_developments[name])):
@@ -93,10 +97,10 @@ df = pd.DataFrame(
      "Consecutive Goals Reached": np.concatenate([dp for name, dp in evaluation_rewards.items()])}
 )
 
-sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", medianprops={"color": "red"}, flierprops={"marker": "x"},
-            fliersize=1, ax=ax2, palette={name: QUALITATIVE_COLOR_PALETTE[i] for i, name in enumerate(names)},
-            showmeans=True, meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black"})
-ax2.set_xlabel("")
+# sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", medianprops={"color": "red"}, flierprops={"marker": "x"},
+#             fliersize=1, ax=ax2, palette={name: QUALITATIVE_COLOR_PALETTE[i] for i, name in enumerate(names)},
+#             showmeans=True, meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black"})
+# ax2.set_xlabel("")
 
 ax1.set_xlabel("Cycle")
 ax1.set_ylabel("Avg. Consecutive Goals Reached")
