@@ -9,12 +9,12 @@ from matplotlib import pyplot as plt
 
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
-# experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
-#                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
-# names = ["symmetric", "asymmetric"]
+experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
+                  ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
+names = ["symmetric", "asymmetric"]
 
-experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
-names = ["IHOM Agents"]
+# experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]
+# names = ["IHOM Agents"]
 
 reward_developments = {}
 reward_bands = {}

@@ -5,19 +5,17 @@ import os
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from matplotlib import pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-
 import statsmodels.stats.api as sms
+from matplotlib import pyplot as plt
 
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
 # experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # only best setting
-experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390', '1674074113731734'],
-                  ['1673350499432390']]  # only best setting
+experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390', '1671749718306373',
+                   '1674975602446141', '1674975602294059', '1674074113731734', '1673786170549564'],
+                  ['1674975602294059']]  # only best setting
 # experiment_ids = [['1674074113967956', '1673350499432390', '1674074113731734']]  # only best setting
-names = ["mean (n=5)", "best"]
+names = [f"mean (n={len(experiment_ids[0])})", "best"]
 
 # experiment_ids = [['1673786170549564'], ['1673350499432390']]  # shared vs unshared
 # experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
@@ -64,20 +62,28 @@ for i, group in enumerate(experiment_ids):
             evaluation_reward_histograms[exp_name].append(
                 np.histogram(evaluation["auxiliary_performances"]["consecutive_goals_reached"], bins=50))
         except:
-            pass
+            print(f"no evaluation for {id}")
 
         reward_developments[exp_name].append(progress["rewards"]["mean"])
         cosucc_developments[exp_name].append(statistics["auxiliary_performances"]["consecutive_goals_reached"]["mean"])
 
     try:
-        evaluation_reward_histograms[exp_name] = np.mean([c for c, b in evaluation_reward_histograms[exp_name]], axis=0), \
+        evaluation_reward_histograms[exp_name] = np.mean([c for c, b in evaluation_reward_histograms[exp_name]],
+                                                         axis=0), \
             evaluation_reward_histograms[exp_name][0][1]
     except:
         pass
+
+    max_length = min(1500, max(len(arr) for arr in cosucc_developments[exp_name]))
+
     reward_developments[exp_name] = np.array(
-        [trace[:min(map(len, reward_developments[exp_name]))] for trace in reward_developments[exp_name]])
+        [trace[:max_length] for trace in reward_developments[exp_name]])
+    reward_developments[exp_name] = np.array(
+        [np.pad(arr, (0, max_length - len(arr)), mode='maximum') for arr in reward_developments[exp_name]])
     cosucc_developments[exp_name] = np.array(
-        [trace[:min(map(len, cosucc_developments[exp_name]))] for trace in cosucc_developments[exp_name]])
+        [trace[:max_length] for trace in cosucc_developments[exp_name]])
+    cosucc_developments[exp_name] = np.array(
+        [np.pad(arr, (0, max_length - len(arr)), mode='maximum') for arr in cosucc_developments[exp_name]])
 
     rd_mean = np.mean(reward_developments[exp_name], axis=0)
     cd_mean = np.mean(cosucc_developments[exp_name], axis=0)
@@ -116,6 +122,12 @@ for i, (name, rewards) in enumerate(reward_developments.items()):
     axes[1].plot(np.mean(cosucc_developments[name], axis=0), label=name, color=QUALITATIVE_COLOR_PALETTE[i])
     axes[1].fill_between(range(len(cosucc_bands[name][0])), cosucc_bands[name][0], cosucc_bands[name][1], alpha=0.2)
 
+    # # plot horizontal line indicating max performance with circles as markers
+    # axes[1].axhline(y=np.max(mean_line), color=QUALITATIVE_COLOR_PALETTE[i], linestyle="--", linewidth=1)
+    #
+    # # plot horizontal line indicating max performance of best agent in group
+    # axes[1].axhline(y=np.max(np.max(cosucc_developments[name], axis=0)), linestyle=":", color=QUALITATIVE_COLOR_PALETTE[i], linewidth=0.5)
+
     # axes[2].hist(
     #     evaluation_reward_histograms[name][1][:-1],
     #     evaluation_reward_histograms[name][1],
@@ -130,12 +142,19 @@ df = pd.DataFrame(
      "Consecutive Goals Reached": np.concatenate([dp for name, dp in evaluation_rewards.items()])}
 )
 
-sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", medianprops={"color": "red"}, flierprops={"marker": "x"},
+sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", notch=True, medianprops={"color": "red"},
+            flierprops={"marker": "x"},
             fliersize=1, ax=axes[2], palette={name: QUALITATIVE_COLOR_PALETTE[i] for i, name in enumerate(names)},
             showmeans=True, meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black"})
 axes[2].set_xlabel("")
 if len(names) == 1:
     axes[2].set_xticks([])
+
+modes = df.groupby("group").aggregate(pd.Series.mode)
+# scatter modes as unfilled triangles on top of boxplot
+axes[2].scatter(modes.index, modes["Consecutive Goals Reached"],
+                marker="^", linewidth=1, facecolors=None,
+                zorder=10, edgecolors="red")
 
 axes[0].set_xlabel("Cycle")
 axes[0].set_ylabel("Avg. Episode Return")
@@ -153,9 +172,10 @@ axes[0].set_xlim(0, x_max)
 axes[0].set_ylim(top=y_max_x0 * 1.1)
 axes[1].set_xlim(0, x_max)
 axes[1].set_ylim(0, 50)
-axes[2].set_ylim(0, 50)
+axes[2].set_ylim(0, 52)
 
 plt.gcf().set_size_inches(12, 4)
 plt.subplots_adjust(wspace=0.5, right=0.995, left=0.05, top=0.99)
-plt.show()
-# plt.savefig("../../../docs/figures/manipulate-learning-curves.pdf", format="pdf", bbox="tight")
+# plt.show()
+plt.savefig("../../../docs/figures/manipulate-learning-curves.pdf", format="pdf")
+# plt.savefig("../../../docs/figures/manipulate-learning-curves.png", format="png")
