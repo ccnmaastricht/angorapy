@@ -89,15 +89,7 @@ agent.drill(n=100, epochs=10, batch_size=512)
 For more details, consult the [examples](examples).
 
 ## 🎓 Documentation
-Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs: 
-
- - [Agent](angorapy/agent) [WIP]
- - [Environments](angorapy/environments)
- - [Models](angorapy/models)
- - [Analysis](angorapy/analysis)
- - [Monitoring](angorapy/monitoring)
-
-If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
+We provide [examples](examples) that get you started with writing your own scripts using AngoraPy. Additionally there is a growing list of [tutorials](https://github.com/weidler/angorapy-tutorials). If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
 
 ## 🔀 Distributed Computation
 PPO is an asynchronous algorithm, allowing multiple parallel workers to generate experience independently. 
