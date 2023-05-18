@@ -24,7 +24,7 @@ import tensorflow as tf
 tf.get_logger().setLevel('INFO')
 
 parser = argparse.ArgumentParser(description="Evaluate an agent.")
-parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=None)
+parser.add_argument("id", type=str, nargs="?", help="id of the agent, defaults to newest", default=None)
 parser.add_argument("-n", type=int, help="number of evaluation episodes", default=12)
 parser.add_argument("--act-confidently", action="store_true", help="act deterministically without stochasticity")
 args = parser.parse_args()

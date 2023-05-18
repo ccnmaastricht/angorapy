@@ -112,8 +112,8 @@ for i_cat, category in enumerate(group_names.keys()):
 
         ax: Axes = axs[i // n_cols][i % n_cols]
 
-        if reward_thresholds[category][name] is not None:
-            ax.axhline(reward_thresholds[category][name], color=QUALITATIVE_COLOR_PALETTE[2], ls="--")
+        # if reward_thresholds[category][name] is not None:
+        #     ax.axhline(reward_thresholds[category][name], color=QUALITATIVE_COLOR_PALETTE[2], ls="--")
         ax.plot(mean_reward, label=category, color=QUALITATIVE_COLOR_PALETTE[i_cat])
         ax.fill_between(range(mean_reward.shape[0]), mean_reward - std_reward, mean_reward + std_reward, alpha=.2)
 

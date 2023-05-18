@@ -74,7 +74,7 @@ for i, group in enumerate(experiment_ids):
     except:
         pass
 
-    max_length = min(1500, max(len(arr) for arr in cosucc_developments[exp_name]))
+    max_length = min(1700, max(len(arr) for arr in cosucc_developments[exp_name]))
 
     reward_developments[exp_name] = np.array(
         [trace[:max_length] for trace in reward_developments[exp_name]])
@@ -175,7 +175,6 @@ axes[1].set_ylim(0, 50)
 axes[2].set_ylim(0, 52)
 
 plt.gcf().set_size_inches(12, 4)
-plt.subplots_adjust(wspace=0.5, right=0.995, left=0.05, top=0.99)
+plt.subplots_adjust(wspace=0.5, right=0.995, left=0.05, top=0.98)
 # plt.show()
 plt.savefig("../../../docs/figures/manipulate-learning-curves.pdf", format="pdf")
-# plt.savefig("../../../docs/figures/manipulate-learning-curves.png", format="png")
