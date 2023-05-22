@@ -22,20 +22,52 @@ This library is developed as part of the [Human Brain Project](https://www.human
 
 ## 📥 Installation
 
-AngoraPy is available on PyPI. 
+### Prerequisites
+AngoraPy requires Python 3.6 or higher. It is recommended to use a virtual environment to install AngoraPy and its dependencies. Additionally, some prerequisites are required. 
 
-```bash
-pip install angorapy
-```
+On Ubuntu, these can be installed by running
 
-### From source
-Alternatively, you can download this repository or the source code of any previous release or branch and install from source, using pip.
+    sudo apt-get install swig
 
-```bash
-pip install -e .
-```
+Additionally, to run AngoraPy with its native distribution, you need MPI installed. On Ubuntu, this can be done by running
 
-This way, if you make changes to the source code, these will be recognized in the installation (without the need to reinstall).
+    sudo apt-get install libopenmpi-dev
+
+However, any other MPI implementation should work as well.
+
+### Installing AngoraPy
+
+#### Binaries
+AngoraPy is available as a binary package on PyPI. To install it, run 
+
+    pip install angorapy
+
+in your terminal.
+
+If you would like to install a specific version, you can specify it by appending `==<version>` to the command above. For example, to install version 0.9.0, run 
+
+    pip install angorapy==0.9.0
+
+#### Source Installation
+To install AngoraPy from source, clone the repository and run `pip install -e .` in the root directory.
+
+### Post-Installation
+
+#### MuJoCo
+Gym installs both MuJoCo's new native Python bindings and the old mujoco-py bindings. You will not need the latter for AngoraPy, so you may uninstall it by running
+
+    pip uninstall mujoco-py
+
+#### Test Your Installation
+You can test your installation by running the following command in your terminal:
+
+    python -m angorapy.train CartPole-v1
+
+To test your MPI installation, run
+
+    mpirun -np <numthreads> --use-hwthread-cpus python -m angorapy.train LunarLanderContinuous-v2
+
+where `<numthreads>` is the number of threads you want to (and can) use.
 
 ### Docker
 Alternatively, you can install AngoraPy and all its dependencies in a docker container using the Dockerfile provided in this repository (/docker/Dockerfile). To this end, download the repository and build the docker image from the /docker directory:
@@ -80,24 +112,16 @@ from angorapy.common.wrappers import make_env
 from angorapy.models import get_model_builder
 from angorapy.agent.ppo_agent import PPOAgent
 
-env = make_env("LunarLanderContinuous-v2")
-model_builder = get_model_builder("simple", "ffn")
-agent = PPOAgent(model_builder, env)
-agent.drill(100, 10, 512)
+env = make_env("ReachAbsolute-v0")
+model_builder = get_model_builder("shadow", "lstm")
+agent = PPOAgent(model_builder, env, workers=24)
+agent.drill(n=100, epochs=10, batch_size=512)
 ```
 
 For more details, consult the [examples](examples).
 
 ## 🎓 Documentation
-Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs: 
-
- - [Agent](angorapy/agent) [WIP]
- - [Environments](angorapy/environments)
- - [Models](angorapy/models)
- - [Analysis](angorapy/analysis)
- - [Monitoring](angorapy/monitoring)
-
-If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
+We provide [examples](examples) that get you started with writing your own scripts using AngoraPy. Additionally there is a growing list of [tutorials](https://github.com/weidler/angorapy-tutorials). If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
 
 ## 🔀 Distributed Computation
 PPO is an asynchronous algorithm, allowing multiple parallel workers to generate experience independently. 
@@ -154,13 +178,17 @@ The number of parallel workers will equal the number of nodes times the number o
 
 If you use AngoraPy for your research, please cite us as follows
 
-    Weidler, T., & Senden, M. (2020). AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
+    Weidler, Tonio, & Senden, Mario. (2023). AngoraPy - Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling (0.9.0). Zenodo. https://doi.org/10.5281/zenodo.7770180
 
 Or using bibtex
 
-    @software{angorapy2020,
-        author = {Weidler, Tonio and Senden, Mario},
-        month = {3},
-        title = {{AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling}},
-        year = {2020}
-    }
+    @software{weidler_angorapy_2023,
+        author       = {Weidler, Tonio and Senden, Mario},
+        title        = {{AngoraPy - Anthropomorphic Goal-Oriented Robotic 
+                         Control for Neuroscientific Modeling}},
+        year         = 2023,
+        publisher    = {Zenodo},
+        version      = {0.9.0},
+        doi          = {10.5281/zenodo.6636482},
+        url          = {https://doi.org/10.5281/zenodo.6636482}
+   }
