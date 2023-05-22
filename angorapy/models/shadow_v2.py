@@ -86,7 +86,8 @@ def build_mc_module(batch_and_sequence_shape, lpfc_input_shape, spl_input_shape,
                         return_state=True,
                         name="pmc_recurrent_layer",
                         recurrent_initializer=OrthogonalMP(),
-                        dtype="float32"
+                        dtype="float32",
+
                         )(pmc_input)
 
     m1_input = tf.keras.layers.concatenate([pmc, ssc_input, spl_input])

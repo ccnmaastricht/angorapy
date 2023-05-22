@@ -14,6 +14,7 @@ from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDi
     MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
 from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.models.components import _build_encoding_sub_model
+from angorapy.utilities.model_utils import make_input_layers
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -26,13 +27,7 @@ def build_ffn_models(env: BaseWrapper,
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    input_list = []
-    for sense_name in state_dimensionality.keys():
-        if sense_name == "asymmetric":
-            continue
-
-        input_node = tf.keras.Input(shape=state_dimensionality[sense_name], name=sense_name)
-        input_list.append(input_node)
+    input_list = make_input_layers(env, None, None)
 
     if len(input_list) > 1:
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
@@ -80,13 +75,7 @@ def build_rnn_models(env: BaseWrapper,
 
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    input_list = []
-    for sense_name in state_dimensionality.keys():
-        if sense_name == "asymmetric":
-            continue
-
-        input_node = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality[sense_name], name=sense_name)
-        input_list.append(input_node)
+    input_list = make_input_layers(env, bs=bs, sequence_length=sequence_length)
 
     if len(input_list) > 1:
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)

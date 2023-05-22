@@ -38,8 +38,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get --no-install-recommends install -y python3.8-dev python3.8 python3-pip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean
+#    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get install -y libopenexr-dev
+RUN apt-get install -y openexr
+RUN apt-get install -y zlib1g-dev
 
 # INSTALL MPI
 RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
@@ -75,11 +79,13 @@ RUN pip install /ang_tmp --default-timeout=100 \
 
 RUN pip install gym[box2d]
 RUN pip install tensorflow_datasets
+#RUN pip install jupyter
 
 WORKDIR /
 
 COPY angorapy/train.py train.py
 COPY angorapy/pretrain.py pretrain.py
+COPY angorapy/analysis/predictability.py predictability.py
 
 # CLEANUP
 RUN pip cache purge
