@@ -22,20 +22,52 @@ This library is developed as part of the [Human Brain Project](https://www.human
 
 ## 📥 Installation
 
-AngoraPy is available on PyPI. 
+### Prerequisites
+AngoraPy requires Python 3.6 or higher. It is recommended to use a virtual environment to install AngoraPy and its dependencies. Additionally, some prerequisites are required. 
 
-```bash
-pip install angorapy
-```
+On Ubuntu, these can be installed by running
 
-### From source
-Alternatively, you can download this repository or the source code of any previous release or branch and install from source, using pip.
+    sudo apt-get install swig
 
-```bash
-pip install -e .
-```
+Additionally, to run AngoraPy with its native distribution, you need MPI installed. On Ubuntu, this can be done by running
 
-This way, if you make changes to the source code, these will be recognized in the installation (without the need to reinstall).
+    sudo apt-get install libopenmpi-dev
+
+However, any other MPI implementation should work as well.
+
+### Installing AngoraPy
+
+#### Binaries
+AngoraPy is available as a binary package on PyPI. To install it, run 
+
+    pip install angorapy
+
+in your terminal.
+
+If you would like to install a specific version, you can specify it by appending `==<version>` to the command above. For example, to install version 0.9.0, run 
+
+    pip install angorapy==0.9.0
+
+#### Source Installation
+To install AngoraPy from source, clone the repository and run `pip install -e .` in the root directory.
+
+### Post-Installation
+
+#### MuJoCo
+Gym installs both MuJoCo's new native Python bindings and the old mujoco-py bindings. You will not need the latter for AngoraPy, so you may uninstall it by running
+
+    pip uninstall mujoco-py
+
+#### Test Your Installation
+You can test your installation by running the following command in your terminal:
+
+    python -m angorapy.train CartPole-v1
+
+To test your MPI installation, run
+
+    mpirun -np <numthreads> --use-hwthread-cpus python -m angorapy.train LunarLanderContinuous-v2
+
+where `<numthreads>` is the number of threads you want to (and can) use.
 
 ### Docker
 Alternatively, you can install AngoraPy and all its dependencies in a docker container using the Dockerfile provided in this repository (/docker/Dockerfile). To this end, download the repository and build the docker image from the /docker directory:
