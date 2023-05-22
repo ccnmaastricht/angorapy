@@ -89,15 +89,7 @@ agent.drill(n=100, epochs=10, batch_size=512)
 For more details, consult the [examples](examples).
 
 ## 🎓 Documentation
-Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs: 
-
- - [Agent](angorapy/agent) [WIP]
- - [Environments](angorapy/environments)
- - [Models](angorapy/models)
- - [Analysis](angorapy/analysis)
- - [Monitoring](angorapy/monitoring)
-
-If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
+We provide [examples](examples) that get you started with writing your own scripts using AngoraPy. Additionally there is a growing list of [tutorials](https://github.com/weidler/angorapy-tutorials). If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
 
 ## 🔀 Distributed Computation
 PPO is an asynchronous algorithm, allowing multiple parallel workers to generate experience independently. 
@@ -154,13 +146,17 @@ The number of parallel workers will equal the number of nodes times the number o
 
 If you use AngoraPy for your research, please cite us as follows
 
-    Weidler, T., & Senden, M. (2020). AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling [Computer software]
+    Weidler, Tonio, & Senden, Mario. (2023). AngoraPy - Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling (0.9.0). Zenodo. https://doi.org/10.5281/zenodo.7770180
 
 Or using bibtex
 
-    @software{angorapy2020,
-        author = {Weidler, Tonio and Senden, Mario},
-        month = {3},
-        title = {{AngoraPy: Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling}},
-        year = {2020}
-    }
+    @software{weidler_angorapy_2023,
+        author       = {Weidler, Tonio and Senden, Mario},
+        title        = {{AngoraPy - Anthropomorphic Goal-Oriented Robotic 
+                         Control for Neuroscientific Modeling}},
+        year         = 2023,
+        publisher    = {Zenodo},
+        version      = {0.9.0},
+        doi          = {10.5281/zenodo.6636482},
+        url          = {https://doi.org/10.5281/zenodo.6636482}
+   }
