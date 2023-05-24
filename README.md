@@ -79,6 +79,8 @@ sudo docker build -t angorapy:master https://github.com/ccnmaastricht/angorapy.g
 To install different versions, replace `#master` in the source by the tag/branch of the respective version you want to install.
 
 ## 🚀 Getting Started
+[ ➡️ Tutorial Section on Getting Started](https://github.com/weidler/angorapy-tutorials/tree/main/get-started)
+
 The scripts `train.py`, `evaluate.py` and `observe.py` provide ready-made scripts for training and evaluating an agent in any environment. With `pretrain.py`, it is possible to pretrain the visual component. `benchmark.py` provides functionality for training a batch of agents possibly using different configs for comparison of strategies.
 
 ### Training an Agent
@@ -86,21 +88,24 @@ The `train.py` commandline interface provides a convenient entry-point for runni
 
 Base usage of `train.py` is as follows:
 
-    python train.py ENV --architecture MODEL
+    python -m angorapy.train ENV --architecture MODEL
     
 For instance, training `LunarLanderContinuous-v2` using the `deeper` architecture is possible by running:
 
-    python train.py LunarLanderContinuous-v2 --architecture deeper
+    python -m angorapy.train LunarLanderContinuous-v2 --architecture deeper
     
 For more advanced options like custom hyperparameters, consult
 
-    python train.py -h
+    python -m angorapy.train -h
 
 
 ### Evaluating and Observing an Agent
-There are two more entry points for evaluating and observing an agent: `evaluate.py` and `observe.py`. General usage is as follows
+[ ➡️ Tutorial Section on Agent Analysis](https://github.com/weidler/angorapy-tutorials/tree/main/analysis)
 
-    python evaluate.py ID
+There are two more entry points for evaluating and observing an agent: `evaluate` and `observe`. General usage is as follows
+
+    python -m angorapy.evaluate ID
+    python -m angorapy.observe ID
 
 Where ID is the agent's ID given when its created (`train.py` prints this outt, in custom scripts get it with `agent.agent_id`).
 
@@ -120,6 +125,9 @@ agent.drill(n=100, epochs=10, batch_size=512)
 
 For more details, consult the [examples](examples).
 
+### Customizing the Models and Environments
+[ ➡️ Tutorial Section on Customization](https://github.com/weidler/angorapy-tutorials/tree/main/customization)
+
 ## 🎓 Documentation
 We provide [examples](examples) that get you started with writing your own scripts using AngoraPy. Additionally there is a growing list of [tutorials](https://github.com/weidler/angorapy-tutorials). If you are missing a documentation for a specific part of AngoraPy, feel free to open an issue and we will do our best to add it.
 
@@ -136,7 +144,7 @@ To use MPI locally, you need to have a running MPI implementation, e.g. Open MPI
 To execute `train.py` via MPI, run
 
 ```bash
-mpirun -np 12 --use-hwthread-cpus python3 train.py ...
+mpirun -np 12 --use-hwthread-cpus python -m angorapy.train ...
 ```
 
 where, in this example, 12 is the number of locally available CPU threads and `--use-hwthread-cpus`
