@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow_datasets as tfds
 from tensorflow.python.data import AUTOTUNE
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from typing import Tuple
 
@@ -28,16 +28,17 @@ import argcomplete
 import tensorflow as tf
 
 from angorapy.common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
-from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, load_dataset
+from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, load_dataset, load_unrendered_dataset
 
 import tensorflow_graphics.geometry.transformation as tfg
 
-tf.get_logger().setLevel('INFO')
+# tf.get_logger().setLevel('INFO')
 gpus = tf.config.list_physical_devices("GPU")
 if gpus:
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
 
+@tf.function
 def rotational_diff_metric(y_true, y_pred):
     rot_true = y_true[..., 3:]
     rot_pred = y_pred[..., 3:]
@@ -45,6 +46,7 @@ def rotational_diff_metric(y_true, y_pred):
     return tfg.quaternion.relative_angle(rot_true, rot_pred) * tf.constant(180. / math.pi)
 
 
+@tf.function
 def positional_diff_metric(y_true, y_pred):
     """Gives positional difference in millimeters."""
     pos_true = y_true[..., :3]
@@ -129,10 +131,10 @@ def render(sim_state):
     qpos = object.qpos.copy()
     object.qpos = original_qpos
 
-    # plt.imshow(np.concatenate(images, axis=-2))
-    # plt.show()
+    images = tf.cast(tf.concat(images, axis=-1) / 255, dtype=tf.float32)
+    qpos = tf.cast(qpos, dtype=tf.float32)
 
-    return tf.cast(tf.concat(images, axis=-1) / 255, dtype=tf.float32), tf.cast(qpos, tf.float32)
+    return images, qpos
 
 
 def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
@@ -141,7 +143,6 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
                             n_cameras=1,
                             load_data: bool = False,
                             name="visual_op",
-                            dataset: Tuple[np.ndarray, np.ndarray] = None,
                             load_from: str = None):
     """Pretrain a visual component on prediction of cube position."""
     data_path = f"storage/data/pretraining/pose_data_{n_samples}_{n_cameras}c.tfrecord"
@@ -151,30 +152,32 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
             data_path,
         )
     else:
-        dataset = load_dataset(data_path)
+        dataset = load_unrendered_dataset(data_path)
 
-    dataset = dataset.map(lambda x, y: (tf.py_function(func=render, inp=[x], Tout=tf.float32)))
+    dataset = dataset.map(lambda x, y: tf.py_function(func=render, inp=[x], Tout=[tf.float32, tf.float32]))
+    # dataset = dataset.map(lambda x, y: render(x))
 
-    n_testset = 10
-    n_valset = 5
+    n_testset = 1000
+    n_valset = 500
 
     testset = dataset.take(n_testset)
     trainset = dataset.skip(n_testset)
     valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
 
-    trainset = trainset.batch(64, drop_remainder=True)
+    trainset = trainset.batch(1, drop_remainder=True, num_parallel_calls=1)
     trainset = trainset.prefetch(AUTOTUNE)
 
-    valset = valset.batch(64, drop_remainder=True)
+    valset = valset.batch(1, drop_remainder=True, num_parallel_calls=1)
     valset = valset.prefetch(AUTOTUNE)
 
-    testset = testset.batch(64, drop_remainder=True)
+    testset = testset.batch(1, drop_remainder=True, num_parallel_calls=1)
     testset = testset.prefetch(AUTOTUNE)
-
 
     if load_from is None:
         model = pretrainable_component
-        model(tf.expand_dims(next(iter(trainset))[0], 0))
+
+        build_sample = tf.expand_dims(next(iter(dataset))[0], 0)
+        model(build_sample)
 
         # chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
         # chunk_mean = np.mean(chunk, axis=0)
@@ -184,15 +187,16 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         # output_layer.set_weights(output_weights)
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
-        model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
+        model.compile(optimizer, loss="mse", metrics=[])
+        # model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
 
         # train and save encoder
         model.fit(x=trainset,
                   epochs=epochs,
                   validation_data=valset,
-                  callbacks=[
-                      tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
-                  ],
+                  # callbacks=[
+                  #     tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
+                  # ],
                   shuffle=True)
         pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
     else:
@@ -294,7 +298,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=30, help=f"number of pretraining epochs")
+    parser.add_argument("--epochs", type=int, default=2, help=f"number of pretraining epochs")
 
     # read arguments
     argcomplete.autocomplete(parser)
@@ -316,7 +320,7 @@ if __name__ == "__main__":
         epochs=args.epochs,
         n_samples=n_samples,
         n_cameras=n_cameras,
-        load_data=False,
+        load_data=True,
         name=args.name,
         load_from=args.load,
     )

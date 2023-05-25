@@ -9,7 +9,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.9.1',
+    version='0.10.0',
     description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
     long_description_content_type='text/markdown',
     long_description=long_description,
@@ -20,16 +20,16 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "swig==4.1.1",
-        "imageio==2.28.1",
-        "numpy==1.19.2",
-        "box2d-py==2.3.5",
-        "gym[all]==0.26.2",
-        "mujoco==2.2",
-        "tensorflow==2.4.2",
-        "tensorflow_probability==0.12.2",
-        "tensorflow_graphics==2021.12.3",
-        "mpi4py==3.1.3",
+        "swig",
+        "imageio",
+        "numpy",
+        "box2d-py",
+        "gym[all]",
+        "mujoco",
+        "tensorflow",
+        "tensorflow_probability",
+        "tensorflow_graphics",
+        "mpi4py",
         "tqdm",
         "simplejson",
         "psutil",
@@ -42,10 +42,10 @@ setup(
         "nvidia-ml-py3",
         "seaborn",
         "distance",
-        "protobuf==3.19.0",
+        "protobuf",
         "panda_gym==3.0.6",
         
-        "keras_cortex==0.0.7",
+        # "keras_cortex==0.0.7",
 
         # webinterface
         "itsdangerous==2.0.1",

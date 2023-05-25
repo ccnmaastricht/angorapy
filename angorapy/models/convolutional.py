@@ -81,6 +81,7 @@ class OpenAIEncoder(tf.keras.Model):
         super().__init__(**kwargs)
 
         self.n_cameras = n_cameras
+
         self.resnet_encoder = _build_openai_resnets(shape=shape,
                                                     batch_size=kwargs.get("batch_size"))
 
