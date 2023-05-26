@@ -123,7 +123,6 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
 
 
 if __name__ == "__main__":
-
     tf.get_logger().setLevel('INFO')
     gpus = tf.config.list_physical_devices("GPU")
     if gpus:

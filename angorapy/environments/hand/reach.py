@@ -26,14 +26,8 @@ class Reach(BaseShadowHandEnv):
                  render_mode: Optional[str] = None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
 
-        # reward function setup
-        self._set_default_reward_function_and_config()
-        self.vision = vision
-        self.touch = touch
-
         self.forced_finger = force_finger
         self.current_target_finger = self.forced_finger
-        self.thumb_name = 'robot0:S_thtip'
 
         # STATE INITIALIZATION
         assert initial_qpos in ["random", "buffered"] or isinstance(initial_qpos, dict), "Illegal state initialization."
@@ -49,7 +43,9 @@ class Reach(BaseShadowHandEnv):
             distance_threshold=self.reward_config["SUCCESS_DISTANCE"],
             n_substeps=n_substeps,
             relative_control=relative_control,
-            render_mode=render_mode
+            render_mode=render_mode,
+            vision=vision,
+            touch=touch,
         )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
@@ -69,10 +65,6 @@ class Reach(BaseShadowHandEnv):
         d = get_fingertip_distance(achieved_goal, desired_goal)
         return (d < self.distance_threshold).astype(np.float32)
 
-    def get_thumb_position(self) -> np.ndarray:
-        """Get the position of the thumb in space."""
-        return self.data.site(self.thumb_name).xpos.flatten()
-
     def get_thumbs_previous_position(self) -> np.ndarray:
         """Get the previous position of the thumb in space."""
         return self.previous_finger_positions[-1]
@@ -88,10 +80,6 @@ class Reach(BaseShadowHandEnv):
     def get_target_fingers_previous_position(self) -> np.ndarray:
         """Get position of the target finger in space."""
         return self.previous_finger_positions[self.current_target_finger]
-
-    def get_finger_position(self, finger_name: str) -> np.ndarray:
-        """Get position of the specified finger in space."""
-        return self.data.site(finger_name).xpos.flatten()
 
     def _reset_sim(self):
         """Resets a simulation and indicates whether or not it was successful."""

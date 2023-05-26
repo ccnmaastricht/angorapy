@@ -94,6 +94,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
                  relative_control=True,
                  model=MODEL_PATH,
                  vision=False,
+                 touch=True,
                  render_mode: Optional[str] = None
                  ):
         gym.utils.EzPickle.__init__(**locals())
@@ -109,7 +110,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.viewpoint = "topdown"
 
         super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
-                                                vision=vision, render_mode=render_mode, delta_t=delta_t, n_substeps=n_substeps)
+                                                vision=vision, touch=touch, render_mode=render_mode, delta_t=delta_t,
+                                                n_substeps=n_substeps)
 
         self.seed()
         self.initial_state = copy.deepcopy(self.get_state())
@@ -118,6 +120,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         self.viewer_setup()
 
+        self.thumb_name = 'robot0:S_thtip'
+
+    # SPACES
     def _set_action_space(self):
         if self.continuous:
             self.action_space = spaces.Box(-1., 1., shape=(20,), dtype=float)
@@ -136,27 +141,54 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             ),
         ))
 
+    # TOGGLES
     def toggle_wrist_freezing(self):
         """Toggle flag preventing the wrist from moving."""
         self._freeze_wrist = not self._freeze_wrist
         print("Wrist movements are now frozen.")
 
-    # INFORMATION METHODS
+    # GETTERS
+    def get_finger_position(self, finger_name: str) -> np.ndarray:
+        """Get position of the specified finger in space."""
+        return self.data.site(finger_name).xpos.flatten()
+
     def get_fingertip_positions(self):
         """Get positions of all fingertips in euclidean space. Each position is encoded by three floating point numbers,
         as such the output is a 15-D numpy array."""
         goal = [self.data.site(name).xpos.flatten() for name in FINGERTIP_SITE_NAMES]
         return np.array(goal).flatten()
 
+    def get_thumb_position(self) -> np.ndarray:
+        """Get the position of the thumb in space."""
+        return self.data.site(self.thumb_name).xpos.flatten()
+
     def is_thumb_tip_touching(self):
         if sum(self.data.sensordata[self._touch_sensor_id]) > 0.0:
             return True
 
-    # ENV METHODS
-
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
+
+    # CONTROL
+    def _set_action(self, action):
+        assert action.shape == (20,)
+
+        actuator_names = mj_get_category_names(self.model, "actuator")
+        ctrlrange = self.model.actuator_ctrlrange
+        actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
+        if self.relative_control:
+            actuation_center = np.zeros_like(action)
+            for i in range(self.data.ctrl.shape[0]):
+                actuation_center[i] = self.data.jnt(actuator_names[i].replace(b':A_', b':')).qpos
+            for joint_name in ['FF', 'MF', 'RF', 'LF']:
+                act_idx = actuator_names.index(str.encode(f'robot0:A_{joint_name}J1'))
+                actuation_center[act_idx] += self.data.jnt(str.encode(f'robot0:{joint_name}J0')).qpos
+        else:
+            actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
+
+        self.data.ctrl[:] = actuation_center + action * actuation_range
+        self.data.ctrl[:] = np.clip(self.data.ctrl, ctrlrange[:, 0], ctrlrange[:, 1])
 
     def step(self, action: np.ndarray):
         if self.continuous:
@@ -187,6 +219,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         return obs, reward, done, False, info
 
+    # SIMULATION
     def reset(self, **kwargs):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
         # is possible to get into a state with numerical issues (e.g. due to penetration or
@@ -210,62 +243,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         return obs, info
 
-    def reset_model(self):
-        self.set_state(**self.initial_state)
-
-    def close(self):
-        if self.viewer is not None:
-            # self.viewer.finish()
-            self.viewer = None
-            self._viewers = {}
-
-    def render(self):
-        return super().render()
-
-    # Extension methods
-    # ----------------------------
-
-    def _reset_sim(self):
-        """Resets a simulation and indicates whether or not it was successful.
-        If a reset was unsuccessful (e.g. if a randomized state caused an error in the
-        simulation), this method should indicate such a failure by returning False.
-        In such a case, this method will be called again to attempt a the reset again.
-        """
-        self.reset_model()
-
-        return True
-
-    @abc.abstractmethod
-    def _get_obs(self):
-        pass
-
-    def _set_action(self, action):
-        assert action.shape == (20,)
-
-        actuator_names = mj_get_category_names(self.model, "actuator")
-        ctrlrange = self.model.actuator_ctrlrange
-        actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
-        if self.relative_control:
-            actuation_center = np.zeros_like(action)
-            for i in range(self.data.ctrl.shape[0]):
-                actuation_center[i] = self.data.jnt(actuator_names[i].replace(b':A_', b':')).qpos
-            for joint_name in ['FF', 'MF', 'RF', 'LF']:
-                act_idx = actuator_names.index(str.encode(f'robot0:A_{joint_name}J1'))
-                actuation_center[act_idx] += self.data.jnt(str.encode(f'robot0:{joint_name}J0')).qpos
-        else:
-            actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
-
-        self.data.ctrl[:] = actuation_center + action * actuation_range
-        self.data.ctrl[:] = np.clip(self.data.ctrl, ctrlrange[:, 0], ctrlrange[:, 1])
-
-    @abc.abstractmethod
-    def _is_success(self, achieved_goal, desired_goal):
-        pass
-
-    @abc.abstractmethod
-    def _sample_goal(self):
-        pass
-
     def _env_setup(self, initial_state):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
@@ -280,17 +257,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         if initial_state is not None:
             self.set_state(**initial_state)
 
-    @abc.abstractmethod
-    def _render_callback(self, render_targets=False):
-        """A custom callback that is called before rendering. Can be used to implement custom visualizations."""
-        pass
-
-    def _step_callback(self):
-        """A custom callback that is called after stepping the simulation. Can be used
-        to enforce additional constraints on the simulation state.
-        """
-        pass
-
+    # RENDERING
     def change_perspective(self, perspective: str):
         assert perspective in ["topdown", "side", "topdown-far"], "This viewpoint has no settings available."
 
@@ -350,6 +317,11 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 
         mpi_print("Camera setup finished.")
+
+    # ABSTRACT METHODS
+    @abc.abstractmethod
+    def _sample_goal(self):
+        pass
 
 
 if __name__ == '__main__':

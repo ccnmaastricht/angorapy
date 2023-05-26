@@ -1,4 +1,5 @@
 #!/bin/bash
+# Script to pull storage from remote server
 
 REMOVE=false
 ONLY_STATS=false
