@@ -208,6 +208,7 @@ def make_input_layers(env, bs, sequence_length = None):
     If the model is not recurrent, provide None for the sequence_length (default)"""
 
     state_dimensionality, n_actions = env_extract_dims(env)
+
     inputs = []
 
     for modality in state_dimensionality.keys():
@@ -215,7 +216,9 @@ def make_input_layers(env, bs, sequence_length = None):
         if sequence_length is not None:
             shape += (sequence_length, )
         shape += tuple(state_dimensionality[modality])
-        inputs.append(tf.keras.Input(batch_shape=shape, name=modality))
+
+        the_input = tf.keras.Input(batch_shape=shape, name=modality)
+        inputs.append(the_input)
 
     return inputs
 

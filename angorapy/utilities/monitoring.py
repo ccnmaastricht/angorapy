@@ -5,12 +5,15 @@ import datetime
 import os
 import socket
 import time
-from importlib.metadata import version
+import sys
+
+
 from inspect import getfullargspec as fargs
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy
+import pkg_resources
 import simplejson as json
 import tensorflow as tf
 from gym.spaces import Box
@@ -25,6 +28,7 @@ from angorapy.common.wrappers import BaseWrapper
 from angorapy.models.mighty_maker import get_model_type
 from angorapy.utilities.util import add_state_dims, flatten
 
+import angorapy
 
 def scale(vector):
     """Min Max scale a vector."""
@@ -123,7 +127,7 @@ class Monitor:
             host=socket.gethostname(),
             n_cpus=MPI.COMM_WORLD.size,
             n_gpus=self.agent.n_optimizers,
-            angorapy_version=version("angorapy"),
+            angorapy_version=pkg_resources.get_distribution("angorapy").version,
             experiment_group=self.experiment_group,
             iterations=self.iterations,
             environment=dict(

@@ -2,6 +2,8 @@ from typing import List
 
 import numpy as np
 import tqdm
+
+from angorapy.environments.anthrobotics import AnthropomorphicEnv
 from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
 
 from angorapy.environments.hand.shadowhand import get_fingertip_distance
@@ -44,14 +46,14 @@ def calculate_auxiliary_finger_penalty(environment, exclude: List[int] = None) -
 
 # REWARD FUNCTIONS
 
-def reach(env, achieved_goal, goal, info: dict):
+def reach(env: "BaseShadowHandEnv", info: dict):
     """Simple reward function for reaching tasks, combining distance, force and success."""
-    return (- get_fingertip_distance(achieved_goal, goal)
+    return (- get_fingertip_distance(env.get_fingertip_positions(), env.goal)
             + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
             - calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"])
 
 
-def free_reach(env, achieved_goal, goal, info: dict):
+def free_reach(env: AnthropomorphicEnv, info: dict):
     """Reward the relative join of the thumb'serialization and a target'serialization fingertip while punishing close
     other fingertips."""
 
@@ -66,7 +68,7 @@ def free_reach(env, achieved_goal, goal, info: dict):
     return reward
 
 
-def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
+def free_reach_positive_reinforcement(env: AnthropomorphicEnv, info: dict):
     """Reward progress towards the goal position while punishing other fingers for interfering."""
     # positive reinforcement
     progress_reward = (
@@ -85,16 +87,16 @@ def free_reach_positive_reinforcement(env, achieved_goal, goal, info: dict):
 
 # SEQUENTIAL REACHING
 
-def sequential_reach(env, achieved_goal, goal, info: dict):  # TODO adjust for sequence?
+def sequential_reach(env: "BaseShadowHandEnv", info: dict):  # TODO adjust for sequence?
     """Reward following a sequence of finger configurations."""
-    reward = (- get_fingertip_distance(achieved_goal, goal)
+    reward = (- get_fingertip_distance(env.get_fingertip_positions(), env.goal)
               + info["is_success"] * env.reward_config["SUCCESS_BONUS"]
               - calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"])
 
     return reward
 
 
-def sequential_free_reach(env, achieved_goal, goal, info: dict):
+def sequential_free_reach(env: "BaseShadowHandEnv", info: dict):
     """Reward following a sequence of reach movements."""
 
     # reinforcement
@@ -117,10 +119,9 @@ def sequential_free_reach(env, achieved_goal, goal, info: dict):
 
 # MANIPULATE
 
-def manipulate(env, achieved_goal, goal, info: dict):
+def manipulate(env: "BaseManipulate", info: dict):
     """Reward function fo object manipulation tasks."""
-    success = env._is_success(achieved_goal, goal).astype(np.float32)
-    d_pos, d_rot = env._goal_distance(achieved_goal, goal)
+    success = env._is_success(env.get_object_pose(), env.goal).astype(np.float32)
     d_progress = env._goal_progress()
 
     reward = (+ d_progress  # convergence to goal reward

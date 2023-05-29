@@ -22,15 +22,15 @@ def build_ffn_models(env: BaseWrapper,
                      distribution: BasePolicyDistribution,
                      shared: bool = False,
                      layer_sizes: Tuple = (64, 64)):
-    """Build a simple fully connected feed-forward model model."""
+    """Build a simple fully connected feed-forward model."""
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
-
     input_list = make_input_layers(env, None, None)
 
     if len(input_list) > 1:
-        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
+        policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
+        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
         inputs = input_list[0]
 
@@ -42,9 +42,10 @@ def build_ffn_models(env: BaseWrapper,
 
     # value network
     if "asymmetric" in state_dimensionality.keys():
-        asymmetric_inputs = tf.keras.Input(shape=state_dimensionality["asymmetric"], name="asymmetric")
-        inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
-        input_list.append(asymmetric_inputs)
+        inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
+            [inputs, list(filter(lambda i: i.name == "asymmetric", input_list))[0]]
+        )
+
     if not shared:
         value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="value_encoder")(inputs)
         value_out = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
@@ -71,21 +72,20 @@ def build_rnn_models(env: BaseWrapper,
     Args:
         sequence_length:
     """
-    # TODO: remove current workaround: solve issue with stateful masked RNNs by fixing the models sequence length
 
     state_dimensionality, n_actions = env_extract_dims(env)
-
     input_list = make_input_layers(env, bs=bs, sequence_length=sequence_length)
 
     if len(input_list) > 1:
-        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
+        policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
+        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
         inputs = input_list[0]
 
     if "asymmetric" in state_dimensionality.keys():
-        asymmetric_inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asymmetric"], name="asymmetric")
-        value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
-        input_list.append(asymmetric_inputs)
+        value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
+            [inputs, list(filter(lambda i: i.name == "asymmetric", input_list))[0]]
+        )
     else:
         value_inputs = inputs
 
@@ -148,7 +148,7 @@ def build_simple_models(env: BaseWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
                         bs: int = 1,
-                        sequence_length: int = None,
+                        sequence_length: int = 1,
                         model_type: str = "gru",
                         **kwargs):
     """Build simple networks (policy, value, joint) for given parameter settings."""

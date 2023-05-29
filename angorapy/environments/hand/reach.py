@@ -38,15 +38,8 @@ class Reach(BaseShadowHandEnv):
         elif self.state_initialization == "buffered":
             initial_qpos = DEFAULT_INITIAL_QPOS
 
-        super().__init__(
-            initial_qpos=initial_qpos,
-            distance_threshold=self.reward_config["SUCCESS_DISTANCE"],
-            n_substeps=n_substeps,
-            relative_control=relative_control,
-            render_mode=render_mode,
-            vision=vision,
-            touch=touch,
-        )
+        super().__init__(initial_qpos=initial_qpos, n_substeps=n_substeps, relative_control=relative_control,
+                         vision=vision, touch=touch, render_mode=render_mode)
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
 
@@ -99,26 +92,6 @@ class Reach(BaseShadowHandEnv):
         #         self.sim.set_state(sampled_initial_state)
 
         return True
-
-    def _get_obs(self):
-        touch = self.data.sensordata[self._touch_sensor_id]
-
-        achieved_goal = self._get_achieved_goal().ravel()
-
-        robot_qpos, robot_qvel = robot_get_obs(self.model, self.data)
-        proprioception = np.concatenate([robot_qpos, robot_qvel, achieved_goal.copy()])  # todo remove achieved goal?
-
-        return {
-            'observation': Sensation(
-                proprioception=proprioception,
-                touch=touch if self.touch else None,
-                vision=self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else np.array([]),
-                goal=self.goal.copy()
-            ),
-
-            'desired_goal': self.goal.copy(),
-            'achieved_goal': achieved_goal.copy(),
-        }
 
     def _sample_goal(self):
         thumb_name = 'robot0:S_thtip'
@@ -190,10 +163,18 @@ class Reach(BaseShadowHandEnv):
         o, r, d, truncated, i = super().step(action)
 
         # update memory
-        i.update({"target_finger": self.current_target_finger})
         # self.state_memory_buffer.append(self.sim.get_state())
 
         return o, r, d, truncated, i
+
+    def _get_info(self):
+        return {
+            **super()._get_info(),
+            "target_finger": self.current_target_finger,
+            "achieved_goal": self._get_achieved_goal().copy(),
+            "desired_goal": self.goal.copy(),
+            "is_success": self._is_success(self._get_achieved_goal(), self.goal),
+        }
 
 
 class ReachSequential(Reach):
@@ -249,7 +230,7 @@ class ReachSequential(Reach):
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
-        return (d < self.distance_threshold).astype(np.float32)
+        return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
     def reset(self):
         self.current_target_finger = None
@@ -309,7 +290,8 @@ class FreeReach(Reach):
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(self.get_thumb_position(), self.get_target_finger_position())
-        return (d < self.distance_threshold).astype(np.float32)
+        print(self.reward_config)
+        return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
     def _render_callback(self, render_targets=False):
         sites_offset = (self.data.site_xpos - self.model.site_pos).copy()

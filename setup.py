@@ -44,6 +44,7 @@ setup(
         "distance",
         "protobuf==3.19.0",
         "panda_gym==3.0.6",
+        "statsmodels==0.14.0",
         
         "keras_cortex==0.0.7",
 

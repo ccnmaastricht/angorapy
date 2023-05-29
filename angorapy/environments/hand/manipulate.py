@@ -89,6 +89,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
         self.touch_get_obs = touch_get_obs
         self.vision = vision
+        self.touch = touch
         self.touch_color = [1, 0, 0, 0.5]
         self.notouch_color = [0, 0.5, 0, 0.2]
 
@@ -108,15 +109,10 @@ class BaseManipulate(BaseShadowHandEnv):
 
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
-        self.previous_achieved_goal = self._get_achieved_goal()
+        self.previous_object_pose = self.get_object_pose()
 
-        super().__init__(initial_qpos=initial_qpos,
-                         distance_threshold=0.1,
-                         n_substeps=n_substeps,
-                         delta_t=delta_t,
-                         relative_control=relative_control,
-                         model=model_path,
-                         vision=vision,
+        super().__init__(initial_qpos=initial_qpos, n_substeps=n_substeps, delta_t=delta_t,
+                         relative_control=relative_control, model=model_path, vision=vision, touch=touch,
                          render_mode=render_mode)
 
         # set touch sensors rgba values
@@ -132,7 +128,7 @@ class BaseManipulate(BaseShadowHandEnv):
         assert set(MANIPULATE_BASE.keys()).issubset(
             self.reward_config.keys()), "Incomplete manipulate reward configuration."
 
-    def _get_achieved_goal(self):
+    def get_object_pose(self):
         """Object position and rotation."""
         if hasattr(self, "data"):
             object_qpos = self.data.jnt('object:joint').qpos
@@ -185,7 +181,7 @@ class BaseManipulate(BaseShadowHandEnv):
     def _env_setup(self, initial_state):
         super()._env_setup(initial_state)
 
-        self.initial_goal = self._get_achieved_goal().copy()
+        self.initial_goal = self.get_object_pose().copy()
         self.palm_xpos = self.data.body('robot0:palm').xpos.copy()
 
         self.goal = self._sample_goal()
@@ -353,19 +349,19 @@ class BaseManipulate(BaseShadowHandEnv):
         return dropped
 
     def _goal_progress(self):
-        return (sum(self._goal_distance(self.goal, self.previous_achieved_goal))
-                - sum(self._goal_distance(self.goal, self._get_achieved_goal())))
+        return (sum(self._goal_distance(self.goal, self.previous_object_pose))
+                - sum(self._goal_distance(self.goal, self.get_object_pose())))
 
     def step(self, action):
         """Make step in environment."""
         obs, reward, terminated, truncated, info = super().step(action)
         self.steps_with_current_goal += 1
 
-        success = self._is_success(self._get_achieved_goal(), self.goal)
+        success = self._is_success(self.get_object_pose(), self.goal)
 
         # determine if a goal has been reached
         if not success:
-            self.previous_achieved_goal = self._get_achieved_goal().copy()
+            self.previous_object_pose = self.get_object_pose().copy()
         else:
             self.consecutive_goals_reached += 1
             self.goal = self._sample_goal()
@@ -384,6 +380,14 @@ class BaseManipulate(BaseShadowHandEnv):
         info["auxiliary_performances"]["consecutive_goals_reached"] = self.consecutive_goals_reached
 
         return obs, reward, terminated, truncated, info
+
+    def _get_info(self):
+        return {
+            **super()._get_info(),
+            "is_success": self._is_success(self.goal, self.get_object_pose()),
+            "achieved_goal": self.get_object_pose().copy(),
+            "desired_goal": self.goal.copy(),
+        }
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
@@ -456,8 +460,6 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
                 proprioception=proprioception.copy(),
                 touch=None,
                 goal=target_orientation),
-            "achieved_goal": object_qpos.copy(),
-            "desired_goal": self.goal.ravel().copy(),
         }
 
 
@@ -517,8 +519,6 @@ class HumanoidManipulateBlockDiscrete(ManipulateBlock):
                 goal=target_orientation,
                 asymmetric=None if not self.asymmetric else asymmetric
             ),
-            "achieved_goal": object_qpos.copy().astype(np.float32),
-            "desired_goal": self.goal.ravel().copy().astype(np.float32),
         }
 
 

@@ -86,28 +86,19 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     continuous = True
     discrete_bin_count = 11
 
-    def __init__(self,
-                 initial_qpos,
-                 distance_threshold,
-                 n_substeps=N_SUBSTEPS,
-                 delta_t=0.002,
-                 relative_control=True,
-                 model=MODEL_PATH,
-                 vision=False,
-                 touch=True,
-                 render_mode: Optional[str] = None
-                 ):
+    def __init__(self, initial_qpos, n_substeps=N_SUBSTEPS, delta_t=0.002, relative_control=True, model=MODEL_PATH,
+                 vision=False, touch=True, render_mode: Optional[str] = None):
         gym.utils.EzPickle.__init__(**locals())
 
         self.relative_control = relative_control
         self._touch_sensor_id_site_id = []
         self._touch_sensor_id = []
         self._thumb_touch_sensor_id = []
-        self.distance_threshold = distance_threshold
         self.reward_type = "dense"
         self._freeze_wrist = False
         self.color_scheme = "default"
         self.viewpoint = "topdown"
+        self.thumb_name = 'robot0:S_thtip'
 
         super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
                                                 vision=vision, touch=touch, render_mode=render_mode, delta_t=delta_t,
@@ -120,21 +111,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         self.viewer_setup()
 
-        self.thumb_name = 'robot0:S_thtip'
-
     # SPACES
-    def _set_action_space(self):
-        if self.continuous:
-            self.action_space = spaces.Box(-1., 1., shape=(20,), dtype=float)
-        else:
-            self.action_space = spaces.MultiDiscrete(np.ones(20) * BaseShadowHandEnv.discrete_bin_count)
-            self.discrete_action_values = np.linspace(-1, 1, BaseShadowHandEnv.discrete_bin_count)
-
     def _set_observation_space(self, obs):
         # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape),
-            achieved_goal=spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=obs['achieved_goal'].shape),
             observation=spaces.Dict(
                 {name: spaces.Box(np.finfo(np.float32).min, np.finfo(np.float32).max, shape=val.shape)
                  for name, val in obs['observation'].dict().items()}
@@ -191,33 +171,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.data.ctrl[:] = np.clip(self.data.ctrl, ctrlrange[:, 0], ctrlrange[:, 1])
 
     def step(self, action: np.ndarray):
-        if self.continuous:
-            action = np.clip(action, self.action_space.low, self.action_space.high)
-        else:
-            action = self.discrete_action_values[action.astype(int)]
-
         if self._freeze_wrist:
             action[:2] = 0
 
-        # perform simulation
-        self.do_simulation(action, n_frames=self.original_n_substeps)
-
-        # read out observation from simulation
-        obs = self._get_obs()
-
-        done = False
-        info = {
-            'is_success': self._is_success(obs['achieved_goal'], self.goal),
-            "achieved_goal": obs["achieved_goal"],
-            "desired_goal": obs["desired_goal"]
-        }
-
-        reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
-
-        if self.render_mode == "human":
-            self.render()
-
-        return obs, reward, done, False, info
+        return super(BaseShadowHandEnv, self).step(action)
 
     # SIMULATION
     def reset(self, **kwargs):
@@ -235,11 +192,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         obs = self._get_obs()
 
-        info = {
-            'is_success': self._is_success(obs['achieved_goal'], self.goal),
-            "achieved_goal": obs["achieved_goal"],
-            "desired_goal": obs["desired_goal"]
-        }
+        info = self._get_info()
 
         return obs, info
 
@@ -269,6 +222,9 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         self.color_scheme = color_scheme
         self.viewer_setup()
+
+    def _get_info(self):
+        return super(BaseShadowHandEnv, self)._get_info()
 
     def viewer_setup(self):
         # lookat = get_palm_position(self.model)
@@ -318,16 +274,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
         mpi_print("Camera setup finished.")
 
-    # ABSTRACT METHODS
-    @abc.abstractmethod
-    def _sample_goal(self):
-        pass
-
 
 if __name__ == '__main__':
-    hand = BaseShadowHandEnv(
-        initial_qpos=DEFAULT_INITIAL_QPOS,
-        distance_threshold=0.2
-    )
+    hand = BaseShadowHandEnv(initial_qpos=DEFAULT_INITIAL_QPOS)
     pass
     print()

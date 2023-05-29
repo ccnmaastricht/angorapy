@@ -74,6 +74,9 @@ class AnthropomorphicEnv(gym.Env, ABC):
     """
     metadata: Dict[str, Any] = {"render_modes": ["human", "rgb_array"]}
 
+    continuous = True
+    discrete_bin_count = 11
+
     def __init__(
             self,
             model_path,
@@ -138,7 +141,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self._env_setup(initial_state=self.initial_state)
         self._set_action_space()
 
-        self.goal = np.array([])
+        self.goal = self._sample_goal()
         observation = self._get_obs()
         self._set_observation_space(observation)
 
@@ -149,9 +152,23 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     # SPACES
     def _set_action_space(self):
+        """Sets the action space of the environment.
+
+        Action spaces may be continuous or discrete. If continuous, the action space is a Box space with the bounds
+        given by the model's actuator control range. If discrete, the action space is a MultiDiscrete space splitting
+        the continuous action space into a number of bins (default 11)."""
+
         bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
         low, high = bounds.T
-        self.action_space = spaces.Box(low=low, high=high, dtype=np.float32)
+
+        if self.continuous:
+            self.action_space = spaces.Box(-1., 1., shape=(self.model.actuator_ctrlrange.shape[0],), dtype=float)
+        else:
+            self.action_space = spaces.MultiDiscrete(
+                np.ones(self.model.actuator_ctrlrange.shape[0]) * self.discrete_bin_count
+            )
+            self.discrete_action_values = np.linspace(-1, 1, self.discrete_bin_count)
+
         return self.action_space
 
     def _set_observation_space(self, observation):
@@ -192,16 +209,12 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def assert_reward_setup(self):
         pass
 
-    def compute_reward(self, achieved_goal, goal, info):
+    def compute_reward(self, info):
         """Compute reward with additional success bonus."""
-        return self.reward_function(self, achieved_goal, goal, info)
+        return self.reward_function(self, info)
 
     @abc.abstractmethod
     def _is_success(self, achieved_goal, desired_goal):
-        pass
-
-    @abc.abstractmethod
-    def _get_achieved_goal(self):
         pass
 
     # TIME
@@ -253,6 +266,28 @@ class AnthropomorphicEnv(gym.Env, ABC):
         return obs, {}
 
     # CONTROL
+    def step(self, action: np.ndarray):
+        if self.continuous:
+            action = np.clip(action, self.action_space.low, self.action_space.high)
+        else:
+            action = self.discrete_action_values[action.astype(int)]
+
+        # perform simulation
+        self.do_simulation(action, n_frames=self.original_n_substeps)
+
+        # read out observation from simulation
+        obs = self._get_obs()
+
+        done = False
+        info = self._get_info()
+
+        reward = self.compute_reward(info)
+
+        if self.render_mode == "human":
+            self.render()
+
+        return obs, reward, done, False, info
+
     def _set_action(self, action):
         if np.array(action).shape != self.action_space.shape:
             raise ValueError("Action dimension mismatch")
@@ -264,11 +299,11 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         for _ in range(n_frames):
             mujoco.mj_step(self.model, self.data)
-            self._step_callback()
+            self._mj_step_callback()
 
         mujoco.mj_rnePostConstraint(self.model, self.data)
 
-    def _step_callback(self):
+    def _mj_step_callback(self):
         """A custom callback that is called after stepping the simulation. Can be used
         to enforce additional constraints on the simulation state.
         """
@@ -412,7 +447,15 @@ class AnthropomorphicEnv(gym.Env, ABC):
                 vision=self.get_vision(),
                 goal=self.goal.copy()
             ),
-
-            'desired_goal': self.goal.copy(),
-            'achieved_goal': self._get_achieved_goal().ravel(),
         }
+
+    def _get_info(self):
+        """Get dict containing additional information about the current state of the environment."""
+        return {
+            "auxiliary_performances": {}
+        }
+
+    # ABSTRACT METHODS
+    @abc.abstractmethod
+    def _sample_goal(self):
+        raise NotImplementedError("Must be implemented in subclass.")
