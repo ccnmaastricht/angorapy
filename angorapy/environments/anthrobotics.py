@@ -98,7 +98,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             if model_path.startswith("/"):
                 fullpath = model_path
             else:
-                fullpath = path.join(path.dirname(__file__), "assets", model_path)
+                fullpath = path.join(path.dirname(__file__), "models", model_path)
 
             if not path.exists(fullpath):
                 raise OSError(f"File {fullpath} does not exist")

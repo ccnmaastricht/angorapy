@@ -35,5 +35,5 @@ DEFAULT_INITIAL_QPOS = {
     'robot0:THJ0': -0.7894883021600622,
 }
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand.xml')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), '../models/mujoco_menagerie/shadow_hand/', 'right_hand.xml')
 MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand_manipulate.xml')
