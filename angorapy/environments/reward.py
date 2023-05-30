@@ -3,10 +3,8 @@ from typing import List
 import numpy as np
 import tqdm
 
-from angorapy.environments.anthrobotics import AnthropomorphicEnv
-from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES
-
-from angorapy.environments.hand.shadowhand import get_fingertip_distance
+from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.utils import get_fingertip_distance
 
 
 # HELPER FUNCTIONS
@@ -53,7 +51,7 @@ def reach(env: "BaseShadowHandEnv", info: dict):
             - calculate_force_penalty(env.data) * env.reward_config["FORCE_MULTIPLIER"])
 
 
-def free_reach(env: AnthropomorphicEnv, info: dict):
+def free_reach(env: "AnthropomorphicEnv", info: dict):
     """Reward the relative join of the thumb'serialization and a target'serialization fingertip while punishing close
     other fingertips."""
 
@@ -68,7 +66,7 @@ def free_reach(env: AnthropomorphicEnv, info: dict):
     return reward
 
 
-def free_reach_positive_reinforcement(env: AnthropomorphicEnv, info: dict):
+def free_reach_positive_reinforcement(env: "AnthropomorphicEnv", info: dict):
     """Reward progress towards the goal position while punishing other fingers for interfering."""
     # positive reinforcement
     progress_reward = (

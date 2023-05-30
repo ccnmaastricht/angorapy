@@ -7,3 +7,4 @@ from angorapy.utilities.monitoring import Monitor
 from angorapy.analysis.investigators import Investigator
 import angorapy.analysis
 import angorapy.models
+import angorapy.environments

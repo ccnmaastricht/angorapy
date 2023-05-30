@@ -9,10 +9,12 @@ from angorapy.environments.utils import robot_get_obs
 from scipy.spatial import transform
 
 from angorapy.common.const import N_SUBSTEPS, VISION_WH
-from angorapy.common.reward import manipulate
+from angorapy.environments.reward import manipulate
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import MANIPULATE_BASE
-from angorapy.environments.hand.shadowhand import BaseShadowHandEnv, get_palm_position, MODEL_PATH_MANIPULATE, FINGERTIP_SITE_NAMES
+from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
+from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES, MODEL_PATH_MANIPULATE
+from angorapy.environments.hand.utils import get_palm_position
 
 MANIPULATE_BLOCK_XML = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))),
                                     "../assets/hand",

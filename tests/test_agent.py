@@ -18,25 +18,24 @@ from angorapy.models import get_model_builder
 import unittest
 
 
-def _test_drill(env_name, model_builder=None,):
-    """Test drilling an agent."""
-    wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
-    env = make_env(env_name, reward_config=None, transformers=wrappers)
-    if model_builder is None:
-        build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
-    else:
-        build_models = model_builder
-    agent = PPOAgent(build_models, env, workers=2, horizon=128)
-    agent.drill(n=2, epochs=2, batch_size=64)
-
-
 class AgentTest(unittest.TestCase):
+
+    def _test_drill(self, env_name, model_builder=None,):
+        """Test drilling an agent."""
+        wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+        env = make_env(env_name, reward_config=None, transformers=wrappers)
+        if model_builder is None:
+            build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
+        else:
+            build_models = model_builder
+        agent = PPOAgent(build_models, env, workers=2, horizon=128)
+        agent.drill(n=2, epochs=2, batch_size=64)
 
     def test_drill_continuous(self):
         """Test drilling of continuous agent (LunarLanderContinuous)."""
 
         try:
-            _test_drill("LunarLanderContinuous-v2")
+            self._test_drill("LunarLanderContinuous-v2")
         except Exception:
             self.fail("Continuous drill raises error.")
 
@@ -44,7 +43,7 @@ class AgentTest(unittest.TestCase):
         """Test drilling of discrete agent (LunarLander)."""
 
         try:
-            _test_drill("LunarLander-v2")
+            self._test_drill("LunarLander-v2")
         except Exception:
             self.fail("Discrete drill raises error.")
 
@@ -99,14 +98,14 @@ class AgentTest(unittest.TestCase):
     def test_classic_control(self):
         for env_name in ["CartPole-v1", "Acrobot-v1", "Pendulum-v1", "MountainCar-v0"]:
             try:
-                _test_drill(env_name)
+                self._test_drill(env_name)
             except Exception:
                 self.fail("Continuous drill raises error.")
 
     def test_robotic_control(self):
         for env_name in ["Ant-v4", "Humanoid-v4"]:
             try:
-                _test_drill(env_name)
+                self._test_drill(env_name)
             except Exception:
                 self.fail("Continuous drill raises error.")
 

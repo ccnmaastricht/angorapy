@@ -4,6 +4,8 @@ from collections import OrderedDict
 from os import path
 from typing import Optional, Union, Callable, Dict, Any
 
+import dm_control
+from dm_control.mjcf import RootElement
 import numpy as np
 import mujoco
 
@@ -14,7 +16,7 @@ from angorapy.common.const import VISION_WH, N_SUBSTEPS
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import resolve_config_name
 from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector, robot_get_obs
-from angorapy.common import reward
+from angorapy.environments import reward
 
 
 def convert_observation_to_space(observation):
@@ -79,7 +81,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def __init__(
             self,
-            model_path,
+            model: Union[str, mujoco.MjModel, RootElement],
             frame_skip,
             initial_qpos=None,
             vision=False,
@@ -90,15 +92,26 @@ class AnthropomorphicEnv(gym.Env, ABC):
             delta_t: float = 0.002,
             n_substeps: int = N_SUBSTEPS,
     ):
-        # mujoco model
-        if model_path.startswith("/"):
-            fullpath = model_path
-        else:
-            fullpath = path.join(path.dirname(__file__), "assets", model_path)
-        if not path.exists(fullpath):
-            raise OSError(f"File {fullpath} does not exist")
+        # get the mujoco model and data
+        if isinstance(model, str):
+            model_path = model
+            if model_path.startswith("/"):
+                fullpath = model_path
+            else:
+                fullpath = path.join(path.dirname(__file__), "assets", model_path)
 
-        self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
+            if not path.exists(fullpath):
+                raise OSError(f"File {fullpath} does not exist")
+
+            self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
+        elif isinstance(model, dm_control.mjcf.RootElement):
+            self.model = mujoco.MjModel.from_xml_string(xml=model.to_xml_string(), assets=model.get_assets())
+        elif isinstance(model, mujoco.MjModel):
+            self.model = model
+        else:
+            raise ValueError(f"model must be either a path to a model xml file or a mujoco.MjModel object, "
+                             f"not {type(model)}")
+
         self.model.vis.global_.offwidth = VISION_WH
         self.model.vis.global_.offheight = VISION_WH
         self.data = mujoco.MjData(self.model)
@@ -125,6 +138,9 @@ class AnthropomorphicEnv(gym.Env, ABC):
         # senses
         self.vision = vision
         self.touch = touch
+
+        self._touch_sensor_id_site_id = []
+        self._touch_sensor_id = []
 
         # store initial state
         if initial_qpos is None or not initial_qpos:
@@ -237,6 +253,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.original_n_substeps = self._simulation_steps_per_control_step
 
     # SETUP
+    @abc.abstractmethod
     def _env_setup(self, initial_state):
         raise NotImplementedError
 

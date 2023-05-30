@@ -5,11 +5,12 @@ import mujoco
 import numpy as np
 
 from angorapy.common.const import N_SUBSTEPS, VISION_WH
-from angorapy.common.reward import sequential_free_reach, free_reach, reach, sequential_reach
+from angorapy.environments.reward import sequential_free_reach, free_reach, reach, sequential_reach
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import REACH_BASE
-from angorapy.environments.hand.shadowhand import DEFAULT_INITIAL_QPOS, FINGERTIP_SITE_NAMES
-from angorapy.environments.hand.shadowhand import get_fingertip_distance, generate_random_sim_qpos, BaseShadowHandEnv
+from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS
+from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
+from angorapy.environments.hand.utils import generate_random_sim_qpos, get_fingertip_distance
 from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
 
 
@@ -56,7 +57,7 @@ class Reach(BaseShadowHandEnv):
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
-        return (d < self.distance_threshold).astype(np.float32)
+        return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
     def get_thumbs_previous_position(self) -> np.ndarray:
         """Get the previous position of the thumb in space."""

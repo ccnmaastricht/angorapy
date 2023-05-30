@@ -1,84 +1,18 @@
 #!/usr/bin/env python
 """BaseShadowHandEnv Environment Wrappers."""
-import abc
 import copy
-import os
-import random
-from typing import Callable, Union, Optional
+from typing import Optional
 
 import gym
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
-from angorapy.common import reward
+from angorapy.environments.anthrobotics import AnthropomorphicEnv
 
 from angorapy.common.const import N_SUBSTEPS
-from angorapy.configs.reward_config import resolve_config_name
-from angorapy.environments.anthrobotics import AnthropomorphicEnv
+from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS, MODEL_PATH
 from angorapy.environments.utils import mj_get_category_names
 from angorapy.utilities.util import mpi_print
-
-FINGERTIP_SITE_NAMES = [
-    'robot0:S_fftip',
-    'robot0:S_mftip',
-    'robot0:S_rftip',
-    'robot0:S_lftip',
-    'robot0:S_thtip',
-]
-
-DEFAULT_INITIAL_QPOS = {
-    'robot0:WRJ1': -0.16514339750464327,
-    'robot0:WRJ0': -0.31973286565062153,
-    'robot0:FFJ3': 0.14340512546557435,
-    'robot0:FFJ2': 0.32028208333591573,
-    'robot0:FFJ1': 0.7126053607727917,
-    'robot0:FFJ0': 0.6705281001412586,
-    'robot0:MFJ3': 0.000246444303701037,
-    'robot0:MFJ2': 0.3152655251085491,
-    'robot0:MFJ1': 0.7659800313729842,
-    'robot0:MFJ0': 0.7323156897425923,
-    'robot0:RFJ3': 0.00038520700007378114,
-    'robot0:RFJ2': 0.36743546201985233,
-    'robot0:RFJ1': 0.7119514095008576,
-    'robot0:RFJ0': 0.6699446327514138,
-    'robot0:LFJ4': 0.0525442258033891,
-    'robot0:LFJ3': -0.13615534724474673,
-    'robot0:LFJ2': 0.39872030433433003,
-    'robot0:LFJ1': 0.7415570009679252,
-    'robot0:LFJ0': 0.704096378652974,
-    'robot0:THJ4': 0.003673823825070126,
-    'robot0:THJ3': 0.5506291436028695,
-    'robot0:THJ2': -0.014515151997119306,
-    'robot0:THJ1': -0.0015229223564485414,
-    'robot0:THJ0': -0.7894883021600622,
-}
-
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand.xml')
-# MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), 'assets/hand/', 'shadowhand.xml')
-MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand_manipulate.xml')
-
-
-def generate_random_sim_qpos(base: dict) -> dict:
-    """Generate a random state of the simulation."""
-    for key, val in base.items():
-        if key in ["robot0:WRJ1", "robot0:WRJ0"]:
-            continue  # do not randomize the wrist
-
-        base[key] = val + val * random.gauss(0, 0.1)
-
-    return base
-
-
-def get_palm_position(model):
-    """Return the robotic hand's palm's center."""
-    return model.body("robot0:palm").pos
-
-
-def get_fingertip_distance(ft_a, ft_b):
-    """Return the distance between two vectors representing finger tip positions."""
-    assert ft_a.shape == ft_b.shape
-    return np.linalg.norm(ft_a - ft_b, axis=-1)
-
 
 class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
@@ -91,8 +25,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         gym.utils.EzPickle.__init__(**locals())
 
         self.relative_control = relative_control
-        self._touch_sensor_id_site_id = []
-        self._touch_sensor_id = []
         self._thumb_touch_sensor_id = []
         self.reward_type = "dense"
         self._freeze_wrist = False
@@ -100,7 +32,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
         self.viewpoint = "topdown"
         self.thumb_name = 'robot0:S_thtip'
 
-        super(BaseShadowHandEnv, self).__init__(model_path=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
+        super(BaseShadowHandEnv, self).__init__(model=model, frame_skip=n_substeps, initial_qpos=initial_qpos,
                                                 vision=vision, touch=touch, render_mode=render_mode, delta_t=delta_t,
                                                 n_substeps=n_substeps)
 
