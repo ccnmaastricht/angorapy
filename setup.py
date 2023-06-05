@@ -49,7 +49,7 @@ setup(
         "box2d-py==2.3.5",
         "gym[all]==0.26.2",
         "mujoco",
-        "dm_control==1.0.12",
+        # "dm_control==1.0.12",
 
         # webinterface
         "itsdangerous==2.0.1",
