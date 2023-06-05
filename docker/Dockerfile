@@ -73,12 +73,11 @@ RUN mkdir /ang_tmp
 COPY . /ang_tmp
 
 RUN pip install /ang_tmp --default-timeout=100 \
-    && pip install mujoco \
-    && pip install imageio \
     && rm -rf /ang_tmp
 
 RUN pip install dm_control==2.3.5
 RUN pip install tensorflow_datasets
+RUN pip uninstall mujoco-py
 
 WORKDIR /
 

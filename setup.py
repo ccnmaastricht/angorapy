@@ -43,7 +43,7 @@ setup(
         "distance",
         "panda_gym==3.0.6",
         "statsmodels==0.14.0",
-        "keras_cortex==0.0.7",
+        "keras_cortex==0.0.8",
 
         # environments
         "box2d-py==2.3.5",
