@@ -77,9 +77,8 @@ RUN pip install /ang_tmp --default-timeout=100 \
     && pip install imageio \
     && rm -rf /ang_tmp
 
-RUN pip install gym[box2d]
+RUN pip install mujoco==2.3.4
 RUN pip install tensorflow_datasets
-#RUN pip install jupyter
 
 WORKDIR /
 
