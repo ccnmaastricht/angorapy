@@ -61,7 +61,7 @@ setup(
     ],
 
     package_data={
-        "angorapy": ["environments/assets/**/*"],
+        "angorapy": ["environments/models/**/*"],
     },
 
     classifiers=[
