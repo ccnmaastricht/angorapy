@@ -48,7 +48,7 @@ setup(
         # environments
         "box2d-py==2.3.5",
         "gym[all]==0.26.2",
-        "mujoco==2.2",
+        "mujoco==2.3.5",
         "dm_control==1.0.12",
 
         # webinterface
