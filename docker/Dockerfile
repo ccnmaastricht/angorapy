@@ -78,6 +78,7 @@ RUN pip install /ang_tmp --default-timeout=100 \
 RUN pip install dm_control==1.0.12
 RUN pip install tensorflow_datasets
 RUN pip uninstall -y mujoco-py
+RUN pip install mujoco_utils
 
 WORKDIR /
 
