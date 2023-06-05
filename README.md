@@ -190,13 +190,15 @@ If you use AngoraPy for your research, please cite us as follows
 
 Or using bibtex
 
-    @software{weidler_angorapy_2023,
-        author       = {Weidler, Tonio and Senden, Mario},
-        title        = {{AngoraPy - Anthropomorphic Goal-Oriented Robotic 
-                         Control for Neuroscientific Modeling}},
-        year         = 2023,
-        publisher    = {Zenodo},
-        version      = {0.9.0},
-        doi          = {10.5281/zenodo.6636482},
-        url          = {https://doi.org/10.5281/zenodo.6636482}
-   }
+```bibtex
+ @software{weidler_angorapy_2023,
+     author       = {Weidler, Tonio and Senden, Mario},
+     title        = {{AngoraPy - Anthropomorphic Goal-Oriented Robotic 
+                      Control for Neuroscientific Modeling}},
+     year         = 2023,
+     publisher    = {Zenodo},
+     version      = {0.9.0},
+     doi          = {10.5281/zenodo.6636482},
+     url          = {https://doi.org/10.5281/zenodo.6636482}
+}
+```
