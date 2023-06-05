@@ -4,14 +4,19 @@ from typing import Optional
 import mujoco
 import numpy as np
 
-from angorapy.common.const import N_SUBSTEPS, VISION_WH
-from angorapy.environments.reward import sequential_free_reach, free_reach, reach, sequential_reach
-from angorapy.common.senses import Sensation
+from angorapy.common.const import N_SUBSTEPS
 from angorapy.configs.reward_config import REACH_BASE
-from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS
+from angorapy.environments.hand.consts import DEFAULT_INITIAL_QPOS, \
+    FINGERTIP_SITE_NAMES
 from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-from angorapy.environments.hand.utils import generate_random_sim_qpos, get_fingertip_distance
-from angorapy.environments.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
+from angorapy.environments.hand.utils import generate_random_sim_qpos, \
+    get_fingertip_distance
+from angorapy.environments.models.shadow_hand.shadow_hand import ShadowHandReach
+from angorapy.environments.reward import free_reach, \
+    reach, \
+    sequential_free_reach, \
+    sequential_reach
+from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector
 
 
 class Reach(BaseShadowHandEnv):
@@ -39,8 +44,15 @@ class Reach(BaseShadowHandEnv):
         elif self.state_initialization == "buffered":
             initial_qpos = DEFAULT_INITIAL_QPOS
 
-        super().__init__(initial_qpos=initial_qpos, n_substeps=n_substeps, relative_control=relative_control,
-                         vision=vision, touch=touch, render_mode=render_mode)
+        super().__init__(
+            initial_qpos=initial_qpos,
+            n_substeps=n_substeps,
+            relative_control=relative_control,
+            vision=vision,
+            touch=touch,
+            render_mode=render_mode,
+            model=ShadowHandReach(),
+        )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
 
@@ -55,7 +67,9 @@ class Reach(BaseShadowHandEnv):
     def _get_achieved_goal(self):
         return self.get_fingertip_positions()
 
-    def _is_success(self, achieved_goal, desired_goal):
+    def _is_success(self,
+                    achieved_goal,
+                    desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
         return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
@@ -63,7 +77,8 @@ class Reach(BaseShadowHandEnv):
         """Get the previous position of the thumb in space."""
         return self.previous_finger_positions[-1]
 
-    def get_fingers_previous_position(self, fname) -> np.ndarray:
+    def get_fingers_previous_position(self,
+                                      fname) -> np.ndarray:
         """Get the previous position of the given finger in space."""
         return self.previous_finger_positions[FINGERTIP_SITE_NAMES.index(fname)]
 
@@ -95,7 +110,7 @@ class Reach(BaseShadowHandEnv):
         return True
 
     def _sample_goal(self):
-        thumb_name = 'robot0:S_thtip'
+        thumb_name = 'thdistal_site'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
 
         if self.forced_finger is None:
@@ -110,8 +125,8 @@ class Reach(BaseShadowHandEnv):
         assert thumb_idx != finger_idx
 
         # Pick a meeting point above the hand.
-        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
-        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
+        meeting_pos = self.palm_xpos + np.array([0.1, -0.01, 0.05])
+        meeting_pos += self.np_random.normal(scale=0.01, size=meeting_pos.shape)
 
         # Slightly move meeting goal towards the respective finger to avoid that they overlap.
         goal = self.initial_goal.copy().reshape(-1, 3)
@@ -126,16 +141,19 @@ class Reach(BaseShadowHandEnv):
 
         return goal.flatten()
 
-    def _env_setup(self, initial_state):
+    def _env_setup(self,
+                   initial_state):
+        super()._env_setup(initial_state=initial_state)
+
         if initial_state is not None:
             self.set_state(**initial_state)
 
         self.initial_goal = self._get_achieved_goal().copy()
-        self.palm_xpos = self.data.body('robot0:palm').xpos.copy()
+        self.palm_xpos = self.data.body('rh_palm').xpos.copy()
 
         self.goal = self._sample_goal()
 
-    def _render_callback(self, render_targets=False):
+    def _render_callback(self, render_targets=True):
         if render_targets:
             # Visualize targets.
             sites_offset = (self.data.site_xpos - self.model.site_pos).copy()
@@ -144,16 +162,18 @@ class Reach(BaseShadowHandEnv):
                 site_name = f"target{finger_idx}"
 
                 site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
-                self.model.site_rgba[site_id][-1] = 0.2
-                self.model.site_pos[site_id][:] = (goal[finger_idx] - sites_offset[site_id]).copy()
+                self.model.site(site_name).rgba[-1] = 0.2
+                # self.data.site(site_name).xpos[:] = (goal[finger_idx] - sites_offset[site_id]).copy()
+                self.model.site_pos[site_id] = (goal[finger_idx] - sites_offset[site_id]).copy()
 
             # Visualize finger positions.
             achieved_goal = self._get_achieved_goal().reshape(5, 3)
             for finger_idx in range(5):
                 site_name = f"finger{finger_idx}"
                 site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
-                self.model.site_rgba[site_id][-1] = 0.2
-                self.model.site_pos[site_id][:] = (achieved_goal[finger_idx] - sites_offset[site_id]).copy()
+                self.model.site(site_name).rgba[-1] = 0.2
+                # self.data.site(site_name).xpos[:] = (achieved_goal[finger_idx] - sites_offset[site_id]).copy()
+                self.model.site_pos[site_id] = (achieved_goal[finger_idx] - sites_offset[site_id]).copy()
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -173,8 +193,8 @@ class Reach(BaseShadowHandEnv):
             **super()._get_info(),
             "target_finger": self.current_target_finger,
             "achieved_goal": self._get_achieved_goal().copy(),
-            "desired_goal": self.goal.copy(),
-            "is_success": self._is_success(self._get_achieved_goal(), self.goal),
+            "desired_goal" : self.goal.copy(),
+            "is_success"   : self._is_success(self._get_achieved_goal(), self.goal),
         }
 
 
@@ -229,7 +249,9 @@ class ReachSequential(Reach):
     def get_target_finger_position(self) -> np.ndarray:
         return self.sim.data.get_site_xpos(FINGERTIP_SITE_NAMES[self.current_target_finger]).flatten()
 
-    def _is_success(self, achieved_goal, desired_goal):
+    def _is_success(self,
+                    achieved_goal,
+                    desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
         return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
@@ -241,13 +263,15 @@ class ReachSequential(Reach):
 
         return ret, {}
 
-    def step(self, action):
+    def step(self,
+             action):
         observation, reward, done, truncated, info = super().step(action)
 
         # set next subgoal if current one is achieved
         if info["is_success"]:
             # print(
-            #     f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1} targets)!")
+            #     f"Reached Target {self.current_target_finger} (after reaching {len(self.goal_sequence) - 1}
+            #     targets)!")
             self.goal = self._sample_goal()
 
         return observation, reward, done, truncated, info
@@ -289,12 +313,15 @@ class FreeReach(Reach):
         """Get position of the target finger in space."""
         return self.data.site(FINGERTIP_SITE_NAMES[np.where(self.goal == 1)[0].item()]).xpos.flatten()
 
-    def _is_success(self, achieved_goal, desired_goal):
+    def _is_success(self,
+                    achieved_goal,
+                    desired_goal):
         d = get_fingertip_distance(self.get_thumb_position(), self.get_target_finger_position())
         print(self.reward_config)
         return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
-    def _render_callback(self, render_targets=False):
+    def _render_callback(self,
+                         render_targets=False):
         sites_offset = (self.data.site_xpos - self.model.site_pos).copy()
 
         # Visualize finger positions.
@@ -319,7 +346,11 @@ class FreeReach(Reach):
 class FreeReachSequential(FreeReach):
     """Freely join fingers in a sequence, where each new goal is randomly generated as the old goal is reached."""
 
-    def __init__(self, n_substeps=N_SUBSTEPS, relative_control=True, initial_qpos=DEFAULT_INITIAL_QPOS, vision=False):
+    def __init__(self,
+                 n_substeps=N_SUBSTEPS,
+                 relative_control=True,
+                 initial_qpos=DEFAULT_INITIAL_QPOS,
+                 vision=False):
         self.goal_sequence = []
 
         self.force_exemplary_sequence = True
@@ -354,7 +385,9 @@ class FreeReachSequential(FreeReach):
     def get_target_finger_position(self) -> np.ndarray:
         return self.sim.data.get_site_xpos(FINGERTIP_SITE_NAMES[self.current_target_finger]).flatten()
 
-    def _is_success(self, achieved_goal, desired_goal):
+    def _is_success(self,
+                    achieved_goal,
+                    desired_goal):
         d = get_fingertip_distance(self.get_thumb_position(),
                                    self.get_finger_position(FINGERTIP_SITE_NAMES[self.current_target_finger]))
         return (d < self.distance_threshold).astype(np.float32)
@@ -384,7 +417,8 @@ class FreeReachSequential(FreeReach):
 
         self.sim.forward()
 
-    def step(self, action):
+    def step(self,
+             action):
         observation, reward, done, truncated, info = super().step(action)
 
         # set next subgoal if current one is achieved

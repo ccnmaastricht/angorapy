@@ -2,21 +2,27 @@ import abc
 from abc import ABC
 from collections import OrderedDict
 from os import path
-from typing import Optional, Union, Callable, Dict, Any
+from typing import Any, \
+    Callable, \
+    Dict, \
+    Optional, \
+    Union
 
 import dm_control
-from dm_control.mjcf import RootElement
-import numpy as np
-import mujoco
-
 import gym
-from gym import error, logger, spaces
+import mujoco
+import numpy as np
+from dm_control.mjcf import RootElement
+from gym import spaces
 
-from angorapy.common.const import VISION_WH, N_SUBSTEPS
+from angorapy.common.const import N_SUBSTEPS, \
+    VISION_WH
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import resolve_config_name
-from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector, robot_get_obs
 from angorapy.environments import reward
+from angorapy.environments.models.base import BaseScene
+from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector, \
+    robot_get_obs
 
 
 def convert_observation_to_space(observation):
@@ -74,7 +80,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
         camera_name (str): The camera name to use.
         frame_skip (int): Number of frames to skip per action.
     """
-    metadata: Dict[str, Any] = {"render_modes": ["human", "rgb_array"]}
+    metadata: Dict[str, Any] = {
+        "render_modes": ["human", "rgb_array"]}
 
     continuous = True
     discrete_bin_count = 11
@@ -92,6 +99,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
             delta_t: float = 0.002,
             n_substeps: int = N_SUBSTEPS,
     ):
+        self.mjcf_model = None
+
         # get the mujoco model and data
         if isinstance(model, str):
             model_path = model
@@ -105,7 +114,13 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
             self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
         elif isinstance(model, dm_control.mjcf.RootElement):
-            self.model = mujoco.MjModel.from_xml_string(xml=model.to_xml_string(), assets=model.get_assets())
+            self.model = mujoco.MjModel.from_xml_string(xml=model.to_xml_string(),
+                                                        assets=model.get_assets())
+            self.mjcf_model = model
+        elif isinstance(model, BaseScene):
+            self.model = mujoco.MjModel.from_xml_string(xml=model.mjcf_model.to_xml_string(),
+                                                        assets=model.mjcf_model.get_assets())
+            self.mjcf_model = model._mjcf_root.root_model
         elif isinstance(model, mujoco.MjModel):
             self.model = model
         else:
@@ -132,7 +147,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         self.metadata = {
             "render_modes": ["human", "rgb_array", "depth_array"],
-            "render_fps": int(np.round(1.0 / self.dt)),
+            "render_fps"  : int(np.round(1.0 / self.dt)),
         }
 
         # senses
@@ -187,7 +202,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         return self.action_space
 
-    def _set_observation_space(self, observation):
+    def _set_observation_space(self,
+                               observation):
         self.observation_space = convert_observation_to_space(observation)
         return self.observation_space
 
@@ -196,7 +212,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def _set_default_reward_function_and_config(self):
         pass
 
-    def set_reward_function(self, function: Union[str, Callable]):
+    def set_reward_function(self,
+                            function: Union[str, Callable]):
         """Set the environment reward function by its config identifier or a callable."""
         if isinstance(function, str):
             try:
@@ -210,7 +227,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         self.reward_function = function
 
-    def set_reward_config(self, new_config: Union[str, dict]):
+    def set_reward_config(self,
+                          new_config: Union[str, dict]):
         """Set the environment's reward configuration by its identifier or a dict."""
         if isinstance(new_config, str):
             new_config: dict = resolve_config_name(new_config)
@@ -225,12 +243,15 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def assert_reward_setup(self):
         pass
 
-    def compute_reward(self, info):
+    def compute_reward(self,
+                       info):
         """Compute reward with additional success bonus."""
         return self.reward_function(self, info)
 
     @abc.abstractmethod
-    def _is_success(self, achieved_goal, desired_goal):
+    def _is_success(self,
+                    achieved_goal,
+                    desired_goal):
         pass
 
     # TIME
@@ -238,7 +259,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def dt(self):
         return self.model.opt.timestep * self.frame_skip
 
-    def set_delta_t_simulation(self, new: float):
+    def set_delta_t_simulation(self,
+                               new: float):
         """Set new value for the simulation delta t."""
         assert np.isclose(self._delta_t_control % new, 0, rtol=1.e-3, atol=1.e-4), \
             f"Delta t of simulation must divide control delta t into integer " \
@@ -247,7 +269,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self._delta_t_simulation = new
         self.model.opt.timestep = self._delta_t_simulation
 
-        self._simulation_steps_per_control_step = int(self._delta_t_control / self._delta_t_simulation * self.original_n_substeps)
+        self._simulation_steps_per_control_step = int(self._delta_t_control / self._delta_t_simulation *
+                                                      self.original_n_substeps)
 
     def set_original_n_substeps_to_sspcs(self):
         self.original_n_substeps = self._simulation_steps_per_control_step
@@ -264,11 +287,11 @@ class AnthropomorphicEnv(gym.Env, ABC):
         """
 
     def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        return_info: bool = False,
-        options: Optional[dict] = None,
+            self,
+            *,
+            seed: Optional[int] = None,
+            return_info: bool = False,
+            options: Optional[dict] = None,
     ):
         super().reset(seed=seed)
 
@@ -283,7 +306,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
         return obs, {}
 
     # CONTROL
-    def step(self, action: np.ndarray):
+    def step(self,
+             action: np.ndarray):
         if self.continuous:
             action = np.clip(action, self.action_space.low, self.action_space.high)
         else:
@@ -305,13 +329,16 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         return obs, reward, done, False, info
 
-    def _set_action(self, action):
+    def _set_action(self,
+                    action):
         if np.array(action).shape != self.action_space.shape:
             raise ValueError("Action dimension mismatch")
 
         self.data.ctrl[:] = action
 
-    def do_simulation(self, ctrl, n_frames):
+    def do_simulation(self,
+                      ctrl,
+                      n_frames):
         self._set_action(ctrl)
 
         for _ in range(n_frames):
@@ -328,7 +355,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     # RENDERING
     def _get_viewer(
-        self, mode
+            self,
+            mode
     ) -> Union[
         "gym.envs.mujoco.mujoco_rendering.Viewer",
         "gym.envs.mujoco.mujoco_rendering.RenderContextOffscreen",
@@ -361,6 +389,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
                 f'e.g. gym("{self.spec.id}", render_mode="rgb_array")'
             )
             return
+
+        self._render_callback()
 
         if self.render_mode in {
             "rgb_array",
@@ -476,3 +506,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
     @abc.abstractmethod
     def _sample_goal(self):
         raise NotImplementedError("Must be implemented in subclass.")
+
+    def _render_callback(self, **kwargs):
+        """A callback that is called before rendering. Can be used to implement custom rendering."""
+        pass

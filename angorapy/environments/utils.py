@@ -7,7 +7,7 @@ def robot_get_obs(model, data):
     """Returns all joint positions and velocities associated with a robot."""
     joint_names = mj_get_category_names(model, "jnt")
     if data.qpos is not None and joint_names:
-        names = [n for n in joint_names if n.startswith(b"robot")]
+        names = [n for n in joint_names if n.startswith(b"rh_")]
         return (
             np.array([data.jnt(name).qpos for name in names]).flatten(),
             np.array([data.jnt(name).qvel for name in names]).flatten(),

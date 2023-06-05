@@ -12,7 +12,7 @@ from angorapy.environments.hand.manipulate import ManipulateBlock, ManipulateEgg
     OpenAIManipulateDiscrete, HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, \
     HumanoidManipulateBlockAsynchronous, HumanoidManipulateBlock
 from angorapy.environments.hand.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
-from angorapy.environments.hanoi import HanoiEnv
+from angorapy.environments.cognitive.hanoi import HanoiEnv
 
 # SHADOW HAND
 gym.envs.register(

@@ -23,9 +23,8 @@ setup(
         "swig==4.1.1",
         "imageio==2.28.1",
         "numpy==1.23.5",
-        "box2d-py==2.3.5",
-        "gym[all]==0.26.2",
-        "mujoco==2.2",
+
+        # tensorflow and extensions
         "tensorflow==2.12.0",
         "tensorflow_probability==0.20.1",
         "tensorflow_graphics==2021.12.3",
@@ -44,8 +43,13 @@ setup(
         "distance",
         "panda_gym==3.0.6",
         "statsmodels==0.14.0",
-        
         "keras_cortex==0.0.7",
+
+        # environments
+        "box2d-py==2.3.5",
+        "gym[all]==0.26.2",
+        "mujoco==2.2",
+        "dm_control==1.0.12",
 
         # webinterface
         "itsdangerous==2.0.1",

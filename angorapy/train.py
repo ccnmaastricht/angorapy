@@ -6,6 +6,8 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 import sys
 import os
 
+import gym
+
 os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 

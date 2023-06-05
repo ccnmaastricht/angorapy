@@ -4,6 +4,7 @@ from collections import namedtuple
 from typing import List, Dict
 
 import numpy as np
+import gym
 
 from angorapy.common.senses import Sensation
 from angorapy.common.const import NP_FLOAT_PREC, EPSILON
