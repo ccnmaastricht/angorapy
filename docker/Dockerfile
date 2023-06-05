@@ -75,9 +75,9 @@ COPY . /ang_tmp
 RUN pip install /ang_tmp --default-timeout=100 \
     && rm -rf /ang_tmp
 
-RUN pip install dm_control==2.3.5
+RUN pip install dm_control==1.0.12
 RUN pip install tensorflow_datasets
-RUN pip uninstall mujoco-py
+RUN pip uninstall -y mujoco-py
 
 WORKDIR /
 
