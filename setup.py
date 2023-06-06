@@ -25,8 +25,8 @@ setup(
         "numpy==1.23.5",
 
         # tensorflow and extensions
-        "tensorflow==2.12.0",
-        "tensorflow_probability==0.20.1",
+        "tensorflow==2.8.3",
+        "tensorflow_probability==0.16.0 ",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
         "tqdm",
@@ -47,7 +47,7 @@ setup(
 
         # environments
         "box2d-py==2.3.5",
-        "gym[all]==0.26.2",
+        "gymnasium[]==0.26.2",
         "mujoco",
         # "dm_control==1.0.12",
 

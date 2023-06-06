@@ -1,6 +1,6 @@
-from gym import spaces
-from gym.envs.box2d import LunarLanderContinuous
-from gym.envs.mujoco import HalfCheetahEnv, InvertedPendulumEnv, ReacherEnv
+from gymnasium import spaces
+from gymnasium.envs.box2d import LunarLanderContinuous
+from gymnasium.envs.mujoco import HalfCheetahEnv, InvertedPendulumEnv, ReacherEnv
 import numpy as np
 
 

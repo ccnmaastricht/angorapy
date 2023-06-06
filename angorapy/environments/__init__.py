@@ -1,6 +1,6 @@
 """Module for additional environments as well as registering modified environments."""
 
-import gym
+import gymnasium as gym
 
 from angorapy.environments.anthrobotics import AnthropomorphicEnv
 

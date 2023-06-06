@@ -13,13 +13,12 @@ from glob import glob
 from json import JSONDecodeError
 from typing import Union, Tuple, Any, Callable
 
-import gym
+import gymnasium as gym
 import numpy as np
 import nvidia_smi
 import psutil
 import tensorflow as tf
-from gym.spaces import Discrete, Box, MultiDiscrete
-from tensorflow.keras import mixed_precision
+from gymnasium.spaces import Discrete, Box, MultiDiscrete
 
 from angorapy.common.senses import Sensation
 
@@ -565,13 +564,15 @@ class PPOAgent:
 
             # OPTIMIZATION PHASE
             if self.is_optimization_process:
-                subprocess_start = time.time()
 
                 dataset = read_dataset_from_storage(
                     dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                     id_prefix=self.agent_id,
                     worker_ids=optimizer_collection_ids,
                     responsive_senses=self.policy.input_names)
+
+                subprocess_start = time.time()
+
                 self.optimize(dataset, epochs, effective_batch_size)
 
                 time_dict["optimizing"] = time.time() - subprocess_start

@@ -71,8 +71,8 @@ def overview():
                 if os.path.isfile(os.path.join(model_path, "best/weights.index")):
                     model_available = True
 
-                    # with open(os.path.join(model_path, "best/parameters.json")) as f:
-                    #     agent_parameters = json.load(f)
+                    with open(os.path.join(model_path, "best/parameters.json")) as f:
+                        agent_parameters = json.load(f)
 
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])

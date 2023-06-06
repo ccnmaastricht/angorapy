@@ -4,7 +4,7 @@ import os
 from time import sleep
 from typing import List, Union
 
-import gym
+import gymnasium as gym
 import matplotlib.pyplot as plt
 import tensorflow as tf
 

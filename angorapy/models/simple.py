@@ -5,7 +5,7 @@ import os
 from contextlib import suppress
 from typing import Tuple
 
-import gym
+import gymnasium as gym
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model

@@ -16,7 +16,7 @@ import numpy
 import pkg_resources
 import simplejson as json
 import tensorflow as tf
-from gym.spaces import Box
+from gymnasium.spaces import Box
 from matplotlib import animation
 from mpi4py import MPI
 

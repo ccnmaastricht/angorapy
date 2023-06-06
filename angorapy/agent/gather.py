@@ -8,7 +8,7 @@ from typing import Tuple, Any
 
 import numpy as np
 import tensorflow as tf
-from gym.spaces import Box
+from gymnasium.spaces import Box
 from tqdm import tqdm
 
 from angorapy.agent.core import estimate_episode_advantages

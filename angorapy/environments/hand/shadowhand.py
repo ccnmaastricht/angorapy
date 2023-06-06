@@ -7,11 +7,11 @@ from typing import Dict, \
     Optional, \
     Tuple
 
-import gym
+import gymnasium as gym
 import numpy as np
 from dm_control import composer
-from gym import spaces
-from gym.utils import seeding
+from gymnasium import spaces
+from gymnasium.utils import seeding
 from mujoco_utils import mjcf_utils
 
 from angorapy.common.const import N_SUBSTEPS

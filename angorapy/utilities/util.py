@@ -4,12 +4,12 @@ import sys
 from typing import Tuple, Union, List, Dict
 import os
 
-import gym
+import gymnasium as gym
 import numpy
 import numpy as np
 import tensorflow as tf
-from gym import spaces
-from gym.spaces import Discrete, Box, MultiDiscrete
+from gymnasium import spaces
+from gymnasium.spaces import Discrete, Box, MultiDiscrete
 from mpi4py import MPI
 from tensorflow.python.client import device_lib
 

@@ -2,7 +2,7 @@
 """Hybrid policy networks that utilize both visual and unstructured input data."""
 import os
 
-import gym
+import gymnasium as gym
 import keras_cortex
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD

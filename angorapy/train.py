@@ -6,10 +6,10 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 import sys
 import os
 
-import gym
+import gymnasium as gym
 
 os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pprint
 import traceback
@@ -22,13 +22,13 @@ import distance
 import numpy as np
 
 import tensorflow as tf
-from tensorflow.keras import mixed_precision
+
 
 import argparse
 import logging
 
 import argcomplete
-from gym.spaces import Box, Discrete, MultiDiscrete
+from gymnasium.spaces import Box, Discrete, MultiDiscrete
 
 from angorapy.configs import hp_config
 from angorapy.common.policies import get_distribution_by_short_name

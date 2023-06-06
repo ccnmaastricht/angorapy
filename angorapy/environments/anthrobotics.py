@@ -9,11 +9,11 @@ from typing import Any, \
     Union
 
 import dm_control
-import gym
+import gymnasium as gym
 import mujoco
 import numpy as np
 from dm_control.mjcf import RootElement
-from gym import spaces
+from gymnasium import spaces
 
 from angorapy.common.const import N_SUBSTEPS, \
     VISION_WH
@@ -364,11 +364,11 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.viewer = self._viewers.get(mode)
         if self.viewer is None:
             if mode == "human":
-                from gym.envs.mujoco.mujoco_rendering import Viewer
+                from gymnasium.envs.mujoco.mujoco_rendering import Viewer
 
                 self.viewer = Viewer(self.model, self.data)
             elif mode in {"rgb_array", "depth_array"}:
-                from gym.envs.mujoco.mujoco_rendering import RenderContextOffscreen
+                from gymnasium.envs.mujoco.mujoco_rendering import RenderContextOffscreen
 
                 self.viewer = RenderContextOffscreen(self.model, self.data)
             else:

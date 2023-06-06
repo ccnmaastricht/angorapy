@@ -3,7 +3,7 @@ from typing import Optional
 
 import mujoco
 import numpy as np
-from gym import utils
+from gymnasium import utils
 from angorapy.environments import rotations
 from angorapy.environments.utils import robot_get_obs
 from scipy.spatial import transform

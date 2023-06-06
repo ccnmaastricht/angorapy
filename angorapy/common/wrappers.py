@@ -3,7 +3,7 @@ import abc
 from pprint import pprint
 from typing import Union, List, Type, OrderedDict
 
-import gym
+import gymnasium as gym
 import numpy
 from mpi4py import MPI
 
