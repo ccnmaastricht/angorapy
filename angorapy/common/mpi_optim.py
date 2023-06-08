@@ -32,7 +32,7 @@ class MpiAdam(tf.keras.optimizers.Adam):
 
         context = super().apply_gradients(grads_and_vars)
 
-        # wait for all processes before continueing
+        # wait for all processes before continuing
         self.comm.Barrier()
         return context
 

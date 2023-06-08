@@ -36,6 +36,7 @@ DEFAULT_INITIAL_QPOS = {
     'rh_THJ1': -0.7894883021600622,
 }
 
+
 FINGERTIP_BODIES: Tuple[str, ...] = (
     "thdistal",
     "ffdistal",

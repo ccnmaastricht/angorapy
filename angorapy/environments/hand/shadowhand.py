@@ -112,22 +112,20 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         return [seed]
 
     # CONTROL
-    def _set_action(self,
-                    action):
-        assert action.shape == (20,)
+    def _set_action(self, action):
+        assert action.shape == (20,), f"Action shape must be (20,) not {action.shape}"
 
-        actuator_names = mj_get_category_names(self.model,
-                                               "actuator")
+        actuator_names, actuator_adresses = mj_get_category_names(self.model, "actuator")
         ctrlrange = self.model.actuator_ctrlrange
         actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
         if self.relative_control:
             actuation_center = np.zeros_like(action)
             for i in range(self.data.ctrl.shape[0]):
-                actuation_center[i] = self.data.jnt(actuator_names[i].replace(b':A_',
-                                                                              b':')).qpos
-            for joint_name in ['FF', 'MF', 'RF', 'LF']:
-                act_idx = actuator_names.index(str.encode(f'robot0:A_{joint_name}J1'))
-                actuation_center[act_idx] += self.data.jnt(str.encode(f'robot0:{joint_name}J0')).qpos
+                jnt_or_ten_name = actuator_names[i].replace(b'_A_', b'_')
+                if self.model.names.index(jnt_or_ten_name) in self.model.name_jntadr:
+                    actuation_center[i] = self.data.jnt(jnt_or_ten_name).qpos
+                elif self.model.names.index(jnt_or_ten_name) in self.model.name_tendonadr:
+                    actuation_center[i] = self.data.tendon(jnt_or_ten_name).length
         else:
             actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
 
@@ -169,7 +167,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
     def _env_setup(self, initial_state):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
-        for k, v in zip(mj_get_category_names(self.model, "sensor"), self.model.sensor_adr):
+        for k, v in zip(mj_get_category_names(self.model, "sensor")[0], self.model.sensor_adr):
             if b'robot0:TS_' in k:
                 # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_',
                 # 'robot0:T_')]))
@@ -197,8 +195,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         self.viewer_setup()
 
     def _get_info(self):
-        return super(BaseShadowHandEnv,
-                     self)._get_info()
+        return super(BaseShadowHandEnv, self)._get_info()
 
     def viewer_setup(self):
         # hand color
@@ -217,26 +214,26 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         if self.viewer is None:
             return
 
-        mpi_print("Setting up camera.")
+        mpi_print(f"Setting up camera with viewpoint '{self.viewpoint}'.")
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.30  # zoom in
-            self.viewer.cam.azimuth = -90.0  # wrist to the bottom
+            self.viewer.cam.distance = 0.65  # zoom in
+            self.viewer.cam.azimuth = 180.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
-            self.viewer.cam.lookat[1] += 0.03  # slightly move forward
+            self.viewer.cam.lookat[0] += 0.1  # slightly move forward
         elif self.viewpoint == "topdown-far":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.4  # zoom in
-            self.viewer.cam.azimuth = -90.0  # wrist to the bottom
+            self.viewer.cam.distance = 0.5  # increased values zoom out
+            self.viewer.cam.azimuth = -0.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
-            self.viewer.cam.lookat[1] += 0.03  # slightly move forward
+            self.viewer.cam.lookat[0] += 0.25  # slightly move forward
         elif self.viewpoint == "side":
             # rotate camera to side view
             self.viewer.cam.distance = 0.35  # zoom in
             self.viewer.cam.azimuth = 25.0  # top down view
             self.viewer.cam.elevation = -45.0  # top down view
-            self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
+            self.viewer.cam.lookat[0] -= 0.04  # slightly move forward
         else:
             raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 

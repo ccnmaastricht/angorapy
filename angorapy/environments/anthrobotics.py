@@ -20,7 +20,7 @@ from angorapy.common.const import N_SUBSTEPS, \
 from angorapy.common.senses import Sensation
 from angorapy.configs.reward_config import resolve_config_name
 from angorapy.environments import reward
-from angorapy.environments.models.base import BaseScene
+from angorapy.environments.models.base import Robot
 from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector, \
     robot_get_obs
 
@@ -88,7 +88,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def __init__(
             self,
-            model: Union[str, mujoco.MjModel, RootElement],
+            model: Union[str, RootElement, Robot],
             frame_skip,
             initial_qpos=None,
             vision=False,
@@ -99,8 +99,6 @@ class AnthropomorphicEnv(gym.Env, ABC):
             delta_t: float = 0.002,
             n_substeps: int = N_SUBSTEPS,
     ):
-        self.mjcf_model = None
-
         # get the mujoco model and data
         if isinstance(model, str):
             model_path = model
@@ -113,16 +111,15 @@ class AnthropomorphicEnv(gym.Env, ABC):
                 raise OSError(f"File {fullpath} does not exist")
 
             self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
+            self.mjcf_model = dm_control.mjcf.from_path(fullpath)
         elif isinstance(model, dm_control.mjcf.RootElement):
             self.model = mujoco.MjModel.from_xml_string(xml=model.to_xml_string(),
                                                         assets=model.get_assets())
             self.mjcf_model = model
-        elif isinstance(model, BaseScene):
+        elif isinstance(model, Robot):
             self.model = mujoco.MjModel.from_xml_string(xml=model.mjcf_model.to_xml_string(),
                                                         assets=model.mjcf_model.get_assets())
             self.mjcf_model = model._mjcf_root.root_model
-        elif isinstance(model, mujoco.MjModel):
-            self.model = model
         else:
             raise ValueError(f"model must be either a path to a model xml file or a mujoco.MjModel object, "
                              f"not {type(model)}")
@@ -364,13 +361,13 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.viewer = self._viewers.get(mode)
         if self.viewer is None:
             if mode == "human":
-                from gymnasium.envs.mujoco.mujoco_rendering import Viewer
+                from gymnasium.envs.mujoco.mujoco_rendering import WindowViewer
 
-                self.viewer = Viewer(self.model, self.data)
+                self.viewer = WindowViewer(self.model, self.data)
             elif mode in {"rgb_array", "depth_array"}:
-                from gymnasium.envs.mujoco.mujoco_rendering import RenderContextOffscreen
+                from gymnasium.envs.mujoco.mujoco_rendering import OffScreenViewer
 
-                self.viewer = RenderContextOffscreen(self.model, self.data)
+                self.viewer = OffScreenViewer(self.model, self.data)
             else:
                 raise AttributeError(
                     f"Unexpected mode: {mode}, expected modes: {self.metadata['render_modes']}"

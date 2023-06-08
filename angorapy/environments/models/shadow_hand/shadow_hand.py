@@ -17,11 +17,13 @@
 from typing import Optional, \
     Sequence
 
-from dm_control import composer
+from dm_control import composer, \
+    mjcf
+from dm_control.mjcf import Element
 from mujoco_utils import mjcf_utils, \
     types
 
-from angorapy.environments.models.base import BaseScene
+from angorapy.environments.models.base import Robot
 from angorapy.environments.models.shadow_hand import consts
 
 _FINGERTIP_OFFSET = 0.026
@@ -31,32 +33,22 @@ _THUMBTIP_OFFSET = 0.0275
 _DEFAULT_FOREARM_DOFS = ("forearm_tx", "forearm_ty")
 
 
-class ShadowHand(BaseScene):
+class ShadowHand(Robot):
     """A Shadow Hand E3M5."""
 
-    def __init__(self,
-                 name: Optional[str] = None) -> None:
-        """Initializes a ShadowHand.
-
-        Args:
-            name: Name of the hand. Used as a prefix in the MJCF name attributes.
-            forearm_dofs: Which dofs to add to the forearm.
-        """
-
-        super().__init__(consts.RIGHT_SHADOW_HAND_XML, name)
-
+    def __init__(self) -> None:
+        """Initializes a ShadowHand."""
         self._prefix = "rh_"
-        self._parse_robot()
-        self._setup_robot()
+        super().__init__(consts.RIGHT_SHADOW_HAND_XML)
 
-    def _parse_robot(self) -> None:
+    def _parse_entity(self) -> None:
         joints = mjcf_utils.safe_find_all(self._mjcf_root, "joint")
         actuators = mjcf_utils.safe_find_all(self._mjcf_root, "actuator")
 
         self._joints = tuple(joints)
         self._actuators = tuple(actuators)
 
-    def _setup_robot(self):
+    def _setup_entity(self):
         # Add sites to the tips of the fingers.
         fingertip_sites = []
         for tip_name in consts.FINGERTIP_BODIES:
@@ -117,14 +109,14 @@ class ShadowHand(BaseScene):
         self._actuator_force_sensors = tuple(actuator_force_sensors)
 
     # ACCESSORS
-    @composer.cached_property
-    def root_body(self) -> types.MjcfElement:
+    @property
+    def root_body(self) -> Element:
         return mjcf_utils.safe_find(self._mjcf_root,
                                     "body",
                                     self._prefix + "forearm")
 
     @composer.cached_property
-    def fingertip_bodies(self) -> Sequence[types.MjcfElement]:
+    def fingertip_bodies(self) -> Sequence[Element]:
         return tuple(
             mjcf_utils.safe_find(self._mjcf_root,
                                  "body",
@@ -133,35 +125,35 @@ class ShadowHand(BaseScene):
         )
 
     @property
-    def joints(self) -> Sequence[types.MjcfElement]:
+    def joints(self) -> Sequence[mjcf.Element]:
         return self._joints
 
     @property
-    def actuators(self) -> Sequence[types.MjcfElement]:
+    def actuators(self) -> Sequence[mjcf.Element]:
         return self._actuators
 
     @property
-    def joint_torque_sensors(self) -> Sequence[types.MjcfElement]:
+    def joint_torque_sensors(self) -> Sequence[mjcf.Element]:
         return self._joint_torque_sensors
 
     @property
-    def fingertip_sites(self) -> Sequence[types.MjcfElement]:
+    def fingertip_sites(self) -> Sequence[mjcf.Element]:
         return self._fingertip_sites
 
     @property
-    def actuator_velocity_sensors(self) -> Sequence[types.MjcfElement]:
+    def actuator_velocity_sensors(self) -> Sequence[mjcf.Element]:
         return self._actuator_velocity_sensors
 
     @property
-    def actuator_force_sensors(self) -> Sequence[types.MjcfElement]:
+    def actuator_force_sensors(self) -> Sequence[mjcf.Element]:
         return self._actuator_force_sensors
 
 
 class ShadowHandReach(ShadowHand):
     """A Shadow Hand E3M5."""
 
-    def _setup_robot(self):
-        super()._setup_robot()
+    def _setup_entity(self):
+        super()._setup_entity()
 
         colors = [[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1], [1, 1, 0, 1], [1, 0, 1, 1]]
 
