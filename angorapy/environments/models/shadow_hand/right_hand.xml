@@ -5,16 +5,16 @@
 
   <default>
 
-      <default class="robot0:D_Touch">
+      <default class="D_Touch">
             <site type="box" size="0.009 0.004 0.013" pos="0 -0.004 0.018" rgba="0.8 0.8 0.8 0.15" group="4"></site>
         </default>
-        <default class="robot0:DC_Hand">
-            <geom material="robot0:MatColl" contype="1" conaffinity="0" group="4"></geom>
+        <default class="DC_Hand">
+            <geom material="MatColl" contype="1" conaffinity="0" group="4"></geom>
         </default>
-        <default class="robot0:D_Vizual">
-            <geom material="robot0:MatViz" contype="0" conaffinity="0" group="1" type="mesh"></geom>
+        <default class="D_Vizual">
+            <geom material="MatViz" contype="0" conaffinity="0" group="1" type="mesh"></geom>
         </default>
-        <default class="robot0:free">
+        <default class="free">
             <joint type="free" damping="0" armature="0" limited="false"></joint>
         </default>
 
@@ -143,14 +143,14 @@
           <geom size="0.01 0.012 0.02" pos="-0.03 0 0.009" type="box" class="plastic_collision"/>
 
           <!-- AngoraPy Edit: Touch Sensors -->
-          <site name="robot0:T_palm_b0" type="box" pos="0.011 -0.005 0.006"  size="0.033 0.007 0.019" rgba="0 0 0 0"/>
-          <site name="robot0:T_palm_bl" type="box" pos="-0.011 -0.005 0.041" size="0.011 0.007 0.016" rgba="1 0 0 0"/>
-          <site name="robot0:T_palm_bm" type="box" pos="0.011 -0.005 0.041"  size="0.011 0.007 0.016" rgba="0 0 0 0"/>
-          <site name="robot0:T_palm_br" type="box" pos="0.033 -0.005 0.041"  size="0.011 0.007 0.016" rgba="1 0 0 0"/>
-          <site name="robot0:T_palm_fl" type="box" pos="-0.011 -0.005 0.073" size="0.011 0.007 0.016" rgba="0 0 0 0"/>
-          <site name="robot0:T_palm_fm" type="box" pos="0.011 -0.005 0.073"  size="0.011 0.007 0.016" rgba="1 0 0 0"/>
-          <site name="robot0:T_palm_fr" type="box" pos="0.033 -0.005 0.073"  size="0.011 0.007 0.016" rgba="0 0 0 0"/>
-        <site name="robot0:T_palm_b1" type="box" pos="-0.0325 -0.005 0.014" size="0.012 0.007 0.027" rgba="0 0 0 0"/>
+          <site name="T_palm_b0" type="box" pos="0.011 -0.005 0.006"  size="0.033 0.007 0.019" rgba="0 0 0 0"/>
+          <site name="T_palm_bl" type="box" pos="-0.011 -0.005 0.041" size="0.011 0.007 0.016" rgba="1 0 0 0"/>
+          <site name="T_palm_bm" type="box" pos="0.011 -0.005 0.041"  size="0.011 0.007 0.016" rgba="0 0 0 0"/>
+          <site name="T_palm_br" type="box" pos="0.033 -0.005 0.041"  size="0.011 0.007 0.016" rgba="1 0 0 0"/>
+          <site name="T_palm_fl" type="box" pos="-0.011 -0.005 0.073" size="0.011 0.007 0.016" rgba="0 0 0 0"/>
+          <site name="T_palm_fm" type="box" pos="0.011 -0.005 0.073"  size="0.011 0.007 0.016" rgba="1 0 0 0"/>
+          <site name="T_palm_fr" type="box" pos="0.033 -0.005 0.073"  size="0.011 0.007 0.016" rgba="0 0 0 0"/>
+        <site name="T_palm_b1" type="box" pos="-0.0325 -0.005 0.014" size="0.012 0.007 0.027" rgba="0 0 0 0"/>
           <body name="rh_ffknuckle" pos="0.033 0 0.095">
             <inertial mass="0.008" pos="0 0 0" quat="0.5 0.5 -0.5 0.5" diaginertia="3.2e-07 2.6e-07 2.6e-07"/>
             <joint name="rh_FFJ4" class="knuckle"/>
@@ -163,13 +163,13 @@
               <geom size="0.009 0.02" pos="0 0 0.025" type="capsule" class="plastic_collision"/>
 
               <!-- AngoraPy Edit: Touch Sensors -->
-                <site name="robot0:T_ffproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                <site name="robot0:T_ffproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                <site name="robot0:T_ffproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                <site name="robot0:T_ffproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                <site name="robot0:T_ffproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
-                <site name="robot0:T_ffproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
-                <site name="robot0:T_ffproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
+                <site name="T_ffproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                <site name="T_ffproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                <site name="T_ffproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                <site name="T_ffproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                <site name="T_ffproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
+                <site name="T_ffproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
+                <site name="T_ffproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
 
               <body name="rh_ffmiddle" pos="0 0 0.045">
                 <inertial mass="0.017" pos="0 0 0.0125" quat="1 0 0 1" diaginertia="2.7e-06 2.6e-06 8.7e-07"/>
@@ -178,11 +178,11 @@
                 <geom size="0.009 0.0125" pos="0 0 0.0125" type="capsule" class="plastic_collision"/>
 
                 <!-- AngoraPy Edit: Touch Sensors -->
-                <site name="robot0:T_ffmiddle_front_left"  type="box"     pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                <site name="robot0:T_ffmiddle_front_right" type="box"     pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                <site name="robot0:T_ffmiddle_back_left"   type="box"     pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                <site name="robot0:T_ffmiddle_back_right"  type="box"     pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                <site name="robot0:T_ffmiddle_tip"         type="sphere"  pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
+                <site name="T_ffmiddle_front_left"  type="box"     pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                <site name="T_ffmiddle_front_right" type="box"     pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                <site name="T_ffmiddle_back_left"   type="box"     pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                <site name="T_ffmiddle_back_right"  type="box"     pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                <site name="T_ffmiddle_tip"         type="sphere"  pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
 
                 <body name="rh_ffdistal" pos="0 0 0.025">
                   <inertial mass="0.013" pos="0 0 0.0130769" quat="1 0 0 1"
@@ -191,13 +191,13 @@
                   <geom class="plastic_visual" mesh="f_distal_pst"/>
                   <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
                   <!-- AngoraPy Edit: Touch Sensors -->
-                                                      <site name="robot0:S_fftip" pos="0 0 0.026" group="3"></site>
-                                    <site class="robot0:D_Touch" name="robot0:Tch_fftip"></site>
-                <site name="robot0:T_fftip_front_left"  type="box"      pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                <site name="robot0:T_fftip_front_right" type="box"      pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                <site name="robot0:T_fftip_back_left"   type="box"      pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                <site name="robot0:T_fftip_back_right"  type="box"      pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                <site name="robot0:T_fftip_tip"         type="sphere"   pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
+                                                      <site name="S_fftip" pos="0 0 0.026" group="3"></site>
+                                    <site class="D_Touch" name="Tch_fftip"></site>
+                <site name="T_fftip_front_left"  type="box"      pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                <site name="T_fftip_front_right" type="box"      pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                <site name="T_fftip_back_left"   type="box"      pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                <site name="T_fftip_back_right"  type="box"      pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                <site name="T_fftip_tip"         type="sphere"   pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
 
                 </body>
               </body>
@@ -215,13 +215,13 @@
               <geom size="0.009 0.02" pos="0 0 0.025" type="capsule" class="plastic_collision"/>
 
               <!-- AngoraPy Edit: Touch Sensors -->
-              <site name="robot0:T_mfproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                            <site name="robot0:T_mfproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                            <site name="robot0:T_mfproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                            <site name="robot0:T_mfproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                            <site name="robot0:T_mfproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
-                            <site name="robot0:T_mfproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
-                            <site name="robot0:T_mfproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
+              <site name="T_mfproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                            <site name="T_mfproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                            <site name="T_mfproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                            <site name="T_mfproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                            <site name="T_mfproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
+                            <site name="T_mfproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
+                            <site name="T_mfproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
               <body name="rh_mfmiddle" pos="0 0 0.045">
                 <inertial mass="0.017" pos="0 0 0.0125" quat="1 0 0 1" diaginertia="2.7e-06 2.6e-06 8.7e-07"/>
                 <joint name="rh_MFJ2" class="middle_distal"/>
@@ -229,11 +229,11 @@
                 <geom size="0.009 0.0125" pos="0 0 0.0125" type="capsule" class="plastic_collision"/>
 
                 <!-- AngoraPy Edit: Touch Sensors -->
-                <site name="robot0:T_mfmiddle_front_left"  type="box"    pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                <site name="robot0:T_mfmiddle_front_right" type="box"    pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                <site name="robot0:T_mfmiddle_back_left"   type="box"    pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                <site name="robot0:T_mfmiddle_back_right"  type="box"    pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                <site name="robot0:T_mfmiddle_tip"         type="sphere" pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
+                <site name="T_mfmiddle_front_left"  type="box"    pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                <site name="T_mfmiddle_front_right" type="box"    pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                <site name="T_mfmiddle_back_left"   type="box"    pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                <site name="T_mfmiddle_back_right"  type="box"    pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                <site name="T_mfmiddle_tip"         type="sphere" pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
 
                 <body name="rh_mfdistal" pos="0 0 0.025">
                   <inertial mass="0.013" pos="0 0 0.0130769" quat="1 0 0 1"
@@ -243,13 +243,13 @@
                   <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
 
                     <!-- AngoraPy Edit: Touch Sensors -->
-                                                      <site name="robot0:S_mftip" pos="0 0 0.026" group="3"></site>
-                                    <site class="robot0:D_Touch" name="robot0:Tch_mftip"></site>
-                <site name="robot0:T_mftip_front_left"  type="box"    pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                                    <site name="robot0:T_mftip_front_right" type="box"    pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                                    <site name="robot0:T_mftip_back_left"   type="box"    pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                                    <site name="robot0:T_mftip_back_right"  type="box"    pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                                    <site name="robot0:T_mftip_tip"         type="sphere" pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
+                                                      <site name="S_mftip" pos="0 0 0.026" group="3"></site>
+                                    <site class="D_Touch" name="Tch_mftip"></site>
+                <site name="T_mftip_front_left"  type="box"    pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                    <site name="T_mftip_front_right" type="box"    pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                    <site name="T_mftip_back_left"   type="box"    pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                    <site name="T_mftip_back_right"  type="box"    pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                    <site name="T_mftip_tip"         type="sphere" pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
                 </body>
               </body>
             </body>
@@ -266,13 +266,13 @@
               <geom size="0.009 0.02" pos="0 0 0.025" type="capsule" class="plastic_collision"/>
 
                 <!-- AngoraPy Edit: Touch Sensors -->
-              <site name="robot0:T_rfproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                            <site name="robot0:T_rfproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                            <site name="robot0:T_rfproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                            <site name="robot0:T_rfproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                            <site name="robot0:T_rfproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
-                            <site name="robot0:T_rfproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
-                            <site name="robot0:T_rfproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
+              <site name="T_rfproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                            <site name="T_rfproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                            <site name="T_rfproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                            <site name="T_rfproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                            <site name="T_rfproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
+                            <site name="T_rfproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
+                            <site name="T_rfproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
               <body name="rh_rfmiddle" pos="0 0 0.045">
                 <inertial mass="0.017" pos="0 0 0.0125" quat="1 0 0 1" diaginertia="2.7e-06 2.6e-06 8.7e-07"/>
                 <joint name="rh_RFJ2" class="middle_distal"/>
@@ -280,11 +280,11 @@
                 <geom size="0.009 0.0125" pos="0 0 0.0125" type="capsule" class="plastic_collision"/>
 
                     <!-- AngoraPy Edit: Touch Sensors -->
-                <site name="robot0:T_rfmiddle_front_left"  type="box"    pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                                <site name="robot0:T_rfmiddle_front_right" type="box"    pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                                <site name="robot0:T_rfmiddle_back_left"   type="box"    pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                                <site name="robot0:T_rfmiddle_back_right"  type="box"    pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                                <site name="robot0:T_rfmiddle_tip"         type="sphere" pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
+                <site name="T_rfmiddle_front_left"  type="box"    pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                <site name="T_rfmiddle_front_right" type="box"    pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                <site name="T_rfmiddle_back_left"   type="box"    pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                <site name="T_rfmiddle_back_right"  type="box"    pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                <site name="T_rfmiddle_tip"         type="sphere" pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
 
                 <body name="rh_rfdistal" pos="0 0 0.025">
                   <inertial mass="0.013" pos="0 0 0.0130769" quat="1 0 0 1"
@@ -294,13 +294,13 @@
                   <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
 
                     <!-- AngoraPy Edit: Touch Sensors -->
-              <site name="robot0:S_rftip" pos="0 0 0.026" group="3"></site>
-                <site class="robot0:D_Touch" name="robot0:Tch_rftip"></site>
-                <site name="robot0:T_rftip_front_left"  type="box"    pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                <site name="robot0:T_rftip_front_right" type="box"    pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                <site name="robot0:T_rftip_back_left"   type="box"    pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                <site name="robot0:T_rftip_back_right"  type="box"    pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                <site name="robot0:T_rftip_tip"         type="sphere" pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
+              <site name="S_rftip" pos="0 0 0.026" group="3"></site>
+                <site class="D_Touch" name="Tch_rftip"></site>
+                <site name="T_rftip_front_left"  type="box"    pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                <site name="T_rftip_front_right" type="box"    pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                <site name="T_rftip_back_left"   type="box"    pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                <site name="T_rftip_back_right"  type="box"    pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                <site name="T_rftip_tip"         type="sphere" pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
                 </body>
               </body>
             </body>
@@ -310,7 +310,7 @@
             <joint name="rh_LFJ5" class="metacarpal"/>
             <geom class="plastic_visual" mesh="lf_metacarpal"/>
             <geom size="0.011 0.012 0.025" pos="0.002 0 0.033" type="box" class="plastic_collision"/>
-            <site name="robot0:T_lfmetacarpal_front" type="box" pos="-0.0165 -0.005 0.00975" size="0.01 0.007 0.026"  rgba="1 0 0 0"/>
+            <site name="T_lfmetacarpal_front" type="box" pos="-0.0165 -0.005 0.00975" size="0.01 0.007 0.026"  rgba="1 0 0 0"/>
             <body name="rh_lfknuckle" pos="0 0 0.06579">
               <inertial mass="0.008" pos="0 0 0" quat="0.5 0.5 -0.5 0.5" diaginertia="3.2e-07 2.6e-07 2.6e-07"/>
               <joint name="rh_LFJ4" class="knuckle" axis="0 1 0"/>
@@ -321,23 +321,23 @@
                 <joint name="rh_LFJ3" class="proximal"/>
                 <geom class="plastic_visual" mesh="f_proximal"/>
                 <geom size="0.009 0.02" pos="0 0 0.025" type="capsule" class="plastic_collision"/>
-                                                <site name="robot0:T_lfproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                                <site name="robot0:T_lfproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                                <site name="robot0:T_lfproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
-                                <site name="robot0:T_lfproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
-                                <site name="robot0:T_lfproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
-                                <site name="robot0:T_lfproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
-                                <site name="robot0:T_lfproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
+                                                <site name="T_lfproximal_front_left_bottom"  type="box"    pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="T_lfproximal_front_right_bottom" type="box"    pos="0.005 -0.005 0.00625"  size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="T_lfproximal_front_left_top"     type="box"    pos="-0.005 -0.005 0.03875" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="T_lfproximal_front_right_top"    type="box"    pos="0.005 -0.005 0.03875"  size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="T_lfproximal_back_left"          type="box"    pos="-0.005 0.005 0.0225"   size="0.005 0.005 0.0325"  rgba="0 0 0 0"/>
+                                <site name="T_lfproximal_back_right"         type="box"    pos="0.005 0.005 0.0225"    size="0.005 0.005 0.0325"  rgba="1 0 0 0"/>
+                                <site name="T_lfproximal_tip"                type="sphere" pos="0 0 0.045"             size="0.011"               rgba="1 1 0 0"/>
                 <body name="rh_lfmiddle" pos="0 0 0.045">
                   <inertial mass="0.017" pos="0 0 0.0125" quat="1 0 0 1" diaginertia="2.7e-06 2.6e-06 8.7e-07"/>
                   <joint name="rh_LFJ2" class="middle_distal"/>
                   <geom class="plastic_visual" mesh="f_middle"/>
                   <geom size="0.009 0.0125" pos="0 0 0.0125" type="capsule" class="plastic_collision"/>
-                                    <site name="robot0:T_lfmiddle_front_left"  type="box"    pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                                    <site name="robot0:T_lfmiddle_front_right" type="box"    pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                                    <site name="robot0:T_lfmiddle_back_left"   type="box"    pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
-                                    <site name="robot0:T_lfmiddle_back_right"  type="box"    pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
-                                    <site name="robot0:T_lfmiddle_tip"         type="sphere" pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
+                                    <site name="T_lfmiddle_front_left"  type="box"    pos="-0.00451 -0.00451 0.0125" size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="T_lfmiddle_front_right" type="box"    pos="0.00451 -0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="T_lfmiddle_back_left"   type="box"    pos="-0.00451 0.00451 0.0125"  size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="T_lfmiddle_back_right"  type="box"    pos="0.00451 0.00451 0.0125"   size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="T_lfmiddle_tip"         type="sphere" pos="0 0 0.025"                size="0.009"                   rgba="1 1 0 0"/>
                   <body name="rh_lfdistal" pos="0 0 0.025">
                     <inertial mass="0.013" pos="0 0 0.0130769" quat="1 0 0 1"
                       diaginertia="1.28092e-06 1.12092e-06 5.3e-07"/>
@@ -345,13 +345,13 @@
                     <geom class="plastic_visual" mesh="f_distal_pst"/>
                     <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
 
-                                                          <site name="robot0:S_lftip" pos="0 0 0.026" group="3"></site>
-                                        <site class="robot0:D_Touch" name="robot0:Tch_lftip"></site>
-                                        <site name="robot0:T_lftip_front_left"  type="box"    pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                                        <site name="robot0:T_lftip_front_right" type="box"    pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                                        <site name="robot0:T_lftip_back_left"   type="box"    pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
-                                        <site name="robot0:T_lftip_back_right"  type="box"    pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
-                                        <site name="robot0:T_lftip_tip"         type="sphere" pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
+                                                          <site name="S_lftip" pos="0 0 0.026" group="3"></site>
+                                        <site class="D_Touch" name="Tch_lftip"></site>
+                                        <site name="T_lftip_front_left"  type="box"    pos="-0.00451 -0.00451 0.012" size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="T_lftip_front_right" type="box"    pos="0.00451 -0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="T_lftip_back_left"   type="box"    pos="-0.00451 0.00451 0.012"  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="T_lftip_back_right"  type="box"    pos="0.00451 0.00451 0.012"   size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="T_lftip_tip"         type="sphere" pos="0 0 0.024"               size="0.008"                   rgba="1 1 0 0"/>
                   </body>
                 </body>
               </body>
@@ -367,11 +367,11 @@
               <geom class="plastic_visual" mesh="th_proximal"/>
               <geom class="plastic_collision" size="0.0105 0.009" pos="0 0 0.02" type="capsule"/>
 
-                                          <site name="robot0:T_thproximal_front_left"  type="box"    pos="-0.007 -0.007 0.019" size="0.007 0.007 0.032" rgba="0 0 0 0"/>
-                            <site name="robot0:T_thproximal_front_right" type="box"    pos="0.007 -0.007 0.019"  size="0.007 0.007 0.032" rgba="1 0 0 0"/>
-                            <site name="robot0:T_thproximal_back_left"   type="box"    pos="-0.007 0.007 0.019"  size="0.007 0.007 0.032" rgba="1 0 0 0"/>
-                            <site name="robot0:T_thproximal_back_right"  type="box"    pos="0.007 0.007 0.019"   size="0.007 0.007 0.032" rgba="0 0 0 0"/>
-                            <site name="robot0:T_thproximal_tip"         type="sphere" pos="0 0 0.038"           size="0.014"             rgba="1 1 0 0"/>
+                                          <site name="T_thproximal_front_left"  type="box"    pos="-0.007 -0.007 0.019" size="0.007 0.007 0.032" rgba="0 0 0 0"/>
+                            <site name="T_thproximal_front_right" type="box"    pos="0.007 -0.007 0.019"  size="0.007 0.007 0.032" rgba="1 0 0 0"/>
+                            <site name="T_thproximal_back_left"   type="box"    pos="-0.007 0.007 0.019"  size="0.007 0.007 0.032" rgba="1 0 0 0"/>
+                            <site name="T_thproximal_back_right"  type="box"    pos="0.007 0.007 0.019"   size="0.007 0.007 0.032" rgba="0 0 0 0"/>
+                            <site name="T_thproximal_tip"         type="sphere" pos="0 0 0.038"           size="0.014"             rgba="1 1 0 0"/>
 
               <body name="rh_thhub" pos="0 0 0.038">
                 <inertial mass="0.005" pos="0 0 0" diaginertia="1e-06 1e-06 3e-07"/>
@@ -384,11 +384,11 @@
                   <geom size="0.009 0.009" pos="0 0 0.012" type="capsule" class="plastic_collision"/>
                   <geom size="0.01" pos="0 0 0.03" class="plastic_collision"/>
 
-                                                      <site name="robot0:T_thmiddle_front_left"  type="box"    pos="-0.006 -0.006 0.016" size="0.006 0.006 0.027" rgba="1 0 0 0"/>
-                                    <site name="robot0:T_thmiddle_front_right" type="box"    pos="0.006 -0.006 0.016"  size="0.006 0.006 0.027" rgba="0 0 0 0"/>
-                                    <site name="robot0:T_thmiddle_back_left"   type="box"    pos="-0.006 0.006 0.016"  size="0.006 0.006 0.027" rgba="0 0 0 0"/>
-                                    <site name="robot0:T_thmiddle_back_right"  type="box"    pos="0.006 0.006 0.016"   size="0.006 0.006 0.027" rgba="1 0 0 0"/>
-                                    <site name="robot0:T_thmiddle_tip"         type="sphere" pos="0 0 0.032"           size="0.012"             rgba="1 1 0 0"/>
+                                                      <site name="T_thmiddle_front_left"  type="box"    pos="-0.006 -0.006 0.016" size="0.006 0.006 0.027" rgba="1 0 0 0"/>
+                                    <site name="T_thmiddle_front_right" type="box"    pos="0.006 -0.006 0.016"  size="0.006 0.006 0.027" rgba="0 0 0 0"/>
+                                    <site name="T_thmiddle_back_left"   type="box"    pos="-0.006 0.006 0.016"  size="0.006 0.006 0.027" rgba="0 0 0 0"/>
+                                    <site name="T_thmiddle_back_right"  type="box"    pos="0.006 0.006 0.016"   size="0.006 0.006 0.027" rgba="1 0 0 0"/>
+                                    <site name="T_thmiddle_tip"         type="sphere" pos="0 0 0.032"           size="0.012"             rgba="1 1 0 0"/>
 
                   <body name="rh_thdistal" pos="0 0 0.032" quat="1 0 0 -1">
                     <inertial mass="0.017" pos="0 0 0.0145588" quat="1 0 0 1"
@@ -397,13 +397,13 @@
                     <geom class="plastic_visual" mesh="th_distal_pst"/>
                     <geom class="plastic_collision" type="mesh" mesh="th_distal_pst"/>
 
-                                                          <site name="robot0:S_thtip" pos="0 0 0.0275" group="3"></site>
-                                        <site class="robot0:D_Touch" name="robot0:Tch_thtip" size="0.005 0.011 0.016" pos="-0.005 0 0.02"></site>
-                                        <site name="robot0:T_thtip_front_left"  type="box"    pos="-0.0056 -0.0056 0.013" size="0.0056 0.0056 0.02218" rgba="0 0 0 0"/>
-                                        <site name="robot0:T_thtip_front_right" type="box"    pos="0.0056 -0.0056 0.013"  size="0.0056 0.0056 0.02218" rgba="1 0 0 0"/>
-                                        <site name="robot0:T_thtip_back_left"   type="box"    pos="-0.0056 0.0056 0.013"  size="0.0056 0.0056 0.02218" rgba="1 0 0 0"/>
-                                        <site name="robot0:T_thtip_back_right"  type="box"    pos="0.0056 0.0056 0.013"   size="0.0056 0.0056 0.02218" rgba="0 0 0 0"/>
-                                        <site name="robot0:T_thtip_tip"         type="sphere" pos="0 0 0.026"             size="0.01"                  rgba="1 1 0 0"/>
+                                                          <site name="S_thtip" pos="0 0 0.0275" group="3"></site>
+                                        <site class="D_Touch" name="Tch_thtip" size="0.005 0.011 0.016" pos="-0.005 0 0.02"></site>
+                                        <site name="T_thtip_front_left"  type="box"    pos="-0.0056 -0.0056 0.013" size="0.0056 0.0056 0.02218" rgba="0 0 0 0"/>
+                                        <site name="T_thtip_front_right" type="box"    pos="0.0056 -0.0056 0.013"  size="0.0056 0.0056 0.02218" rgba="1 0 0 0"/>
+                                        <site name="T_thtip_back_left"   type="box"    pos="-0.0056 0.0056 0.013"  size="0.0056 0.0056 0.02218" rgba="1 0 0 0"/>
+                                        <site name="T_thtip_back_right"  type="box"    pos="0.0056 0.0056 0.013"   size="0.0056 0.0056 0.02218" rgba="0 0 0 0"/>
+                                        <site name="T_thtip_tip"         type="sphere" pos="0 0 0.026"             size="0.01"                  rgba="1 1 0 0"/>
                   </body>
                 </body>
               </body>
@@ -464,119 +464,119 @@
     <sensor>
 
         <!--PALM-->
-        <touch name="robot0:TS_palm_b0" site="robot0:T_palm_b0"></touch>
-        <touch name="robot0:TS_palm_bl" site="robot0:T_palm_bl"></touch>
-        <touch name="robot0:TS_palm_bm" site="robot0:T_palm_bm"></touch>
-        <touch name="robot0:TS_palm_br" site="robot0:T_palm_br"></touch>
-        <touch name="robot0:TS_palm_fl" site="robot0:T_palm_fl"></touch>
-        <touch name="robot0:TS_palm_fm" site="robot0:T_palm_fm"></touch>
-        <touch name="robot0:TS_palm_fr" site="robot0:T_palm_fr"></touch>
-        <touch name="robot0:TS_palm_b1" site="robot0:T_palm_b1"></touch>
+        <touch name="TS_palm_b0" site="T_palm_b0"></touch>
+        <touch name="TS_palm_bl" site="T_palm_bl"></touch>
+        <touch name="TS_palm_bm" site="T_palm_bm"></touch>
+        <touch name="TS_palm_br" site="T_palm_br"></touch>
+        <touch name="TS_palm_fl" site="T_palm_fl"></touch>
+        <touch name="TS_palm_fm" site="T_palm_fm"></touch>
+        <touch name="TS_palm_fr" site="T_palm_fr"></touch>
+        <touch name="TS_palm_b1" site="T_palm_b1"></touch>
 
          <!--FOREFINGER-->
-        <touch name="robot0:TS_ffproximal_front_left_bottom"  site="robot0:T_ffproximal_front_left_bottom"></touch>
-        <touch name="robot0:TS_ffproximal_front_right_bottom" site="robot0:T_ffproximal_front_right_bottom"></touch>
-        <touch name="robot0:TS_ffproximal_front_left_top"     site="robot0:T_ffproximal_front_left_top"></touch>
-        <touch name="robot0:TS_ffproximal_front_right_top"    site="robot0:T_ffproximal_front_right_top"></touch>
-        <touch name="robot0:TS_ffproximal_back_left"          site="robot0:T_ffproximal_back_left"></touch>
-        <touch name="robot0:TS_ffproximal_back_right"         site="robot0:T_ffproximal_back_right"></touch>
-        <touch name="robot0:TS_ffproximal_tip"                site="robot0:T_ffproximal_tip"></touch>
+        <touch name="TS_ffproximal_front_left_bottom"  site="T_ffproximal_front_left_bottom"></touch>
+        <touch name="TS_ffproximal_front_right_bottom" site="T_ffproximal_front_right_bottom"></touch>
+        <touch name="TS_ffproximal_front_left_top"     site="T_ffproximal_front_left_top"></touch>
+        <touch name="TS_ffproximal_front_right_top"    site="T_ffproximal_front_right_top"></touch>
+        <touch name="TS_ffproximal_back_left"          site="T_ffproximal_back_left"></touch>
+        <touch name="TS_ffproximal_back_right"         site="T_ffproximal_back_right"></touch>
+        <touch name="TS_ffproximal_tip"                site="T_ffproximal_tip"></touch>
 
-        <touch name="robot0:TS_ffmiddle_front_left"  site="robot0:T_ffmiddle_front_left"></touch>
-        <touch name="robot0:TS_ffmiddle_front_right" site="robot0:T_ffmiddle_front_right"></touch>
-        <touch name="robot0:TS_ffmiddle_back_left"   site="robot0:T_ffmiddle_back_left"></touch>
-        <touch name="robot0:TS_ffmiddle_back_right"  site="robot0:T_ffmiddle_back_right"></touch>
-        <touch name="robot0:TS_ffmiddle_tip"         site="robot0:T_ffmiddle_tip"></touch>
+        <touch name="TS_ffmiddle_front_left"  site="T_ffmiddle_front_left"></touch>
+        <touch name="TS_ffmiddle_front_right" site="T_ffmiddle_front_right"></touch>
+        <touch name="TS_ffmiddle_back_left"   site="T_ffmiddle_back_left"></touch>
+        <touch name="TS_ffmiddle_back_right"  site="T_ffmiddle_back_right"></touch>
+        <touch name="TS_ffmiddle_tip"         site="T_ffmiddle_tip"></touch>
 
-        <touch name="robot0:TS_fftip_front_left"  site="robot0:T_fftip_front_left"></touch>
-        <touch name="robot0:TS_fftip_front_right" site="robot0:T_fftip_front_right"></touch>
-        <touch name="robot0:TS_fftip_back_left"   site="robot0:T_fftip_back_left"></touch>
-        <touch name="robot0:TS_fftip_back_right"  site="robot0:T_fftip_back_right"></touch>
-        <touch name="robot0:TS_fftip_tip"         site="robot0:T_fftip_tip"></touch>
+        <touch name="TS_fftip_front_left"  site="T_fftip_front_left"></touch>
+        <touch name="TS_fftip_front_right" site="T_fftip_front_right"></touch>
+        <touch name="TS_fftip_back_left"   site="T_fftip_back_left"></touch>
+        <touch name="TS_fftip_back_right"  site="T_fftip_back_right"></touch>
+        <touch name="TS_fftip_tip"         site="T_fftip_tip"></touch>
 
         <!-- MIDDLE FINGER -->
-        <touch name="robot0:TS_mfproximal_front_left_bottom"  site="robot0:T_mfproximal_front_left_bottom"></touch>
-        <touch name="robot0:TS_mfproximal_front_right_bottom" site="robot0:T_mfproximal_front_right_bottom"></touch>
-        <touch name="robot0:TS_mfproximal_front_left_top"     site="robot0:T_mfproximal_front_left_top"></touch>
-        <touch name="robot0:TS_mfproximal_front_right_top"    site="robot0:T_mfproximal_front_right_top"></touch>
-        <touch name="robot0:TS_mfproximal_back_left"          site="robot0:T_mfproximal_back_left"></touch>
-        <touch name="robot0:TS_mfproximal_back_right"         site="robot0:T_mfproximal_back_right"></touch>
-        <touch name="robot0:TS_mfproximal_tip"                site="robot0:T_mfproximal_tip"></touch>
+        <touch name="TS_mfproximal_front_left_bottom"  site="T_mfproximal_front_left_bottom"></touch>
+        <touch name="TS_mfproximal_front_right_bottom" site="T_mfproximal_front_right_bottom"></touch>
+        <touch name="TS_mfproximal_front_left_top"     site="T_mfproximal_front_left_top"></touch>
+        <touch name="TS_mfproximal_front_right_top"    site="T_mfproximal_front_right_top"></touch>
+        <touch name="TS_mfproximal_back_left"          site="T_mfproximal_back_left"></touch>
+        <touch name="TS_mfproximal_back_right"         site="T_mfproximal_back_right"></touch>
+        <touch name="TS_mfproximal_tip"                site="T_mfproximal_tip"></touch>
 
-        <touch name="robot0:TS_mfmiddle_front_left"  site="robot0:T_mfmiddle_front_left"></touch>
-        <touch name="robot0:TS_mfmiddle_front_right" site="robot0:T_mfmiddle_front_right"></touch>
-        <touch name="robot0:TS_mfmiddle_back_left"   site="robot0:T_mfmiddle_back_left"></touch>
-        <touch name="robot0:TS_mfmiddle_back_right"  site="robot0:T_mfmiddle_back_right"></touch>
-        <touch name="robot0:TS_mfmiddle_tip"         site="robot0:T_mfmiddle_tip"></touch>
+        <touch name="TS_mfmiddle_front_left"  site="T_mfmiddle_front_left"></touch>
+        <touch name="TS_mfmiddle_front_right" site="T_mfmiddle_front_right"></touch>
+        <touch name="TS_mfmiddle_back_left"   site="T_mfmiddle_back_left"></touch>
+        <touch name="TS_mfmiddle_back_right"  site="T_mfmiddle_back_right"></touch>
+        <touch name="TS_mfmiddle_tip"         site="T_mfmiddle_tip"></touch>
 
-        <touch name="robot0:TS_mftip_front_left"  site="robot0:T_mftip_front_left"></touch>
-        <touch name="robot0:TS_mftip_front_right" site="robot0:T_mftip_front_right"></touch>
-        <touch name="robot0:TS_mftip_back_left"   site="robot0:T_mftip_back_left"></touch>
-        <touch name="robot0:TS_mftip_back_right"  site="robot0:T_mftip_back_right"></touch>
-        <touch name="robot0:TS_mftip_tip"         site="robot0:T_mftip_tip"></touch>
+        <touch name="TS_mftip_front_left"  site="T_mftip_front_left"></touch>
+        <touch name="TS_mftip_front_right" site="T_mftip_front_right"></touch>
+        <touch name="TS_mftip_back_left"   site="T_mftip_back_left"></touch>
+        <touch name="TS_mftip_back_right"  site="T_mftip_back_right"></touch>
+        <touch name="TS_mftip_tip"         site="T_mftip_tip"></touch>
 
         <!-- RING FINGER -->
-        <touch name="robot0:TS_rfproximal_front_left_bottom"  site="robot0:T_rfproximal_front_left_bottom"></touch>
-        <touch name="robot0:TS_rfproximal_front_right_bottom" site="robot0:T_rfproximal_front_right_bottom"></touch>
-        <touch name="robot0:TS_rfproximal_front_left_top"     site="robot0:T_rfproximal_front_left_top"></touch>
-        <touch name="robot0:TS_rfproximal_front_right_top"    site="robot0:T_rfproximal_front_right_top"></touch>
-        <touch name="robot0:TS_rfproximal_back_left"          site="robot0:T_rfproximal_back_left"></touch>
-        <touch name="robot0:TS_rfproximal_back_right"         site="robot0:T_rfproximal_back_right"></touch>
-        <touch name="robot0:TS_rfproximal_tip"                site="robot0:T_rfproximal_tip"></touch>
+        <touch name="TS_rfproximal_front_left_bottom"  site="T_rfproximal_front_left_bottom"></touch>
+        <touch name="TS_rfproximal_front_right_bottom" site="T_rfproximal_front_right_bottom"></touch>
+        <touch name="TS_rfproximal_front_left_top"     site="T_rfproximal_front_left_top"></touch>
+        <touch name="TS_rfproximal_front_right_top"    site="T_rfproximal_front_right_top"></touch>
+        <touch name="TS_rfproximal_back_left"          site="T_rfproximal_back_left"></touch>
+        <touch name="TS_rfproximal_back_right"         site="T_rfproximal_back_right"></touch>
+        <touch name="TS_rfproximal_tip"                site="T_rfproximal_tip"></touch>
 
-        <touch name="robot0:TS_rfmiddle_front_left"  site="robot0:T_rfmiddle_front_left"></touch>
-        <touch name="robot0:TS_rfmiddle_front_right" site="robot0:T_rfmiddle_front_right"></touch>
-        <touch name="robot0:TS_rfmiddle_back_left"   site="robot0:T_rfmiddle_back_left"></touch>
-        <touch name="robot0:TS_rfmiddle_back_right"  site="robot0:T_rfmiddle_back_right"></touch>
-        <touch name="robot0:TS_rfmiddle_tip"         site="robot0:T_rfmiddle_tip"></touch>
+        <touch name="TS_rfmiddle_front_left"  site="T_rfmiddle_front_left"></touch>
+        <touch name="TS_rfmiddle_front_right" site="T_rfmiddle_front_right"></touch>
+        <touch name="TS_rfmiddle_back_left"   site="T_rfmiddle_back_left"></touch>
+        <touch name="TS_rfmiddle_back_right"  site="T_rfmiddle_back_right"></touch>
+        <touch name="TS_rfmiddle_tip"         site="T_rfmiddle_tip"></touch>
 
-        <touch name="robot0:TS_rftip_front_left"  site="robot0:T_rftip_front_left"></touch>
-        <touch name="robot0:TS_rftip_front_right" site="robot0:T_rftip_front_right"></touch>
-        <touch name="robot0:TS_rftip_back_left"   site="robot0:T_rftip_back_left"></touch>
-        <touch name="robot0:TS_rftip_back_right"  site="robot0:T_rftip_back_right"></touch>
-        <touch name="robot0:TS_rftip_tip"         site="robot0:T_rftip_tip"></touch>
+        <touch name="TS_rftip_front_left"  site="T_rftip_front_left"></touch>
+        <touch name="TS_rftip_front_right" site="T_rftip_front_right"></touch>
+        <touch name="TS_rftip_back_left"   site="T_rftip_back_left"></touch>
+        <touch name="TS_rftip_back_right"  site="T_rftip_back_right"></touch>
+        <touch name="TS_rftip_tip"         site="T_rftip_tip"></touch>
 
         <!-- LITTLE FINGER -->
-        <touch name="robot0:TS_lfmetacarpal_front" site="robot0:T_lfmetacarpal_front"></touch>
+        <touch name="TS_lfmetacarpal_front" site="T_lfmetacarpal_front"></touch>
 
-        <touch name="robot0:TS_lfproximal_front_left_bottom"  site="robot0:T_lfproximal_front_left_bottom"></touch>
-        <touch name="robot0:TS_lfproximal_front_right_bottom" site="robot0:T_lfproximal_front_right_bottom"></touch>
-        <touch name="robot0:TS_lfproximal_front_left_top"     site="robot0:T_lfproximal_front_left_top"></touch>
-        <touch name="robot0:TS_lfproximal_front_right_top"    site="robot0:T_lfproximal_front_right_top"></touch>
-        <touch name="robot0:TS_lfproximal_back_left"          site="robot0:T_lfproximal_back_left"></touch>
-        <touch name="robot0:TS_lfproximal_back_right"         site="robot0:T_lfproximal_back_right"></touch>
-        <touch name="robot0:TS_lfproximal_tip"                site="robot0:T_lfproximal_tip"></touch>
+        <touch name="TS_lfproximal_front_left_bottom"  site="T_lfproximal_front_left_bottom"></touch>
+        <touch name="TS_lfproximal_front_right_bottom" site="T_lfproximal_front_right_bottom"></touch>
+        <touch name="TS_lfproximal_front_left_top"     site="T_lfproximal_front_left_top"></touch>
+        <touch name="TS_lfproximal_front_right_top"    site="T_lfproximal_front_right_top"></touch>
+        <touch name="TS_lfproximal_back_left"          site="T_lfproximal_back_left"></touch>
+        <touch name="TS_lfproximal_back_right"         site="T_lfproximal_back_right"></touch>
+        <touch name="TS_lfproximal_tip"                site="T_lfproximal_tip"></touch>
 
-        <touch name="robot0:TS_lfmiddle_front_left"  site="robot0:T_lfmiddle_front_left"></touch>
-        <touch name="robot0:TS_lfmiddle_front_right" site="robot0:T_lfmiddle_front_right"></touch>
-        <touch name="robot0:TS_lfmiddle_back_left"   site="robot0:T_lfmiddle_back_left"></touch>
-        <touch name="robot0:TS_lfmiddle_back_right"  site="robot0:T_lfmiddle_back_right"></touch>
-        <touch name="robot0:TS_lfmiddle_tip"         site="robot0:T_lfmiddle_tip"></touch>
+        <touch name="TS_lfmiddle_front_left"  site="T_lfmiddle_front_left"></touch>
+        <touch name="TS_lfmiddle_front_right" site="T_lfmiddle_front_right"></touch>
+        <touch name="TS_lfmiddle_back_left"   site="T_lfmiddle_back_left"></touch>
+        <touch name="TS_lfmiddle_back_right"  site="T_lfmiddle_back_right"></touch>
+        <touch name="TS_lfmiddle_tip"         site="T_lfmiddle_tip"></touch>
 
-        <touch name="robot0:TS_lftip_front_left"  site="robot0:T_lftip_front_left"></touch>
-        <touch name="robot0:TS_lftip_front_right" site="robot0:T_lftip_front_right"></touch>
-        <touch name="robot0:TS_lftip_back_left"   site="robot0:T_lftip_back_left"></touch>
-        <touch name="robot0:TS_lftip_back_right"  site="robot0:T_lftip_back_right"></touch>
-        <touch name="robot0:TS_lftip_tip"         site="robot0:T_lftip_tip"></touch>
+        <touch name="TS_lftip_front_left"  site="T_lftip_front_left"></touch>
+        <touch name="TS_lftip_front_right" site="T_lftip_front_right"></touch>
+        <touch name="TS_lftip_back_left"   site="T_lftip_back_left"></touch>
+        <touch name="TS_lftip_back_right"  site="T_lftip_back_right"></touch>
+        <touch name="TS_lftip_tip"         site="T_lftip_tip"></touch>
 
         <!--THUMB-->
-        <touch name="robot0:TS_thproximal_front_left"  site="robot0:T_thproximal_front_left"></touch>
-        <touch name="robot0:TS_thproximal_front_right" site="robot0:T_thproximal_front_right"></touch>
-        <touch name="robot0:TS_thproximal_back_left"   site="robot0:T_thproximal_back_left"></touch>
-        <touch name="robot0:TS_thproximal_back_right"  site="robot0:T_thproximal_back_right"></touch>
-        <touch name="robot0:TS_thproximal_tip"         site="robot0:T_thproximal_tip"></touch>
+        <touch name="TS_thproximal_front_left"  site="T_thproximal_front_left"></touch>
+        <touch name="TS_thproximal_front_right" site="T_thproximal_front_right"></touch>
+        <touch name="TS_thproximal_back_left"   site="T_thproximal_back_left"></touch>
+        <touch name="TS_thproximal_back_right"  site="T_thproximal_back_right"></touch>
+        <touch name="TS_thproximal_tip"         site="T_thproximal_tip"></touch>
 
-        <touch name="robot0:TS_thmiddle_front_left"  site="robot0:T_thmiddle_front_left"></touch>
-        <touch name="robot0:TS_thmiddle_front_right" site="robot0:T_thmiddle_front_right"></touch>
-        <touch name="robot0:TS_thmiddle_back_left"   site="robot0:T_thmiddle_back_left"></touch>
-        <touch name="robot0:TS_thmiddle_back_right"  site="robot0:T_thmiddle_back_right"></touch>
-        <touch name="robot0:TS_thmiddle_tip"         site="robot0:T_thmiddle_tip"></touch>
+        <touch name="TS_thmiddle_front_left"  site="T_thmiddle_front_left"></touch>
+        <touch name="TS_thmiddle_front_right" site="T_thmiddle_front_right"></touch>
+        <touch name="TS_thmiddle_back_left"   site="T_thmiddle_back_left"></touch>
+        <touch name="TS_thmiddle_back_right"  site="T_thmiddle_back_right"></touch>
+        <touch name="TS_thmiddle_tip"         site="T_thmiddle_tip"></touch>
 
-        <touch name="robot0:TS_thtip_front_left"  site="robot0:T_thtip_front_left"></touch>
-        <touch name="robot0:TS_thtip_front_right" site="robot0:T_thtip_front_right"></touch>
-        <touch name="robot0:TS_thtip_back_left"   site="robot0:T_thtip_back_left"></touch>
-        <touch name="robot0:TS_thtip_back_right"  site="robot0:T_thtip_back_right"></touch>
-        <touch name="robot0:TS_thtip_tip"         site="robot0:T_thtip_tip"></touch>
+        <touch name="TS_thtip_front_left"  site="T_thtip_front_left"></touch>
+        <touch name="TS_thtip_front_right" site="T_thtip_front_right"></touch>
+        <touch name="TS_thtip_back_left"   site="T_thtip_back_left"></touch>
+        <touch name="TS_thtip_back_right"  site="T_thtip_back_right"></touch>
+        <touch name="TS_thtip_tip"         site="T_thtip_tip"></touch>
 
     </sensor>
 

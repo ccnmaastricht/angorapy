@@ -168,9 +168,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
         for k, v in zip(mj_get_category_names(self.model, "sensor")[0], self.model.sensor_adr):
-            if b'robot0:TS_' in k:
-                # self._touch_sensor_id_site_id.append((v, self.model._site_name2id[k.replace('robot0:TS_',
-                # 'robot0:T_')]))
+            if b'robot/TS_' in k:
                 self._touch_sensor_id.append(v)
 
                 if b'thtip' in k:
@@ -198,13 +196,15 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         return super(BaseShadowHandEnv, self)._get_info()
 
     def viewer_setup(self):
+        print(f"Setting up color scheme {self.color_scheme}.")
+
         # hand color
         if self.color_scheme == "default":
-            self.model.mat_rgba[1] = np.array([29, 33, 36, 255]) / 255  # hand
-            self.model.mat_rgba[2] = np.array([255, 255, 255, 255]) / 255  # background
+            pass
+            # self.model.mat_rgba[2] = np.array([30, 30, 30, 255]) / 255  # hand
         elif self.color_scheme == "inverted":
             self.model.mat_rgba[0] = np.array([200, 200, 200, 255]) / 255  # hand
-            self.model.mat_rgba[2] = np.array([0, 0, 0, 255]) / 255  # background
+            self.model.mat_rgba[1] = np.array([0, 0, 0, 255]) / 255  # background
         else:
             raise NotImplementedError(f"Unknown Color Scheme {self.color_scheme}.")
 
@@ -218,13 +218,13 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.65  # zoom in
-            self.viewer.cam.azimuth = 180.0  # wrist to the bottom
+            self.viewer.cam.distance = 0.5  # zoom in
+            self.viewer.cam.azimuth = 0.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
-            self.viewer.cam.lookat[0] += 0.1  # slightly move forward
+            self.viewer.cam.lookat[0] += 0.3  # slightly move forward
         elif self.viewpoint == "topdown-far":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.5  # increased values zoom out
+            self.viewer.cam.distance = 0.7  # increased values zoom out
             self.viewer.cam.azimuth = -0.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[0] += 0.25  # slightly move forward

@@ -74,7 +74,7 @@ if isinstance(env.unwrapped, BaseShadowHandEnv):
     env.set_delta_t_simulation(0.002)
     env.set_original_n_substeps_to_sspcs()
     env.change_color_scheme("default")
-    env.change_perspective("topdown-far")
+
 if not args.force_case_circulation or ("Reach" not in env.unwrapped.spec.id):
     for i in range(1000):
         investigator.render_episode(env, act_confidently=not args.act_stochastic)

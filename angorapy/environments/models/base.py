@@ -1,18 +1,30 @@
 import abc
-from typing import Sequence
+from typing import Any, \
+    Optional, \
+    Sequence, \
+    Union
 
 from dm_control import mjcf
-from mujoco_utils import types as mj_types
 
 
 class _Entity(abc.ABC):
 
-    def __init__(self, root: mj_types.MjcfRootElement, name: str):
+    def __init__(self,
+                 root: mjcf.RootElement,
+                 name: str,
+                 position: Optional[Sequence[float]] = (0, 0, 0),
+                 rotation: Optional[Sequence[float]] = (0, 0, 0)):
         self._mjcf_root = root
         self._mjcf_root.model = name
 
         self._parse_entity()
         self._setup_entity()
+
+        if position is not None:
+            self.root_body.pos = position
+
+        if rotation is not None:
+            self.root_body.quat = rotation
 
     @abc.abstractmethod
     def _parse_entity(self) -> None:
@@ -23,7 +35,7 @@ class _Entity(abc.ABC):
         ...
 
     @property
-    def mjcf_model(self) -> mj_types.MjcfRootElement:
+    def mjcf_model(self) -> mjcf.RootElement:
         return self._mjcf_root
 
     @property
@@ -32,35 +44,45 @@ class _Entity(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def root_body(self) -> mj_types.MjcfElement:
+    def root_body(self) -> mjcf.Element:
         ...
+
+    def attach(self, other: Union["_Entity", mjcf.Element]) -> None:
+        """Attaches another entity to this one."""
+        self.mjcf_model.attach(other.mjcf_model)
 
 
 class Robot(_Entity):
 
-    def __init__(self, base_xml_file: str):
-        super().__init__(mjcf.from_path(str(base_xml_file)), "robot")
+    def __init__(self,
+                 base_xml_file: str,
+                 position: Sequence[float] = (.0, .0, .0),
+                 rotation: Sequence[float] = (.0, .0, .0)):
+        super().__init__(mjcf.from_path(str(base_xml_file)), "robot", position=position, rotation=rotation)
 
     @property
     @abc.abstractmethod
-    def joints(self) -> Sequence[mj_types.MjcfElement]:
+    def joints(self) -> Sequence[mjcf.Element]:
         ...
 
     @property
     @abc.abstractmethod
-    def actuators(self) -> Sequence[mj_types.MjcfElement]:
+    def actuators(self) -> Sequence[mjcf.Element]:
         ...
 
 
 class External(_Entity):
 
-    def __init__(self, base_xml_file: str):
-        super().__init__(mjcf.from_path(str(base_xml_file)), "external")
-
+    def __init__(self,
+                 root: mjcf.RootElement,
+                 name: str,
+                 position: Optional[Sequence[float]],
+                 rotation: Optional[Sequence[float]]):
+        super().__init__(root, name, position=position, rotation=rotation)
 
     @property
     @abc.abstractmethod
-    def joints(self) -> Sequence[mj_types.MjcfElement]:
+    def joints(self) -> Sequence[mjcf.Element]:
         ...
 
 
@@ -69,7 +91,7 @@ class Stage(_Entity):
 
     def __init__(self) -> None:
         """Initializes a stage."""
-        super().__init__(mjcf.RootElement(), "stage")
+        super().__init__(mjcf.RootElement(), "stage", position=None, rotation=None)
 
     def _parse_entity(self) -> None:
         pass
@@ -88,7 +110,7 @@ class Stage(_Entity):
         # Lights.
         self._mjcf_root.worldbody.add("light", pos=(0, 0, 1))
         self._mjcf_root.worldbody.add(
-            "light", pos=(0.3, 0, 1), dir=(0, 0, -1), directional=False
+            "light", pos=(0.3, 0, 1.5), dir=(0, 0, -1), directional=True
         )
 
         # Dark checkerboard floor.
@@ -97,23 +119,26 @@ class Stage(_Entity):
             name="grid",
             type="2d",
             builtin="checker",
-            width=512,
-            height=512,
-            rgb1=[0.1, 0.1, 0.1],
-            rgb2=[0.2, 0.2, 0.2],
+            mark="cross",
+            width=256,
+            height=256,
+            rgb1=[0.2, 0.3, 0.4],
+            rgb2=[0.1, 0.2, 0.3],
+            markrgb=[0.8, 0.8, 0.8],
         )
         self._mjcf_root.asset.add(
             "material",
             name="grid",
             texture="grid",
-            texrepeat=(1, 1),
+            texrepeat=(5, 5),
             texuniform=True,
             reflectance=0.2,
         )
         self._ground_geom = self._mjcf_root.worldbody.add(
             "geom",
             type="plane",
-            size=(1, 1, 0.05),
+            size=(0, 0, 0.05),
+            pos=(0, 0, -0.1),
             material="grid",
             contype=0,
             conaffinity=0,

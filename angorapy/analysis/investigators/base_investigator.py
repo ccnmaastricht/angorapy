@@ -211,6 +211,7 @@ class Investigator:
                 action, _ = self.distribution.act(*probabilities)
 
             observation, reward, terminated, truncated, info = env.step(action)
+
             cumulative_reward += (reward if "original_reward" not in info else info["original_reward"])
             done = terminated or truncated
 

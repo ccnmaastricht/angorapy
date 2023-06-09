@@ -47,9 +47,9 @@ setup(
 
         # environments
         "box2d-py==2.3.5",
-        "gymnasium[]==0.26.2",
+        "gymnasium[]==0.28.1",
         "mujoco",
-        # "dm_control==1.0.12",
+        "dm_control==1.0.12",
 
         # webinterface
         "itsdangerous==2.0.1",

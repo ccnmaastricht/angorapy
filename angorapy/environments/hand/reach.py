@@ -11,6 +11,7 @@ from angorapy.environments.hand.consts import DEFAULT_INITIAL_QPOS, \
 from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
 from angorapy.environments.hand.utils import generate_random_sim_qpos, \
     get_fingertip_distance
+from angorapy.environments.models.base import Stage
 from angorapy.environments.models.shadow_hand.shadow_hand import ShadowHandReach
 from angorapy.environments.reward import free_reach, \
     reach, \
@@ -44,6 +45,11 @@ class Reach(BaseShadowHandEnv):
         elif self.state_initialization == "buffered":
             initial_qpos = DEFAULT_INITIAL_QPOS
 
+        self._stage = Stage()
+        self._hand = ShadowHandReach()
+
+        self._stage.mjcf_model.attach(self._hand.mjcf_model)
+
         super().__init__(
             initial_qpos=initial_qpos,
             n_substeps=n_substeps,
@@ -51,7 +57,7 @@ class Reach(BaseShadowHandEnv):
             vision=vision,
             touch=touch,
             render_mode=render_mode,
-            model=ShadowHandReach(),
+            model=self._stage.mjcf_model,
         )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
@@ -110,7 +116,7 @@ class Reach(BaseShadowHandEnv):
         return True
 
     def _sample_goal(self):
-        thumb_name = 'thdistal_site'
+        thumb_name = 'robot/thdistal_site'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
 
         if self.forced_finger is None:
@@ -149,7 +155,7 @@ class Reach(BaseShadowHandEnv):
             self.set_state(**initial_state)
 
         self.initial_goal = self._get_achieved_goal().copy()
-        self.palm_xpos = self.data.body('rh_palm').xpos.copy()
+        self.palm_xpos = self.data.body('robot/rh_palm').xpos.copy()
 
         self.goal = self._sample_goal()
 
@@ -159,7 +165,7 @@ class Reach(BaseShadowHandEnv):
             sites_offset = (self.data.site_xpos - self.model.site_pos).copy()
             goal = self.goal.reshape(5, 3)
             for finger_idx in range(5):
-                site_name = f"target{finger_idx}"
+                site_name = f"robot/target{finger_idx}"
 
                 site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
                 self.model.site(site_name).rgba[-1] = 0.2
@@ -169,7 +175,7 @@ class Reach(BaseShadowHandEnv):
             # Visualize finger positions.
             achieved_goal = self._get_achieved_goal().reshape(5, 3)
             for finger_idx in range(5):
-                site_name = f"finger{finger_idx}"
+                site_name = f"robot/finger{finger_idx}"
                 site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
                 self.model.site(site_name).rgba[-1] = 0.2
                 # self.data.site(site_name).xpos[:] = (achieved_goal[finger_idx] - sites_offset[site_id]).copy()
