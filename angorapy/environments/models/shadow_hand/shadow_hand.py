@@ -17,7 +17,6 @@
 from typing import Sequence
 
 from dm_control import mjcf
-from dm_control.mjcf import Element
 from mujoco_utils import mjcf_utils
 
 from angorapy.environments.models.base import Robot
@@ -57,7 +56,7 @@ class ShadowHand(Robot):
 
     # ACCESSORS
     @property
-    def root_body(self) -> Element:
+    def root_body(self) -> mjcf.Element:
         return mjcf_utils.safe_find(self._mjcf_root, "body", self._prefix + "forearm")
 
     @property
@@ -102,4 +101,4 @@ class ShadowHandReach(ShadowHand):
 
 
 if __name__ == '__main__':
-    shadow_hand = ShadowHand(name="ShadowHand")
+    shadow_hand = ShadowHand()

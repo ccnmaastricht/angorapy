@@ -47,7 +47,7 @@ setup(
 
         # environments
         "box2d-py==2.3.5",
-        "gymnasium[]==0.28.1",
+        "gymnasium[box2d,mujoco]==0.28.1",
         "mujoco",
         "dm_control==1.0.12",
 

@@ -116,7 +116,7 @@ class Reach(BaseShadowHandEnv):
         return True
 
     def _sample_goal(self):
-        thumb_name = 'robot/thdistal_site'
+        thumb_name = 'robot/S_thtip'
         finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
 
         if self.forced_finger is None:

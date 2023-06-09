@@ -2,11 +2,11 @@ import os
 from typing import Tuple, Dict
 
 FINGERTIP_SITE_NAMES = [
-    'robot/ffdistal_site',
-    'robot/mfdistal_site',
-    'robot/rfdistal_site',
-    'robot/lfdistal_site',
-    'robot/thdistal_site',
+    'robot/S_fftip',
+    'robot/S_mftip',
+    'robot/S_rftip',
+    'robot/S_lftip',
+    'robot/S_thtip',
 ]
 
 DEFAULT_INITIAL_QPOS = {
