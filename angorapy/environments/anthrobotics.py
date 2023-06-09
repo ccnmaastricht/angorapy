@@ -292,15 +292,18 @@ class AnthropomorphicEnv(gym.Env, ABC):
     ):
         super().reset(seed=seed)
 
-        mujoco.mj_resetData(self.model, self.data)
-        self.reset_model()
+        did_reset_sim = False
+        while not did_reset_sim:
+            did_reset_sim = self._reset_sim()
 
-        obs = self._get_obs()["observation"]
+        self.goal = self._sample_goal()
+        obs = self._get_obs()
+        info = self._get_info()
 
         if self.render_mode == "human":
             self.render()
 
-        return obs, {}
+        return obs, info
 
     # CONTROL
     def step(self,
@@ -460,6 +463,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         return True
 
     def reset_model(self):
+        mujoco.mj_resetData(self.model, self.data)
         self.set_state(**self.initial_state)
 
     # SENSES

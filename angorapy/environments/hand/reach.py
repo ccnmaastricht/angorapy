@@ -187,12 +187,7 @@ class Reach(BaseShadowHandEnv):
         """Step the environment."""
         self.previous_finger_positions = [self.get_finger_position(fname).copy() for fname in FINGERTIP_SITE_NAMES]
 
-        o, r, d, truncated, i = super().step(action)
-
-        # update memory
-        # self.state_memory_buffer.append(self.sim.get_state())
-
-        return o, r, d, truncated, i
+        return super().step(action)
 
     def _get_info(self):
         return {
@@ -323,7 +318,6 @@ class FreeReach(Reach):
                     achieved_goal,
                     desired_goal):
         d = get_fingertip_distance(self.get_thumb_position(), self.get_target_finger_position())
-        print(self.reward_config)
         return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
     def _render_callback(self,
@@ -333,7 +327,7 @@ class FreeReach(Reach):
         # Visualize finger positions.
         achieved_goal = self._get_achieved_goal().reshape(5, 3)
         for finger_idx in range(5):
-            site_name = f"finger{finger_idx}"
+            site_name = f"robot/finger{finger_idx}"
             site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
 
             fname = FINGERTIP_SITE_NAMES[finger_idx]

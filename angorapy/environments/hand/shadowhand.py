@@ -49,7 +49,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         self._freeze_wrist = False
         self.color_scheme = "default"
         self.viewpoint = "topdown"
-        self.thumb_name = 'S_thtip'
+        self.thumb_name = 'robot/S_thtip'
 
         super(BaseShadowHandEnv,
               self).__init__(model=model,
@@ -143,27 +143,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
                      self).step(action)
 
     # SIMULATION
-    def reset(self,
-              **kwargs):
-        # Attempt to reset the simulator. Since we randomize initial conditions, it
-        # is possible to get into a state with numerical issues (e.g. due to penetration or
-        # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
-        # In this case, we just keep randomizing until we eventually achieve a valid initial
-        # configuration.
-        super(BaseShadowHandEnv,
-              self).reset(**kwargs)
-        did_reset_sim = False
-
-        while not did_reset_sim:
-            did_reset_sim = self._reset_sim()
-        self.goal = self._sample_goal().copy()
-
-        obs = self._get_obs()
-
-        info = self._get_info()
-
-        return obs, info
-
     def _env_setup(self, initial_state):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
@@ -196,7 +175,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         return super(BaseShadowHandEnv, self)._get_info()
 
     def viewer_setup(self):
-        print(f"Setting up color scheme {self.color_scheme}.")
+        mpi_print(f"Setting up color scheme {self.color_scheme}.")
 
         # hand color
         if self.color_scheme == "default":
