@@ -5,7 +5,7 @@ import mujoco
 import numpy as np
 
 from angorapy.common.const import N_SUBSTEPS
-from angorapy.configs.reward_config import REACH_BASE
+from angorapy.environments.reward_config import REACH_BASE
 from angorapy.environments.hand.consts import DEFAULT_INITIAL_QPOS, \
     FINGERTIP_SITE_NAMES
 from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
@@ -127,20 +127,24 @@ class Reach(BaseShadowHandEnv):
         thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
         finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
         self.current_target_finger = finger_idx
+        goal = self.initial_goal.copy().reshape(-1, 3)
 
         assert thumb_idx != finger_idx
 
         # Pick a meeting point above the hand.
-        meeting_pos = self.palm_xpos + np.array([0.1, -0.01, 0.05])
-        meeting_pos += self.np_random.normal(scale=0.01, size=meeting_pos.shape)
+        meeting_pos = self.palm_xpos + np.array([0.1, 0.01, 0.05])
+        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
+
+        # slightly move meeting point along y-axis towards the target finger to make goal achievable
+        meeting_pos[1] += 0.01 * (meeting_pos - goal[finger_idx])[1]
 
         # Slightly move meeting goal towards the respective finger to avoid that they overlap.
-        goal = self.initial_goal.copy().reshape(-1, 3)
         for idx in [thumb_idx, finger_idx]:
             offset_direction = (meeting_pos - goal[idx])
             offset_direction /= np.linalg.norm(offset_direction)
             goal[idx] = meeting_pos - 0.005 * offset_direction
 
+        # in 10% of the cases, the goal is the initial goal (i.e. the hand is not supposed to move)
         if self.forced_finger is None:
             if self.np_random.uniform() < 0.1:
                 goal = self.initial_goal.copy()
@@ -231,7 +235,7 @@ class ReachSequential(Reach):
         goal = self.initial_goal.copy()
 
         # pick a meeting point above the hand
-        meeting_pos = self.palm_xpos + np.array([0.0, -0.09, 0.05])
+        meeting_pos = self.palm_xpos + np.array([0.0, -0.2, 0.05])
         meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
 
         # slightly move meeting goal towards the respective finger to avoid that they overlap

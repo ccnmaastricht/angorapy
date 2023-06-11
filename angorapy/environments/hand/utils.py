@@ -14,11 +14,6 @@ def generate_random_sim_qpos(base: dict) -> dict:
     return base
 
 
-def get_palm_position(model):
-    """Return the robotic hand's palm's center."""
-    return model.body("robot/palm").pos
-
-
 def get_fingertip_distance(ft_a, ft_b):
     """Return the distance between two vectors representing finger tip positions."""
     assert ft_a.shape == ft_b.shape

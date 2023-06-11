@@ -13,17 +13,17 @@ class _Entity(abc.ABC):
                  root: mjcf.RootElement,
                  name: str,
                  position: Optional[Sequence[float]] = (0, 0, 0),
-                 rotation: Optional[Sequence[float]] = (0, 0, 0)):
+                 rotation: Optional[Sequence[float]] = (0, 0, 0, 0)):
         self._mjcf_root = root
         self._mjcf_root.model = name
 
         self._parse_entity()
         self._setup_entity()
 
-        if position is not None:
+        if position is not None and self.root_body is not None:
             self.root_body.pos = position
 
-        if rotation is not None:
+        if rotation is not None and self.root_body is not None:
             self.root_body.quat = rotation
 
     @abc.abstractmethod
@@ -47,9 +47,9 @@ class _Entity(abc.ABC):
     def root_body(self) -> mjcf.Element:
         ...
 
-    def attach(self, other: Union["_Entity", mjcf.Element]) -> None:
+    def attach(self, other: Union["_Entity", mjcf.Element]) -> mjcf.Element:
         """Attaches another entity to this one."""
-        self.mjcf_model.attach(other.mjcf_model)
+        return self.mjcf_model.attach(other.mjcf_model)
 
 
 class Robot(_Entity):
@@ -57,7 +57,7 @@ class Robot(_Entity):
     def __init__(self,
                  base_xml_file: str,
                  position: Sequence[float] = (.0, .0, .0),
-                 rotation: Sequence[float] = (.0, .0, .0)):
+                 rotation: Sequence[float] = (.0, .0, .0, 0.)):
         super().__init__(mjcf.from_path(str(base_xml_file)), "robot", position=position, rotation=rotation)
 
     @property
@@ -76,8 +76,8 @@ class External(_Entity):
     def __init__(self,
                  root: mjcf.RootElement,
                  name: str,
-                 position: Optional[Sequence[float]],
-                 rotation: Optional[Sequence[float]]):
+                 position: Optional[Sequence[float]] = (0, 0, 0),
+                 rotation: Optional[Sequence[float]] = (0, 0, 0, 0)):
         super().__init__(root, name, position=position, rotation=rotation)
 
     @property
@@ -160,3 +160,22 @@ class Stage(_Entity):
     @property
     def root_body(self) -> mjcf.Element:
         return self.mjcf_model.find("worldbody")
+
+
+class PhysicalWorld(abc.ABC):
+    """A physical world in which an environment is simulated."""
+
+    @property
+    @abc.abstractmethod
+    def robot(self) -> Robot:
+        ...
+
+    @property
+    @abc.abstractmethod
+    def stage(self) -> Robot:
+        ...
+
+    @property
+    def root(self) -> mjcf.RootElement:
+        """Returns the root element of the physical world."""
+        return self.stage.mjcf_model

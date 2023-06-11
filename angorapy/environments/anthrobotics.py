@@ -18,9 +18,10 @@ from gymnasium import spaces
 from angorapy.common.const import N_SUBSTEPS, \
     VISION_WH
 from angorapy.common.senses import Sensation
-from angorapy.configs.reward_config import resolve_config_name
+from angorapy.environments.reward_config import resolve_config_name
 from angorapy.environments import reward
-from angorapy.environments.models.base import Robot
+from angorapy.environments.models.base import _Entity, \
+    Robot
 from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector, \
     robot_get_obs
 
@@ -88,7 +89,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def __init__(
             self,
-            model: Union[str, RootElement, Robot],
+            model: Union[str, RootElement, _Entity],
             frame_skip,
             initial_qpos=None,
             vision=False,
@@ -116,7 +117,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
             self.model = mujoco.MjModel.from_xml_string(xml=model.to_xml_string(),
                                                         assets=model.get_assets())
             self.mjcf_model = model
-        elif isinstance(model, Robot):
+        elif isinstance(model, _Entity):
+            print(model.mjcf_model.to_xml_string())
             self.model = mujoco.MjModel.from_xml_string(xml=model.mjcf_model.to_xml_string(),
                                                         assets=model.mjcf_model.get_assets())
             self.mjcf_model = model._mjcf_root.root_model
@@ -465,6 +467,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def reset_model(self):
         mujoco.mj_resetData(self.model, self.data)
         self.set_state(**self.initial_state)
+
+        return True
 
     # SENSES
     def get_proprioception(self):

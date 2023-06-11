@@ -50,6 +50,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         self.color_scheme = "default"
         self.viewpoint = "topdown"
         self.thumb_name = 'robot/S_thtip'
+        self.palm_name = 'robot/rh_palm'
 
         super(BaseShadowHandEnv,
               self).__init__(model=model,
@@ -101,6 +102,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
     def get_thumb_position(self) -> np.ndarray:
         """Get the position of the thumb in space."""
         return self.data.site(self.thumb_name).xpos.flatten()
+
+    def get_palm_position(self) -> np.ndarray:
+        """Return the robotic hand's palm's center."""
+        return self.model.body(self.palm_name).pos
 
     def is_thumb_tip_touching(self):
         if sum(self.data.sensordata[self._touch_sensor_id]) > 0.0:
