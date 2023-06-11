@@ -263,7 +263,6 @@ class BaseManipulate(BaseShadowHandEnv):
             self._set_action(np.zeros(20))
             mujoco.mj_step(self.model, self.data)
 
-        return True
         return is_on_palm()
 
     def _sample_goal(self):

@@ -1,8 +1,8 @@
 ARG UBUNTU_VERSION=18.04
 ARG ARCH=
-ARG CUDA=11.8
+ARG CUDA=11.2
 
-FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}.0-cudnn8-runtime-ubuntu${UBUNTU_VERSION} as base
+FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}.1-cudnn8-runtime-ubuntu${UBUNTU_VERSION} as base
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -14,7 +14,7 @@ RUN apt-key del 7fa2af80
 COPY docker/cuda-keyring_1.0-1_all.deb cuda-keyring_1.0-1_all.deb
 RUN dpkg -i cuda-keyring_1.0-1_all.deb
 
-WORKDIR /usr/local/cuda-11.8/lib64
+WORKDIR /usr/local/cuda-11.2/lib64
 RUN ln -s libcusolver.so.11 libcusolver.so.10
 WORKDIR /
 
