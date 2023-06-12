@@ -11,7 +11,7 @@ from angorapy.environments import rotations
 from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES, \
     MODEL_PATH_MANIPULATE
 from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-from angorapy.environments.models.shadow_hand.worlds.manipulation import ShadowHandWithCube
+from angorapy.environments.models.shadow_hand.worlds.manipulation import ShadowHandWithCubeWorld
 from angorapy.environments.reward import manipulate
 from angorapy.environments.reward_config import MANIPULATE_BASE
 from angorapy.environments.utils import robot_get_obs
@@ -86,7 +86,7 @@ class BaseManipulate(BaseShadowHandEnv):
                 position (False)
         """
 
-        self.world = ShadowHandWithCube()
+        self.world = ShadowHandWithCubeWorld()
         self.object_id = self.world.cube.name + "/"
         self.object_joint_id = f'{self.object_id}object:joint/'
         self.object_center_id = f'{self.object_id}object:center'

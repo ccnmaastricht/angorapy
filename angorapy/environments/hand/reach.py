@@ -5,6 +5,7 @@ import mujoco
 import numpy as np
 
 from angorapy.common.const import N_SUBSTEPS
+from angorapy.environments.models.shadow_hand.worlds.reach import ShadowHandReachWorld
 from angorapy.environments.reward_config import REACH_BASE
 from angorapy.environments.hand.consts import DEFAULT_INITIAL_QPOS, \
     FINGERTIP_SITE_NAMES
@@ -45,10 +46,7 @@ class Reach(BaseShadowHandEnv):
         elif self.state_initialization == "buffered":
             initial_qpos = DEFAULT_INITIAL_QPOS
 
-        self._stage = Stage()
-        self._hand = ShadowHandReach()
-
-        self._stage.mjcf_model.attach(self._hand.mjcf_model)
+        self.world = ShadowHandReachWorld()
 
         super().__init__(
             initial_qpos=initial_qpos,

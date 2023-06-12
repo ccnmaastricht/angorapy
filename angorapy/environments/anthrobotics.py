@@ -22,7 +22,8 @@ from angorapy.environments.reward_config import resolve_config_name
 from angorapy.environments import reward
 from angorapy.environments.models.base import _Entity, \
     Robot
-from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector, \
+from angorapy.environments.utils import mj_get_category_names, \
+    mj_qpos_dict_to_qpos_vector, \
     robot_get_obs
 
 
@@ -449,6 +450,17 @@ class AnthropomorphicEnv(gym.Env, ABC):
             "qvel": self.data.qvel[:],
         }
 
+    def get_robot_state(self):
+        """Returns all joint positions and velocities associated with a robot."""
+        joint_names, _ = mj_get_category_names(self.model, "jnt")
+        if self.data.qpos is not None and joint_names:
+            names = [n for n in joint_names if n.startswith(b"robot")]
+            return (
+                np.array([self.data.jnt(name).qpos for name in names]).flatten(),
+                np.array([self.data.jnt(name).qvel for name in names]).flatten(),
+            )
+        return np.zeros(0), np.zeros(0)
+
     def set_state(self, qpos, qvel):
         assert qpos.shape == (self.model.nq,) and qvel.shape == (self.model.nv,), \
             f"State shape [{qpos.shape}|{qvel.shape}] does not fit [{self.model.nq}|{self.model.nv}]"
@@ -473,7 +485,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
     # SENSES
     def get_proprioception(self):
         """Get proprioception sensor readings."""
-        robot_qpos, robot_qvel = robot_get_obs(self.model, self.data)
+        robot_qpos, robot_qvel = self.get_robot_state()
         proprioception = np.concatenate([robot_qpos, robot_qvel])
 
         return proprioception

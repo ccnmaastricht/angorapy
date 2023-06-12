@@ -2,7 +2,7 @@ ARG UBUNTU_VERSION=18.04
 ARG ARCH=
 ARG CUDA=11.2
 
-FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}.1-cudnn8-runtime-ubuntu${UBUNTU_VERSION} as base
+FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}.1-cudnn8-devel-ubuntu${UBUNTU_VERSION} as base
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -17,6 +17,20 @@ RUN dpkg -i cuda-keyring_1.0-1_all.deb
 WORKDIR /usr/local/cuda-11.2/lib64
 RUN ln -s libcusolver.so.11 libcusolver.so.10
 WORKDIR /
+
+# Install TensorRT.
+RUN echo \
+    deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 / \
+    > /etc/apt/sources.list.d/nvidia-ml.list \
+      && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F60F4B3D7FA2AF80 && \
+    apt-get update && apt-get install -y \
+    libnvinfer-dev=7.2.2-1+cuda11.1 \
+    libnvinfer7=7.2.2-1+cuda11.1 \
+    libnvinfer-plugin-dev=7.2.2-1+cuda11.1 \
+    libnvinfer-plugin7=7.2.2-1+cuda11.1 \
+      && \
+    rm -rf /var/lib/apt/lists/*
 
 # install packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -59,6 +73,7 @@ WORKDIR /
 ENV LD_LIBRARY_PATH="/usr/lib/nvidia:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.2/lib64:$LD_LIBRARY_PATH"
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.1/lib64"
 
 # matplotlib
 ENV MPLCONFIGDIR=/var/cache/matplotlib
@@ -77,7 +92,6 @@ RUN pip install /ang_tmp --default-timeout=100 \
 
 RUN pip install dm_control==1.0.12
 RUN pip install tensorflow_datasets
-RUN pip uninstall -y mujoco-py
 RUN pip install mujoco_utils
 
 WORKDIR /
