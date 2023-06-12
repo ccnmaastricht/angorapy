@@ -52,6 +52,8 @@ RUN virtualenv --python=python3.8 $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN pip install pip --upgrade
 
+RUN pip install --upgrade setuptools
+
 # INSTALL TOOL
 RUN mkdir /ang_tmp
 COPY . /ang_tmp
@@ -68,9 +70,6 @@ WORKDIR /
 COPY angorapy/train.py train.py
 COPY angorapy/pretrain.py pretrain.py
 COPY angorapy/analysis/predictability.py predictability.py
-
-# CLEANUP
-RUN pip cache purge
 
 # FINAL
 CMD [ "/bin/bash" ]

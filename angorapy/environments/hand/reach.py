@@ -55,7 +55,7 @@ class Reach(BaseShadowHandEnv):
             vision=vision,
             touch=touch,
             render_mode=render_mode,
-            model=self._stage.mjcf_model,
+            model=self.world.root,
         )
 
         self.previous_finger_positions = [self.get_finger_position(fname) for fname in FINGERTIP_SITE_NAMES]
