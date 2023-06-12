@@ -232,11 +232,6 @@ if __name__ == '__main__':
         def assert_reward_setup(self):
             pass
 
-        def _is_success(self,
-                        achieved_goal,
-                        desired_goal):
-            pass
-
         def _sample_goal(self):
             return np.zeros(1)
 

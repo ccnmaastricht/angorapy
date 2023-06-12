@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install --no-install-recommends -y file g++ gcc make gdb strace ca-certificates \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
-    && apt-get --no-install-recommends install -y python3.8-dev python3.8 python3-pip \
+    && apt-get --no-install-recommends install -y python3.9-dev python3.9 python3-pip \
     && apt-get clean
 #    && rm -rf /var/lib/apt/lists/*
 
@@ -38,20 +38,13 @@ RUN ldconfig
 WORKDIR /
 
 # ENVIRONMENT VARIABLES
-ENV LD_LIBRARY_PATH="/usr/lib/nvidia:$LD_LIBRARY_PATH"
-ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
-ENV LD_LIBRARY_PATH="/usr/local/cuda-11.2/lib64:$LD_LIBRARY_PATH"
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.1/lib64"
-
-# matplotlib
-ENV MPLCONFIGDIR=/var/cache/matplotlib
 
 # SETUP ENV
 ENV VIRTUAL_ENV=/venv
-RUN virtualenv --python=python3.8 $VIRTUAL_ENV
+RUN virtualenv --python=python3.9 $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip install pip --upgrade
 
+RUN pip install pip --upgrade
 RUN pip install --upgrade setuptools
 
 # INSTALL TOOL
@@ -61,9 +54,13 @@ COPY . /ang_tmp
 RUN pip install /ang_tmp --default-timeout=100 \
     && rm -rf /ang_tmp
 
+RUN pip install numpy==1.21.0
 RUN pip install tensorflow_datasets
 RUN pip install mujoco_utils
 RUN pip install protobuf==3.20.0
+
+# matplotlib
+ENV MPLCONFIGDIR=/var/cache/matplotlib
 
 WORKDIR /
 

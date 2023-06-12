@@ -243,16 +243,12 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def assert_reward_setup(self):
         pass
 
-    def compute_reward(self,
-                       info):
+    def compute_reward(self, info):
         """Compute reward with additional success bonus."""
         return self.reward_function(self, info)
 
-    @abc.abstractmethod
-    def _is_success(self,
-                    achieved_goal,
-                    desired_goal):
-        pass
+    def _is_success(self, achieved_goal, desired_goal):
+        return False
 
     # TIME
     @property
