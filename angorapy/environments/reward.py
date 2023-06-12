@@ -135,19 +135,19 @@ def manipulate(env: "BaseManipulate", info: dict):
 if __name__ == '__main__':
     from environments import *
 
-    env = gym.make("HumanoidManipulateBlockDiscreteAsynchronous-v0")
-    env.reset()
+    environment = gym.make("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    environment.reset()
 
     force_penalties = []
     tendon_penalties = []
     for i in tqdm.tqdm(range(100000)):
-        o, r, d, _ = env.step(env.action_space.sample())
+        o, r, d, _ = environment.step(environment.action_space.sample())
 
-        tendon_penalties.append(calculate_tendon_stress_penalty(env.data))
-        force_penalties.append(calculate_force_penalty(env.data))
+        tendon_penalties.append(calculate_tendon_stress_penalty(environment.data))
+        force_penalties.append(calculate_force_penalty(environment.data))
 
         if d:
-            env.reset()
+            environment.reset()
 
     print(f"Mean Force Penalty: {np.mean(force_penalties)}")
     print(f"Mean Tendon Penalty: {np.mean(tendon_penalties)}")
