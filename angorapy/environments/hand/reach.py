@@ -134,9 +134,9 @@ class Reach(BaseShadowHandEnv):
         meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
 
         # slightly move meeting point along y-axis towards the target finger to make goal achievable
-        meeting_pos[1] += 0.01 * (meeting_pos - goal[finger_idx])[1]
+        meeting_pos[1] += 0.05 * (meeting_pos - goal[finger_idx])[1]
 
-        # Slightly move meeting goal towards the respective finger to avoid that they overlap.
+        # slightly move meeting goal towards the respective finger to avoid that they overlap
         for idx in [thumb_idx, finger_idx]:
             offset_direction = (meeting_pos - goal[idx])
             offset_direction /= np.linalg.norm(offset_direction)
@@ -149,8 +149,7 @@ class Reach(BaseShadowHandEnv):
 
         return goal.flatten()
 
-    def _env_setup(self,
-                   initial_state):
+    def _env_setup(self, initial_state):
         super()._env_setup(initial_state=initial_state)
 
         if initial_state is not None:

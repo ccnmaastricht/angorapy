@@ -328,16 +328,13 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         return obs, reward, done, False, info
 
-    def _set_action(self,
-                    action):
+    def _set_action(self, action):
         if np.array(action).shape != self.action_space.shape:
             raise ValueError("Action dimension mismatch")
 
         self.data.ctrl[:] = action
 
-    def do_simulation(self,
-                      ctrl,
-                      n_frames):
+    def do_simulation(self, ctrl, n_frames):
         self._set_action(ctrl)
 
         for _ in range(n_frames):

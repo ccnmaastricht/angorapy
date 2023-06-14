@@ -139,13 +139,11 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
                                     ctrlrange[:, 0],
                                     ctrlrange[:, 1])
 
-    def step(self,
-             action: np.ndarray):
+    def step(self, action: np.ndarray):
         if self._freeze_wrist:
             action[:2] = 0
 
-        return super(BaseShadowHandEnv,
-                     self).step(action)
+        return super(BaseShadowHandEnv, self).step(action)
 
     # SIMULATION
     def _env_setup(self, initial_state):
