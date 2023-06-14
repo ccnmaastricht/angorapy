@@ -8,7 +8,7 @@
 <br />
 
 <p align="center"><img src="docs/img/angorapy.svg" width=25% align="center" /></p>
-<h3> <p align="center"> Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling </p> </h3>
+<h3> <p align="center"> Anthropomorphic Goal-directed Responsive Agents in Python </p> </h3>
 
 <br />
    
