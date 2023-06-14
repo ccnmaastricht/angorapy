@@ -90,11 +90,10 @@ COPY . /ang_tmp
 RUN pip install /ang_tmp --default-timeout=100 \
     && rm -rf /ang_tmp
 
+RUN pip install gymnasium[box2d,mujoco]==0.28.1
 RUN pip install dm_control==1.0.12
 RUN pip install tensorflow_datasets
 RUN pip install mujoco_utils
-
-
 
 WORKDIR /
 

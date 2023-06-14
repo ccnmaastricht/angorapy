@@ -18,14 +18,13 @@ setup(
     author_email='research@tonioweidler.de',
     license='GPL-3.0',
     packages=find_packages(),
-    include_package_data=True,
     install_requires=[
         "swig==4.1.1",
         "imageio==2.28.1",
-        "numpy",
+        # "numpy",
 
         # tensorflow and extensions
-        "tensorflow==2.9.3",
+        "tensorflow==2.4.2",
         "tensorflow_probability==0.16.0 ",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
@@ -46,9 +45,9 @@ setup(
 
         # environments
         "box2d-py==2.3.5",
-        "gymnasium[box2d,mujoco]==0.28.1",
+        # "gymnasium[box2d,mujoco]==0.28.1",
         "mujoco",
-        "dm_control==1.0.12",
+        # "dm_control==1.0.12",
 
         # webinterface
         "itsdangerous==2.0.1",
@@ -59,6 +58,7 @@ setup(
         "flask_jsglue",
     ],
 
+    include_package_data=True,
     package_data={
         "angorapy": ["environments/models/**/*"],
     },
@@ -69,9 +69,8 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
+    python_requires=">=3.7",
 )
