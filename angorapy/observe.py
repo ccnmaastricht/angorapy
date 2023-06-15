@@ -8,8 +8,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from angorapy.analysis.investigators import Investigator
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES
+from angorapy.tasks.envs.hand.shadowhand import BaseShadowHandEnv
+from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES
 
 import time
 

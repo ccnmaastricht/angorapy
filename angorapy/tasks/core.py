@@ -18,13 +18,11 @@ from gymnasium import spaces
 from angorapy.common.const import N_SUBSTEPS, \
     VISION_WH
 from angorapy.common.senses import Sensation
-from angorapy.environments.reward_config import resolve_config_name
-from angorapy.environments import reward
-from angorapy.environments.models.base import _Entity, \
-    Robot
-from angorapy.environments.utils import mj_get_category_names, \
-    mj_qpos_dict_to_qpos_vector, \
-    robot_get_obs
+from angorapy.tasks.reward_config import resolve_config_name
+from angorapy.tasks import reward
+from angorapy.tasks.world_building.entities import _Entity
+from angorapy.tasks.utils import mj_get_category_names, \
+    mj_qpos_dict_to_qpos_vector
 
 
 def convert_observation_to_space(observation):

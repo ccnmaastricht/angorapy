@@ -54,5 +54,5 @@ JOINT_GROUP: Dict[str, Tuple[str, ...]] = {
     "little": ("LFJ4", "LFJ3", "LFJ2", "LFJ1", "LFJ0"),
 }
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../models/shadow_hand/', 'right_hand.xml')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'mujoco_model/', 'right_hand.xml')
 MODEL_PATH_MANIPULATE = os.path.join(os.path.dirname(__file__), '../assets/hand/', 'shadowhand_manipulate.xml')

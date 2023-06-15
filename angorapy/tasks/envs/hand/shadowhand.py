@@ -2,24 +2,18 @@
 """BaseShadowHandEnv Environment Wrappers."""
 import abc
 import copy
-from dataclasses import dataclass
-from typing import Dict, \
-    Optional, \
-    Tuple
+from typing import Optional
 
 import gymnasium as gym
 import numpy as np
-from dm_control import composer
 from gymnasium import spaces
 from gymnasium.utils import seeding
-from mujoco_utils import mjcf_utils
 
 from angorapy.common.const import N_SUBSTEPS
-from angorapy.environments.anthrobotics import AnthropomorphicEnv
-from angorapy.environments.hand import consts
-from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES
-from angorapy.environments.models.shadow_hand.shadow_hand import ShadowHand
-from angorapy.environments.utils import mj_get_category_names
+from angorapy.tasks.core import AnthropomorphicEnv
+from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES
+from angorapy.tasks.envs.hand.mujoco_model.shadow_hand import ShadowHand
+from angorapy.tasks.utils import mj_get_category_names
 from angorapy.utilities.util import mpi_print
 
 
@@ -105,7 +99,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
 
     def get_palm_position(self) -> np.ndarray:
         """Return the robotic hand's palm's center."""
-        return self.model.body(self.palm_name).pos
+        return self.model.site("robot/palm_center_site").xpos
 
     def is_thumb_tip_touching(self):
         if sum(self.data.sensordata[self._touch_sensor_id]) > 0.0:

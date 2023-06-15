@@ -3,8 +3,8 @@ from typing import List
 import numpy as np
 import tqdm
 
-from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES
-from angorapy.environments.hand.utils import get_fingertip_distance
+from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES
+from angorapy.tasks.envs.hand.utils import get_fingertip_distance
 
 
 # HELPER FUNCTIONS

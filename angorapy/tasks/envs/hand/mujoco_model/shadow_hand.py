@@ -19,8 +19,8 @@ from typing import Sequence
 from dm_control import mjcf
 from mujoco_utils import mjcf_utils
 
-from angorapy.environments.models.base import Robot
-from angorapy.environments.models.shadow_hand import consts
+from angorapy.tasks.world_building.entities import Robot
+from angorapy.tasks.envs.hand.mujoco_model import consts
 
 _FINGERTIP_OFFSET = 0.026
 _THUMBTIP_OFFSET = 0.0275
@@ -53,6 +53,17 @@ class ShadowHand(Robot):
 
     def _setup_entity(self):
         pass
+
+    # VISUALIZATION
+    def show_touch_sites(self, show: bool = True):
+        for site in self.mjcf_model.worldbody.find_all("site"):
+            if "T_" in site.name:
+                site.rgba[-1] = 1 if show else 0
+
+    def show_palm_site(self, show: bool = True):
+        for site in self.mjcf_model.worldbody.find_all("site"):
+            if "palm_center_site" in site.name:
+                site.rgba[-1] = 1 if show else 0
 
     # ACCESSORS
     @property

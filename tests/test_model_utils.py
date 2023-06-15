@@ -1,12 +1,9 @@
 import unittest
 
-import gym
 import numpy as np
 import tensorflow as tf
 
-from angorapy.common.policies import BetaPolicyDistribution
-from angorapy.models import get_model_builder
-from angorapy.utilities.model_utils import reset_states_masked, build_sub_model_from, get_layers_by_names
+from angorapy.utilities.model_utils import reset_states_masked
 
 
 class UtilTest(unittest.TestCase):
@@ -35,17 +32,3 @@ class UtilTest(unittest.TestCase):
             [9, 9, 9, 9, 9],
             [0, 0, 0, 0, 0],
         ]))
-
-    # def test_submodeling_from(self):
-    #     env = gym.make("LunarLanderContinuous-v2")
-    #     full_model, _, _ = get_model_builder("simple", "gru", shared=False)(env, BetaPolicyDistribution(env))
-    #     sub_model_from_a = build_sub_model_from(full_model, "beta_action_head")
-    #     sub_model_from_b = build_sub_model_from(full_model, "policy_recurrent_layer")
-    #
-    #     for sub_model_from in [sub_model_from_a, sub_model_from_b]:
-    #         layer = get_layers_by_names(sub_model_from, ["beta_action_head"])[0]
-    #
-    #         input_shape_raw = layer.get_input_shape_at(1)
-    #         input_shape_replaced = tuple(v if v is not None else 1 for v in input_shape_raw)
-    #
-    #         out = sub_model_from(tf.random.normal(input_shape_replaced))

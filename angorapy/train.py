@@ -35,12 +35,12 @@ from angorapy.common.policies import get_distribution_by_short_name
 from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
-from angorapy.utilities.util import env_extract_dims
+from angorapy.utilities.util import env_extract_dims, mpi_print
 from angorapy.common.wrappers import make_env
 from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 from angorapy.agent.ppo_agent import PPOAgent
 
-from angorapy.environments import *
+from angorapy.tasks import *
 
 from mpi4py import MPI
 
@@ -164,7 +164,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                     monitor=monitor, save_every=settings["save_every"], separate_eval=settings["eval"],
                     stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
     except KeyboardInterrupt:
-        print("test")
+        mpi_print("Ended by user.")
     except Exception:
         if mpi_rank == 0:
             traceback.print_exc()

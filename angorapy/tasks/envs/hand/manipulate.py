@@ -5,16 +5,16 @@ import numpy as np
 from gymnasium import utils
 from scipy.spatial import transform
 
+import angorapy.tasks.utils
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.senses import Sensation
-from angorapy.environments import rotations
-from angorapy.environments.hand.consts import FINGERTIP_SITE_NAMES, \
+from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES, \
     MODEL_PATH_MANIPULATE
-from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-from angorapy.environments.models.shadow_hand.worlds.manipulation import ShadowHandWithCubeWorld
-from angorapy.environments.reward import manipulate
-from angorapy.environments.reward_config import MANIPULATE_BASE
-from angorapy.environments.utils import robot_get_obs
+from angorapy.tasks.envs.hand.shadowhand import BaseShadowHandEnv
+from angorapy.tasks.envs.hand.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
+from angorapy.tasks.reward import manipulate
+from angorapy.tasks.reward_config import MANIPULATE_BASE
+from angorapy.tasks.utils import robot_get_obs
 
 
 def quat_from_angle_and_axis(angle,
@@ -100,7 +100,7 @@ class BaseManipulate(BaseShadowHandEnv):
         self.target_position = target_position
         self.target_rotation = target_rotation
         self.target_position_range = target_position_range
-        self.parallel_quats = [rotations.euler2quat(r) for r in rotations.get_parallel_rotations()]
+        self.parallel_quats = [angorapy.tasks.utils.euler2quat(r) for r in angorapy.tasks.utils.get_parallel_rotations()]
         self.randomize_initial_rotation = randomize_initial_rotation
         self.randomize_initial_position = randomize_initial_position
         self.distance_threshold = distance_threshold
@@ -170,13 +170,13 @@ class BaseManipulate(BaseShadowHandEnv):
                 # This code here assumes Euler angles with xyz convention. We first transform
                 # to euler, then set the Z component to be equal between the two, and finally
                 # transform back into quaternions.
-                euler_a = rotations.quat2euler(quat_a)
-                euler_b = rotations.quat2euler(quat_b)
+                euler_a = angorapy.tasks.utils.quat2euler(quat_a)
+                euler_b = angorapy.tasks.utils.quat2euler(quat_b)
                 euler_a[2] = euler_b[2]
-                quat_a = rotations.euler2quat(euler_a)
+                quat_a = angorapy.tasks.utils.euler2quat(euler_a)
 
             # Subtract quaternions and extract angle between them.
-            quat_diff = rotations.quat_mul(quat_a, rotations.quat_conjugate(quat_b))
+            quat_diff = angorapy.tasks.utils.quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(quat_b))
             angle_diff = 2 * np.arccos(np.clip(quat_diff[..., 0], -1., 1.))
             d_rot = angle_diff
 
@@ -225,23 +225,23 @@ class BaseManipulate(BaseShadowHandEnv):
                 angle = self.np_random.uniform(-np.pi, np.pi)
                 axis = np.array([0., 0., 1.])
                 offset_quat = quat_from_angle_and_axis(angle, axis)
-                initial_quat = rotations.quat_mul(initial_quat, offset_quat)
+                initial_quat = angorapy.tasks.utils.quat_mul(initial_quat, offset_quat)
             elif self.target_rotation == 'parallel':
                 angle = self.np_random.uniform(-np.pi, np.pi)
                 axis = np.array([0., 0., 1.])
                 z_quat = quat_from_angle_and_axis(angle, axis)
                 parallel_quat = self.parallel_quats[self.np_random.randint(len(self.parallel_quats))]
-                offset_quat = rotations.quat_mul(z_quat, parallel_quat)
-                initial_quat = rotations.quat_mul(initial_quat, offset_quat)
+                offset_quat = angorapy.tasks.utils.quat_mul(z_quat, parallel_quat)
+                initial_quat = angorapy.tasks.utils.quat_mul(initial_quat, offset_quat)
             elif self.target_rotation in ['xyz', 'ignore']:
                 angle = self.np_random.uniform(-np.pi, np.pi)
                 axis = self.np_random.uniform(-1., 1., size=3)
                 offset_quat = quat_from_angle_and_axis(angle, axis)
-                initial_quat = rotations.quat_mul(initial_quat, offset_quat)
+                initial_quat = angorapy.tasks.utils.quat_mul(initial_quat, offset_quat)
             elif self.target_rotation == 'fixed':
                 pass
             else:
-                raise error.Error('Unknown target_rotation option "{}".'.format(self.target_rotation))
+                raise ValueError('Unknown target_rotation option "{}".'.format(self.target_rotation))
 
         # Randomize initial position.
         if self.randomize_initial_position:
@@ -276,7 +276,7 @@ class BaseManipulate(BaseShadowHandEnv):
         elif self.target_position in ['ignore', 'fixed']:
             target_pos = self.data.jnt(self.object_joint_id).qpos[:3]
         else:
-            raise error.Error('Unknown target_position option "{}".'.format(self.target_position))
+            raise ValueError('Unknown target_position option "{}".'.format(self.target_position))
         assert target_pos is not None
         assert target_pos.shape == (3,)
 
@@ -291,7 +291,7 @@ class BaseManipulate(BaseShadowHandEnv):
             axis = np.array([0., 0., 1.])
             target_quat = quat_from_angle_and_axis(angle, axis)
             parallel_quat = self.parallel_quats[self.np_random.randint(len(self.parallel_quats))]
-            target_quat = rotations.quat_mul(target_quat, parallel_quat)
+            target_quat = angorapy.tasks.utils.quat_mul(target_quat, parallel_quat)
         elif self.target_rotation == 'xyz':
             angle = self.np_random.uniform(-np.pi, np.pi)
             axis = self.np_random.uniform(-1., 1., size=3)
@@ -299,7 +299,7 @@ class BaseManipulate(BaseShadowHandEnv):
         elif self.target_rotation in ['ignore', 'fixed']:
             target_quat = self.data.jnt(self.object_joint_id).qpos
         else:
-            raise error.Error('Unknown target_rotation option "{}".'.format(self.target_rotation))
+            raise ValueError('Unknown target_rotation option "{}".'.format(self.target_rotation))
         assert target_quat is not None
         assert target_quat.shape == (4,)
 
@@ -356,12 +356,10 @@ class BaseManipulate(BaseShadowHandEnv):
         obj_center_pos = self.data.site(self.object_center_id).xpos
 
         # determine palm center position
-        palm_center_pos = self.get_palm_position()
+        palm_center_pos = self.data.site("robot/palm_center_site").xpos
 
         dropped = (
                 obj_center_pos[2] < palm_center_pos[2]  # z axis of object smaller than that of palm
-            # we could add smth like checking for contacts between palm and object here, but the above works
-            # pretty well already tbh
         )
 
         return dropped

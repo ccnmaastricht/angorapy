@@ -6,7 +6,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import unittest
 
-import gym
+import gymnasium as gym
 import numpy as np
 import tensorflow as tf
 from scipy.stats import norm, entropy, beta

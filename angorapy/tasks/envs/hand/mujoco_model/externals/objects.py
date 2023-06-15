@@ -3,7 +3,7 @@ from typing import Sequence
 
 from dm_control import mjcf
 
-from angorapy.environments.models.base import External
+from angorapy.tasks.world_building.entities import External
 
 
 class Block(External):
@@ -103,9 +103,9 @@ class Block(External):
                          attachment_frame: mjcf.Element):
         attachment_frame.set_attributes(
             # pos=[1, 0.87, 0.2]
-            pos=[0.3, 0.0, 0.2]
+            pos=[0.32, 0.0, 0.2]
         )
-        attachment_frame.add("joint", type="free", damping=0.1, name="object:joint")
+        attachment_frame.add("joint", type="free", damping=0.01, name="object:joint")
 
     @property
     def joints(self) -> Sequence[mjcf.Element]:

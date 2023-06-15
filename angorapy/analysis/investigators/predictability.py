@@ -11,7 +11,7 @@ from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import stack_sensations
 from angorapy.common.wrappers import BaseWrapper
-from angorapy.environments.rotations import quat2mat, quat2axisangle
+from angorapy.tasks.utils import quat2mat, quat2axisangle
 from angorapy.utilities.util import flatten, stack_dicts
 import tensorflow_graphics.geometry.transformation as tfg
 

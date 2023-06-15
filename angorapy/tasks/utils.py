@@ -1,3 +1,48 @@
+import itertools
+from typing import Dict, Tuple
+
+import numpy as np
+
+
+def robot_get_obs(model, data):
+    """Returns all joint positions and velocities associated with a robot."""
+    joint_names, _ = mj_get_category_names(model, "jnt")
+    if data.qpos is not None and joint_names:
+        names = [n for n in joint_names if n.startswith(b"robot")]
+        return (
+            np.array([data.jnt(name).qpos for name in names]).flatten(),
+            np.array([data.jnt(name).qvel for name in names]).flatten(),
+        )
+    return np.zeros(0), np.zeros(0)
+
+
+def mj_get_category_names(model, category: str) -> Tuple[np.ndarray, np.ndarray]:
+    """Returns the names and adresses of elements of a given category in the model.
+
+    Args:
+        model: The MuJoCo model to extract the information from.
+        category: The category of elements to extract, e.g. jnt, actuator, tendon.
+
+    Returns:
+        A tuple of two numpy arrays, the first containing the names, the second the adresses.
+    """
+
+    adresses = getattr(model, f"name_{category}adr")
+    return model.names[adresses[0]:].split(b'\x00')[:len(adresses)], adresses
+
+
+def mj_qpos_dict_to_qpos_vector(model, qpos_dict: Dict):
+    """From a given dictionary of joint name-position pairs, create a vector using their order in the model."""
+    return np.array(
+        [qpos_dict[n] for n in map(lambda x: x.decode("utf-8"), model.names.split(b"\x00")) if n in qpos_dict.keys()]
+    )
+
+
+_FLOAT_EPS = np.finfo(np.float64).eps
+_EPS4 = _FLOAT_EPS * 4.0
+
+
+
 # Copyright (c) 2009-2017, Matthew Brett and Christoph Gohlke
 #    All rights reserved.
 #
@@ -27,9 +72,6 @@
 # Many methods borrow heavily or entirely from transforms3d:
 # https://github.com/matthew-brett/transforms3d
 # They have mostly been modified to support batched operations.
-
-import numpy as np
-import itertools
 
 """
 Rotations
@@ -103,11 +145,6 @@ TODO / Missing
     - (Maybe) define everything as to/from matricies, for simplicity
 """
 
-# For testing whether a number is close to zero
-_FLOAT_EPS = np.finfo(np.float64).eps
-_EPS4 = _FLOAT_EPS * 4.0
-
-
 def euler2mat(euler):
     """Convert Euler Angles to Rotation Matrix.  See rotation.py for notes"""
     euler = np.asarray(euler, dtype=np.float64)
@@ -172,57 +209,9 @@ def mat2euler(mat):
     )
     return euler
 
-
-def mat2quat(mat):
-    """Convert Rotation Matrix to Quaternion.  See rotation.py for notes"""
-    mat = np.asarray(mat, dtype=np.float64)
-    assert mat.shape[-2:] == (3, 3), "Invalid shape matrix {}".format(mat)
-
-    Qxx, Qyx, Qzx = mat[..., 0, 0], mat[..., 0, 1], mat[..., 0, 2]
-    Qxy, Qyy, Qzy = mat[..., 1, 0], mat[..., 1, 1], mat[..., 1, 2]
-    Qxz, Qyz, Qzz = mat[..., 2, 0], mat[..., 2, 1], mat[..., 2, 2]
-    # Fill only lower half of symmetric matrix
-    K = np.zeros(mat.shape[:-2] + (4, 4), dtype=np.float64)
-    K[..., 0, 0] = Qxx - Qyy - Qzz
-    K[..., 1, 0] = Qyx + Qxy
-    K[..., 1, 1] = Qyy - Qxx - Qzz
-    K[..., 2, 0] = Qzx + Qxz
-    K[..., 2, 1] = Qzy + Qyz
-    K[..., 2, 2] = Qzz - Qxx - Qyy
-    K[..., 3, 0] = Qyz - Qzy
-    K[..., 3, 1] = Qzx - Qxz
-    K[..., 3, 2] = Qxy - Qyx
-    K[..., 3, 3] = Qxx + Qyy + Qzz
-    K /= 3.0
-    # TODO: vectorize this -- probably could be made faster
-    q = np.empty(K.shape[:-2] + (4,))
-    it = np.nditer(q[..., 0], flags=["multi_index"])
-    while not it.finished:
-        # Use Hermitian eigenvectors, values for speed
-        vals, vecs = np.linalg.eigh(K[it.multi_index])
-        # Select largest eigenvector, reorder to w,x,y,z quaternion
-        q[it.multi_index] = vecs[[3, 0, 1, 2], np.argmax(vals)]
-        # Prefer quaternion with positive w
-        # (q * -1 corresponds to same rotation as q)
-        if q[it.multi_index][0] < 0:
-            q[it.multi_index] *= -1
-        it.iternext()
-    return q
-
-
 def quat2euler(quat):
     """Convert Quaternion to Euler Angles.  See rotation.py for notes"""
     return mat2euler(quat2mat(quat))
-
-
-def subtract_euler(e1, e2):
-    assert e1.shape == e2.shape
-    assert e1.shape[-1] == 3
-    q1 = euler2quat(e1)
-    q2 = euler2quat(e2)
-    q_diff = quat_mul(q1, quat_conjugate(q2))
-    return quat2euler(q_diff)
-
 
 def quat2mat(quat):
     """Convert Quaternion to rotation angle.  See rotation.py for notes"""
@@ -282,17 +271,6 @@ def quat_mul(q0, q1):
     return q
 
 
-def quat_rot_vec(q, v0):
-    q_v0 = np.array([0, v0[0], v0[1], v0[2]])
-    q_v = quat_mul(q, quat_mul(q_v0, quat_conjugate(q)))
-    v = q_v[1:]
-    return v
-
-
-def quat_identity():
-    return np.array([1, 0, 0, 0])
-
-
 def quat2axisangle(quat):
     theta = 0
     axis = np.array([0, 0, 1])
@@ -304,71 +282,6 @@ def quat2axisangle(quat):
         axis = quat[1:] / sin_theta
 
     return axis, theta
-
-
-def euler2point_euler(euler):
-    _euler = euler.copy()
-    if len(_euler.shape) < 2:
-        _euler = np.expand_dims(_euler, 0)
-    assert _euler.shape[1] == 3
-    _euler_sin = np.sin(_euler)
-    _euler_cos = np.cos(_euler)
-    return np.concatenate([_euler_sin, _euler_cos], axis=-1)
-
-
-def point_euler2euler(euler):
-    _euler = euler.copy()
-    if len(_euler.shape) < 2:
-        _euler = np.expand_dims(_euler, 0)
-    assert _euler.shape[1] == 6
-    angle = np.arctan(_euler[..., :3] / _euler[..., 3:])
-    angle[_euler[..., 3:] < 0] += np.pi
-    return angle
-
-
-def quat2point_quat(quat):
-    # Should be in qw, qx, qy, qz
-    _quat = quat.copy()
-    if len(_quat.shape) < 2:
-        _quat = np.expand_dims(_quat, 0)
-    assert _quat.shape[1] == 4
-    angle = np.arccos(_quat[:, [0]]) * 2
-    xyz = _quat[:, 1:]
-    xyz[np.squeeze(np.abs(np.sin(angle / 2))) >= 1e-5] = (xyz / np.sin(angle / 2))[
-        np.squeeze(np.abs(np.sin(angle / 2))) >= 1e-5
-    ]
-    return np.concatenate([np.sin(angle), np.cos(angle), xyz], axis=-1)
-
-
-def point_quat2quat(quat):
-    _quat = quat.copy()
-    if len(_quat.shape) < 2:
-        _quat = np.expand_dims(_quat, 0)
-    assert _quat.shape[1] == 5
-    angle = np.arctan(_quat[:, [0]] / _quat[:, [1]])
-    qw = np.cos(angle / 2)
-
-    qxyz = _quat[:, 2:]
-    qxyz[np.squeeze(np.abs(np.sin(angle / 2))) >= 1e-5] = (qxyz * np.sin(angle / 2))[
-        np.squeeze(np.abs(np.sin(angle / 2))) >= 1e-5
-    ]
-    return np.concatenate([qw, qxyz], axis=-1)
-
-
-def normalize_angles(angles):
-    """Puts angles in [-pi, pi] range."""
-    angles = angles.copy()
-    if angles.size > 0:
-        angles = (angles + np.pi) % (2 * np.pi) - np.pi
-        assert -np.pi - 1e-6 <= angles.min() and angles.max() <= np.pi + 1e-6
-    return angles
-
-
-def round_to_straight_angles(angles):
-    """Returns closest angle modulo 90 degrees"""
-    angles = np.round(angles / (np.pi / 2)) * (np.pi / 2)
-    return normalize_angles(angles)
-
 
 def get_parallel_rotations():
     mult90 = [0, np.pi / 2, -np.pi / 2, np.pi]

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-"""Hybrid policy networks that utilize both visual and unstructured input data."""
 import os
 
 import gymnasium as gym

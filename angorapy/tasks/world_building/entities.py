@@ -1,8 +1,5 @@
 import abc
-from typing import Any, \
-    Optional, \
-    Sequence, \
-    Union
+from typing import Optional, Sequence, Union
 
 from dm_control import mjcf
 
@@ -160,22 +157,3 @@ class Stage(_Entity):
     @property
     def root_body(self) -> mjcf.Element:
         return self.mjcf_model.find("worldbody")
-
-
-class PhysicalWorld(abc.ABC):
-    """A physical world in which an environment is simulated."""
-
-    @property
-    @abc.abstractmethod
-    def robot(self) -> Robot:
-        ...
-
-    @property
-    @abc.abstractmethod
-    def stage(self) -> Robot:
-        ...
-
-    @property
-    def root(self) -> mjcf.RootElement:
-        """Returns the root element of the physical world."""
-        return self.stage.mjcf_model

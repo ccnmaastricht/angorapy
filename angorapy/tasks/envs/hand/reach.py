@@ -5,20 +5,18 @@ import mujoco
 import numpy as np
 
 from angorapy.common.const import N_SUBSTEPS
-from angorapy.environments.models.shadow_hand.worlds.reach import ShadowHandReachWorld
-from angorapy.environments.reward_config import REACH_BASE
-from angorapy.environments.hand.consts import DEFAULT_INITIAL_QPOS, \
+from angorapy.tasks.envs.hand.mujoco_model.worlds.reach import ShadowHandReachWorld
+from angorapy.tasks.reward_config import REACH_BASE
+from angorapy.tasks.envs.hand.consts import DEFAULT_INITIAL_QPOS, \
     FINGERTIP_SITE_NAMES
-from angorapy.environments.hand.shadowhand import BaseShadowHandEnv
-from angorapy.environments.hand.utils import generate_random_sim_qpos, \
+from angorapy.tasks.envs.hand.shadowhand import BaseShadowHandEnv
+from angorapy.tasks.envs.hand.utils import generate_random_sim_qpos, \
     get_fingertip_distance
-from angorapy.environments.models.base import Stage
-from angorapy.environments.models.shadow_hand.shadow_hand import ShadowHandReach
-from angorapy.environments.reward import free_reach, \
+from angorapy.tasks.reward import free_reach, \
     reach, \
     sequential_free_reach, \
     sequential_reach
-from angorapy.environments.utils import mj_qpos_dict_to_qpos_vector
+from angorapy.tasks.utils import mj_qpos_dict_to_qpos_vector
 
 
 class Reach(BaseShadowHandEnv):
