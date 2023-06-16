@@ -99,7 +99,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
 
     def get_palm_position(self) -> np.ndarray:
         """Return the robotic hand's palm's center."""
-        return self.model.site("robot/palm_center_site").xpos
+        return self.model.site("robot/palm_center_site").pos
 
     def is_thumb_tip_touching(self):
         if sum(self.data.sensordata[self._touch_sensor_id]) > 0.0:

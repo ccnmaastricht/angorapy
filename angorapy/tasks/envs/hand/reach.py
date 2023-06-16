@@ -128,11 +128,13 @@ class Reach(BaseShadowHandEnv):
         assert thumb_idx != finger_idx
 
         # Pick a meeting point above the hand.
-        meeting_pos = self.palm_xpos + np.array([0.1, 0.01, 0.05])
-        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
+        meeting_pos = self.palm_xpos + np.array([0.08, 0.01, 0.05])
 
-        # slightly move meeting point along y-axis towards the target finger to make goal achievable
-        meeting_pos[1] += 0.05 * (meeting_pos - goal[finger_idx])[1]
+        # move meeting point along y-axis towards the target finger to make goal achievable
+        meeting_pos[1] -= .5 * (meeting_pos - goal[finger_idx])[1]
+
+        # perturb meeting point
+        meeting_pos += self.np_random.normal(scale=0.005, size=meeting_pos.shape)
 
         # slightly move meeting goal towards the respective finger to avoid that they overlap
         for idx in [thumb_idx, finger_idx]:
