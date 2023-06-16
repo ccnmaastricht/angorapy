@@ -1,7 +1,7 @@
 from angorapy.tasks.world_building.base import PhysicalWorld
 from angorapy.tasks.world_building.entities import Stage
 from angorapy.tasks.envs.hand.mujoco_model.externals import Block
-from angorapy.tasks.envs.hand.mujoco_model.shadow_hand import ShadowHand
+from angorapy.tasks.envs.hand.mujoco_model.robot import ShadowHand
 
 
 class ShadowHandWithCubeWorld(PhysicalWorld):

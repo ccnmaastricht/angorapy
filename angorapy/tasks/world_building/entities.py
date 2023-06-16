@@ -119,8 +119,11 @@ class Stage(_Entity):
             mark="cross",
             width=256,
             height=256,
-            rgb1=[0.2, 0.3, 0.4],
-            rgb2=[0.1, 0.2, 0.3],
+            # rgb1=[0.2, 0.3, 0.4],
+            # rgb2=[0.1, 0.2, 0.3],
+            rgb1=[1, 1, 1],
+            rgb2=[1, 1, 1],
+
             markrgb=[0.8, 0.8, 0.8],
         )
         self._mjcf_root.asset.add(

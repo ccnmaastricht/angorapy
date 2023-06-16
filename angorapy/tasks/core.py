@@ -73,7 +73,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             vision=False,
             touch=True,
             render_mode: Optional[str] = None,
-            camera_id: Optional[int] = None,
+            camera_id: Optional[int] = 0,
             camera_name: Optional[str] = None,
             delta_t: float = 0.002,
             n_substeps: int = N_SUBSTEPS,
@@ -361,11 +361,6 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def render(self):
         if self.render_mode is None:
-            gym.logger.warn(
-                "You are calling render method without specifying any render mode. "
-                "You can specify the render_mode at initialization, "
-                f'e.g. gym("{self.spec.id}", render_mode="rgb_array")'
-            )
             return
 
         self._render_callback()
@@ -394,16 +389,16 @@ class AnthropomorphicEnv(gym.Env, ABC):
                     camera_name,
                 )
 
-                self._get_viewer(self.render_mode).render(camera_id=camera_id)
+                self._get_viewer(self.render_mode).render(camera_id=camera_id, render_mode=self.render_mode)
 
         if self.render_mode == "rgb_array":
-            data = self._get_viewer(self.render_mode).read_pixels(depth=False)
+            data = self._get_viewer(self.render_mode).render(camera_id=-1, render_mode=self.render_mode)
             # original image is upside-down, so flip it
             return data[::-1, :, :]
         elif self.render_mode == "depth_array":
             self._get_viewer(self.render_mode).render()
-            # Extract depth part of the read_pixels() tuple
-            data = self._get_viewer(self.render_mode).read_pixels(depth=True)[1]
+            # Extract depth part of the render() tuple
+            data = self._get_viewer(self.render_mode).render(depth=True)[1]
             # original image is upside-down, so flip it
             return data[::-1, :]
         elif self.render_mode == "human":

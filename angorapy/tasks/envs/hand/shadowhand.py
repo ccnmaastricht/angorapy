@@ -12,7 +12,7 @@ from gymnasium.utils import seeding
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.tasks.core import AnthropomorphicEnv
 from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES
-from angorapy.tasks.envs.hand.mujoco_model.shadow_hand import ShadowHand
+from angorapy.tasks.envs.hand.mujoco_model.robot import ShadowHand
 from angorapy.tasks.utils import mj_get_category_names
 from angorapy.utilities.util import mpi_print
 
@@ -210,6 +210,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
             self.viewer.cam.azimuth = 25.0  # top down view
             self.viewer.cam.elevation = -45.0  # top down view
             self.viewer.cam.lookat[0] -= 0.04  # slightly move forward
+        elif self.viewpoint == "angled":
+            self.viewer.cam.distance = 0.5  # zoom in
+            self.viewer.cam.azimuth = 35.0  # wrist to the bottom
+            self.viewer.cam.elevation = -125.0  # top down view
+            self.viewer.cam.lookat[0] += 0.  # slightly move forward
+            self.viewer.cam.lookat[1] += 0.0  # slightly move forward
         else:
             raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 
