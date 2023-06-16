@@ -284,6 +284,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         reward = self.compute_reward(info)
 
         if self.render_mode == "human":
+            self._render_callback()
             self.render()
 
         return obs, reward, done, False, info

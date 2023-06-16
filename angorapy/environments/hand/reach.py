@@ -134,7 +134,7 @@ class Reach(BaseShadowHandEnv):
 
         self.goal = self._sample_goal()
 
-    def _render_callback(self, render_targets=False):
+    def _render_callback(self, render_targets=True):
         if render_targets:
             # Visualize targets.
             sites_offset = (self.data.site_xpos - self.model.site_pos).copy()
