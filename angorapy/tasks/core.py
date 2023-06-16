@@ -1,6 +1,5 @@
 import abc
 from abc import ABC
-from collections import OrderedDict
 from os import path
 from typing import Any, \
     Callable, \
@@ -22,27 +21,7 @@ from angorapy.tasks.reward_config import resolve_config_name
 from angorapy.tasks import reward
 from angorapy.tasks.world_building.entities import _Entity
 from angorapy.tasks.utils import mj_get_category_names, \
-    mj_qpos_dict_to_qpos_vector
-
-
-def convert_observation_to_space(observation):
-    if isinstance(observation, dict):
-        space = spaces.Dict(
-            OrderedDict(
-                [
-                    (key, convert_observation_to_space(value))
-                    for key, value in observation.items()
-                ]
-            )
-        )
-    elif isinstance(observation, np.ndarray):
-        low = np.full(observation.shape, -float("inf"), dtype=np.float32)
-        high = np.full(observation.shape, float("inf"), dtype=np.float32)
-        space = spaces.Box(low, high, dtype=observation.dtype)
-    else:
-        raise NotImplementedError(type(observation), observation)
-
-    return space
+    mj_qpos_dict_to_qpos_vector, convert_observation_to_space
 
 
 class AnthropomorphicEnv(gym.Env, ABC):
@@ -208,6 +187,11 @@ class AnthropomorphicEnv(gym.Env, ABC):
     # REWARD
     @abc.abstractmethod
     def _set_default_reward_function_and_config(self):
+        """Sets the default reward function and config.
+
+        The reward config is optional (can be empty) but can be used to
+        configure the reward function. The reward function is a function that takes the environment and the steps info
+        dictionary and returns a reward value."""
         pass
 
     def set_reward_function(self,

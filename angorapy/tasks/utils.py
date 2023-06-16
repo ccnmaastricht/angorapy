@@ -1,7 +1,9 @@
 import itertools
+from collections import OrderedDict
 from typing import Dict, Tuple
 
 import numpy as np
+from gymnasium import spaces
 
 
 def robot_get_obs(model, data):
@@ -298,3 +300,23 @@ def get_parallel_rotations():
             parallel_rotations += [canonical]
     assert len(parallel_rotations) == 24
     return parallel_rotations
+
+
+def convert_observation_to_space(observation):
+    if isinstance(observation, dict):
+        space = spaces.Dict(
+            OrderedDict(
+                [
+                    (key, convert_observation_to_space(value))
+                    for key, value in observation.items()
+                ]
+            )
+        )
+    elif isinstance(observation, np.ndarray):
+        low = np.full(observation.shape, -float("inf"), dtype=np.float32)
+        high = np.full(observation.shape, float("inf"), dtype=np.float32)
+        space = spaces.Box(low, high, dtype=observation.dtype)
+    else:
+        raise NotImplementedError(type(observation), observation)
+
+    return space

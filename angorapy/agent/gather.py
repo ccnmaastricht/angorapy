@@ -11,7 +11,7 @@ import tensorflow as tf
 from gymnasium.spaces import Box
 from tqdm import tqdm
 
-from angorapy.agent.core import estimate_episode_advantages
+from angorapy.agent.utils import estimate_episode_advantages
 from angorapy.agent.dataio import tf_serialize_example, make_dataset_and_stats, serialize_sample
 from angorapy.common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 from angorapy.common.policies import BasePolicyDistribution

@@ -2,7 +2,7 @@ from typing import Union
 
 import tensorflow as tf
 
-from angorapy.agent.core import extract_discrete_action_probabilities
+from angorapy.agent.utils import extract_discrete_action_probabilities
 from angorapy.agent.ppo import loss
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import Sensation

@@ -8,7 +8,7 @@ import gymnasium as gym
 import numpy as np
 import tensorflow as tf
 
-from angorapy.agent.core import extract_discrete_action_probabilities
+from angorapy.agent.utils import extract_discrete_action_probabilities
 from angorapy.common.const import EPSILON
 from angorapy.common.layers import StdevLayer, BetaDistributionSpreadLayer
 from angorapy.utilities.util import env_extract_dims

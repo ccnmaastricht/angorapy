@@ -1,6 +1,6 @@
 import os
 
-from angorapy.agent.core import extract_discrete_action_probabilities
+from angorapy.agent.utils import extract_discrete_action_probabilities
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
