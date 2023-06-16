@@ -12,9 +12,9 @@ from angorapy.environments.hand.shadowhand import FINGERTIP_SITE_NAMES, BaseShad
 
 import time
 
-from agent.ppo_agent import PPOAgent
-from common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
-from common.wrappers import make_env
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
+from angorapy.common.wrappers import make_env
 import tensorflow as tf
 
 tf.get_logger().setLevel('INFO')

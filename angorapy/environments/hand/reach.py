@@ -21,7 +21,7 @@ class Reach(BaseShadowHandEnv):
                  n_substeps=N_SUBSTEPS,
                  relative_control=True,
                  vision=False,
-                 touch=True,
+                 touch=False,
                  force_finger=None,
                  render_mode: Optional[str] = None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."
@@ -56,7 +56,7 @@ class Reach(BaseShadowHandEnv):
 
     def _is_success(self, achieved_goal, desired_goal):
         d = get_fingertip_distance(achieved_goal, desired_goal)
-        return (d < self.distance_threshold).astype(np.float32)
+        return (d < self.reward_config["SUCCESS_DISTANCE"]).astype(np.float32)
 
     def get_thumbs_previous_position(self) -> np.ndarray:
         """Get the previous position of the thumb in space."""
@@ -166,6 +166,13 @@ class Reach(BaseShadowHandEnv):
         # self.state_memory_buffer.append(self.sim.get_state())
 
         return o, r, d, truncated, i
+
+    def get_proprioception(self):
+        """Get proprioception sensor readings."""
+        robot_qpos, robot_qvel = robot_get_obs(self.model, self.data)
+        proprioception = np.concatenate([robot_qpos, robot_qvel, self.get_fingertip_positions()])
+
+        return proprioception
 
     def _get_info(self):
         return {
