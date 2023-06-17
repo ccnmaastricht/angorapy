@@ -212,7 +212,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
 
     # RENDERING
     def change_perspective(self, perspective: str):
-        assert perspective in ["topdown", "side", "topdown-far"], "This viewpoint has no settings available."
+        assert perspective in ["topdown", "side", "topdown-far", "isometric"], "This viewpoint has no settings available."
 
         self.viewpoint = perspective
         self.viewer_setup()
@@ -269,6 +269,13 @@ class BaseShadowHandEnv(AnthropomorphicEnv):  #, abc.ABC):
             self.viewer.cam.azimuth = 25.0  # top down view
             self.viewer.cam.elevation = -45.0  # top down view
             self.viewer.cam.lookat[1] -= 0.04  # slightly move forward
+        elif self.viewpoint == "isometric":
+            # rotate camera to isometric view
+            self.viewer.cam.distance = 0.5
+            self.viewer.cam.azimuth = 105.0
+            self.viewer.cam.elevation = -35.0
+            self.viewer.cam.lookat[1] += 0.08  # slightly move forward
+
         else:
             raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 
