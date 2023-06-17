@@ -1,5 +1,0 @@
-<mujoco model="right_shadow_hand scene">
-
-  <include file="right_hand.xml"/>
-
-</mujoco>

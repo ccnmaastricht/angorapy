@@ -1,10 +1,6 @@
 from pathlib import Path
 from typing import Dict, Tuple
 
-_HERE = Path(__file__).resolve().parent
-
-NQ = 24  # Number of joints.
-NU = 20  # Number of actuators.
 
 JOINT_GROUP: Dict[str, Tuple[str, ...]] = {
     "wrist": ("WRJ1", "WRJ0"),
@@ -33,6 +29,4 @@ FINGERTIP_COLORS: Tuple[Tuple[float, float, float], ...] = (
     (0.8, 0.8, 0.2),  # Yellow.
 )
 
-# Path to the shadow hand E3M5 XML file.
-RIGHT_SHADOW_HAND_XML = _HERE / "scene_right.xml"
-LEFT_SHADOW_HAND_XML = _HERE / "left_hand.xml"
+MODEL_XML = Path(__file__).resolve().parent / "right_hand.xml"

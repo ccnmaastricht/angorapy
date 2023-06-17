@@ -60,7 +60,7 @@ setup(
 
     include_package_data=True,
     package_data={
-        "angorapy": ["environments/models/**/*"],
+        "angorapy": ["tasks/**/*"],
     },
 
     classifiers=[

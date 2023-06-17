@@ -11,8 +11,8 @@ from gymnasium.utils import seeding
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.tasks.core import AnthropomorphicEnv
-from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES
-from angorapy.tasks.envs.hand.mujoco_model.robot import ShadowHand
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
+from angorapy.tasks.envs.dexterity.mujoco_model.robot import ShadowHand
 from angorapy.tasks.utils import mj_get_category_names
 from angorapy.utilities.util import mpi_print
 

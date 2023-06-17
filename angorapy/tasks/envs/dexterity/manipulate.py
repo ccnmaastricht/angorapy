@@ -8,22 +8,14 @@ from scipy.spatial import transform
 import angorapy.tasks.utils
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.senses import Sensation
-from angorapy.tasks.envs.hand.consts import FINGERTIP_SITE_NAMES, \
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES, \
     MODEL_PATH_MANIPULATE
-from angorapy.tasks.envs.hand.shadowhand import BaseShadowHandEnv
-from angorapy.tasks.envs.hand.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
+from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
+from angorapy.tasks.envs.dexterity.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
+from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
 from angorapy.tasks.reward import manipulate
 from angorapy.tasks.reward_config import MANIPULATE_BASE
 from angorapy.tasks.utils import robot_get_obs
-
-
-def quat_from_angle_and_axis(angle,
-                             axis):
-    assert axis.shape == (3,)
-    axis /= np.linalg.norm(axis)
-    quat = np.concatenate([[np.cos(angle / 2.)], np.sin(angle / 2.) * axis])
-    quat /= np.linalg.norm(quat)
-    return quat
 
 
 class BaseManipulate(BaseShadowHandEnv):

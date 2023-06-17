@@ -5,12 +5,12 @@ import mujoco
 import numpy as np
 
 from angorapy.common.const import N_SUBSTEPS
-from angorapy.tasks.envs.hand.mujoco_model.worlds.reach import ShadowHandReachWorld
+from angorapy.tasks.envs.dexterity.mujoco_model.worlds.reach import ShadowHandReachWorld
 from angorapy.tasks.reward_config import REACH_BASE
-from angorapy.tasks.envs.hand.consts import DEFAULT_INITIAL_QPOS, \
+from angorapy.tasks.envs.dexterity.consts import DEFAULT_INITIAL_QPOS, \
     FINGERTIP_SITE_NAMES
-from angorapy.tasks.envs.hand.shadowhand import BaseShadowHandEnv
-from angorapy.tasks.envs.hand.utils import generate_random_sim_qpos, \
+from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
+from angorapy.tasks.envs.dexterity.utils import generate_random_sim_qpos, \
     get_fingertip_distance
 from angorapy.tasks.reward import free_reach, \
     reach, \

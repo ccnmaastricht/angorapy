@@ -1,6 +1,6 @@
 from angorapy.tasks.world_building.base import PhysicalWorld
 from angorapy.tasks.world_building.entities import Stage
-from angorapy.tasks.envs.hand.mujoco_model.robot import ShadowHand, ShadowHandReach
+from angorapy.tasks.envs.dexterity.mujoco_model.robot import ShadowHand, ShadowHandReach
 
 
 class ShadowHandReachWorld(PhysicalWorld):

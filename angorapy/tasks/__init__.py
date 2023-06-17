@@ -6,9 +6,9 @@ from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_
 from angorapy.tasks.core import AnthropomorphicEnv
 from angorapy.tasks.envs.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
-from angorapy.tasks.envs.hand.manipulate import ManipulateBlock, ManipulateBlockDiscrete, HumanoidManipulateBlock, \
+from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlock, ManipulateBlockDiscrete, HumanoidManipulateBlock, \
     HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, HumanoidManipulateBlockAsynchronous
-from angorapy.tasks.envs.hand.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
+from angorapy.tasks.envs.dexterity.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
 
 # SHADOW HAND
 gym.envs.register(

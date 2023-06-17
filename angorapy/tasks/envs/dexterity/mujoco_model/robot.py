@@ -20,7 +20,7 @@ from dm_control import mjcf
 from mujoco_utils import mjcf_utils
 
 from angorapy.tasks.world_building.entities import Robot
-from angorapy.tasks.envs.hand.mujoco_model import consts
+from angorapy.tasks.envs.dexterity.mujoco_model import consts
 
 _FINGERTIP_OFFSET = 0.026
 _THUMBTIP_OFFSET = 0.0275
@@ -42,7 +42,7 @@ class ShadowHand(Robot):
             rotation: The rotation of the robot, as a quaternion. Defaults to (1, -1, 1, -1), palm facing up.
         """
         self._prefix = "rh_"
-        super().__init__(consts.RIGHT_SHADOW_HAND_XML, position=position, rotation=rotation)
+        super().__init__(consts.MODEL_XML, position=position, rotation=rotation)
 
     def _parse_entity(self) -> None:
         joints = mjcf_utils.safe_find_all(self._mjcf_root, "joint")
