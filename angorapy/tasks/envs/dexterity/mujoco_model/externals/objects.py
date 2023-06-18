@@ -85,25 +85,24 @@ class Block(External):
                                       material="material:object",
                                       condim=4,
                                       density=567)
-        # self.mjcf_model.worldbody.add("geom", name="object_hidden", type="box",
-        #                 size=[0.024, 0.024, 0.024],
-        #                 material="material:hidden",
-        #                 condim=4,
-        #                 contype=0,
-        #                 conaffinity=0,
-        #                 mass=0
-        #                 )
+        self.mjcf_model.worldbody.add("geom", name="object_hidden", type="box",
+                        size=[0.024, 0.024, 0.024],
+                        material="material:hidden",
+                        condim=4,
+                        contype=0,
+                        conaffinity=0,
+                        mass=0
+                        )
         self.mjcf_model.worldbody.add("site",
                                       name="object:center",
                                       pos=[0, 0, 0],
                                       size=[0.01, 0.01, 0.01],
                                       rgba=[1, 0, 0, 0])
 
-    def add_object_joint(self,
-                         attachment_frame: mjcf.Element):
+    def add_object_joint(self, attachment_frame: mjcf.Element):
         attachment_frame.set_attributes(
             # pos=[1, 0.87, 0.2]
-            pos=[0.32, 0.0, 0.2]
+            pos=[0.32, 0.0, 0.1]
         )
         attachment_frame.add("joint", type="free", damping=0.01, name="object:joint")
 

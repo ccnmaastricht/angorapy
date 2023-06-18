@@ -8,14 +8,14 @@ from scipy.spatial import transform
 import angorapy.tasks.utils
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.senses import Sensation
-from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES, \
-    MODEL_PATH_MANIPULATE
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS
 from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
 from angorapy.tasks.envs.dexterity.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
 from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
 from angorapy.tasks.reward import manipulate
 from angorapy.tasks.reward_config import MANIPULATE_BASE
-from angorapy.tasks.utils import robot_get_obs
+from angorapy.tasks.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
+
 
 
 class BaseManipulate(BaseShadowHandEnv):
@@ -25,11 +25,10 @@ class BaseManipulate(BaseShadowHandEnv):
 
     def __init__(
             self,
-            model_path,
             target_position,
             target_rotation,
             target_position_range,
-            initial_qpos=None,
+            initial_qpos=DEFAULT_INITIAL_QPOS,
             randomize_initial_position=True,
             randomize_initial_rotation=True,
             distance_threshold=0.01,
@@ -46,7 +45,6 @@ class BaseManipulate(BaseShadowHandEnv):
         """Initializes a new Hand manipulation environment.
 
         Args:
-            model_path (string): path to the environments XML file
             target_position (string): the type of target position:
                 - ignore: target position is fully ignored, i.e. the object can be positioned arbitrarily
                 - fixed: target position is set to the initial position of the object
@@ -101,7 +99,6 @@ class BaseManipulate(BaseShadowHandEnv):
 
         assert self.target_position in ['ignore', 'fixed', 'random']
         assert self.target_rotation in ['ignore', 'fixed', 'xyz', 'z', 'parallel']
-        initial_qpos = initial_qpos or {}
 
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
@@ -125,6 +122,14 @@ class BaseManipulate(BaseShadowHandEnv):
     def _set_default_reward_function_and_config(self):
         self.reward_function = manipulate
         self.reward_config = MANIPULATE_BASE
+
+    def set_initial_qpos(self, initial_qpos):
+        if initial_qpos is not None and len(initial_qpos) == 24:
+            final_initial_qpos = self.data.qpos.copy()
+            final_initial_qpos[0:24] = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
+
+            return final_initial_qpos
+        return initial_qpos
 
     def assert_reward_setup(self):
         """Assert whether the reward config fits the environment. """
@@ -252,7 +257,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
         # Run the simulation for a bunch of timesteps to let everything settle in.
         for _ in range(10):
-            self._set_action(np.zeros(20))
+            self._set_action(self.data.actuator_length[:])
             mujoco.mj_step(self.model, self.data)
 
         return is_on_palm()
@@ -412,7 +417,6 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  render_mode: Optional[str] = None):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
-                                model_path=MODEL_PATH_MANIPULATE,
                                 touch_get_obs=touch_get_obs,
                                 target_rotation=target_rotation,
                                 target_position=target_position,
@@ -430,7 +434,6 @@ class OpenAIManipulate(BaseManipulate, utils.EzPickle):
                  delta_t=0.002):
         utils.EzPickle.__init__(self, "ignore", "xyz", 'sensordata', "dense")
         BaseManipulate.__init__(self,
-                                model_path=MODEL_PATH_MANIPULATE,
                                 touch_get_obs='sensordata',
                                 target_rotation="xyz",
                                 target_position="ignore",
@@ -553,27 +556,6 @@ class OpenAIManipulateDiscrete(OpenAIManipulate):
 
 class ManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
-
-
-class ManipulateEgg(BaseManipulate, utils.EzPickle):
-    """Manipulate Environment with an Egg as an object."""
-
-    def __init__(self,
-                 target_position='ignore',
-                 target_rotation='xyz',
-                 touch_get_obs='sensordata',
-                 relative_control=True,
-                 vision: bool = False):
-        utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
-        BaseManipulate.__init__(self,
-                                model_path=MANIPULATE_EGG_XML,
-                                touch_get_obs=touch_get_obs,
-                                target_rotation=target_rotation,
-                                target_position=target_position,
-                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                vision=vision,
-                                relative_control=relative_control
-                                )
 
 
 if __name__ == '__main__':

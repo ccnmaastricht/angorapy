@@ -35,9 +35,11 @@ def mj_get_category_names(model, category: str) -> Tuple[np.ndarray, np.ndarray]
 
 def mj_qpos_dict_to_qpos_vector(model, qpos_dict: Dict):
     """From a given dictionary of joint name-position pairs, create a vector using their order in the model."""
-    return np.array(
+    qpos = np.array(
         [qpos_dict[n] for n in map(lambda x: x.decode("utf-8"), model.names.split(b"\x00")) if n in qpos_dict.keys()]
     )
+
+    return qpos
 
 
 _FLOAT_EPS = np.finfo(np.float64).eps

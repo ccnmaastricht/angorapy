@@ -11,7 +11,7 @@ from gymnasium.utils import seeding
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.tasks.core import AnthropomorphicEnv
-from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS
 from angorapy.tasks.envs.dexterity.mujoco_model.robot import ShadowHand
 from angorapy.tasks.utils import mj_get_category_names
 from angorapy.utilities.util import mpi_print
@@ -24,7 +24,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
     discrete_bin_count = 11
 
     def __init__(self,
-                 initial_qpos=None,
+                 initial_qpos=DEFAULT_INITIAL_QPOS,
                  n_substeps=N_SUBSTEPS,
                  delta_t=0.002,
                  relative_control=True,
@@ -37,7 +37,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         if model is None:
             model = ShadowHand()
 
-        self.relative_control = relative_control
         self._thumb_touch_sensor_id = []
         self.reward_type = "dense"
         self._freeze_wrist = False
@@ -52,15 +51,10 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
                              initial_qpos=initial_qpos,
                              vision=vision,
                              touch=touch,
+                             relative_control=relative_control,
                              render_mode=render_mode,
                              delta_t=delta_t,
                              n_substeps=n_substeps)
-
-        self.seed()
-        self.initial_state = copy.deepcopy(self.get_state())
-
-        obs = self._get_obs()
-        self.viewer_setup()
 
     # SPACES
     def _set_observation_space(self,
@@ -105,34 +99,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         if sum(self.data.sensordata[self._touch_sensor_id]) > 0.0:
             return True
 
-    def seed(self,
-             seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
-
     # CONTROL
-    def _set_action(self, action):
-        assert action.shape == (20,), f"Action shape must be (20,) not {action.shape}"
-
-        actuator_names, actuator_adresses = mj_get_category_names(self.model, "actuator")
-        ctrlrange = self.model.actuator_ctrlrange
-        actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
-        if self.relative_control:
-            actuation_center = np.zeros_like(action)
-            for i in range(self.data.ctrl.shape[0]):
-                jnt_or_ten_name = actuator_names[i].replace(b'_A_', b'_')
-                if self.model.names.index(jnt_or_ten_name) in self.model.name_jntadr:
-                    actuation_center[i] = self.data.jnt(jnt_or_ten_name).qpos
-                elif self.model.names.index(jnt_or_ten_name) in self.model.name_tendonadr:
-                    actuation_center[i] = self.data.actuator(actuator_names[i]).length
-        else:
-            actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
-
-        self.data.ctrl[:] = actuation_center + action * actuation_range
-        self.data.ctrl[:] = np.clip(self.data.ctrl,
-                                    ctrlrange[:, 0],
-                                    ctrlrange[:, 1])
-
     def step(self, action: np.ndarray):
         if self._freeze_wrist:
             action[:2] = 0

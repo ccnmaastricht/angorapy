@@ -214,50 +214,6 @@ gym.envs.register(
     max_episode_steps=50 * 100,
 )
 
-# MODIFIED ENVIRONMENTS
-
-gym.envs.register(
-    id='MountainCarLong-v0',
-    entry_point='gym.envs.classic_control:MountainCarEnv',
-    max_episode_steps=500,
-    reward_threshold=-110.0,
-)
-
-gym.envs.register(
-    id="InvertedPendulumNoVel-v2",
-    entry_point="angorapy.tasks:InvertedPendulumNoVelEnv",
-    max_episode_steps=1000,
-    reward_threshold=950.0,
-)
-
-gym.envs.register(
-    id='ReacherNoVel-v2',
-    entry_point='angorapy.tasks:ReacherNoVelEnv',
-    max_episode_steps=50,
-    reward_threshold=-3.75,
-)
-
-gym.envs.register(
-    id='HalfCheetahNoVel-v2',
-    entry_point='angorapy.tasks:HalfCheetahNoVelEnv',
-    max_episode_steps=1000,
-    reward_threshold=4800.0,
-)
-
-gym.envs.register(
-    id='LunarLanderContinuousNoVel-v2',
-    entry_point='angorapy.tasks:LunarLanderContinuousNoVel',
-    max_episode_steps=1000,
-    reward_threshold=200,
-)
-
-gym.envs.register(
-    id='LunarLanderMultiDiscrete-v2',
-    entry_point='angorapy.tasks:LunarLanderMultiDiscrete',
-    max_episode_steps=1000,
-    reward_threshold=200,
-)
-
 gym.envs.register(
     id="HanoiTower-v0",
     entry_point="angorapy.tasks:HanoiEnv",

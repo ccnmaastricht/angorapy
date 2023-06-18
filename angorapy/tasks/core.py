@@ -13,6 +13,7 @@ import mujoco
 import numpy as np
 from dm_control.mjcf import RootElement
 from gymnasium import spaces
+from gymnasium.utils import seeding
 
 from angorapy.common.const import N_SUBSTEPS, \
     VISION_WH
@@ -72,6 +73,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             initial_qpos=None,
             vision=False,
             touch=True,
+            relative_control=True,
             render_mode: Optional[str] = None,
             camera_id: Optional[int] = 0,
             camera_name: Optional[str] = None,
@@ -135,17 +137,14 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self._touch_sensor_id = []
 
         # store initial state
-        if initial_qpos is None or not initial_qpos:
-            initial_qpos = self.data.qpos[:]
-        else:
-            initial_qpos = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
-
+        initial_qpos = self.set_initial_qpos(initial_qpos)
         self.initial_state = {
             "qpos": initial_qpos,
             "qvel": self.data.qvel[:]
         }
 
         # setup environment
+        self.relative_control = relative_control
         self._env_setup(initial_state=self.initial_state)
         self._set_action_space()
 
@@ -157,6 +156,12 @@ class AnthropomorphicEnv(gym.Env, ABC):
         self.original_n_substeps = n_substeps
 
         self._set_default_reward_function_and_config()
+        self.seed()
+        self.viewer_setup()
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
 
     # SPACES
     def _set_action_space(self):
@@ -311,7 +316,26 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def _set_action(self, action):
         if np.array(action).shape != self.action_space.shape:
-            raise ValueError("Action dimension mismatch")
+            raise ValueError(f"Action dimension mismatch [{np.array(action).shape}|{self.action_space.shape}]!")
+
+        actuator_names, actuator_adresses = mj_get_category_names(self.model, "actuator")
+        ctrlrange = self.model.actuator_ctrlrange
+        actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
+        if self.relative_control:
+            actuation_center = np.zeros_like(action)
+            for i in range(self.data.ctrl.shape[0]):
+                jnt_or_ten_name = actuator_names[i].replace(b'_A_', b'_')
+                if self.model.names.index(jnt_or_ten_name) in self.model.name_jntadr:
+                    actuation_center[i] = self.data.jnt(jnt_or_ten_name).qpos
+                elif self.model.names.index(jnt_or_ten_name) in self.model.name_tendonadr:
+                    actuation_center[i] = self.data.actuator(actuator_names[i]).length
+        else:
+            actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
+
+        self.data.ctrl[:] = actuation_center + action * actuation_range
+        self.data.ctrl[:] = np.clip(self.data.ctrl,
+                                    ctrlrange[:, 0],
+                                    ctrlrange[:, 1])
 
         self.data.ctrl[:] = action
 
@@ -496,3 +520,11 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def _render_callback(self, **kwargs):
         """A callback that is called before rendering. Can be used to implement custom rendering."""
         pass
+
+    def set_initial_qpos(self, initial_qpos) -> np.ndarray:
+        if initial_qpos is None or not initial_qpos:
+            initial_qpos = self.data.qpos[:]
+        else:
+            initial_qpos = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
+
+        return initial_qpos
