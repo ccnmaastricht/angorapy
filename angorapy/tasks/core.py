@@ -287,8 +287,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         return obs, info
 
     # CONTROL
-    def step(self,
-             action: np.ndarray):
+    def step(self, action: np.ndarray):
         if self.continuous:
             action = np.clip(action, self.action_space.low, self.action_space.high)
         else:

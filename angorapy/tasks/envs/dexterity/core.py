@@ -124,7 +124,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
                 if self.model.names.index(jnt_or_ten_name) in self.model.name_jntadr:
                     actuation_center[i] = self.data.jnt(jnt_or_ten_name).qpos
                 elif self.model.names.index(jnt_or_ten_name) in self.model.name_tendonadr:
-                    actuation_center[i] = self.data.tendon(jnt_or_ten_name).length
+                    actuation_center[i] = self.data.actuator(actuator_names[i]).length
         else:
             actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
 
