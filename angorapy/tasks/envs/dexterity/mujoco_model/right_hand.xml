@@ -43,7 +43,7 @@
             <default class="thumb">
                 <default class="thbase">
                     <joint axis="0 0 -1" range="-1.0472 1.0472"/>
-                    <position kp="0.4" ctrlrange="-1.0472 1.0472" forcerange="-2.3722 2.3722"/>
+                    <position kp="1" ctrlrange="-1.0472 1.0472" forcerange="-2.3722 2.3722"/>
                 </default>
                 <default class="thproximal">
                     <joint range="0 1.22173"/>
@@ -51,11 +51,11 @@
                 </default>
                 <default class="thhub">
                     <joint range="-0.20944 0.20944"/>
-                    <position kp="0.5" ctrlrange="-0.20944 0.20944" forcerange="-0.99 0.99"/>
+                    <position kp="1" ctrlrange="-0.20944 0.20944" forcerange="-0.99 0.99"/>
                 </default>
                 <default class="thmiddle">
                     <joint axis="0 -1 0" range="-0.698132 0.698132"/>
-                    <position kp="1.5" ctrlrange="-0.698132 0.698132" forcerange="-0.99 0.99"/>
+                    <position kp="1" ctrlrange="-0.698132 0.698132" forcerange="-0.99 0.99"/>
                 </default>
                 <default class="thdistal">
                     <joint range="-0.261799 1.5708"/>
@@ -77,7 +77,7 @@
             </default>
             <default class="middle_distal">
                 <joint range="0 1.5708"/>
-                <position kp="0.5" ctrlrange="0 3.1415" forcerange="-0.9 0.9"/>
+                <position kp="1" ctrlrange="0 3.1415" forcerange="-0.9 0.9"/>
             </default>
 
             <default class="plastic">
@@ -581,6 +581,103 @@
         <fixed name="rh_LFJ0">
             <joint joint="rh_LFJ2" coef="1"/>
             <joint joint="rh_LFJ1" coef="1"/>
+        </fixed>
+
+        <fixed name="rh_T_WRJ2r" limited="true" range="-0.032 0.032" user="1236">
+            <joint joint="rh_WRJ2" coef="0.0325"></joint>
+        </fixed>
+        <fixed name="rh_T_WRJ2l" limited="true" range="-0.032 0.032" user="1237">
+            <joint joint="rh_WRJ2" coef="-0.0325"></joint>
+        </fixed>
+        <fixed name="rh_T_WRJ1u" limited="true" range="-0.032 0.032" user="1236">
+            <joint joint="rh_WRJ1" coef="0.0175"></joint>
+        </fixed>
+        <fixed name="rh_T_WRJ1d" limited="true" range="-0.032 0.032" user="1237">
+            <joint joint="rh_WRJ1" coef="-0.0175"></joint>
+        </fixed>
+        <fixed name="rh_T_FFJ3r" limited="true" range="-0.018 0.018" user="1204">
+            <joint joint="rh_FFJ3" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_FFJ3l" limited="true" range="-0.018 0.018" user="1205">
+            <joint joint="rh_FFJ3" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_FFJ2u" limited="true" range="-0.007 0.03" user="1202">
+            <joint joint="rh_FFJ2" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_FFJ2d" limited="true" range="-0.03 0.007" user="1203">
+            <joint joint="rh_FFJ2" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_MFJ3r" limited="true" range="-0.018 0.018" user="1210">
+            <joint joint="rh_MFJ3" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_MFJ3l" limited="true" range="-0.018 0.018" user="1211">
+            <joint joint="rh_MFJ3" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_MFJ2u" limited="true" range="-0.007 0.03" user="1208">
+            <joint joint="rh_MFJ2" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_MFJ2d" limited="true" range="-0.03 0.007" user="1209">
+            <joint joint="rh_MFJ2" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_RFJ3r" limited="true" range="-0.018 0.018" user="1216">
+            <joint joint="rh_RFJ3" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_RFJ3l" limited="true" range="-0.018 0.018" user="1217">
+            <joint joint="rh_RFJ3" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_RFJ2u" limited="true" range="-0.007 0.03" user="1214">
+            <joint joint="rh_RFJ2" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_RFJ2d" limited="true" range="-0.03 0.007" user="1215">
+            <joint joint="rh_RFJ2" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_LFJ4u" limited="true" range="-0.007 0.03" user="1224">
+            <joint joint="rh_LFJ4" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_LFJ4d" limited="true" range="-0.03 0.007" user="1225">
+            <joint joint="rh_LFJ4" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_LFJ3r" limited="true" range="-0.018 0.018" user="1222">
+            <joint joint="rh_LFJ3" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_LFJ3l" limited="true" range="-0.018 0.018" user="1223">
+            <joint joint="rh_LFJ3" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_LFJ2u" limited="true" range="-0.007 0.03" user="1220">
+            <joint joint="rh_LFJ2" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_LFJ2d" limited="true" range="-0.03 0.007" user="1221">
+            <joint joint="rh_LFJ2" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ5a" limited="true" range="-0.018 0.018" user="1234">
+            <joint joint="rh_THJ5" coef="0.01636"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ5c" limited="true" range="-0.018 0.018" user="1235">
+            <joint joint="rh_THJ5" coef="-0.01636"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ4u" limited="true" range="-0.007 0.03" user="1232">
+            <joint joint="rh_THJ4" coef="0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ4d" limited="true" range="-0.03 0.007" user="1233">
+            <joint joint="rh_THJ4" coef="-0.01"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ3u" limited="true" range="-0.018 0.018" user="1230">
+            <joint joint="rh_THJ3" coef="0.011"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ3d" limited="true" range="-0.018 0.018" user="1231">
+            <joint joint="rh_THJ3" coef="-0.011"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ2r" limited="true" range="-0.018 0.018" user="1228">
+            <joint joint="rh_THJ2" coef="0.011"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ2l" limited="true" range="-0.018 0.018" user="1229">
+            <joint joint="rh_THJ2" coef="-0.011"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ1r" limited="true" range="-0.03 0.007" user="1226">
+            <joint joint="rh_THJ1" coef="0.009"></joint>
+        </fixed>
+        <fixed name="rh_T_THJ1l" limited="true" range="-0.007 0.03" user="1227">
+            <joint joint="rh_THJ1" coef="-0.009"></joint>
         </fixed>
     </tendon>
 
