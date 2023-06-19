@@ -221,7 +221,7 @@
                                     <geom class="plastic_visual" mesh="f_distal_pst"/>
                                     <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
                                     <!-- AngoraPy Edit: Touch Sensors -->
-                                    <site name="S_fftip" pos="0 0 0.026" group="3"/>
+                                    <site name="rh_S_fftip" pos="0 0 0.026" group="3"/>
                                     <site class="D_Touch" name="Tch_fftip"/>
                                     <site name="T_fftip_front_left" type="box" group="5" pos="-0.00451 -0.00451 0.012"
                                           size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
@@ -296,7 +296,7 @@
                                     <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
 
                                     <!-- AngoraPy Edit: Touch Sensors -->
-                                    <site name="S_mftip" pos="0 0 0.026" group="3"/>
+                                    <site name="rh_S_mftip" pos="0 0 0.026" group="3"/>
                                     <site class="D_Touch" name="Tch_mftip"/>
                                     <site name="T_mftip_front_left" type="box" group="5" pos="-0.00451 -0.00451 0.012"
                                           size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
@@ -370,7 +370,7 @@
                                     <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
 
                                     <!-- AngoraPy Edit: Touch Sensors -->
-                                    <site name="S_rftip" pos="0 0 0.026" group="3"/>
+                                    <site name="rh_S_rftip" pos="0 0 0.026" group="3"/>
                                     <site class="D_Touch" name="Tch_rftip"/>
                                     <site name="T_rftip_front_left" type="box" group="5" pos="-0.00451 -0.00451 0.012"
                                           size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
@@ -454,7 +454,7 @@
                                         <geom class="plastic_visual" mesh="f_distal_pst"/>
                                         <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
 
-                                        <site name="S_lftip" pos="0 0 0.026" group="3"/>
+                                        <site name="rh_S_lftip" pos="0 0 0.026" group="3"/>
                                         <site class="D_Touch" name="Tch_lftip"/>
                                         <site name="T_lftip_front_left" type="box" group="5"
                                               pos="-0.00451 -0.00451 0.012"
@@ -533,7 +533,7 @@
                                         <geom class="plastic_visual" mesh="th_distal_pst"/>
                                         <geom class="plastic_collision" type="mesh" mesh="th_distal_pst"/>
 
-                                        <site name="S_thtip" pos="0 0 0.0275" group="3"/>
+                                        <site name="rh_S_thtip" pos="0 0 0.0275" group="3"/>
                                         <site class="D_Touch" name="Tch_thtip" size="0.005 0.011 0.016"
                                               pos="-0.005 0 0.02"/>
                                         <site name="T_thtip_front_left" type="box" group="5" pos="-0.0056 -0.0056 0.013"

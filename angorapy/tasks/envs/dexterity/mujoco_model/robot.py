@@ -68,7 +68,7 @@ class ShadowHand(Robot):
     # ACCESSORS
     @property
     def root_body(self) -> mjcf.Element:
-        return mjcf_utils.safe_find(self._mjcf_root, "body", self._prefix + "forearm")
+        return mjcf_utils.safe_find(self._mjcf_root, "body", self._prefix + "hand mount")
 
     @property
     def joints(self) -> Sequence[mjcf.Element]:

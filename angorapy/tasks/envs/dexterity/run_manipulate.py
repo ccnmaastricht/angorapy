@@ -17,12 +17,17 @@ while True:
     env.reset()
     done = False
     step = 0
-    wait()
+
     while not done:
         o, r, t, t2, i = env.step(env.action_space.sample())
         done = t or t2
         # if step % 10 == 0:
         #     plt.imshow(o.vision)
         #     plt.show()
+
+        print(f"Step {step}: {env.data.site('robot/palm_center_site').xpos} vs {env.data.site('block/object:center').xpos}")
+        if done:
+            print("ITS OVER!")
+            wait()
 
         step += 1

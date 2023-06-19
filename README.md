@@ -23,8 +23,8 @@ This library is developed as part of the [Human Brain Project](https://www.human
 
 ### Supported Task Settings
 
-* [X]  Discrete Action Spaces
-* [X]  Continuous Action Spaces
+* [X]  Discrete Action Spaces (Categorical, MultiCategorical)
+* [X]  Continuous Action Spaces (Beta, Gaussian)
 * [X]  Discrete State Spaces
 * [X]  Continuous State Spaces
 

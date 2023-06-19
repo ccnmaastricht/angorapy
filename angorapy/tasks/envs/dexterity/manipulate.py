@@ -353,6 +353,7 @@ class BaseManipulate(BaseShadowHandEnv):
         obj_center_pos = self.data.site(self.object_center_id).xpos
 
         # determine palm center position
+        # palm_center_pos = self.data.site("robot/palm_center_site").xpos
         palm_center_pos = self.data.site("robot/palm_center_site").xpos
 
         dropped = (

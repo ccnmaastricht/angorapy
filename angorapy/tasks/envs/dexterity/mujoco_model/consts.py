@@ -29,4 +29,4 @@ FINGERTIP_COLORS: Tuple[Tuple[float, float, float], ...] = (
     (0.8, 0.8, 0.2),  # Yellow.
 )
 
-MODEL_XML = Path(__file__).resolve().parent / "right_hand.xml"
+MODEL_XML = Path(__file__).resolve().parent / "bodies" / "gym_shadowhand.xml"
