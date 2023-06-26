@@ -24,7 +24,7 @@ setup(
         # "numpy",
 
         # tensorflow and extensions
-        "tensorflow==2.4.2",
+        "tensorflow==2.9.3",
         "tensorflow_probability==0.16.0 ",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
@@ -45,9 +45,9 @@ setup(
 
         # environments
         "box2d-py==2.3.5",
-        # "gymnasium[box2d,mujoco]==0.28.1",
+        "gymnasium[box2d,mujoco]==0.28.1",
         "mujoco",
-        # "dm_control==1.0.12",
+        "dm_control==1.0.12",
 
         # webinterface
         "itsdangerous==2.0.1",
