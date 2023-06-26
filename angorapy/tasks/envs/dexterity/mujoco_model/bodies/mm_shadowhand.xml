@@ -1,5 +1,5 @@
 <mujoco model="right_shadow_hand">
-    <compiler angle="radian" coordinate="local" meshdir="assets" autolimits="true"/>
+    <compiler angle="radian" coordinate="local" meshdir="../assets/mujoco_menagerie" autolimits="true"/>
 
     <option timestep="0.002" iterations="20" apirate="200">
         <flag warmstart="enable"/>

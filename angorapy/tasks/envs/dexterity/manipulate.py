@@ -123,14 +123,6 @@ class BaseManipulate(BaseShadowHandEnv):
         self.reward_function = manipulate
         self.reward_config = MANIPULATE_BASE
 
-    def set_initial_qpos(self, initial_qpos):
-        if initial_qpos is not None and len(initial_qpos) == 24:
-            final_initial_qpos = self.data.qpos.copy()
-            final_initial_qpos[0:24] = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
-
-            return final_initial_qpos
-        return initial_qpos
-
     def assert_reward_setup(self):
         """Assert whether the reward config fits the environment. """
         assert set(MANIPULATE_BASE.keys()).issubset(
@@ -195,8 +187,6 @@ class BaseManipulate(BaseShadowHandEnv):
         super()._env_setup(initial_state)
 
         self.initial_goal = self.get_object_pose().copy()
-        self.palm_xpos = self.data.body(self.palm_name).xpos.copy()
-
         self.goal = self._sample_goal()
 
     def reset(self,
@@ -326,24 +316,58 @@ class BaseManipulate(BaseShadowHandEnv):
         mujoco.mj_forward(self.model, self.data)
 
     def _get_obs(self):
+
+        """Gather humanoid senses and asymmetric information."""
+
         object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
+
+        # vision
+        if not self.vision:
+            vision_input = object_qpos.astype(np.float32)
+        else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision_input = self.render()
+            self.render_mode = tmp_render_mode
+
+        # goal
         target_orientation = self.goal.ravel().copy()[3:]
+
+        # proprioception
         hand_joint_angles, hand_joint_velocities = robot_get_obs(self.model, self.data)
 
         proprioception = np.concatenate([
             hand_joint_angles,
-            hand_joint_velocities,
-            object_qpos,
+            hand_joint_velocities
+        ])
+
+        # touch
+        touch = self.data.sensordata[self._touch_sensor_id]
+
+        # asymmetric information
+        finger_tip_positions = np.array([self.data.site(name).xpos for name in FINGERTIP_SITE_NAMES]).flatten()
+        target_quat = transform.Rotation.from_quat(target_orientation)
+        current_quat = transform.Rotation.from_quat((object_qpos[3:]))
+        relative_target_orientation = (target_quat * current_quat.inv()).as_quat()
+
+        object_positional_velocity = self.data.body(self.object_id).cvel[3:]  # todo double check if correct part
+        object_angular_velocity = self.data.body(self.object_id).cvel[:3]  # quaternions in OpenAI model
+
+        asymmetric = np.concatenate([
+            finger_tip_positions,
+            relative_target_orientation,
+            object_positional_velocity,
+            object_angular_velocity
         ])
 
         return {
-            "observation"  : Sensation(
-                vision=object_qpos,
+            "observation": Sensation(
+                vision=vision_input,
                 proprioception=proprioception.copy(),
-                touch=None,
-                goal=target_orientation),
-            "achieved_goal": object_qpos.copy(),
-            "desired_goal" : self.goal.ravel().copy(),
+                touch=touch,
+                goal=target_orientation,
+                asymmetric=None if not self.asymmetric else asymmetric
+            ),
         }
 
     def _is_dropped(self) -> bool:
@@ -408,6 +432,9 @@ class BaseManipulate(BaseShadowHandEnv):
 class ManipulateBlock(BaseManipulate, utils.EzPickle):
     """Manipulate Environment with a Block as an object."""
 
+    asymmetric = False
+    continuous = True
+
     def __init__(self,
                  target_position='ignore',
                  target_rotation='xyz',
@@ -429,135 +456,16 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                                 )
 
 
-class OpenAIManipulate(BaseManipulate, utils.EzPickle):
-
-    def __init__(self,
-                 delta_t=0.002):
-        utils.EzPickle.__init__(self, "ignore", "xyz", 'sensordata', "dense")
-        BaseManipulate.__init__(self,
-                                touch_get_obs='sensordata',
-                                target_rotation="xyz",
-                                target_position="ignore",
-                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                vision=False,
-                                n_substeps=10,
-                                delta_t=delta_t,
-                                relative_control=True
-                                )
-
-    def _get_obs(self):
-        finger_tip_positions = np.array([self.sim.data.get_site_xpos(name) for name in FINGERTIP_SITE_NAMES]).flatten()
-        object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
-        target_orientation = self.goal.ravel().copy()[3:]
-
-        target_quat = transform.Rotation.from_quat(target_orientation)
-        current_quat = transform.Rotation.from_quat((object_qpos[3:]))
-        relative_target_orientation = (target_quat * current_quat.inv()).as_quat()
-
-        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.sim)
-        object_positional_velocity = self.sim.data.get_body_xvelp('object')
-        object_angular_velocity = self.sim.data.get_body_xvelr('object')  # quaternions in OpenAI model
-
-        proprioception = np.concatenate([
-            finger_tip_positions,
-            object_qpos,
-            relative_target_orientation,
-            hand_joint_angles,
-            hand_joint_velocities,
-            object_positional_velocity,
-            object_angular_velocity
-        ])
-
-        return {
-            "observation": Sensation(
-                vision=None,
-                proprioception=proprioception.copy(),
-                touch=None,
-                goal=target_orientation),
-        }
-
-
-class HumanoidManipulateBlockDiscrete(ManipulateBlock):
-    continuous = False
-    asymmetric = False
-
-    def _get_obs(self):
-        """Gather humanoid senses and asymmetric information."""
-
-        object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
-
-        # vision
-        if not self.vision:
-            vision_input = object_qpos.astype(np.float32)
-        else:
-            tmp_render_mode = self.render_mode
-            self.render_mode = "rgb_array"
-            vision_input = self.render()
-            self.render_mode = tmp_render_mode
-
-        # goal
-        target_orientation = self.goal.ravel().copy()[3:]
-
-        # proprioception
-        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.model, self.data)
-
-        proprioception = np.concatenate([
-            hand_joint_angles,
-            hand_joint_velocities
-        ])
-
-        # touch
-        touch = self.data.sensordata[self._touch_sensor_id]
-
-        # asymmetric information
-        finger_tip_positions = np.array([self.data.site(name).xpos for name in FINGERTIP_SITE_NAMES]).flatten()
-        target_quat = transform.Rotation.from_quat(target_orientation)
-        current_quat = transform.Rotation.from_quat((object_qpos[3:]))
-        relative_target_orientation = (target_quat * current_quat.inv()).as_quat()
-
-        object_positional_velocity = self.data.body(self.object_id).cvel[3:]  # todo double check if correct part
-        object_angular_velocity = self.data.body(self.object_id).cvel[:3]  # quaternions in OpenAI model
-
-        asymmetric = np.concatenate([
-            finger_tip_positions,
-            relative_target_orientation,
-            object_positional_velocity,
-            object_angular_velocity
-        ])
-
-        return {
-            "observation": Sensation(
-                vision=vision_input,
-                proprioception=proprioception.copy(),
-                touch=touch,
-                goal=target_orientation,
-                asymmetric=None if not self.asymmetric else asymmetric
-            ),
-        }
-
-
-class HumanoidManipulateBlock(HumanoidManipulateBlockDiscrete):
-    continuous = True
-    asymmetric = False
-
-
-class HumanoidManipulateBlockDiscreteAsynchronous(HumanoidManipulateBlockDiscrete):
-    asymmetric = True
-    continuous = False
-
-
-class HumanoidManipulateBlockAsynchronous(HumanoidManipulateBlockDiscrete):
-    asymmetric = True
-    continuous = True
-
-
-class OpenAIManipulateDiscrete(OpenAIManipulate):
-    continuous = False
-
-
 class ManipulateBlockDiscrete(ManipulateBlock):
+    asymmetric = False
     continuous = False
 
 
-if __name__ == '__main__':
-    hand = HumanoidManipulateBlockDiscrete()
+class ManipulateBlockDiscreteAsynchronous(ManipulateBlockDiscrete):
+    asymmetric = True
+    continuous = False
+
+
+class ManipulateBlockAsynchronous(ManipulateBlockDiscrete):
+    asymmetric = True
+    continuous = True

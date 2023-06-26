@@ -19,8 +19,6 @@ from angorapy.utilities.util import mpi_print
 
 class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
     """Base class for all shadow hand environments, setting up mostly visual characteristics of the environment."""
-
-    continuous = True
     discrete_bin_count = 11
 
     def __init__(self,
@@ -42,7 +40,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         self._freeze_wrist = False
         self.color_scheme = "default"
         self.viewpoint = "topdown"
-        self.thumb_name = 'robot/S_thtip'
+        self.thumb_name = 'robot/rh_S_thtip'
         self.palm_name = 'robot/rh_palm'
 
         super(BaseShadowHandEnv,
@@ -57,8 +55,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
                              n_substeps=n_substeps)
 
     # SPACES
-    def _set_observation_space(self,
-                               obs):
+    def _set_observation_space(self, obs):
         # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
             observation=spaces.Dict(

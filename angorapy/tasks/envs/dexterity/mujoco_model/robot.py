@@ -1,19 +1,3 @@
-# Copyright 2023 The RoboPianist Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Shadow hand composer class."""
-
 from typing import Sequence
 
 from dm_control import mjcf
@@ -21,9 +5,6 @@ from mujoco_utils import mjcf_utils
 
 from angorapy.tasks.world_building.entities import Robot
 from angorapy.tasks.envs.dexterity.mujoco_model import consts
-
-_FINGERTIP_OFFSET = 0.026
-_THUMBTIP_OFFSET = 0.0275
 
 HAND_POSITION = (0., 0., 0.)
 HAND_QUATERNION = (1, -1, 1, -1)
@@ -68,7 +49,7 @@ class ShadowHand(Robot):
     # ACCESSORS
     @property
     def root_body(self) -> mjcf.Element:
-        return mjcf_utils.safe_find(self._mjcf_root, "body", self._prefix + "hand mount")
+        return mjcf_utils.safe_find(self._mjcf_root, "body", self._prefix + "forearm")
 
     @property
     def joints(self) -> Sequence[mjcf.Element]:

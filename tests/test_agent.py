@@ -52,24 +52,24 @@ class AgentTest(unittest.TestCase):
 
         try:
             wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
-            env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0", reward_config=None, transformers=wrappers)
+            env = make_env("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, transformers=wrappers)
             build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
             agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=MultiCategoricalPolicyDistribution(env))
             agent.drill(n=2, epochs=2, batch_size=64)
         except Exception:
-            self.fail("HumanoidManipulateBlockDiscreteAsynchronous drill raises error.")
+            self.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")
 
     def test_drill_manipulate_continuous(self):
         """Test drilling of discrete agent (LunarLander)."""
 
         try:
             wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
-            env = make_env("HumanoidManipulateBlockAsynchronous-v0", reward_config=None, transformers=wrappers)
+            env = make_env("ManipulateBlockAsynchronous-v0", reward_config=None, transformers=wrappers)
             build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
             agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
             agent.drill(n=2, epochs=2, batch_size=64)
         except Exception:
-            self.fail("HumanoidManipulateBlockDiscreteAsynchronous drill raises error.")
+            self.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")
 
     def test_drill_reach(self):
         """Test drilling of discrete agent (LunarLander)."""
@@ -103,7 +103,7 @@ class AgentTest(unittest.TestCase):
                 self.fail("Continuous drill raises error.")
 
     def test_robotic_control(self):
-        for env_name in ["Ant-v4", "Humanoid-v4"]:
+        for env_name in ["Ant-v4", "-v4"]:
             try:
                 self._test_drill(env_name)
             except Exception:

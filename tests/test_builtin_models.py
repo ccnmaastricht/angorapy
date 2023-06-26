@@ -14,7 +14,7 @@ def perform_test_on_model(model_name):
     discrete_env = make_env("LunarLander-v2")
     discrete_distr = CategoricalPolicyDistribution(discrete_env)
 
-    multi_discrete_env = make_env("HumanoidManipulateBlockDiscrete-v0")
+    multi_discrete_env = make_env("ManipulateBlockDiscrete-v0")
     multi_discrete_distr = MultiCategoricalPolicyDistribution(multi_discrete_env)
 
     build_model = get_model_builder(model=model_name, model_type="ffn", shared=False)

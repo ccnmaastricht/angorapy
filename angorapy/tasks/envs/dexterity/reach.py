@@ -112,15 +112,14 @@ class Reach(BaseShadowHandEnv):
         return True
 
     def _sample_goal(self):
-        thumb_name = 'robot/S_thtip'
-        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != thumb_name]
+        finger_names = [name for name in FINGERTIP_SITE_NAMES if name != self.thumb_name]
 
         if self.forced_finger is None:
             finger_name = self.np_random.choice(finger_names)
         else:
             finger_name = finger_names[self.forced_finger]
 
-        thumb_idx = FINGERTIP_SITE_NAMES.index(thumb_name)
+        thumb_idx = FINGERTIP_SITE_NAMES.index(self.thumb_name)
         finger_idx = FINGERTIP_SITE_NAMES.index(finger_name)
         self.current_target_finger = finger_idx
         goal = self.initial_goal.copy().reshape(-1, 3)
@@ -156,7 +155,7 @@ class Reach(BaseShadowHandEnv):
             self.set_state(**initial_state)
 
         self.initial_goal = self._get_achieved_goal().copy()
-        self.palm_xpos = self.data.body('robot/rh_palm').xpos.copy()
+        self.palm_xpos = self.data.body(self.palm_name).xpos.copy()
 
         self.goal = self._sample_goal()
 

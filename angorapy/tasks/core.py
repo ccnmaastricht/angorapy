@@ -337,8 +337,6 @@ class AnthropomorphicEnv(gym.Env, ABC):
                                     ctrlrange[:, 0],
                                     ctrlrange[:, 1])
 
-        self.data.ctrl[:] = action
-
     def do_simulation(self, ctrl, n_frames):
         self._set_action(ctrl)
 
@@ -521,10 +519,16 @@ class AnthropomorphicEnv(gym.Env, ABC):
         """A callback that is called before rendering. Can be used to implement custom rendering."""
         pass
 
-    def set_initial_qpos(self, initial_qpos) -> np.ndarray:
-        if initial_qpos is None or not initial_qpos:
+    def set_initial_qpos(self, initial_qpos):
+        """Set the initial qpos of the simulation based on given configuration. If the configuration is only specific
+        to the robot, the rest of the qpos is left unchanged."""
+
+        if initial_qpos is not None and len(initial_qpos) == 24:
+            final_initial_qpos = self.data.qpos.copy()
+            final_initial_qpos[0:24] = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
+
+            return final_initial_qpos
+        elif initial_qpos is None or not initial_qpos:
             initial_qpos = self.data.qpos[:]
-        else:
-            initial_qpos = mj_qpos_dict_to_qpos_vector(self.model, initial_qpos)
 
         return initial_qpos

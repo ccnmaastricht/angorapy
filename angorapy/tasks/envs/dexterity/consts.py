@@ -63,8 +63,6 @@ DEFAULT_INITIAL_QPOS = {
     'robot/rh_THJ0': -0.7894883021600622,
 }
 
-
-
 FINGERTIP_BODIES: Tuple[str, ...] = (
     "thdistal",
     "ffdistal",
@@ -81,5 +79,3 @@ JOINT_GROUP: Dict[str, Tuple[str, ...]] = {
     "ring": ("RFJ3", "RFJ2", "RFJ1", "RFJ0"),
     "little": ("LFJ4", "LFJ3", "LFJ2", "LFJ1", "LFJ0"),
 }
-
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'mujoco_model/', 'right_hand.xml')

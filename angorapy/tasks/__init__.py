@@ -6,8 +6,8 @@ from angorapy.common.const import SHADOWHAND_MAX_STEPS, SHADOWHAND_SEQUENCE_MAX_
 from angorapy.tasks.core import AnthropomorphicEnv
 from angorapy.tasks.envs.adapted import InvertedPendulumNoVelEnv, ReacherNoVelEnv, HalfCheetahNoVelEnv, \
     LunarLanderContinuousNoVel, LunarLanderMultiDiscrete
-from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlock, ManipulateBlockDiscrete, HumanoidManipulateBlock, \
-    HumanoidManipulateBlockDiscrete, HumanoidManipulateBlockDiscreteAsynchronous, HumanoidManipulateBlockAsynchronous
+from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlock, ManipulateBlockDiscrete, \
+    ManipulateBlockDiscrete, ManipulateBlockDiscreteAsynchronous, ManipulateBlockAsynchronous
 from angorapy.tasks.envs.dexterity.reach import Reach, FreeReach, FreeReachSequential, ReachSequential
 
 # SHADOW HAND
@@ -138,78 +138,43 @@ for control_mode in ["Relative", "Absolute"]:
     )
 
 gym.envs.register(
-    id=f'OpenAIManipulate-v0',
-    entry_point='angorapy.tasks:OpenAIManipulate',
-    kwargs={},
-    max_episode_steps=50 * 100,
-)
-
-gym.envs.register(
-    id=f'OpenAIManipulateDiscrete-v0',
-    entry_point='angorapy.tasks:OpenAIManipulateDiscrete',
-    kwargs={},
-    max_episode_steps=50 * 100,
-)
-
-gym.envs.register(
-    id=f'OpenAIManipulateApproxDiscrete-v0',
-    entry_point='angorapy.tasks:OpenAIManipulateDiscrete',
-    kwargs={"delta_t": 0.008},
-    max_episode_steps=50 * 100,
-)
-
-gym.envs.register(
-    id=f'OpenAIManipulateApprox-v0',
-    entry_point='angorapy.tasks:OpenAIManipulate',
-    kwargs={"delta_t": 0.008},
-    max_episode_steps=50 * 100,
-)
-
-gym.envs.register(
-    id=f'ManipulateBlockApproxDiscrete-v0',
+    id=f'ManipulateBlockDiscrete-v0',
     entry_point='angorapy.tasks:ManipulateBlockDiscrete',
     kwargs={"delta_t": 0.008},
     max_episode_steps=50 * 100,
 )
 
 gym.envs.register(
-    id=f'HumanoidManipulateBlockDiscrete-v0',
-    entry_point='angorapy.tasks:HumanoidManipulateBlockDiscrete',
+    id=f'ManipulateBlockDiscreteAsynchronous-v0',
+    entry_point='angorapy.tasks:ManipulateBlockDiscreteAsynchronous',
     kwargs={"delta_t": 0.008},
     max_episode_steps=50 * 100,
 )
 
 gym.envs.register(
-    id=f'HumanoidManipulateBlockDiscreteAsynchronous-v0',
-    entry_point='angorapy.tasks:HumanoidManipulateBlockDiscreteAsynchronous',
-    kwargs={"delta_t": 0.008},
-    max_episode_steps=50 * 100,
-)
-
-gym.envs.register(
-    id=f'HumanoidVisualManipulateBlockDiscreteAsynchronous-v0',
-    entry_point='angorapy.tasks:HumanoidManipulateBlockDiscreteAsynchronous',
+    id=f'VisualManipulateBlockDiscreteAsynchronous-v0',
+    entry_point='angorapy.tasks:ManipulateBlockDiscreteAsynchronous',
     kwargs={"delta_t": 0.008, "vision": True},
     max_episode_steps=50 * 100,
 )
 
 gym.envs.register(
-    id=f'HumanoidManipulateBlockAsynchronous-v0',
-    entry_point='angorapy.tasks:HumanoidManipulateBlockAsynchronous',
+    id=f'ManipulateBlockAsynchronous-v0',
+    entry_point='angorapy.tasks:ManipulateBlockAsynchronous',
     kwargs={"delta_t": 0.008},
     max_episode_steps=50 * 100,
 )
 
 gym.envs.register(
-    id=f'HumanoidManipulateBlock-v0',
-    entry_point='angorapy.tasks:HumanoidManipulateBlock',
+    id=f'ManipulateBlock-v0',
+    entry_point='angorapy.tasks:ManipulateBlock',
     kwargs={"delta_t": 0.008},
     max_episode_steps=50 * 100,
 )
 
 gym.envs.register(
-    id=f'HumanoidVisualManipulateBlock-v0',
-    entry_point='angorapy.tasks:HumanoidManipulateBlock',
+    id=f'VisualManipulateBlock-v0',
+    entry_point='angorapy.tasks:ManipulateBlock',
     kwargs={"delta_t": 0.008, "vision": True},
     max_episode_steps=50 * 100,
 )

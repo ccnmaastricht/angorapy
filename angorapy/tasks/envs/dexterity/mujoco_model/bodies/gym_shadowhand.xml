@@ -428,9 +428,9 @@
     </asset>
 
     <worldbody>
-        <body name="rh_hand mount" pos="1 1.25 0.15">
+        <body name="rh_hand mount" pos="0 0 0">
             <inertial mass="0.1" pos="0 0 0" diaginertia="0.001 0.001 0.001"/>
-            <body childclass="rh_asset_class" name="rh_forearm" pos="0 0.01 0">
+            <body childclass="rh_asset_class" name="rh_forearm" quat="1 -1 1 -1">
                 <inertial pos="0.001 -0.002 0.29" quat="0.982 -0.016 0 -0.188" mass="4" diaginertia="0.01 0.01 0.0075"/>
                 <geom class="rh_D_Vizual" pos="0 0.01 0.04" name="rh_V_forearm" mesh="rh_forearm"
                       euler="0 0 1.57"/>

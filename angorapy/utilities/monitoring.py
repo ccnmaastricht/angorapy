@@ -127,7 +127,7 @@ class Monitor:
             host=socket.gethostname(),
             n_cpus=MPI.COMM_WORLD.size,
             n_gpus=self.agent.n_optimizers,
-            angorapy_version=pkg_resources.get_distribution("angorapy").version,
+            angorapy_version=None, #pkg_resources.get_distribution("angorapy").version,
             experiment_group=self.experiment_group,
             iterations=self.iterations,
             environment=dict(

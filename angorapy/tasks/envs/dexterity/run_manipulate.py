@@ -7,8 +7,11 @@ from angorapy import make_env
 from mujoco import viewer
 from PIL import Image
 
-env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0", render_mode="human")
+env = make_env("ManipulateBlockDiscreteAsynchronous-v0", render_mode="human")
 env.world.robot.show_palm_site()
+env.set_delta_t_simulation(0.002)
+env.set_original_n_substeps_to_sspcs()
+env.change_color_scheme("default")
 
 # viewer.launch(mujoco.MjModel.from_xml_string(env.world.stage.mjcf_model.to_xml_string(), assets=env.world.stage.mjcf_model.get_assets()))
 # viewer.launch(env.model, env.data)
@@ -28,6 +31,5 @@ while True:
         print(f"Step {step}: {env.data.site('robot/palm_center_site').xpos} vs {env.data.site('block/object:center').xpos}")
         if done:
             print("ITS OVER!")
-            wait()
 
         step += 1
