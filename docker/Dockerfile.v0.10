@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.5.2-gpu as base
+FROM tensorflow/tensorflow:2.10.1-gpu as base
 
 # install packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -37,11 +37,9 @@ RUN make install
 RUN ldconfig
 WORKDIR /
 
-# ENVIRONMENT VARIABLES
-
 # SETUP ENV
 ENV VIRTUAL_ENV=/venv
-RUN virtualenv --python=python3.9 $VIRTUAL_ENV
+RUN virtualenv --system-site-packages --python=python3.9 $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN pip install pip --upgrade
