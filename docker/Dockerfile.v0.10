@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.10.1-gpu as base
+FROM tensorflow/tensorflow:2.5.2-gpu as base
 
 # install packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -55,8 +55,8 @@ RUN pip install /ang_tmp --default-timeout=100 \
     && rm -rf /ang_tmp
 
 RUN pip install numpy==1.21.0
-RUN pip install tensorflow_datasets
-RUN pip install mujoco_utils
+RUN pip install gymnasium[box2d,mujoco]==0.28.1
+RUN pip install dm_control==1.0.12 tensorflow_datasets mujoco_utils tensorflow_probability==0.12.2
 RUN pip install protobuf==3.20.0
 
 # matplotlib
