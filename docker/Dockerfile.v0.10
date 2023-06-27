@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.8.4-gpu as base
+FROM tensorflow/tensorflow:2.10.1-gpu as base
 
 # install packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
