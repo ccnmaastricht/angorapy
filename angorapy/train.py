@@ -1,7 +1,7 @@
 import logging
 import re
 
-logging.getLogger("requests").setLevel(logging.WARNING)
+# logging.getLogger("requests").setLevel(logging.WARNING)
 
 import sys
 import os
@@ -9,7 +9,7 @@ import os
 import gymnasium as gym
 
 os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pprint
 import traceback

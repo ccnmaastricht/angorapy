@@ -38,9 +38,9 @@ RUN ldconfig
 WORKDIR /
 
 # SETUP ENV
-ENV VIRTUAL_ENV=/venv
-RUN virtualenv --system-site-packages --python=python3.9 $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+#ENV VIRTUAL_ENV=/venv
+#RUN virtualenv --system-site-packages --python=python3.9 $VIRTUAL_ENV
+#ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN pip install pip --upgrade
 RUN pip install --upgrade setuptools
@@ -52,7 +52,6 @@ COPY . /ang_tmp
 RUN pip install /ang_tmp --default-timeout=100 \
     && rm -rf /ang_tmp
 
-RUN pip install numpy==1.21.0
 RUN pip install gymnasium[box2d,mujoco]==0.28.1
 RUN pip install dm_control==1.0.12 tensorflow_datasets mujoco_utils tensorflow_probability==0.12.2
 RUN pip install protobuf==3.20.0
