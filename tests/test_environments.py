@@ -14,7 +14,7 @@ from angorapy.utilities.util import env_extract_dims
 class EnvironmentTest(unittest.TestCase):
 
     def test_state_normalization(self):
-        env_name = "HumanoidManipulateBlockDiscreteAsynchronous-v0"
+        env_name = "ManipulateBlockDiscreteAsynchronous-v0"
         env = make_env(env_name)
         normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 

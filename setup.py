@@ -24,8 +24,8 @@ setup(
         # "numpy",
 
         # tensorflow and extensions
-        "tensorflow==2.8.4",
-        "tensorflow_probability==0.16.0 ",
+        "tensorflow==2.7.4",
+        "tensorflow_probability==0.15.0 ",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
         "tqdm",
