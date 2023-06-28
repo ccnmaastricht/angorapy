@@ -917,7 +917,13 @@ class PPOAgent:
         if name is None:
             name = str(self.iteration)
 
-        self.joint.save_weights(os.path.join(self.agent_directory, f"{name}/weights"))
+        if not os.path.exists(self.agent_directory + f"/{name}/weights"):
+            os.makedirs(self.agent_directory + f"/{name}/weights")
+
+        self.joint.save_weights(
+            os.path.join(self.agent_directory, f"{name}/weights"),
+            overwrite=True
+        )
         with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
             json.dump(self.get_parameters(), f)
 
