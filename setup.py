@@ -24,7 +24,7 @@ setup(
         # "numpy",
 
         # tensorflow and extensions
-        "tensorflow==2.10.1",
+        "tensorflow==2.12.0",
         "tensorflow_probability==0.16.0 ",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
@@ -69,8 +69,9 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
     python_requires=">=3.7",
 )
