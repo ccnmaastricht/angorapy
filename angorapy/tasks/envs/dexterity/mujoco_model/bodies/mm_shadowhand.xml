@@ -706,119 +706,119 @@
 
     <sensor>
         <!--PALM-->
-        <touch name="TS_palm_b0" site="T_palm_b0"/>
-        <touch name="TS_palm_bl" site="T_palm_bl"/>
-        <touch name="TS_palm_bm" site="T_palm_bm"/>
-        <touch name="TS_palm_br" site="T_palm_br"/>
-        <touch name="TS_palm_fl" site="T_palm_fl"/>
-        <touch name="TS_palm_fm" site="T_palm_fm"/>
-        <touch name="TS_palm_fr" site="T_palm_fr"/>
-        <touch name="TS_palm_b1" site="T_palm_b1"/>
+        <touch name="rh_TS_palm_b0" site="T_palm_b0"/>
+        <touch name="rh_TS_palm_bl" site="T_palm_bl"/>
+        <touch name="rh_TS_palm_bm" site="T_palm_bm"/>
+        <touch name="rh_TS_palm_br" site="T_palm_br"/>
+        <touch name="rh_TS_palm_fl" site="T_palm_fl"/>
+        <touch name="rh_TS_palm_fm" site="T_palm_fm"/>
+        <touch name="rh_TS_palm_fr" site="T_palm_fr"/>
+        <touch name="rh_TS_palm_b1" site="T_palm_b1"/>
 
         <!--FOREFINGER-->
-        <touch name="TS_ffproximal_front_left_bottom" site="T_ffproximal_front_left_bottom"/>
-        <touch name="TS_ffproximal_front_right_bottom" site="T_ffproximal_front_right_bottom"/>
-        <touch name="TS_ffproximal_front_left_top" site="T_ffproximal_front_left_top"/>
-        <touch name="TS_ffproximal_front_right_top" site="T_ffproximal_front_right_top"/>
-        <touch name="TS_ffproximal_back_left" site="T_ffproximal_back_left"/>
-        <touch name="TS_ffproximal_back_right" site="T_ffproximal_back_right"/>
-        <touch name="TS_ffproximal_tip" site="T_ffproximal_tip"/>
+        <touch name="rh_TS_ffproximal_front_left_bottom" site="T_ffproximal_front_left_bottom"/>
+        <touch name="rh_TS_ffproximal_front_right_bottom" site="T_ffproximal_front_right_bottom"/>
+        <touch name="rh_TS_ffproximal_front_left_top" site="T_ffproximal_front_left_top"/>
+        <touch name="rh_TS_ffproximal_front_right_top" site="T_ffproximal_front_right_top"/>
+        <touch name="rh_TS_ffproximal_back_left" site="T_ffproximal_back_left"/>
+        <touch name="rh_TS_ffproximal_back_right" site="T_ffproximal_back_right"/>
+        <touch name="rh_TS_ffproximal_tip" site="T_ffproximal_tip"/>
 
-        <touch name="TS_ffmiddle_front_left" site="T_ffmiddle_front_left"/>
-        <touch name="TS_ffmiddle_front_right" site="T_ffmiddle_front_right"/>
-        <touch name="TS_ffmiddle_back_left" site="T_ffmiddle_back_left"/>
-        <touch name="TS_ffmiddle_back_right" site="T_ffmiddle_back_right"/>
-        <touch name="TS_ffmiddle_tip" site="T_ffmiddle_tip"/>
+        <touch name="rh_TS_ffmiddle_front_left" site="T_ffmiddle_front_left"/>
+        <touch name="rh_TS_ffmiddle_front_right" site="T_ffmiddle_front_right"/>
+        <touch name="rh_TS_ffmiddle_back_left" site="T_ffmiddle_back_left"/>
+        <touch name="rh_TS_ffmiddle_back_right" site="T_ffmiddle_back_right"/>
+        <touch name="rh_TS_ffmiddle_tip" site="T_ffmiddle_tip"/>
 
-        <touch name="TS_fftip_front_left" site="T_fftip_front_left"/>
-        <touch name="TS_fftip_front_right" site="T_fftip_front_right"/>
-        <touch name="TS_fftip_back_left" site="T_fftip_back_left"/>
-        <touch name="TS_fftip_back_right" site="T_fftip_back_right"/>
-        <touch name="TS_fftip_tip" site="T_fftip_tip"/>
+        <touch name="rh_TS_fftip_front_left" site="T_fftip_front_left"/>
+        <touch name="rh_TS_fftip_front_right" site="T_fftip_front_right"/>
+        <touch name="rh_TS_fftip_back_left" site="T_fftip_back_left"/>
+        <touch name="rh_TS_fftip_back_right" site="T_fftip_back_right"/>
+        <touch name="rh_TS_fftip_tip" site="T_fftip_tip"/>
 
         <!-- MIDDLE FINGER -->
-        <touch name="TS_mfproximal_front_left_bottom" site="T_mfproximal_front_left_bottom"/>
-        <touch name="TS_mfproximal_front_right_bottom" site="T_mfproximal_front_right_bottom"/>
-        <touch name="TS_mfproximal_front_left_top" site="T_mfproximal_front_left_top"/>
-        <touch name="TS_mfproximal_front_right_top" site="T_mfproximal_front_right_top"/>
-        <touch name="TS_mfproximal_back_left" site="T_mfproximal_back_left"/>
-        <touch name="TS_mfproximal_back_right" site="T_mfproximal_back_right"/>
-        <touch name="TS_mfproximal_tip" site="T_mfproximal_tip"/>
+        <touch name="rh_TS_mfproximal_front_left_bottom" site="T_mfproximal_front_left_bottom"/>
+        <touch name="rh_TS_mfproximal_front_right_bottom" site="T_mfproximal_front_right_bottom"/>
+        <touch name="rh_TS_mfproximal_front_left_top" site="T_mfproximal_front_left_top"/>
+        <touch name="rh_TS_mfproximal_front_right_top" site="T_mfproximal_front_right_top"/>
+        <touch name="rh_TS_mfproximal_back_left" site="T_mfproximal_back_left"/>
+        <touch name="rh_TS_mfproximal_back_right" site="T_mfproximal_back_right"/>
+        <touch name="rh_TS_mfproximal_tip" site="T_mfproximal_tip"/>
 
-        <touch name="TS_mfmiddle_front_left" site="T_mfmiddle_front_left"/>
-        <touch name="TS_mfmiddle_front_right" site="T_mfmiddle_front_right"/>
-        <touch name="TS_mfmiddle_back_left" site="T_mfmiddle_back_left"/>
-        <touch name="TS_mfmiddle_back_right" site="T_mfmiddle_back_right"/>
-        <touch name="TS_mfmiddle_tip" site="T_mfmiddle_tip"/>
+        <touch name="rh_TS_mfmiddle_front_left" site="T_mfmiddle_front_left"/>
+        <touch name="rh_TS_mfmiddle_front_right" site="T_mfmiddle_front_right"/>
+        <touch name="rh_TS_mfmiddle_back_left" site="T_mfmiddle_back_left"/>
+        <touch name="rh_TS_mfmiddle_back_right" site="T_mfmiddle_back_right"/>
+        <touch name="rh_TS_mfmiddle_tip" site="T_mfmiddle_tip"/>
 
-        <touch name="TS_mftip_front_left" site="T_mftip_front_left"/>
-        <touch name="TS_mftip_front_right" site="T_mftip_front_right"/>
-        <touch name="TS_mftip_back_left" site="T_mftip_back_left"/>
-        <touch name="TS_mftip_back_right" site="T_mftip_back_right"/>
-        <touch name="TS_mftip_tip" site="T_mftip_tip"/>
+        <touch name="rh_TS_mftip_front_left" site="T_mftip_front_left"/>
+        <touch name="rh_TS_mftip_front_right" site="T_mftip_front_right"/>
+        <touch name="rh_TS_mftip_back_left" site="T_mftip_back_left"/>
+        <touch name="rh_TS_mftip_back_right" site="T_mftip_back_right"/>
+        <touch name="rh_TS_mftip_tip" site="T_mftip_tip"/>
 
         <!-- RING FINGER -->
-        <touch name="TS_rfproximal_front_left_bottom" site="T_rfproximal_front_left_bottom"/>
-        <touch name="TS_rfproximal_front_right_bottom" site="T_rfproximal_front_right_bottom"/>
-        <touch name="TS_rfproximal_front_left_top" site="T_rfproximal_front_left_top"/>
-        <touch name="TS_rfproximal_front_right_top" site="T_rfproximal_front_right_top"/>
-        <touch name="TS_rfproximal_back_left" site="T_rfproximal_back_left"/>
-        <touch name="TS_rfproximal_back_right" site="T_rfproximal_back_right"/>
-        <touch name="TS_rfproximal_tip" site="T_rfproximal_tip"/>
+        <touch name="rh_TS_rfproximal_front_left_bottom" site="T_rfproximal_front_left_bottom"/>
+        <touch name="rh_TS_rfproximal_front_right_bottom" site="T_rfproximal_front_right_bottom"/>
+        <touch name="rh_TS_rfproximal_front_left_top" site="T_rfproximal_front_left_top"/>
+        <touch name="rh_TS_rfproximal_front_right_top" site="T_rfproximal_front_right_top"/>
+        <touch name="rh_TS_rfproximal_back_left" site="T_rfproximal_back_left"/>
+        <touch name="rh_TS_rfproximal_back_right" site="T_rfproximal_back_right"/>
+        <touch name="rh_TS_rfproximal_tip" site="T_rfproximal_tip"/>
 
-        <touch name="TS_rfmiddle_front_left" site="T_rfmiddle_front_left"/>
-        <touch name="TS_rfmiddle_front_right" site="T_rfmiddle_front_right"/>
-        <touch name="TS_rfmiddle_back_left" site="T_rfmiddle_back_left"/>
-        <touch name="TS_rfmiddle_back_right" site="T_rfmiddle_back_right"/>
-        <touch name="TS_rfmiddle_tip" site="T_rfmiddle_tip"/>
+        <touch name="rh_TS_rfmiddle_front_left" site="T_rfmiddle_front_left"/>
+        <touch name="rh_TS_rfmiddle_front_right" site="T_rfmiddle_front_right"/>
+        <touch name="rh_TS_rfmiddle_back_left" site="T_rfmiddle_back_left"/>
+        <touch name="rh_TS_rfmiddle_back_right" site="T_rfmiddle_back_right"/>
+        <touch name="rh_TS_rfmiddle_tip" site="T_rfmiddle_tip"/>
 
-        <touch name="TS_rftip_front_left" site="T_rftip_front_left"/>
-        <touch name="TS_rftip_front_right" site="T_rftip_front_right"/>
-        <touch name="TS_rftip_back_left" site="T_rftip_back_left"/>
-        <touch name="TS_rftip_back_right" site="T_rftip_back_right"/>
-        <touch name="TS_rftip_tip" site="T_rftip_tip"/>
+        <touch name="rh_TS_rftip_front_left" site="T_rftip_front_left"/>
+        <touch name="rh_TS_rftip_front_right" site="T_rftip_front_right"/>
+        <touch name="rh_TS_rftip_back_left" site="T_rftip_back_left"/>
+        <touch name="rh_TS_rftip_back_right" site="T_rftip_back_right"/>
+        <touch name="rh_TS_rftip_tip" site="T_rftip_tip"/>
 
         <!-- LITTLE FINGER -->
-        <touch name="TS_lfmetacarpal_front" site="T_lfmetacarpal_front"/>
+        <touch name="rh_TS_lfmetacarpal_front" site="T_lfmetacarpal_front"/>
 
-        <touch name="TS_lfproximal_front_left_bottom" site="T_lfproximal_front_left_bottom"/>
-        <touch name="TS_lfproximal_front_right_bottom" site="T_lfproximal_front_right_bottom"/>
-        <touch name="TS_lfproximal_front_left_top" site="T_lfproximal_front_left_top"/>
-        <touch name="TS_lfproximal_front_right_top" site="T_lfproximal_front_right_top"/>
-        <touch name="TS_lfproximal_back_left" site="T_lfproximal_back_left"/>
-        <touch name="TS_lfproximal_back_right" site="T_lfproximal_back_right"/>
-        <touch name="TS_lfproximal_tip" site="T_lfproximal_tip"/>
+        <touch name="rh_TS_lfproximal_front_left_bottom" site="T_lfproximal_front_left_bottom"/>
+        <touch name="rh_TS_lfproximal_front_right_bottom" site="T_lfproximal_front_right_bottom"/>
+        <touch name="rh_TS_lfproximal_front_left_top" site="T_lfproximal_front_left_top"/>
+        <touch name="rh_TS_lfproximal_front_right_top" site="T_lfproximal_front_right_top"/>
+        <touch name="rh_TS_lfproximal_back_left" site="T_lfproximal_back_left"/>
+        <touch name="rh_TS_lfproximal_back_right" site="T_lfproximal_back_right"/>
+        <touch name="rh_TS_lfproximal_tip" site="T_lfproximal_tip"/>
 
-        <touch name="TS_lfmiddle_front_left" site="T_lfmiddle_front_left"/>
-        <touch name="TS_lfmiddle_front_right" site="T_lfmiddle_front_right"/>
-        <touch name="TS_lfmiddle_back_left" site="T_lfmiddle_back_left"/>
-        <touch name="TS_lfmiddle_back_right" site="T_lfmiddle_back_right"/>
-        <touch name="TS_lfmiddle_tip" site="T_lfmiddle_tip"/>
+        <touch name="rh_TS_lfmiddle_front_left" site="T_lfmiddle_front_left"/>
+        <touch name="rh_TS_lfmiddle_front_right" site="T_lfmiddle_front_right"/>
+        <touch name="rh_TS_lfmiddle_back_left" site="T_lfmiddle_back_left"/>
+        <touch name="rh_TS_lfmiddle_back_right" site="T_lfmiddle_back_right"/>
+        <touch name="rh_TS_lfmiddle_tip" site="T_lfmiddle_tip"/>
 
-        <touch name="TS_lftip_front_left" site="T_lftip_front_left"/>
-        <touch name="TS_lftip_front_right" site="T_lftip_front_right"/>
-        <touch name="TS_lftip_back_left" site="T_lftip_back_left"/>
-        <touch name="TS_lftip_back_right" site="T_lftip_back_right"/>
-        <touch name="TS_lftip_tip" site="T_lftip_tip"/>
+        <touch name="rh_TS_lftip_front_left" site="T_lftip_front_left"/>
+        <touch name="rh_TS_lftip_front_right" site="T_lftip_front_right"/>
+        <touch name="rh_TS_lftip_back_left" site="T_lftip_back_left"/>
+        <touch name="rh_TS_lftip_back_right" site="T_lftip_back_right"/>
+        <touch name="rh_TS_lftip_tip" site="T_lftip_tip"/>
 
         <!--THUMB-->
-        <touch name="TS_thproximal_front_left" site="T_thproximal_front_left"/>
-        <touch name="TS_thproximal_front_right" site="T_thproximal_front_right"/>
-        <touch name="TS_thproximal_back_left" site="T_thproximal_back_left"/>
-        <touch name="TS_thproximal_back_right" site="T_thproximal_back_right"/>
-        <touch name="TS_thproximal_tip" site="T_thproximal_tip"/>
+        <touch name="rh_TS_thproximal_front_left" site="T_thproximal_front_left"/>
+        <touch name="rh_TS_thproximal_front_right" site="T_thproximal_front_right"/>
+        <touch name="rh_TS_thproximal_back_left" site="T_thproximal_back_left"/>
+        <touch name="rh_TS_thproximal_back_right" site="T_thproximal_back_right"/>
+        <touch name="rh_TS_thproximal_tip" site="T_thproximal_tip"/>
 
-        <touch name="TS_thmiddle_front_left" site="T_thmiddle_front_left"/>
-        <touch name="TS_thmiddle_front_right" site="T_thmiddle_front_right"/>
-        <touch name="TS_thmiddle_back_left" site="T_thmiddle_back_left"/>
-        <touch name="TS_thmiddle_back_right" site="T_thmiddle_back_right"/>
-        <touch name="TS_thmiddle_tip" site="T_thmiddle_tip"/>
+        <touch name="rh_TS_thmiddle_front_left" site="T_thmiddle_front_left"/>
+        <touch name="rh_TS_thmiddle_front_right" site="T_thmiddle_front_right"/>
+        <touch name="rh_TS_thmiddle_back_left" site="T_thmiddle_back_left"/>
+        <touch name="rh_TS_thmiddle_back_right" site="T_thmiddle_back_right"/>
+        <touch name="rh_TS_thmiddle_tip" site="T_thmiddle_tip"/>
 
-        <touch name="TS_thtip_front_left" site="T_thtip_front_left"/>
-        <touch name="TS_thtip_front_right" site="T_thtip_front_right"/>
-        <touch name="TS_thtip_back_left" site="T_thtip_back_left"/>
-        <touch name="TS_thtip_back_right" site="T_thtip_back_right"/>
-        <touch name="TS_thtip_tip" site="T_thtip_tip"/>
+        <touch name="rh_TS_thtip_front_left" site="T_thtip_front_left"/>
+        <touch name="rh_TS_thtip_front_right" site="T_thtip_front_right"/>
+        <touch name="rh_TS_thtip_back_left" site="T_thtip_back_left"/>
+        <touch name="rh_TS_thtip_back_right" site="T_thtip_back_right"/>
+        <touch name="rh_TS_thtip_tip" site="T_thtip_tip"/>
 
     </sensor>
 

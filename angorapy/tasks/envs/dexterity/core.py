@@ -108,7 +108,7 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         """Initial configuration of the environment. Can be used to configure initial state
         and extract information from the simulation."""
         for k, v in zip(mj_get_category_names(self.model, "sensor")[0], self.model.sensor_adr):
-            if b'robot/TS_' in k:
+            if b'robot/rh_TS_' in k:
                 self._touch_sensor_id.append(v)
 
                 if b'thtip' in k:
