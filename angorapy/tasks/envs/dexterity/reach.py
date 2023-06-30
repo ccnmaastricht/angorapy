@@ -198,6 +198,13 @@ class Reach(BaseShadowHandEnv):
             "is_success"   : self._is_success(self._get_achieved_goal(), self.goal),
         }
 
+    def _get_obs(self):
+        """Return the observation."""
+        obs = super()._get_obs()
+        obs["observation"]["vision"] = self.get_fingertip_positions().flatten()
+
+        return obs
+
 
 class ReachSequential(Reach):
     """Generate finger configurations in a sequence. Each new goal is randomly generated as the old goal is reached."""

@@ -499,7 +499,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             'observation': Sensation(
                 proprioception=self.get_proprioception(),
                 touch=self.get_touch() if self.touch else None,
-                vision=self.get_vision(),
+                vision=self.get_vision() if self.vision else None,
                 goal=self.goal.copy()
             ),
         }
