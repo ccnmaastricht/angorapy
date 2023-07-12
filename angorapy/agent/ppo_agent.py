@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
-import code
 import gc
 import json
 import os
@@ -20,7 +19,7 @@ import psutil
 import tensorflow as tf
 from gymnasium.spaces import Discrete, Box, MultiDiscrete
 
-from angorapy.common.senses import Sensation
+from angorapy.agent.ppo.train_step import ff_train_step, recurrent_train_step
 
 try:
     from mpi4py import MPI
@@ -31,9 +30,10 @@ from psutil import NoSuchProcess
 from tqdm import tqdm
 
 from angorapy import models
+from angorapy.common.senses import Sensation
+
 from angorapy.agent.dataio import read_dataset_from_storage
 from angorapy.agent.gather import Gatherer, evaluate
-from angorapy.agent.ppo.optim import learn_on_batch
 from angorapy.common import policies, const
 from angorapy.common.const import COLORS, BASE_SAVE_PATH, PRETRAINED_COMPONENTS_PATH, STORAGE_DIR, PATH_TO_EXPERIMENTS
 from angorapy.common.const import MIN_STAT_EPS
@@ -43,10 +43,10 @@ from angorapy.common.transformers import BaseRunningMeanTransformer, transformer
 from angorapy.common.wrappers import BaseWrapper, make_env
 from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
 from angorapy.utilities.error import ComponentError
-from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, reset_states_masked, \
-    requires_batch_size, requires_sequence_length, validate_model_builder, validate_env_model_compatibility
+from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, requires_batch_size, \
+    requires_sequence_length, validate_model_builder, validate_env_model_compatibility
 from angorapy.utilities.statistics import ignore_none
-from angorapy.utilities.util import mpi_flat_print, env_extract_dims, detect_finished_episodes, find_optimal_tile_shape, \
+from angorapy.utilities.util import mpi_flat_print, env_extract_dims, find_optimal_tile_shape, \
     mpi_print, flatten
 
 
@@ -110,7 +110,7 @@ class PPOAgent:
             clip_values (bool): boolean switch to turn off or on the clipping of the value loss
             lr_schedule (str): type of scheduler for the learning rate, default None (constant learning rate). Can be
                 either None or 'exponential'
-            _make_dirs (bool): internal parameter to indicate whether or not to recreate the directories
+            _make_dirs (bool): internal parameter to indicate whether to recreate the directories
             debug (bool): turn on/off debugging mode
         """
         super().__init__()
@@ -209,6 +209,7 @@ class PPOAgent:
                     print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
         self.optimizer: MpiAdam = MpiAdam(comm=self.optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
+
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -293,7 +294,8 @@ class PPOAgent:
             if len(gpus) > 0:
                 tf.config.experimental.set_memory_growth(gpus[0], True)
 
-        optimization_ranks = [r for r in mpi_comm.allgather(MPI.COMM_WORLD.rank if is_optimization_process else -1) if r != -1]
+        optimization_ranks = [r for r in mpi_comm.allgather(MPI.COMM_WORLD.rank if is_optimization_process else -1) if
+                              r != -1]
         if limit_to_n_optimizers is not None and limit_to_n_optimizers != 0:
             optimization_ranks = optimization_ranks[:limit_to_n_optimizers]
             is_optimization_process = mpi_comm.rank in optimization_ranks
@@ -440,14 +442,12 @@ class PPOAgent:
             effective_batch_size = batch_size
 
         # rebuild model with desired batch size
-        # mixed_precision.set_global_policy("mixed_float16")
         joint_weights = self.joint.get_weights()
         self.policy, self.value, self.joint = self.build_models(
             weights=joint_weights,
             batch_size=batch_size,
             sequence_length=self.tbptt_length)
 
-        # mixed_precision.set_global_policy("float32")
         _, _, actor_joint = self.build_models(joint_weights, 1, 1)
 
         # reset optimizer to not be confused by the newly build models
@@ -564,7 +564,6 @@ class PPOAgent:
 
             # OPTIMIZATION PHASE
             if self.is_optimization_process:
-
                 dataset = read_dataset_from_storage(
                     dtype_actions=tf.float32 if self.continuous_control else tf.int32,
                     id_prefix=self.agent_id,
@@ -572,9 +571,7 @@ class PPOAgent:
                     responsive_senses=self.policy.input_names)
 
                 subprocess_start = time.time()
-
                 self.optimize(dataset, epochs, effective_batch_size)
-
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 # FINALIZE
@@ -678,13 +675,6 @@ class PPOAgent:
 
     def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: Union[int, Tuple[int, int]]) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
-        
-        Since data processing is apparently not possible with tensorflow data sets on a GPU, we will only let the GPU
-        handle the training, but keep the rest of the data pipeline on the CPU. I am not currently sure if this is the
-        best approach, but it might be the good anyways for large data chunks anyways due to GPU memory limits. It also
-        should not make much of a difference since gym runs entirely on CPU anyways, hence for every experience
-        gathering we need to transfer all Tensors from CPU to GPU, no matter whether the dataset is stored on GPU or
-        not. Even more so this applies with running simulations on the cluster.
 
         Args:
             dataset (tf.data.Dataset): tensorflow dataset containing serialization, a, p(a), r and A as components per data point
@@ -695,98 +685,55 @@ class PPOAgent:
             None
         """
 
-        _learn_on_batch = tf.function(learn_on_batch)
-
-        total_updates = (self.n_workers * self.horizon) // ((np.prod(batch_size) * self.tbptt_length) if self.is_recurrent else batch_size) * epochs
+        # start optimization
+        total_updates = (batch_size[0] if self.is_recurrent else batch_size) * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
         with tqdm(total=total_updates, disable=self.mpi_comm.rank != 0, desc="Optimizing...") as pbar:
             for epoch in range(epochs):
+                if self.is_recurrent:
+                    batched_dataset = dataset.batch(batch_size[0], drop_remainder=True)
+                    with tf.device(self.device):
+                        for batch in batched_dataset:
+                            ent, pi_loss, v_loss = recurrent_train_step(
+                                batch=batch,
+                                batch_size=batch_size,
+                                joint=self.joint,
+                                distribution=self.distribution,
+                                continuous_control=self.continuous_control,
+                                clip_values=self.clip_values,
+                                gradient_clipping=self.gradient_clipping,
+                                clip=self.clip,
+                                c_value=self.c_value,
+                                c_entropy=self.c_entropy,
+                                is_recurrent=self.is_recurrent,
+                                optimizer=self.optimizer)
+                            pbar.update(1)
 
-                # shuffle to break correlation; not for recurrent data since that would break chunk dependence
-                if not self.is_recurrent:
+                        policy_loss_history.append(pi_loss.numpy().item())
+                        value_loss_history.append(v_loss.numpy().item())
+                        entropy_history.append(ent.numpy().item())
+                else:
                     dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 
-                # divide into batches; for recurrent this is only batches trajectory wise, further split performed later
-                batched_dataset = dataset.batch(batch_size[0] if self.is_recurrent else batch_size, drop_remainder=True)
+                    # divide into batches
+                    batched_dataset = dataset.batch(batch_size, drop_remainder=True)
+                    policy_epoch_losses, value_epoch_losses, entropies = [], [], []
 
-                policy_epoch_losses, value_epoch_losses, entropies = [], [], []
+                    with tf.device(self.device):
+                        for b in batched_dataset:
+                            ent, pi_loss, v_loss = ff_train_step(b)
 
-                with tf.device(self.device):
-                    for b in batched_dataset:
-                        if not self.is_recurrent:
-                            grad, ent, pi_loss, v_loss = _learn_on_batch(
-                                batch=b, joint=self.joint, distribution=self.distribution,
-                                continuous_control=self.continuous_control, clip_values=self.clip_values,
-                                gradient_clipping=self.gradient_clipping, clipping_bound=self.clip, c_value=self.c_value,
-                                c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-                            self.optimizer.apply_gradients(zip(grad, self.joint.trainable_variables))
-                        else:
-                            # truncated back propagation through time
-                            # incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
-                            # we split along the N_SUBSEQUENCES dimension to get batches of single subsequences that can be
-                            # fed into the model chronologically to adhere to statefulness
-                            # if the following line throws a CPU to GPU error this is most likely due to too little memory
-                            # on the GPU; lower the number of worker/horizon/... in that case TODO solve by microbatching
-                            n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
-                            # print(f"bs {batch_size} | split "
-                            #       f"{[(bv.shape[1], n_chunks_per_trajectory_per_batch) for bk, bv in b.items()]}")
-                            # print(sum([bv.dtype.size * tf.reduce_prod(bv.shape).numpy().item() for bv in b.values()]) / 1e9)
+                        entropies.append(ent)
+                        policy_epoch_losses.append(pi_loss)
+                        value_epoch_losses.append(v_loss)
 
-                            split_batch = {bk: tf.split(bv, bv.shape[1] // n_chunks_per_trajectory_per_batch, axis=1)
-                                           for bk, bv in b.items()}
-                            for batch_i in range(len(split_batch["advantage"])):
-                                batch_grad, batch_ent, batch_pi_loss, batch_v_loss = None, None, None, None
+                        # reset RNN states after each outer batch
+                        self.joint.reset_states()
 
-                                for chunk_i in range(split_batch["advantage"][batch_i].shape[1]):
-                                    # extract chunks
-                                    partial_batch = {k: v[batch_i][:, chunk_i, ...] for k, v in split_batch.items()}
-
-                                    # find and apply the gradients
-                                    # grad, ent, pi_loss, v_loss = [tf.random.normal(v.shape)
-                                    # for v in self.joint.trainable_variables], 0, 0, 0
-                                    grad, ent, pi_loss, v_loss = _learn_on_batch(
-                                        batch=partial_batch, joint=self.joint, distribution=self.distribution,
-                                        continuous_control=self.continuous_control, clip_values=self.clip_values,
-                                        gradient_clipping=self.gradient_clipping, clipping_bound=self.clip,
-                                        c_value=self.c_value, c_entropy=self.c_entropy, is_recurrent=self.is_recurrent)
-
-                                    if chunk_i == 0:
-                                        batch_grad, batch_ent, batch_pi_loss, batch_v_loss = grad, ent, pi_loss, v_loss
-                                    else:
-                                        batch_grad = [tf.add(bg, g) for bg, g in zip(batch_grad, grad)]
-                                        batch_ent += ent
-                                        batch_pi_loss += pi_loss
-                                        batch_v_loss += v_loss
-
-                                    # make partial RNN state resets
-                                    reset_mask = detect_finished_episodes(partial_batch["done"])
-                                    reset_states_masked(self.joint, reset_mask)
-
-                                    # free memory
-                                    del partial_batch
-
-                                batch_grad = [b / n_chunks_per_trajectory_per_batch for b in batch_grad]
-                                self.optimizer.apply_gradients(zip(batch_grad, self.joint.trainable_variables))
-                                pbar.update(1)
-
-                                # free memory
-                                del batch_grad
-
-                            # free memory
-                            del split_batch, b, batch_ent, batch_pi_loss, batch_v_loss
-
-                    # todo makes no sense with the split batches, need to average over them
-                    entropies.append(ent)
-                    policy_epoch_losses.append(pi_loss)
-                    value_epoch_losses.append(v_loss)
-
-                    # reset RNN states after each outer batch
-                    self.joint.reset_states()
-
-                # remember some statistics
-                policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
-                value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
-                entropy_history.append(tf.reduce_mean(entropies).numpy().item())
+                    # remember some statistics
+                    policy_loss_history.append(tf.reduce_mean(policy_epoch_losses).numpy().item())
+                    value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
+                    entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
         self.optimization_comm.Barrier()
 
@@ -813,7 +760,8 @@ class PPOAgent:
 
         stat_bundles = []
         for i in tqdm(range(n), disable=not self.is_root):
-            lengths, rewards, classes, auxiliary_performances = evaluate(policy, self.env, self.distribution, act_confidently)
+            lengths, rewards, classes, auxiliary_performances = evaluate(policy, self.env, self.distribution,
+                                                                         act_confidently)
             stat_bundles.append(
                 StatBundle(
                     1, lengths, [rewards], [lengths],
@@ -1047,7 +995,8 @@ class PPOAgent:
 
             loaded_agent.__dict__[p] = v
 
-        loaded_agent.joint.load_weights(f"./{path_modifier}/{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
+        loaded_agent.joint.load_weights(
+            f"./{path_modifier}/{BASE_SAVE_PATH}/{agent_id}/" + f"/{from_iteration}/weights")
 
         if "optimizer" in parameters.keys():  # for backwards compatibility
             if os.path.isfile(agent_path + f"/{from_iteration}/optimizer_weights.npz"):

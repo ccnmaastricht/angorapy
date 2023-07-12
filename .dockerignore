@@ -1,6 +1,10 @@
-./**/venv/
-./**/storage/
-./**/docs/
-./**/build/
-./**/*.egg-info/
-./**/*.pytest_cache/
+**/venv/
+**/storage/
+**/docs/
+**/build/
+**/*.egg-info/
+**/*.pytest_cache/
+**/.git
+**/logdir/
+**/results/
+**/*.pdf

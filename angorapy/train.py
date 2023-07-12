@@ -85,6 +85,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     # choose and make policy distribution
     if settings["distribution"] is None:
         distribution = autoselect_distribution(env)
+        settings["distribution"] = distribution.short_name
     else:
         distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
@@ -146,6 +147,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     if len(tf.config.list_physical_devices('GPU')) > 0:
         agent.set_gpu(not settings["cpu"])
     else:
+        print("No GPU found, running on CPU.")
         agent.set_gpu(False)
 
     monitor = None
@@ -160,9 +162,11 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                           experiment_group=settings["experiment_group"])
 
     try:
+        # tf.profiler.experimental.start("logdir")
         agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
                     monitor=monitor, save_every=settings["save_every"], separate_eval=settings["eval"],
                     stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+        # tf.profiler.experimental.stop()
     except KeyboardInterrupt:
         mpi_print("Ended by user.")
     except Exception:
@@ -269,6 +273,8 @@ if __name__ == "__main__":
         tf.config.run_functions_eagerly(True)
         if is_root:
             logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
+    else:
+        tf.config.run_functions_eagerly(False)
 
     try:
         run_experiment(args.env, vars(args), use_monitor=not args.no_monitor)

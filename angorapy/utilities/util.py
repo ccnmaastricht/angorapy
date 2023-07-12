@@ -81,6 +81,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], Tuple[int]]:
     return obs_dim, act_dim
 
 
+@tf.function
 def normalize(x, is_img=False) -> numpy.ndarray:
     """Normalize a numpy array to have all values in range (0, 1)."""
     x = tf.convert_to_tensor(x).numpy()

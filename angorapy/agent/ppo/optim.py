@@ -8,6 +8,7 @@ from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import Sensation
 
 
+@tf.function
 def learn_on_batch(batch,
                    joint: tf.keras.Model,
                    distribution: BasePolicyDistribution,

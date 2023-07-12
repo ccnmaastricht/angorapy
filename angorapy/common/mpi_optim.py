@@ -8,7 +8,13 @@ class AdamSynchronizationError(Exception):
     pass
 
 
-class MpiAdam(tf.keras.optimizers.legacy.Adam):
+try:
+    ADAM_BASE = tf.keras.optimizers.legacy.Adam
+except:
+    ADAM_BASE = tf.keras.optimizers.Adam
+
+
+class MpiAdam(ADAM_BASE):
     """Adam optimizer that averages gradients across mpi processes."""
 
     def __init__(self, comm, learning_rate=0.001, epsilon=1e-7):

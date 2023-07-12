@@ -25,7 +25,7 @@ setup(
 
         # tensorflow and extensions
         "tensorflow==2.12.0",
-        "tensorflow_probability==0.16.0 ",
+        "tensorflow_probability==0.20.0",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
         "tqdm",
@@ -48,6 +48,8 @@ setup(
         "gymnasium[box2d,mujoco]==0.28.1",
         "mujoco",
         "dm_control==1.0.12",
+        "mujoco_utils",
+        "tensorflow_datasets",
 
         # webinterface
         "itsdangerous==2.0.1",

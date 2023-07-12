@@ -122,7 +122,9 @@ class Gatherer(BaseGatherer):
 
                 # based on given state, predict action distribution and state value; need flatten due to tf eager bug
                 prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-                policy_out = flatten(joint(prepared_state, training=False))
+
+                # with tf.profiler.experimental.Trace("gather", step_num=t, _r=1):
+                policy_out = flatten(joint(prepared_state))
 
                 predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
                 # from the action distribution sample an action and remember both the action and its probability

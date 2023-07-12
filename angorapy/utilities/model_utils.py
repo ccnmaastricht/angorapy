@@ -4,6 +4,7 @@ from typing import List, Union, Callable
 import numpy
 import numpy as np
 import tensorflow as tf
+from keras import backend
 from tensorflow.keras.layers import TimeDistributed
 
 import angorapy
@@ -146,25 +147,36 @@ def get_component(model: tf.keras.Model, name: str):
             return layer
 
 
-def reset_states_masked(model: tf.keras.Model, mask: List):
+def reset_states_masked(recurrent_layers: List[tf.keras.layers.RNN], mask: List):
     """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
 
     The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
     and zeros otherwise (booleans possible too)."""
 
-    # extract recurrent layers by their superclass RNN
-    recurrent_layers = [layer for layer in model.submodules if isinstance(layer, tf.keras.layers.RNN)]
-
     for layer in recurrent_layers:
-        current_states = [state.numpy() for state in layer.states]
-        initial_states = 0
-        new_states = []
-        for current_state in current_states:
-            expanded_mask = numpy.tile(numpy.rot90(numpy.expand_dims(mask, axis=0)), (1, current_state.shape[-1]))
-            masked_reset_state = np.where(expanded_mask, initial_states, current_state)
-            new_states.append(masked_reset_state)
+        current_states = layer.states
+        new_states = tf.TensorArray(tf.float32, size=len(current_states))
+        for i_state in range(len(current_states)):
+            current_state = current_states[i_state]
+            expanded_mask = tf.tile(
+                tf.reverse(
+                    tf.transpose(
+                        tf.expand_dims(mask, axis=0)
+                    ), axis=[0]),
+                (1, current_state.shape[-1])
+            )  # TODO why did we reverse?
 
-        layer.reset_states(new_states)
+            masked_reset_state = tf.where(expanded_mask, 0., current_state)
+            new_states.write(i_state, masked_reset_state)
+
+        # we need to do this by hand here because Keras' reset_states() method does not work with tf.function
+        if tf.nest.flatten(layer.states)[0] is not None:
+            flat_states = tf.nest.flatten(layer.states)
+
+            for i, state in enumerate(flat_states):
+                state.assign(new_states.read(i))
+        else:
+            raise NotImplementedError("Masked state reset cannot deal with uninitialized layers.")
 
 
 def calc_max_memory_usage(model: tf.keras.Model):
