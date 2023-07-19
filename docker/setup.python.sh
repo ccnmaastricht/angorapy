@@ -24,6 +24,7 @@ VERSION=$1
 REQUIREMENTS=$2
 
 # Install Python packages for this container's version
+echo "Installing Python $VERSION and packages from $REQUIREMENTS"
 cat >pythons.txt <<EOF
 $VERSION
 $VERSION-venv
@@ -31,6 +32,7 @@ $VERSION-distutils
 $VERSION-dev
 EOF
 /setup.packages.sh pythons.txt
+echo "Python $VERSION installed"
 
 # Setup links for TensorFlow to compile.
 # Referenced in devel.usertools/*.bazelrc

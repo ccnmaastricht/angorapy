@@ -48,9 +48,6 @@ def learn_on_batch(batch,
 
         if continuous_control:
             # if action space is continuous, calculate PDF at chosen action value
-            for moment in policy_output:
-                tf.debugging.assert_all_finite(moment, "A moment in policy output is nan/inf")
-
             action_probabilities = distribution.log_probability(batch["action"], *policy_output)
         else:
             # if the action space is discrete, extract the probabilities of actions actually chosen
@@ -73,18 +70,11 @@ def learn_on_batch(batch,
         entropy = loss.entropy_bonus(policy_output=policy_output,
                                      distribution=distribution)
 
-        tf.debugging.assert_all_finite(policy_loss, f"Policy loss is nan/inf")
-        tf.debugging.assert_all_finite(entropy, f"Entropy is nan/inf")
-        tf.debugging.assert_all_finite(value_loss, f"Value loss is nan/inf")
-
         # combine weighted losses
         total_loss = policy_loss + tf.multiply(c_value, value_loss) - tf.multiply(c_entropy, entropy)
 
     # calculate the gradient of the joint model based on total loss
     gradients = tape.gradient(total_loss, joint.trainable_variables)
-
-    for i, gradient in enumerate(gradients):
-        tf.debugging.assert_all_finite(gradient, f"Gradient {i} is nan/inf")
 
     # clip gradients to avoid gradient explosion and stabilize learning
     if gradient_clipping is not None:

@@ -56,9 +56,11 @@ def overview():
             model_path = os.path.join(BASE_SAVE_PATH, eid)
 
             if os.path.isfile(os.path.join(exp_path, "progress.json")):
-                print(eid)
-                with open(os.path.join(exp_path, "progress.json"), "r") as f:
-                    progress = json.load(f)
+                try:
+                    with open(os.path.join(exp_path, "progress.json"), "r") as f:
+                        progress = json.load(f)
+                except:
+                    continue
 
                 try:
                     with open(os.path.join(exp_path, "meta.json"), "r") as f:

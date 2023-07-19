@@ -28,7 +28,7 @@ class AgentTest(unittest.TestCase):
             build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
         else:
             build_models = model_builder
-        agent = PPOAgent(build_models, env, workers=2, horizon=128)
+        agent = PPOAgent(build_models, env, workers=2, horizon=max(128, env.spec.max_episode_steps))
         agent.drill(n=2, epochs=2, batch_size=64)
 
     def test_drill_continuous(self):
@@ -47,7 +47,7 @@ class AgentTest(unittest.TestCase):
         except Exception:
             self.fail("Discrete drill raises error.")
 
-    def test_drill_manipulate_multicontinuous(self):
+    def test_drill_manipulate_multicategorical(self):
         """Test drilling of discrete agent (LunarLander)."""
 
         try:

@@ -209,7 +209,8 @@ class PPOAgent:
                     print(f"\tNo outer component named '{component.name}' in model. Skipping.")
 
         self.optimizer: MpiAdam = MpiAdam(comm=self.optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
-
+        self.optimizer.apply_gradients(zip([tf.zeros_like(v) for v in self.joint.trainable_variables],
+                                           self.joint.trainable_variables))
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -721,7 +722,18 @@ class PPOAgent:
 
                     with tf.device(self.device):
                         for b in batched_dataset:
-                            ent, pi_loss, v_loss = ff_train_step(b)
+                            ent, pi_loss, v_loss = ff_train_step(batch=b,
+                                                                 joint=self.joint,
+                                                                 distribution=self.distribution,
+                                                                 continuous_control=self.continuous_control,
+                                                                 clip_values=self.clip_values,
+                                                                 gradient_clipping=self.gradient_clipping,
+                                                                 clip=self.clip,
+                                                                 c_value=self.c_value,
+                                                                 c_entropy=self.c_entropy,
+                                                                 is_recurrent=self.is_recurrent,
+                                                                 optimizer=self.optimizer)
+                            pbar.update(1)
 
                         entropies.append(ent)
                         policy_epoch_losses.append(pi_loss)

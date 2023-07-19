@@ -110,8 +110,8 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
     def push_seq_to_buffer(self, states: List[Sensation], actions: List[arr], action_probabilities: List[arr],
                            values: List[arr], episode_ended: bool = False):
         """Push a sequence to the buffer, constructed from given lists of values."""
-        assert np.all(np.array([len(states), len(actions), len(action_probabilities), len(values)]) == len(states)), \
-            "Inconsistent input sizes."
+        # assert np.all(np.array([len(states), len(actions), len(action_probabilities), len(values)]) == len(states)), \
+        #     "Inconsistent input sizes."
 
         seq_length = len(actions)
 

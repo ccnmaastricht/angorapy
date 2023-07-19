@@ -6,12 +6,14 @@ from typing import Union, Tuple, List
 
 import gymnasium as gym
 import numpy as np
+import scipy
 import tensorflow as tf
 
 from angorapy.agent.utils import extract_discrete_action_probabilities
 from angorapy.common.const import EPSILON
 from angorapy.common.layers import StdevLayer, BetaDistributionSpreadLayer
 from angorapy.utilities.util import env_extract_dims
+import tensorflow_probability as tfp
 
 
 class BasePolicyDistribution(abc.ABC):
@@ -46,6 +48,11 @@ class BasePolicyDistribution(abc.ABC):
     def act(self, *args, **kwargs):
         """Sample an step_tuple from the distribution and return it alongside its probability."""
         pass
+
+    def act_numpy(self, *args, **kwargs):
+        """Can be overwritten by subclasses to provide a faster numpy implementation of the act method. This pure numpy
+        implementation is called by the gatherer where no GPU utilization is possible."""
+        return self.act(*args, **kwargs)
 
     @abc.abstractmethod
     def act_deterministic(self, *args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
@@ -301,6 +308,13 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
 
         return tf.reshape(actions, [-1]).numpy(), tf.squeeze(probabilities).numpy()
 
+    def act_numpy(self, means: np.ndarray, log_stdevs: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Sample an step_tuple from a gaussian step_tuple distribution defined by the means and log standard deviations."""
+        actions = np.random.normal(means, np.exp(log_stdevs), size=means.shape)
+        probabilities = self.log_probability_numpy(actions, means=means, log_stdevs=log_stdevs)
+
+        return np.reshape(actions, [-1]), np.squeeze(probabilities)
+
     def sample(self, means: tf.Tensor, log_stdevs: tf.Tensor):
         """Sample from the Gaussian distribution."""
         action = tf.random.normal(means.shape, means, tf.exp(log_stdevs))
@@ -324,15 +338,25 @@ class GaussianPolicyDistribution(BaseContinuousPolicyDistribution):
         Output Shapes:
             - all: (B) or (B, S)
         """
-        # tf.debugging.assert_all_finite(samples, "samples not all finite")
-        # tf.debugging.assert_all_finite(means, "means not all finite")
-        # tf.debugging.assert_all_finite(log_stdevs, "log_stdevs not all finite")
-
         log_likelihoods = (- tf.reduce_sum(log_stdevs, axis=-1)
                            - tf.math.log(2 * np.pi)
                            - (0.5 * tf.reduce_sum(tf.square(((samples - means) / tf.exp(log_stdevs))), axis=-1)))
 
-        # tf.debugging.assert_all_finite(log_likelihoods, "log_likelihoods not all finite")
+        return log_likelihoods
+
+    @staticmethod
+    def log_probability_numpy(samples: np.ndarray, means: np.ndarray, log_stdevs: np.ndarray):
+        """Calculate log probability density for a given batch of potentially joint Gaussian PDF.
+
+        Input Shapes:
+            - all: (B, A) or (B, S, A)
+
+        Output Shapes:
+            - all: (B) or (B, S)
+        """
+        log_likelihoods = (- np.sum(log_stdevs, axis=-1)
+                           - np.log(2 * np.pi)
+                           - (0.5 * np.sum(np.square(((samples - means) / np.exp(log_stdevs))), axis=-1)))
 
         return log_likelihoods
 
@@ -434,6 +458,20 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
         return actions, probabilities
 
+    def act_numpy(self, alphas: np.ndarray, betas: np.ndarray):
+        """Sample an action from a beta distribution."""
+        actions = np.random.beta(alphas, betas)
+
+        # we need to prevent 0 and 1 as actions, otherwise log in probability calculation can fuck up
+        actions = np.where(actions == 0, actions + EPSILON, actions)
+        actions = np.where(actions == 1, actions - EPSILON, actions)
+
+        actions = self._scale_sample_to_action_range_numpy(np.reshape(actions, [-1]))
+
+        probabilities = tf.squeeze(self.log_probability_numpy(actions, alphas, betas))
+
+        return actions, probabilities
+
     def act_deterministic(self, alphas: Union[tf.Tensor, np.ndarray], betas: Union[tf.Tensor, np.ndarray]):
         """Get action by deterministically taking the mode of the distribution."""
         actions = (alphas) / (alphas + betas)
@@ -458,11 +496,17 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
     def _scale_sample_to_action_range(self, sample) -> tf.Tensor:
         return tf.add(tf.multiply(sample, self.action_mm_diff), self.action_min_values)
 
+    def _scale_sample_to_action_range_numpy(self, sample) -> np.ndarray:
+        return np.add(np.multiply(sample, self.action_mm_diff), self.action_min_values)
+
     @tf.function
     def _scale_sample_to_distribution_range(self, sample) -> tf.Tensor:
-        # clipping just to, you know, be sure
-        return tf.clip_by_value(tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff), EPSILON,
-                                1 - EPSILON)
+        # TODO I removed the clipping here because in theory its not necessary, but slows computations down
+        # however, numerical faults might make it necessary (?) so check later if all still worked fine (14/07/2023)
+        return tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff)
+
+    def _scale_sample_to_distribution_range_numpy(self, sample) -> np.ndarray:
+        return np.divide(np.subtract(sample, self.action_min_values), self.action_mm_diff)
 
     @tf.function
     def probability(self, samples: tf.Tensor, alphas: tf.Tensor, betas: tf.Tensor):
@@ -491,6 +535,16 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
         log_pdf = log_top - tf.math.lgamma(alphas) - tf.math.lgamma(betas) + tf.math.lgamma(alphas + betas)
 
         return tf.math.reduce_sum(log_pdf, axis=-1)
+
+    def log_probability_numpy(self, samples: np.ndarray, alphas: np.ndarray, betas: np.ndarray):
+        """
+        Input Shape: (B, A)
+        Output Shape: (B,)
+        """
+        rescaled_samples = self._scale_sample_to_distribution_range_numpy(samples)
+        log_pdf = scipy.stats.beta.logpdf(rescaled_samples, alphas, betas)
+
+        return np.sum(log_pdf, axis=-1)
 
     @tf.function
     def entropy(self, params: Tuple[tf.Tensor, tf.Tensor]):

@@ -82,7 +82,7 @@ class Gatherer(BaseGatherer):
         Args:
             joint:          network returning both policy and value
             env:            environment from which to gather the data
-            horizon:        the number of steps gatherd by this worker
+            horizon:        the number of steps gathered by this worker
             discount:       discount factor
             lam:            lambda parameter of GAE balancing the tradeoff between bias and variance
             subseq_length:  the length of connected subsequences for TBPTT
@@ -116,23 +116,25 @@ class Gatherer(BaseGatherer):
         achieved_goals = []
         state, info = env.reset()
 
+        joint.__call__ = tf.function(joint.__call__)
         with tqdm(total=self.horizon, disable=self.worker_id != 0, desc="Gathering experience...") as pbar:
             while t < self.horizon:
                 current_subseq_length += 1
 
                 # based on given state, predict action distribution and state value; need flatten due to tf eager bug
                 prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
-
-                # with tf.profiler.experimental.Trace("gather", step_num=t, _r=1):
-                policy_out = flatten(joint(prepared_state))
+                policy_out = flatten(joint(prepared_state, training=False))
+                # policy_out = fake_joint_output(joint)
 
                 predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
                 # from the action distribution sample an action and remember both the action and its probability
                 action, action_probability = self.select_action(predicted_distribution_parameters)
+                # action, action_probability = env.action_space.sample(), 0.5
 
                 states.append(state)
                 values.append(np.squeeze(value))
                 actions.append(action)
+
                 action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
                 # make a step based on the chosen action and collect the reward for this state
@@ -266,10 +268,10 @@ class Gatherer(BaseGatherer):
 
         return buffer
 
-    def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
+    def select_action(self, predicted_parameters: list) -> np.ndarray:
         """Standard action selection where an action is sampled fully from the predicted distribution."""
-        action, action_probability = self.distribution.act(*predicted_parameters)
-        action = action if not DETERMINISTIC else np.zeros(action.shape)
+        action, action_probability = self.distribution.act_numpy(*predicted_parameters)
+        action = action if not DETERMINISTIC else np.zeros_like(action)
 
         return action, action_probability
 

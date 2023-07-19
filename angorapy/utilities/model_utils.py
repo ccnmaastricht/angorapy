@@ -159,10 +159,9 @@ def reset_states_masked(recurrent_layers: List[tf.keras.layers.RNN], mask: List)
         for i_state in range(len(current_states)):
             current_state = current_states[i_state]
             expanded_mask = tf.tile(
-                tf.reverse(
                     tf.transpose(
                         tf.expand_dims(mask, axis=0)
-                    ), axis=[0]),
+                    ),
                 (1, current_state.shape[-1])
             )  # TODO why did we reverse?
 

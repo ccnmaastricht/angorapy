@@ -1,3 +1,5 @@
+from typing import Dict
+
 import tensorflow as tf
 
 from angorapy.agent.ppo.optim import learn_on_batch
@@ -5,7 +7,6 @@ from angorapy.utilities.model_utils import reset_states_masked
 from angorapy.utilities.util import detect_finished_episodes
 
 
-@tf.function
 def ff_train_step(batch,
                   joint,
                   distribution,
@@ -26,18 +27,61 @@ def ff_train_step(batch,
 
     return ent, pi_loss, v_loss
 
+@tf.function
+def _split_batch(batch: Dict[str, tf.Tensor], n_chunks_per_trajectory_per_batch: int):
+    _split_part = lambda bv: tf.reshape(bv,
+                                       [bv.shape[0]]
+                                       + [bv.shape[1] // n_chunks_per_trajectory_per_batch,
+                                          n_chunks_per_trajectory_per_batch]
+                                       + bv.shape[2:])
+
+    return {k: _split_part(v) for k, v in batch.items()}
+
 
 @tf.function
-def _split_batch(bv, n_chunks_per_trajectory_per_batch):
-    return tf.reshape(bv,
-                      [bv.shape[0]]
-                      + [bv.shape[1] // n_chunks_per_trajectory_per_batch, n_chunks_per_trajectory_per_batch]
-                      + bv.shape[2:])
+def _do_batch_op(joint,
+                 recurrent_layers,
+                 n_chunks_per_trajectory_per_batch,
+                 batch_i,
+                 split_batch,
+                 distribution,
+                 continuous_control,
+                 clip_values,
+                 gradient_clipping,
+                 clip,
+                 c_value,
+                 c_entropy,
+                 is_recurrent):
+    batch_grad = [tf.zeros_like(tv) for tv in joint.trainable_variables]
+    batch_ent = tf.constant(0.)
+    batch_pi_loss = tf.constant(0.)
+    batch_v_loss = tf.constant(0.)
+
+    for chunk_i in tf.range(n_chunks_per_trajectory_per_batch):
+        partial_batch = {k: v[:, batch_i, chunk_i, ...] for k, v in split_batch.items()}
+        grad, ent, pi_loss, v_loss = learn_on_batch(
+            batch=partial_batch, joint=joint, distribution=distribution,
+            continuous_control=continuous_control, clip_values=clip_values,
+            gradient_clipping=gradient_clipping, clipping_bound=clip,
+            c_value=c_value, c_entropy=c_entropy, is_recurrent=is_recurrent)
+
+        batch_grad = tf.nest.map_structure(lambda bg, g: tf.add(bg, g), batch_grad, grad)
+        reset_mask = detect_finished_episodes(partial_batch["done"])
+
+        batch_ent += ent
+        batch_pi_loss += pi_loss
+        batch_v_loss += v_loss
+
+        # make partial RNN state resets
+        reset_states_masked(recurrent_layers, reset_mask)
+
+    batch_grad = tf.nest.map_structure(lambda b: b / n_chunks_per_trajectory_per_batch, batch_grad)
+
+    return batch_grad, batch_ent, batch_pi_loss, batch_v_loss
 
 
-@tf.function
-def recurrent_train_step(batch,
-                         batch_size,
+def recurrent_train_step(batch: dict,
+                         batch_size: tf.int32,
                          joint,
                          distribution,
                          continuous_control,
@@ -61,35 +105,23 @@ def recurrent_train_step(batch,
     batch_pi_loss = tf.constant(0.)
     batch_v_loss = tf.constant(0.)
 
-    split_batch = {k: _split_batch(v, n_chunks_per_trajectory_per_batch) for k, v in batch.items()}
-    total_chunks = 0
+    split_batch = _split_batch(batch, n_chunks_per_trajectory_per_batch)
     for batch_i in tf.range(split_batch["advantage"].shape[1]):
-        batch_grad = [tf.zeros_like(tv) for tv in joint.trainable_variables]
-        batch_ent = tf.constant(0.)
-        batch_pi_loss = tf.constant(0.)
-        batch_v_loss = tf.constant(0.)
-
-        for chunk_i in tf.range(n_chunks_per_trajectory_per_batch):
-            total_chunks += 1
-
-            partial_batch = {k: v[:, batch_i, chunk_i, ...] for k, v in split_batch.items()}
-            grad, ent, pi_loss, v_loss = learn_on_batch(
-                batch=partial_batch, joint=joint, distribution=distribution,
-                continuous_control=continuous_control, clip_values=clip_values,
-                gradient_clipping=gradient_clipping, clipping_bound=clip,
-                c_value=c_value, c_entropy=c_entropy, is_recurrent=is_recurrent)
-
-            batch_grad = tf.nest.map_structure(lambda bg, g: tf.add(bg, g), batch_grad, grad)
-            reset_mask = detect_finished_episodes(partial_batch["done"])
-
-            batch_ent += ent
-            batch_pi_loss += pi_loss
-            batch_v_loss += v_loss
-
-            # make partial RNN state resets
-            reset_states_masked(recurrent_layers, reset_mask)
-
-        batch_grad = tf.nest.map_structure(lambda b: b / n_chunks_per_trajectory_per_batch, batch_grad)
+        batch_grad, batch_ent, batch_pi_loss, batch_v_loss = _do_batch_op(
+            joint,
+            recurrent_layers,
+            n_chunks_per_trajectory_per_batch,
+            batch_i,
+            split_batch,
+            distribution,
+            continuous_control,
+            clip_values,
+            gradient_clipping,
+            clip,
+            c_value,
+            c_entropy,
+            is_recurrent
+        )
         optimizer.apply_gradients(zip(batch_grad, joint.trainable_variables))
 
     return batch_ent, batch_pi_loss, batch_v_loss
