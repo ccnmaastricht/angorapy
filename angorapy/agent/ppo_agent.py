@@ -800,7 +800,7 @@ class PPOAgent:
 
         return stats, classes
 
-    def report(self, total_iterations):
+    def report(self, total_iterations, verbose=False):
         """Print a report of the current state of the training."""
         if MPI.COMM_WORLD.rank != 0:
             return
@@ -853,24 +853,31 @@ class PPOAgent:
         if self.years_of_experience is not None:
             years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.3f}{ec}; "
 
-        # print the report
-        if self.is_root:
-            pass
+        report_items = {
+            "cycle": f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}",
+            "reward": f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}",
+            "length": f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}",
+            "n": f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}",
+            "loss": f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]",
+            "time": f"time: {time_string} {time_distribution_string}",
+            "underflow": underflow,
+            "lr": f"lr: {nc}{current_lr:.2e}{ec}",
+            "updates": f"upd: {nc}{self.optimizer.iterations.numpy().item() - 1:6d}{ec}",
+            "frames": f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k",
+            "time_left": f"time left: {nc}{time_left}{ec}",
+            "yoe": years_of_experience_report,
+            "eps": f"eps: {nc}{self.total_episodes_seen:5d}{ec}",
+            "took": f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]",
+            "mem": f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}|{self.used_gpu_memory[-1]}/{round(total_gpu_memory / 1e9, 2)}"
+        }
+
+        included_items = ["cycle", "reward", "length", "n", "loss", "updates", "yoe", "time", "time_left", "took"]
+        if verbose:
+            included_items = report_items.keys()
+
         mpi_flat_print(
-            f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}: "
-            f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}; "
-            f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}; "
-            f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}; "
-            f"loss: [{nc}{pi_loss}{ec}|{nc}{v_loss}{ec}|{nc}{ent}{ec}]; "
-            f"eps: {nc}{self.total_episodes_seen:5d}{ec}; "
-            f"lr: {nc}{current_lr:.2e}{ec}; "
-            f"upd: {nc}{self.optimizer.iterations.numpy().item():6d}{ec}; "
-            f"f: {nc}{round(self.total_frames_seen / 1e3, 3):8.3f}{ec}k; "
-            f"{years_of_experience_report}"
-            f"{underflow}"
-            f"times: {time_string} {time_distribution_string}; "
-            f"took {self.cycle_timings[-1] if len(self.cycle_timings) > 0 else ''}s [{time_left} left]; "
-            f"mem: {self.used_memory[-1]}/{round(psutil.virtual_memory()[0] / 1e9)}|{self.used_gpu_memory[-1]}/{round(total_gpu_memory / 1e9, 2)};\n")
+            "; ".join([report_items[k] for k in included_items]) + "\n"
+        )
 
     def save_agent_state(self, name=None):
         """Save the current state of the agent into the agent directory, identified by the current iteration."""

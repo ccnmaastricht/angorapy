@@ -192,6 +192,10 @@ class Investigator:
 
     def render_episode(self, env: gym.Env, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
+        if not env.render_mode == "human":
+            print("WARNING: Rendering is not set to human mode. You will not see any output. Rebuild the environment"
+                  "in human render mode.")
+
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
 
