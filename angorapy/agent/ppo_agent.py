@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Implementation of Proximal Policy Optimization Algorithm."""
+import collections
 import gc
 import json
 import os
@@ -10,7 +11,7 @@ import time
 from collections import OrderedDict
 from glob import glob
 from json import JSONDecodeError
-from typing import Union, Tuple, Any, Callable
+from typing import Union, Tuple, Any, Callable, Dict
 
 import gymnasium as gym
 import numpy as np
@@ -211,6 +212,7 @@ class PPOAgent:
         self.optimizer: MpiAdam = MpiAdam(comm=self.optimization_comm, learning_rate=self.lr_schedule, epsilon=1e-5)
         self.optimizer.apply_gradients(zip([tf.zeros_like(v) for v in self.joint.trainable_variables],
                                            self.joint.trainable_variables))
+
         self.is_recurrent = is_recurrent_model(self.policy)
         if not self.is_recurrent:
             self.tbptt_length = 1
@@ -326,7 +328,7 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
-    def act(self, state: Sensation):
+    def act(self, state: Union[Sensation, Dict[str, Any]]):
         """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
         that can be directly given to an environment.
 
@@ -335,6 +337,18 @@ class PPOAgent:
         sampling from the predicted distribution."""
 
         # based on given state, predict action distribution and state value; need flatten due to tf eager bug
+        if isinstance(state, (dict, collections.OrderedDict)) and "observation" in state.keys():
+            state = state["observation"]
+
+            if not isinstance(state, Sensation):
+                try:
+                    state = Sensation(**state)
+                except:
+                    raise ValueError("Observation in state dict must be a Sensation or dict convertible into "
+                                     "an observation.")
+        else:
+            raise ValueError("State must be a Sensation or a dictionary with an 'observation' key.")
+
         _, _, joint = self.build_models(self.joint.get_weights(), 1, 1)
 
         prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
