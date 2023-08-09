@@ -53,7 +53,13 @@ This library is developed as part of the [Human Brain Project](https://www.human
 
 ## 📥 Installation
 
-AngoraPy is available on PyPI.
+AngoraPy is available on PyPI. First, install requirements:
+
+```bash
+sudo apt install swig libopenmpi-dev
+```
+
+Then install AngoraPy from pip.
 
 ```bash
 pip install angorapy

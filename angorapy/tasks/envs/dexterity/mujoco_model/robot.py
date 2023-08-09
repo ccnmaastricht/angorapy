@@ -11,21 +11,27 @@ HAND_QUATERNION = (1, -1, 1, -1)
 
 
 class ShadowHand(Robot):
-    """A ShdaowHand robot implementation."""
+    """A ShadowHand robot implementation."""
 
     def __init__(self,
                  position: Sequence[float] = HAND_POSITION,
-                 rotation: Sequence[float] = HAND_QUATERNION) -> None:
+                 rotation: Sequence[float] = HAND_QUATERNION,
+                 no_wrist_control: bool = False) -> None:
         """Initializes a ShadowHand.
 
         Args:
             position: The position of the robot. Defaults to (0, 0, 0).
             rotation: The rotation of the robot, as a quaternion. Defaults to (1, -1, 1, -1), palm facing up.
+            no_wrist_control: If True, the wrist is fixed and cannot be controlled. Defaults to False.
         """
         self._prefix = "rh_"
+        self.no_wrist_control = no_wrist_control
         super().__init__(consts.MODEL_XML, position=position, rotation=rotation)
 
     def _parse_entity(self) -> None:
+        if self.no_wrist_control:
+            self._delete_wrist_actuators()
+
         joints = mjcf_utils.safe_find_all(self._mjcf_root, "joint")
         actuators = mjcf_utils.safe_find_all(self._mjcf_root, "actuator")
 
@@ -34,6 +40,12 @@ class ShadowHand(Robot):
 
     def _setup_entity(self):
         pass
+
+    def _delete_wrist_actuators(self):
+        actuators = mjcf_utils.safe_find_all(self._mjcf_root, "actuator")
+        for actor in actuators:
+            if "_WR" in actor.name:
+                actor.remove()
 
     # VISUALIZATION
     def show_touch_sites(self, show: bool = True):
@@ -93,4 +105,4 @@ class ShadowHandReach(ShadowHand):
 
 
 if __name__ == '__main__':
-    shadow_hand = ShadowHand()
+    shadow_hand = ShadowHand(no_wrist_control=True)
