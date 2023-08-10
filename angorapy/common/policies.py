@@ -501,9 +501,9 @@ class BetaPolicyDistribution(BaseContinuousPolicyDistribution):
 
     @tf.function
     def _scale_sample_to_distribution_range(self, sample) -> tf.Tensor:
-        # TODO I removed the clipping here because in theory its not necessary, but slows computations down
-        # however, numerical faults might make it necessary (?) so check later if all still worked fine (14/07/2023)
-        return tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff)
+        return tf.clip_by_value(tf.divide(tf.subtract(sample, self.action_min_values), self.action_mm_diff),
+                                EPSILON,
+                                1. - EPSILON)
 
     def _scale_sample_to_distribution_range_numpy(self, sample) -> np.ndarray:
         return np.divide(np.subtract(sample, self.action_min_values), self.action_mm_diff)
