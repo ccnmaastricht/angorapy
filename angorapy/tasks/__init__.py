@@ -15,75 +15,51 @@ from angorapy.tasks.envs.cognitive.hanoi import HanoiEnv
 # REACHING
 for vision_mode in ["Visual", ""]:
     for control_mode in ["Relative", "Absolute"]:
-        for init_mode in ["", "Random", "Buffered"]:
-            gym.envs.register(
-                id=f'Reach{init_mode}{control_mode}{vision_mode}-v0',
-                entry_point='angorapy.tasks:Reach',
-                kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
-                        **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                        "n_substeps": N_SUBSTEPS},
-                max_episode_steps=SHADOWHAND_MAX_STEPS,
-            )
+        gym.envs.register(
+            id=f'Reach{control_mode}{vision_mode}-v0',
+            entry_point='angorapy.tasks:Reach',
+            kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
+                    "n_substeps": N_SUBSTEPS},
+            max_episode_steps=SHADOWHAND_MAX_STEPS,
+        )
 
-            gym.envs.register(
-                id=f'Reach{init_mode}{control_mode}{vision_mode}NoTouch-v0',
-                entry_point='angorapy.tasks:Reach',
-                kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
-                        **({"initial_qpos": init_mode.lower()} if init_mode else {}), "touch": False,
-                        "n_substeps": N_SUBSTEPS},
-                max_episode_steps=SHADOWHAND_MAX_STEPS,
-            )
+        gym.envs.register(
+            id=f'Reach{control_mode}{vision_mode}NoTouch-v0',
+            entry_point='angorapy.tasks:Reach',
+            kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual", "touch": False,
+                    "n_substeps": N_SUBSTEPS},
+            max_episode_steps=SHADOWHAND_MAX_STEPS,
+        )
 
+        gym.envs.register(
+            id=f'FreeReach{control_mode}{vision_mode}-v0',
+            entry_point='angorapy.tasks:FreeReach',
+            kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
+                    "n_substeps": N_SUBSTEPS},
+            max_episode_steps=SHADOWHAND_MAX_STEPS,
+        )
+
+        for i, name in enumerate(["FF", "MF", "RF", "LF"]):
             gym.envs.register(
-                id=f'FreeReach{init_mode}{control_mode}{vision_mode}-v0',
+                id=f'FreeReach{name}{control_mode}{vision_mode}-v0',
                 entry_point='angorapy.tasks:FreeReach',
-                kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
-                        **({"initial_qpos": init_mode.lower()} if init_mode else {}),
+                kwargs={"relative_control": control_mode == "Relative",
+                        "vision": vision_mode == "Visual",
+                        "force_finger": i,
                         "n_substeps": N_SUBSTEPS},
                 max_episode_steps=SHADOWHAND_MAX_STEPS,
             )
 
-            for i, name in enumerate(["FF", "MF", "RF", "LF"]):
-                gym.envs.register(
-                    id=f'FreeReach{name}{init_mode}{control_mode}{vision_mode}-v0',
-                    entry_point='angorapy.tasks:FreeReach',
-                    kwargs={"relative_control": control_mode == "Relative",
-                            "vision": vision_mode == "Visual",
-                            "force_finger": i,
-                            **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                            "n_substeps": N_SUBSTEPS},
-                    max_episode_steps=SHADOWHAND_MAX_STEPS,
-                )
-
-                gym.envs.register(
-                    id=f'Reach{name}{init_mode}{control_mode}{vision_mode}-v0',
-                    entry_point='angorapy.tasks:Reach',
-                    kwargs={"relative_control": control_mode == "Relative",
-                            "vision": vision_mode == "Visual",
-                            "force_finger": i,
-                            **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                            "n_substeps": N_SUBSTEPS},
-                    max_episode_steps=SHADOWHAND_MAX_STEPS,
-                )
-
-            # REACH SEQUENCES
             gym.envs.register(
-                id=f'FreeReachSequential{init_mode}{control_mode}{vision_mode}-v0',
-                entry_point='angorapy.tasks:FreeReachSequential',
-                kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
-                        **({"initial_qpos": init_mode.lower()} if init_mode else {}),
+                id=f'Reach{name}{control_mode}{vision_mode}-v0',
+                entry_point='angorapy.tasks:Reach',
+                kwargs={"relative_control": control_mode == "Relative",
+                        "vision": vision_mode == "Visual",
+                        "force_finger": i,
                         "n_substeps": N_SUBSTEPS},
-                max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
+                max_episode_steps=SHADOWHAND_MAX_STEPS,
             )
 
-            gym.envs.register(
-                id=f'ReachSequential{init_mode}{control_mode}{vision_mode}-v0',
-                entry_point='angorapy.tasks:ReachSequential',
-                kwargs={"relative_control": control_mode == "Relative", "vision": vision_mode == "Visual",
-                        **({"initial_qpos": init_mode.lower()} if init_mode else {}),
-                        "n_substeps": N_SUBSTEPS},
-                max_episode_steps=SHADOWHAND_SEQUENCE_MAX_STEPS,
-            )
 
 # MANIPULATE
 gym.envs.register(

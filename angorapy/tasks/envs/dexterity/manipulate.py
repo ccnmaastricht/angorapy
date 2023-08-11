@@ -342,7 +342,7 @@ class BaseManipulate(BaseShadowHandEnv):
         ])
 
         # touch
-        touch = self.data.sensordata[self._touch_sensor_id]
+        touch = self.get_touch()
 
         # asymmetric information
         finger_tip_positions = np.array([self.data.site(name).xpos for name in FINGERTIP_SITE_NAMES]).flatten()

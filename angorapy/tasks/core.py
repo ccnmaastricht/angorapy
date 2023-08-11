@@ -489,9 +489,15 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def get_vision(self):
         """Get vision sensor readings."""
-        vision = self.render("rgb_array", VISION_WH, VISION_WH) if self.vision else np.array([])
+        if self.vision:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision_input = self.render()
+            self.render_mode = tmp_render_mode
+        else:
+            vision_input = np.array([])
 
-        return vision
+        return vision_input
 
     def _get_obs(self):
         """Get proprioception, touch and vision sensor readings."""

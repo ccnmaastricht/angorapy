@@ -18,15 +18,19 @@ def test_manipulate():
     _test_any_task(ap.make_env("ManipulateBlockDiscreteAsymmetric-v0"))
     _test_any_task(ap.make_env("ManipulateBlockVisualDiscreteAsymmetric-v0"))
 
-    assert True
-
 
 def test_reach():
     _test_any_task(ap.make_env("ReachAbsolute-v0"))
+    _test_any_task(ap.make_env("ReachRelative-v0"))
+    _test_any_task(ap.make_env("ReachAbsoluteVisual-v0"))
+    _test_any_task(ap.make_env("ReachRelativeVisual-v0"))
 
 
 def test_free_reach():
     _test_any_task(ap.make_env("FreeReachAbsolute-v0"))
+    _test_any_task(ap.make_env("FreeReachRelative-v0"))
+    _test_any_task(ap.make_env("FreeReachAbsoluteVisual-v0"))
+    _test_any_task(ap.make_env("FreeReachRelativeVisual-v0"))
 
 
 def test_cognitive():
