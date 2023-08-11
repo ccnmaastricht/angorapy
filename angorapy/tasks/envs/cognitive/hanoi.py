@@ -2,25 +2,25 @@
 
 import itertools
 import random
+from typing import Union
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from angorapy.common.senses import Sensation
+from angorapy.tasks.utils import convert_observation_to_space
 
 
 class HanoiEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
+    def __init__(self, render_mode=None):
         self.num_disks = 3
         self.env_noise = 0
-        self.action_space = spaces.Discrete(6)
-        self.observation_space = spaces.Tuple(self.num_disks * (spaces.Discrete(3),))
 
-        self.current_state = None
-        self.goal_state = self.num_disks * (2,)
+        self.current_state: Union[None, np.ndarray] = None
+        self.goal_state: Union[None, np.ndarray] = np.array(self.num_disks * (2,))
 
         self.done = None
         self.ACTION_LOOKUP = {0: "(0,1) - top disk of pole 0 to top of pole 1 ",
@@ -29,6 +29,9 @@ class HanoiEnv(gym.Env):
                               3: "(1,2) - top disk of pole 1 to top of pole 2",
                               4: "(2,0) - top disk of pole 2 to top of pole 0",
                               5: "(2,1) - top disk of pole 2 to top of pole 1"}
+
+        self.action_space = spaces.Discrete(6)
+        self.observation_space = convert_observation_to_space(self.reset()[0])
 
     def step(self, action):
         """
@@ -63,11 +66,11 @@ class HanoiEnv(gym.Env):
             disk_to_move = min(self.disks_on_peg(move[0]))
             moved_state = list(self.current_state)
             moved_state[disk_to_move] = move[1]
-            self.current_state = tuple(moved_state)
+            self.current_state = np.array(tuple(moved_state))
         else:
             info["invalid_action"] = True
 
-        if self.current_state == self.goal_state:
+        if np.all(self.current_state == self.goal_state):
             reward = 100
             self.done = True
         elif info["invalid_action"] == True:
@@ -75,7 +78,14 @@ class HanoiEnv(gym.Env):
         else:
             reward = -0.01
 
-        return Sensation(proprioception=np.array(self.current_state)), reward, self.done, info
+        return self._get_obs(), reward, self.done, self.done, info
+
+    def _get_obs(self):
+        return {
+            "observation": Sensation(
+                proprioception=np.array(self.current_state),
+            ),
+        }
 
     def disks_on_peg(self, peg):
         """
@@ -106,24 +116,14 @@ class HanoiEnv(gym.Env):
         else:
             return False
 
-    def reset(self):
-        self.current_state = self.num_disks * (0,)
+    def reset(self, **kwargs):
+        self.current_state = np.array(self.num_disks * (0,))
         self.done = False
-        return Sensation(proprioception=np.array(self.current_state))
+
+        return self._get_obs(), {}
 
     def render(self, mode='human', close=False):
         return
-
-    def set_env_parameters(self, num_disks=4, env_noise=0, verbose=True):
-        self.num_disks = num_disks
-        self.env_noise = env_noise
-        self.observation_space = spaces.Tuple(self.num_disks * (spaces.Discrete(3),))
-        self.goal_state = self.num_disks * (2,)
-
-        if verbose:
-            print("Hanoi Environment Parameters have been set to:")
-            print("\t Number of Disks: {}".format(self.num_disks))
-            print("\t Transition Failure Probability: {}".format(self.env_noise))
 
     def get_movability_map(self, fill=False):
         # Initialize movability map

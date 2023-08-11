@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import BaseWrapper
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \

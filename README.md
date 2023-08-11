@@ -115,7 +115,7 @@ Where ID is the agent's ID given when its created (`train.py` prints this outt, 
 To train agents with custom models, environments, etc. you write your own script. The following is a minimal example:
 
 ```python
-from angorapy.common.wrappers import make_env
+from angorapy.tasks.wrappers import make_env
 from angorapy.models import get_model_builder
 from angorapy.agent.ppo_agent import PPOAgent
 

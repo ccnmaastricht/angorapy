@@ -69,7 +69,6 @@ class AnthropomorphicEnv(gym.Env, ABC):
     def __init__(
             self,
             model: Union[str, RootElement, _Entity],
-            frame_skip,
             initial_qpos=None,
             vision=False,
             touch=True,
@@ -78,6 +77,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             camera_id: Optional[int] = 0,
             camera_name: Optional[str] = None,
             delta_t: float = 0.002,
+            frame_skip=N_SUBSTEPS,
             n_substeps: int = N_SUBSTEPS,
     ):
         # get the mujoco model and data
@@ -512,7 +512,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     # ABSTRACT METHODS
     @abc.abstractmethod
-    def _sample_goal(self):
+    def _sample_goal(self) -> np.ndarray:
         raise NotImplementedError("Must be implemented in subclass.")
 
     def _render_callback(self, **kwargs):

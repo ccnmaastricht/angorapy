@@ -16,7 +16,7 @@ from angorapy.agent.dataio import tf_serialize_example, make_dataset_and_stats, 
 from angorapy.common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import Sensation
-from angorapy.common.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import BaseWrapper, make_env
 from angorapy.common.const import STORAGE_DIR, DETERMINISTIC
 from angorapy.utilities.datatypes import StatBundle
 from angorapy.utilities.model_utils import is_recurrent_model

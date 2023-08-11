@@ -1,4 +1,5 @@
 import abc
+import pathlib
 from typing import Optional, Sequence, Union
 
 from dm_control import mjcf
@@ -52,10 +53,17 @@ class _Entity(abc.ABC):
 class Robot(_Entity):
 
     def __init__(self,
-                 base_xml_file: str,
+                 xml_or_mjcf: Union[str, mjcf.RootElement],
                  position: Sequence[float] = (.0, .0, .0),
                  rotation: Sequence[float] = (.0, .0, .0, 0.)):
-        super().__init__(mjcf.from_path(str(base_xml_file)), "robot", position=position, rotation=rotation)
+        if isinstance(xml_or_mjcf, (str, pathlib.Path)):
+            mjfc_element = mjcf.from_path(str(xml_or_mjcf))
+        elif isinstance(xml_or_mjcf, mjcf.RootElement):
+            mjfc_element = xml_or_mjcf
+        else:
+            raise ValueError(f"xml_or_mjcf must be either a string or a mjcf.RootElement, got {type(xml_or_mjcf)}")
+
+        super().__init__(mjfc_element, "robot", position=position, rotation=rotation)
 
     @property
     @abc.abstractmethod

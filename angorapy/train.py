@@ -36,7 +36,7 @@ from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
 from angorapy.utilities.util import env_extract_dims, mpi_print
-from angorapy.common.wrappers import make_env
+from angorapy.tasks.wrappers import make_env
 from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 from angorapy.agent.ppo_agent import PPOAgent
 

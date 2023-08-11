@@ -7,11 +7,9 @@ from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from angorapy.common.activations import LiF, lif
 from angorapy.common.const import VISION_WH
 from angorapy.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
-from angorapy.common.wrappers import make_env
-from angorapy.models import _build_openai_encoder
+from angorapy.tasks.wrappers import make_env
 from angorapy.utilities.util import env_extract_dims
 
 

@@ -12,7 +12,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
     MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
-from angorapy.common.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import BaseWrapper, make_env
 from angorapy.models.components import _build_encoding_sub_model
 from angorapy.utilities.model_utils import make_input_layers
 from angorapy.utilities.util import env_extract_dims

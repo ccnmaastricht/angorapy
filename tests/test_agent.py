@@ -11,7 +11,7 @@ except:
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution
 from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from angorapy.common.wrappers import make_env
+from angorapy.tasks.wrappers import make_env
 
 from angorapy.models import get_model_builder
 

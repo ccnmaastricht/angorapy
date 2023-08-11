@@ -9,7 +9,7 @@ from tensorflow.keras.layers import TimeDistributed
 
 import angorapy
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import BaseWrapper
 from angorapy.utilities.error import IncompatibleModelException
 from angorapy.utilities.util import flatten, env_extract_dims
 

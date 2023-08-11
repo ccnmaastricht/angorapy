@@ -30,6 +30,10 @@ def mj_get_category_names(model, category: str) -> Tuple[np.ndarray, np.ndarray]
     """
 
     adresses = getattr(model, f"name_{category}adr")
+
+    if len(adresses) == 0:
+        return np.zeros(0), np.zeros(0)
+
     return model.names[adresses[0]:].split(b'\x00')[:len(adresses)], adresses
 
 

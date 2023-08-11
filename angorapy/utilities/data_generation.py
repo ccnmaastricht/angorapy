@@ -11,7 +11,7 @@ from tqdm import tqdm
 from angorapy.agent import PPOAgent
 from angorapy.common.const import VISION_WH
 from angorapy.common.loss import multi_point_euclidean_distance
-from angorapy.common.wrappers import make_env
+from angorapy.tasks.wrappers import make_env
 from angorapy.tasks import *
 from angorapy.tasks.core import AnthropomorphicEnv
 import tensorflow_graphics.geometry.transformation as tfg

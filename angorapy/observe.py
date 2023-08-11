@@ -15,7 +15,7 @@ import time
 
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
-from angorapy.common.wrappers import make_env
+from angorapy.tasks.wrappers import make_env
 import tensorflow as tf
 import robotapper
 

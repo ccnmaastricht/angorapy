@@ -461,11 +461,11 @@ class ManipulateBlockDiscrete(ManipulateBlock):
     continuous = False
 
 
-class ManipulateBlockDiscreteAsynchronous(ManipulateBlockDiscrete):
+class ManipulateBlockDiscreteAsymmetric(ManipulateBlockDiscrete):
     asymmetric = True
     continuous = False
 
 
-class ManipulateBlockAsynchronous(ManipulateBlockDiscrete):
+class ManipulateBlockAsymmetric(ManipulateBlockDiscrete):
     asymmetric = True
     continuous = True
