@@ -397,6 +397,8 @@ class PPOAgent:
                 "batch_size": batch_size,
             })
 
+        self.batch_size = batch_size
+
         # determine the number of independent repeated gatherings required on this worker
         worker_base, worker_extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
         worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
@@ -439,11 +441,12 @@ class PPOAgent:
 
             n_trajectories_per_batch = n_trajectories_per_batch_per_process * self.n_optimizers
             n_chunks_per_trajectory_per_batch = n_chunks_per_trajectory_per_batch_per_process
+            self.n_updates_per_epoch = (self.n_workers * self.horizon) // batch_size
 
             if self.is_root:
                 print(f"\nThe policy is recurrent and the batch size is interpreted as the number of transitions "
                       f"per policy update. Given the batch size of {batch_size} this results in: \n"
-                      f"\t{n_chunks_per_batch} chunks per update and {(self.n_workers * self.horizon) // batch_size} updates per epoch\n"
+                      f"\t{n_chunks_per_batch} chunks per update and {self.n_updates_per_epoch} updates per epoch\n"
                       f"\tBatch tilings of "
                       f"{n_trajectories_per_batch_per_process, n_chunks_per_trajectory_per_batch_per_process} per process "
                       f"and {n_trajectories_per_batch, n_chunks_per_trajectory_per_batch} in total.\n\n")
@@ -586,7 +589,7 @@ class PPOAgent:
                     responsive_senses=self.policy.input_names)
 
                 subprocess_start = time.time()
-                self.optimize(dataset, epochs, effective_batch_size)
+                self.optimize(dataset, epochs, batch_size, effective_batch_size)
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 # FINALIZE
@@ -688,30 +691,42 @@ class PPOAgent:
             subseq_length=subseq_length
         )
 
-    def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: Union[int, Tuple[int, int]]) -> None:
+    def optimize(
+            self,
+            dataset: tf.data.TFRecordDataset,
+            epochs: int, batch_size: int,
+            effective_batch_sizes: Union[int, Tuple[int, int]]) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
 
         Args:
             dataset (tf.data.Dataset): tensorflow dataset containing serialization, a, p(a), r and A as components per data point
             epochs (int): number of epochs to train on this dataset
-            batch_size (int): batch size representing the number of TRANSITIONS per batch (not chunks)
+            batch_size (Tuple): batch size representing the number of TRANSITIONS per batch (not chunks)
+            effective_batch_sizes (Tuple): batch size representing the number of TRAJECTORIES per batch and the
+                                            number of CHUNKS per trajectory per batch
 
         Returns:
             None
         """
 
         # start optimization
-        total_updates = (batch_size[0] if self.is_recurrent else batch_size) * epochs
+        if self.is_recurrent:
+            total_updates = self.n_updates_per_epoch * epochs
+        else:
+            total_updates = (self.n_workers * self.horizon) // batch_size * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        with tqdm(total=total_updates, disable=self.mpi_comm.rank != 0, desc="Optimizing...") as pbar:
+        with tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...") as pbar:
             for epoch in range(epochs):
                 if self.is_recurrent:
-                    batched_dataset = dataset.batch(batch_size[0], drop_remainder=True)
+                    batched_dataset = dataset.batch(effective_batch_sizes[0], drop_remainder=True)
                     with tf.device(self.device):
-                        for batch in batched_dataset:
+                        super_batch_ents = []
+                        super_batch_pi_losses = []
+                        super_batch_v_losses = []
+                        for super_batch in batched_dataset:
                             ent, pi_loss, v_loss = recurrent_train_step(
-                                batch=batch,
-                                batch_size=batch_size,
+                                super_batch=super_batch,
+                                batch_size=effective_batch_sizes,
                                 joint=self.joint,
                                 distribution=self.distribution,
                                 continuous_control=self.continuous_control,
@@ -721,12 +736,16 @@ class PPOAgent:
                                 c_value=self.c_value,
                                 c_entropy=self.c_entropy,
                                 is_recurrent=self.is_recurrent,
-                                optimizer=self.optimizer)
-                            pbar.update(1)
+                                optimizer=self.optimizer,
+                                pbar=pbar if self.is_root else None)
 
-                        policy_loss_history.append(pi_loss.numpy().item())
-                        value_loss_history.append(v_loss.numpy().item())
-                        entropy_history.append(ent.numpy().item())
+                            super_batch_ents.append(ent)
+                            super_batch_pi_losses.append(pi_loss)
+                            super_batch_v_losses.append(v_loss)
+
+                        policy_loss_history.append(tf.reduce_mean(super_batch_pi_losses).numpy().item())
+                        value_loss_history.append(tf.reduce_mean(super_batch_v_losses).numpy().item())
+                        entropy_history.append(tf.reduce_mean(super_batch_ents).numpy().item())
                 else:
                     dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
 

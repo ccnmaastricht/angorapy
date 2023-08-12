@@ -27,6 +27,7 @@ def ff_train_step(batch,
 
     return ent, pi_loss, v_loss
 
+
 @tf.function
 def _split_batch(batch: Dict[str, tf.Tensor], n_chunks_per_trajectory_per_batch: int):
     _split_part = lambda bv: tf.reshape(bv,
@@ -80,7 +81,7 @@ def _do_batch_op(joint,
     return batch_grad, batch_ent, batch_pi_loss, batch_v_loss
 
 
-def recurrent_train_step(batch: dict,
+def recurrent_train_step(super_batch: dict,
                          batch_size: tf.int32,
                          joint,
                          distribution,
@@ -91,7 +92,8 @@ def recurrent_train_step(batch: dict,
                          c_value,
                          c_entropy,
                          is_recurrent,
-                         optimizer):
+                         optimizer,
+                         pbar=None):
     """Recurrent train step, using truncated back propagation through time.
 
     Incoming batch shape: (BATCH_SIZE, N_SUBSEQUENCES, SUBSEQUENCE_LENGTH, *STATE_DIMS)
@@ -99,13 +101,18 @@ def recurrent_train_step(batch: dict,
     chronologically to adhere to statefulness if the following line throws a CPU to GPU error this is most likely due
     to too little memory on the GPU; lower the number of worker/horizon/... ."""
     n_trajectories_per_batch, n_chunks_per_trajectory_per_batch = batch_size
+
     recurrent_layers = [layer for layer in joint.submodules if isinstance(layer, tf.keras.layers.RNN)]
 
     batch_ent = tf.constant(0.)
     batch_pi_loss = tf.constant(0.)
     batch_v_loss = tf.constant(0.)
 
-    split_batch = _split_batch(batch, n_chunks_per_trajectory_per_batch)
+    batch_ents = []
+    batch_pi_losses = []
+    batch_v_losses = []
+
+    split_batch = _split_batch(super_batch, n_chunks_per_trajectory_per_batch)
     for batch_i in tf.range(split_batch["advantage"].shape[1]):
         batch_grad, batch_ent, batch_pi_loss, batch_v_loss = _do_batch_op(
             joint,
@@ -123,5 +130,11 @@ def recurrent_train_step(batch: dict,
             is_recurrent
         )
         optimizer.apply_gradients(zip(batch_grad, joint.trainable_variables))
+        batch_ents.append(batch_ent)
+        batch_pi_losses.append(batch_pi_loss)
+        batch_v_losses.append(batch_v_loss)
 
-    return batch_ent, batch_pi_loss, batch_v_loss
+        if pbar is not None:
+            pbar.update(1)
+
+    return tf.reduce_mean(batch_ents), tf.reduce_mean(batch_pi_losses), tf.reduce_mean(batch_v_losses)
