@@ -203,7 +203,7 @@ if __name__ == "__main__":
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     # without vision
-    env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    env = make_env("ManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_v2_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     })
 
     # with vision
-    env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
+    env = make_env("VisualManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_v2_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=False,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)

@@ -3,7 +3,7 @@ from typing import Dict
 import tensorflow as tf
 
 from angorapy.agent.ppo.optim import learn_on_batch
-from angorapy.utilities.model_utils import reset_states_masked
+from angorapy.utilities.model_utils import reset_states_masked, reset_states_masked_tf
 from angorapy.utilities.util import detect_finished_episodes
 
 
@@ -74,7 +74,7 @@ def _do_batch_op(joint,
         batch_v_loss += v_loss
 
         # make partial RNN state resets
-        reset_states_masked(recurrent_layers, reset_mask)
+        reset_states_masked_tf(recurrent_layers, reset_mask)
 
     batch_grad = tf.nest.map_structure(lambda b: b / n_chunks_per_trajectory_per_batch, batch_grad)
 
