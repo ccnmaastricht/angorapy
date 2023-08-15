@@ -12,6 +12,7 @@ from angorapy.tasks.envs.dexterity.reach import Reach, FreeReach, FreeReachSeque
 from angorapy.tasks.envs.cognitive.hanoi import HanoiEnv
 
 
+
 # REACHING
 for vision_mode in ["Visual", ""]:
     for control_mode in ["Relative", "Absolute"]:
@@ -156,5 +157,5 @@ gym.envs.register(
 
 __all__ = [
     "AnthropomorphicEnv",
-    "world_building"
+    "world_building",
 ]

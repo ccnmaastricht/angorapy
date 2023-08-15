@@ -115,11 +115,12 @@ Where ID is the agent's ID given when its created (`train.py` prints this outt, 
 To train agents with custom models, environments, etc. you write your own script. The following is a minimal example:
 
 ```python
-from angorapy.tasks.wrappers import make_env
+
+from angorapy import make_task
 from angorapy.models import get_model_builder
 from angorapy.agent.ppo_agent import PPOAgent
 
-env = make_env("LunarLanderContinuous-v2")
+env = make_task("LunarLanderContinuous-v2")
 model_builder = get_model_builder("simple", "ffn")
 agent = PPOAgent(model_builder, env)
 agent.drill(100, 10, 512)

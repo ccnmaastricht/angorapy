@@ -12,13 +12,13 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
     MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
-from angorapy.tasks.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.models.components import _build_encoding_sub_model
 from angorapy.utilities.model_utils import make_input_layers
 from angorapy.utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: BaseWrapper,
+def build_ffn_models(env: TaskWrapper,
                      distribution: BasePolicyDistribution,
                      shared: bool = False,
                      layer_sizes: Tuple = (64, 64)):
@@ -60,7 +60,7 @@ def build_ffn_models(env: BaseWrapper,
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, value_out], name="policy_value")
 
 
-def build_rnn_models(env: BaseWrapper,
+def build_rnn_models(env: TaskWrapper,
                      distribution: BasePolicyDistribution,
                      shared: bool = False,
                      bs: int = 1,
@@ -144,7 +144,7 @@ def build_rnn_models(env: BaseWrapper,
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, out_value], name="simple_rnn")
 
 
-def build_simple_models(env: BaseWrapper,
+def build_simple_models(env: TaskWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
                         bs: int = 1,
@@ -161,7 +161,7 @@ def build_simple_models(env: BaseWrapper,
                                 layer_sizes=(64, 64))
 
 
-def build_deeper_models(env: BaseWrapper,
+def build_deeper_models(env: TaskWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
                         bs: int = 1,
@@ -178,7 +178,7 @@ def build_deeper_models(env: BaseWrapper,
                                 model_type=model_type, layer_sizes=(64, 64, 64, 32, 32))
 
 
-def build_wider_models(env: BaseWrapper,
+def build_wider_models(env: TaskWrapper,
                        distribution: BasePolicyDistribution,
                        shared: bool = False,
                        bs: int = 1,
@@ -196,9 +196,11 @@ def build_wider_models(env: BaseWrapper,
 
 
 if __name__ == '__main__':
+    from angorapy import make_task
+
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    cont_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    cont_env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0")
     discrete_env = gym.make("LunarLander-v2")
     multi_discrete_env = gym.make("ManipulateBlockDiscreteRelative-v0")
 

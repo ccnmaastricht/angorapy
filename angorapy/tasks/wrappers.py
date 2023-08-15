@@ -1,22 +1,28 @@
 """Wrappers encapsulating envs to modulate n_steps, rewards, and control state initialization."""
 import abc
-from pprint import pprint
-from typing import Union, List, Type, OrderedDict
+from typing import List, OrderedDict, Tuple, Dict, Any, SupportsFloat
 
 import gymnasium as gym
 import numpy
 from mpi4py import MPI
 
 from angorapy.common.senses import Sensation
-from angorapy.common.transformers import BaseTransformer, StateNormalizationTransformer, RewardNormalizationTransformer,\
-    merge_transformers
-from angorapy.utilities.util import env_extract_dims
+from angorapy.common.transformers import BaseTransformer, merge_transformers
 
 
-class BaseWrapper(gym.ObservationWrapper, abc.ABC):
-    """Abstract base class for preprocessors."""
+class TaskWrapper(gym.ObservationWrapper):
+    """Wrapper for all tasks with basic functionality.
 
-    def __init__(self, env):
+    Parses observations of the wrapped task to Sensations. Serves additionally as base class for all other wrappers.
+
+    Args:
+        env (gym.Env): The task to wrap.
+
+    Attributes:
+        env (gym.Env): The wrapped environment.
+    """
+
+    def __init__(self, env: gym.Env):
         super().__init__(env)
 
     @property
@@ -34,7 +40,7 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         obs, info = self.env.reset(**kwargs)
         return self.observation(obs), self.info(info)
 
-    def observation(self, observation):
+    def observation(self, observation) -> Sensation:
         """Process an observation to be of type 'Sensation'."""
         if isinstance(observation, Sensation):
             return observation
@@ -45,13 +51,13 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
                 return observation["observation"]
             elif isinstance(observation["observation"], numpy.ndarray):  # GOAl ENVS
                 return Sensation(proprioception=observation["observation"], goal=observation["desired_goal"])
-            elif isinstance(observation["observation"], dict) and all([k in observation["observation"].keys() for k in Sensation.sense_names]):
+            elif isinstance(observation["observation"], dict) and all(
+                    [k in observation["observation"].keys() for k in Sensation.sense_names]):
                 return Sensation(**observation["observation"])
 
         return Sensation(proprioception=observation)
 
-    def step(self, action):
-        """Returns a modified observation and info."""
+    def step(self, action) -> tuple[Sensation, SupportsFloat, bool, bool, dict[str, Any]]:
         observation, reward, terminated, truncated, info = self.env.step(action)
 
         if hasattr(observation, "keys") and "achieved_goal" in observation.keys():
@@ -69,7 +75,7 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
 
     def mpi_sync(self):
         """Synchronize the wrapper and all wrapped wrappers over all MPI ranks."""
-        if isinstance(self.env, BaseWrapper):
+        if isinstance(self.env, TaskWrapper):
             self.env.mpi_sync()
 
         self._mpi_sync()
@@ -86,7 +92,7 @@ class BaseWrapper(gym.ObservationWrapper, abc.ABC):
         pass
 
 
-class TransformationWrapper(BaseWrapper):
+class TransformationWrapper(TaskWrapper):
     """Wrapper transforming rewards and observation based on running means."""
 
     def __init__(self, env, transformers: List[BaseTransformer]):
@@ -138,30 +144,3 @@ class TransformationWrapper(BaseWrapper):
     def serialize(self):
         """Return separate transformer serializations in a list"""
         return [t.serialize() for t in self.transformers]
-
-
-def make_env(env_name,
-             reward_config: Union[str, dict] = None,
-             reward_function: Union[str, dict] = None,
-             transformers: List[Union[Type[BaseTransformer], BaseTransformer]] = [StateNormalizationTransformer, RewardNormalizationTransformer],
-             **kwargs) -> BaseWrapper:
-    """Make environment, including a possible reward config and transformers."""
-    base_env = gym.make(env_name, **kwargs)
-    state_dim, n_actions = env_extract_dims(base_env)
-
-    if transformers is None:
-        transformers = []
-    elif all(isinstance(t, BaseTransformer) for t in transformers):
-        transformers = transformers
-    elif all(callable(t) for t in transformers):
-        transformers = [t(env_name, state_dim, n_actions) for t in transformers]
-
-    env = TransformationWrapper(base_env, transformers=transformers)
-
-    if reward_function is not None and hasattr(env, "reward_function"):
-        env.set_reward_function(reward_function)
-
-    if reward_config is not None and hasattr(env, "reward_config"):
-        env.set_reward_config(reward_config)
-
-    return env

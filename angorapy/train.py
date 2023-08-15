@@ -36,7 +36,7 @@ from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
 from angorapy.utilities.util import env_extract_dims, mpi_print
-from angorapy.tasks.wrappers import make_env
+from angorapy import make_task
 from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 from angorapy.agent.ppo_agent import PPOAgent
 
@@ -71,10 +71,10 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     wrappers.append(RewardNormalizationTransformer) if not settings["no_reward_norming"] else None
 
     # setup environment and extract and report information
-    env = make_env(environment,
-                   reward_config=settings["rcon"],
-                   transformers=wrappers,
-                   render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
+    env = make_task(environment,
+                    reward_config=settings["rcon"],
+                    transformers=wrappers,
+                    render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
     state_dim, number_of_actions = env_extract_dims(env)
 
     if env.spec.max_episode_steps is not None and env.spec.max_episode_steps > settings["horizon"] and not settings[

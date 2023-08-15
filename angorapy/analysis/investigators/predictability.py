@@ -8,7 +8,7 @@ from sklearn.linear_model import Ridge
 from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import stack_sensations
-from angorapy.tasks.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.util import flatten, stack_dicts
 
 
@@ -22,7 +22,7 @@ class Predictability(base_investigator.Investigator):
 
         self.n_states = np.nan
 
-    def prepare(self, env: BaseWrapper, layers: List[str], n_states=1000):
+    def prepare(self, env: TaskWrapper, layers: List[str], n_states=1000):
         """Prepare samples to predict from."""
         self.network.reset_states()
         state, info = env.reset(return_info=True)

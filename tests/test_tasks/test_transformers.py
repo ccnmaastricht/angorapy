@@ -3,8 +3,7 @@ import unittest
 
 import numpy as np
 
-from angorapy import make_env
-from angorapy.common.const import NP_FLOAT_PREC
+from angorapy.tasks.registration import make_task
 from angorapy.common.senses import Sensation
 from angorapy.common.transformers import RewardNormalizationTransformer, merge_transformers, \
     StateNormalizationTransformer
@@ -13,7 +12,7 @@ from angorapy.utilities.util import env_extract_dims
 
 def test_state_normalization():
     env_name = "ManipulateBlockDiscreteAsynchronous-v0"
-    env = make_env(env_name)
+    env = make_task(env_name)
     normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 
     env.reset()
@@ -32,7 +31,7 @@ def test_state_normalization():
 
 def test_state_normalization_non_anthropomorphic():
     env_name = "LunarLanderContinuous-v2"
-    env = make_env(env_name)
+    env = make_task(env_name)
     normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
 
     env.reset()
@@ -45,17 +44,12 @@ def test_state_normalization_non_anthropomorphic():
 
     for name in true_mean.dict().keys():
         assert np.allclose(true_mean[name], normalizer.mean[name], atol=1e-6), f"{name}'s mean not equal."
-        assert np.allclose(true_std[name], normalizer.variance[name], atol=1e-5), f"{name}'s std not equal.")
-
-
-def test_reward_normalization():
-    # testing not so straight forward because its based on the return, maybe later todo
-    pass
+        assert np.allclose(true_std[name], normalizer.variance[name], atol=1e-5), f"{name}'s std not equal."
 
 
 def test_state_normalization_adding():
     env_name = "LunarLanderContinuous-v2"
-    env = make_env(env_name)
+    env = make_task(env_name)
     normalizer_a = StateNormalizationTransformer(env_name, *env_extract_dims(env))
     normalizer_b = StateNormalizationTransformer(env_name, *env_extract_dims(env))
     normalizer_c = StateNormalizationTransformer(env_name, *env_extract_dims(env))
@@ -79,12 +73,6 @@ def test_state_normalization_adding():
     combined_normalizer = normalizer_a + normalizer_b + normalizer_c
     merged_normalizer = merge_transformers([normalizer_a, normalizer_b, normalizer_c])
 
-    # print(normalizer_a.mean["proprioception"])
-    # print(normalizer_b.mean["proprioception"])
-    # print(normalizer_c.mean["proprioception"])
-    # print(true_mean)
-    # print(combined_normalizer.mean["proprioception"])
-
     assert np.allclose(true_mean, combined_normalizer.mean["proprioception"], atol=1e-6)
     assert np.allclose(true_mean, merged_normalizer.mean["proprioception"], atol=1e-6)
     assert np.allclose(true_std, np.sqrt(combined_normalizer.variance["proprioception"]), atol=1e-6)
@@ -92,7 +80,7 @@ def test_state_normalization_adding():
 
 def test_reward_normalization_adding():
     env_name = "LunarLanderContinuous-v2"
-    env = make_env(env_name)
+    env = make_task(env_name)
     normalizer_a = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
     normalizer_b = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
     normalizer_c = RewardNormalizationTransformer(env_name, *env_extract_dims(env))

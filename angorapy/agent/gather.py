@@ -16,7 +16,7 @@ from angorapy.agent.dataio import tf_serialize_example, make_dataset_and_stats, 
 from angorapy.common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import Sensation
-from angorapy.tasks.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.common.const import STORAGE_DIR, DETERMINISTIC
 from angorapy.utilities.datatypes import StatBundle
 from angorapy.utilities.model_utils import is_recurrent_model
@@ -30,7 +30,7 @@ class BaseGatherer(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: BaseWrapper) -> ExperienceBuffer:
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: TaskWrapper) -> ExperienceBuffer:
         pass
 
     @abc.abstractmethod
@@ -48,7 +48,7 @@ class Gatherer(BaseGatherer):
             self,
             worker_id: int,
             exp_id: int,
-            distribution: BasePolicyDistribution, 
+            distribution: BasePolicyDistribution,
             horizon: int,
             discount: float,
             lam: float,
@@ -75,7 +75,7 @@ class Gatherer(BaseGatherer):
 
     def collect(self,
                 joint: tf.keras.Model,
-                env: BaseWrapper,
+                env: TaskWrapper,
                 collector_id: int) -> StatBundle:
         """Collect a batch shard of experience for a given number of time steps.
 
@@ -138,7 +138,8 @@ class Gatherer(BaseGatherer):
                 action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
                 # make a step based on the chosen action and collect the reward for this state
-                observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
+                observation, reward, terminated, truncated, info = env.step(
+                    np.atleast_1d(action) if is_continuous else action)
                 done = terminated or truncated
                 current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
                 rewards.append(reward)
@@ -213,7 +214,8 @@ class Gatherer(BaseGatherer):
                     buffer.auxiliary_performances[key] = []
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
+        values.append(
+            np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
@@ -262,7 +264,7 @@ class Gatherer(BaseGatherer):
 
         return stats
 
-    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: BaseWrapper):
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: TaskWrapper):
         """Postprocess the gathered data."""
         buffer.normalize_advantages()
 
@@ -293,7 +295,7 @@ class EpsilonGreedyGatherer(Gatherer):
         return action, action_probability
 
 
-def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution,
+def evaluate(policy: tf.keras.Model, env: TaskWrapper, distribution: BasePolicyDistribution,
              act_confidently=False) -> Tuple[int, int, Any, dict]:
     """Evaluate one episode of the given environment following the given policy."""
     policy.reset_states()
@@ -333,7 +335,7 @@ def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyD
     return steps, cumulative_reward, eps_class, auxiliary_performances
 
 
-def fake_env_step(env: BaseWrapper):
+def fake_env_step(env: TaskWrapper):
     """Return a random step imitating the given environment without actually stepping the environment."""
     return env.observation(env.observation_space.sample()), 1, False, {}
 
@@ -345,5 +347,5 @@ def fake_joint_output(joint):
         outshape[i] = [d if d is not None else 1 for d in outshape[i]]
 
     return np.float32(np.random.random(outshape[0])), \
-           np.float32(np.random.random(outshape[1])), \
-           np.float32(np.random.random(outshape[2]))
+        np.float32(np.random.random(outshape[1])), \
+        np.float32(np.random.random(outshape[2]))

@@ -3,11 +3,11 @@ from os import wait
 import mujoco
 from matplotlib import pyplot as plt
 
-from angorapy import make_env
+from angorapy import make_task
 from mujoco import viewer
 from PIL import Image
 
-env = make_env("ManipulateBlockDiscreteAsynchronous-v0", render_mode="human")
+env = make_task("ManipulateBlockDiscreteAsynchronous-v0", render_mode="human")
 env.world.robot.show_palm_site()
 env.set_delta_t_simulation(0.002)
 env.set_original_n_substeps_to_sspcs()

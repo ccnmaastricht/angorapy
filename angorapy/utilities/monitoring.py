@@ -24,7 +24,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common import const
 from angorapy.common.const import PATH_TO_EXPERIMENTS
 from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from angorapy.tasks.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.models.mighty_maker import get_model_type
 from angorapy.utilities.util import add_state_dims, flatten
 
@@ -41,7 +41,7 @@ class Monitor:
 
     def __init__(self,
                  agent: PPOAgent,
-                 env: BaseWrapper = None,
+                 env: TaskWrapper = None,
                  frequency: int = 1,
                  gif_every: int = 0,
                  id=None,

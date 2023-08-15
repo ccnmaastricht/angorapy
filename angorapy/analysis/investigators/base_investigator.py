@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.tasks.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
@@ -224,7 +224,7 @@ class Investigator:
         print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
-    def render_episode_jupyter(self, env: BaseWrapper, substeps_per_step=1, act_confidently=True) -> None:
+    def render_episode_jupyter(self, env: TaskWrapper, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
         from IPython import display, core
 

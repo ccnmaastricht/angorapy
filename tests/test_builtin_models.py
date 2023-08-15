@@ -1,4 +1,4 @@
-from angorapy import make_env, get_model_builder
+from angorapy import make_task, get_model_builder
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution, \
     CategoricalPolicyDistribution
 from angorapy.utilities.model_utils import is_recurrent_model
@@ -6,13 +6,13 @@ from angorapy.utilities.util import flatten
 
 
 def perform_test_on_model(model_name):
-    cont_env = make_env("LunarLanderContinuous-v2")
+    cont_env = make_task("LunarLanderContinuous-v2")
     cont_distr = BetaPolicyDistribution(cont_env)
 
-    discrete_env = make_env("LunarLander-v2")
+    discrete_env = make_task("LunarLander-v2")
     discrete_distr = CategoricalPolicyDistribution(discrete_env)
 
-    multi_discrete_env = make_env("ManipulateBlockDiscrete-v0")
+    multi_discrete_env = make_task("ManipulateBlockDiscrete-v0")
     multi_discrete_distr = MultiCategoricalPolicyDistribution(multi_discrete_env)
 
     build_model = get_model_builder(model=model_name, model_type="ffn", shared=False)

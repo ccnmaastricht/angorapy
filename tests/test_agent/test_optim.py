@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from angorapy import make_env
+from angorapy import make_task
 from angorapy.common.policies import BetaPolicyDistribution
 from angorapy.models import build_shadow_v2_brain_models, build_wider_models
 from angorapy.utilities.model_utils import reset_states_masked, reset_states_masked_tf
@@ -9,7 +9,7 @@ from angorapy.utilities.util import flatten
 
 
 def test_model_state_reset():
-    env = make_env("LunarLanderContinuous-v2")
+    env = make_task("LunarLanderContinuous-v2")
     model, _, _ = build_wider_models(env, BetaPolicyDistribution(env), bs=5)
 
     # copy of model with same weights

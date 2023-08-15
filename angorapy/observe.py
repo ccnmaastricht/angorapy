@@ -16,7 +16,7 @@ import time
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import BASE_SAVE_PATH, PATH_TO_EXPERIMENTS
 
-from angorapy.tasks.wrappers import make_env
+from angorapy import make_task
 import tensorflow as tf
 import robotapper
 
@@ -56,7 +56,7 @@ except:
     print("Could not create model plot.")
 
 investigator = Investigator.from_agent(agent)
-env = make_env(agent.env.spec.id, transformers=agent.env.transformers, render_mode="human")
+env = make_task(agent.env.spec.id, transformers=agent.env.transformers, render_mode="human")
 if args.freeze_wrist:
     env.toggle_wrist_freezing()
 

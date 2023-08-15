@@ -9,7 +9,7 @@ import tensorflow as tf
 from angorapy.analysis.sindy.autoencoder import SindyAutoencoder
 from angorapy.analysis.util.sindy import compute_z_derivatives, sindy_library_tf
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.tasks.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities import util
 
 import pysindy as ps
@@ -25,7 +25,7 @@ class Dynamics(base_investigator.Investigator):
 
         assert self.is_recurrent, "Network is not recurrent, no system to be identified without temporal dependencies."
 
-    def prepare(self, env: BaseWrapper, layer: str, n_states: int):
+    def prepare(self, env: TaskWrapper, layer: str, n_states: int):
         """Collect data for the system to be identified from via SINDy."""
         state, info = env.reset(return_info=True)
 

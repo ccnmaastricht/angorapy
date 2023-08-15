@@ -9,7 +9,7 @@ from tensorflow.keras.layers import TimeDistributed
 
 import angorapy
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.tasks.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.error import IncompatibleModelException
 from angorapy.utilities.util import flatten, env_extract_dims
 
@@ -248,7 +248,7 @@ def make_input_layers(env, bs, sequence_length=None):
 
 # Validators
 
-def validate_model_builder(model_function: Callable, env: BaseWrapper, distribution: BasePolicyDistribution) -> None:
+def validate_model_builder(model_function: Callable, env: TaskWrapper, distribution: BasePolicyDistribution) -> None:
     models = model_function(env, distribution)
 
     # validate model order
@@ -260,7 +260,7 @@ def validate_model_builder(model_function: Callable, env: BaseWrapper, distribut
         pass
 
 
-def validate_env_model_compatibility(env: BaseWrapper, model: tf.keras.Model) -> bool:
+def validate_env_model_compatibility(env: TaskWrapper, model: tf.keras.Model) -> bool:
     """Validate whether the envs states can be processed by the model."""
     model_inputs = [ip.name for ip in model.inputs]
     env_outputs = list(env.reset()[0].dict().keys())

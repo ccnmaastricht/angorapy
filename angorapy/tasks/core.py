@@ -144,7 +144,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
         self.metadata = {
             "render_modes": ["human", "rgb_array", "depth_array"],
-            "render_fps"  : int(np.round(1.0 / self.dt)),
+            "render_fps": int(np.round(1.0 / self.dt)),
         }
 
         # senses

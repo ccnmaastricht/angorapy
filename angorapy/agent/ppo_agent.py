@@ -30,6 +30,7 @@ except:
 from psutil import NoSuchProcess
 from tqdm import tqdm
 
+from angorapy.tasks.registration import make_task
 from angorapy import models
 from angorapy.common.senses import Sensation
 
@@ -41,7 +42,7 @@ from angorapy.common.const import MIN_STAT_EPS
 from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, GaussianPolicyDistribution
 from angorapy.common.transformers import BaseRunningMeanTransformer, transformers_from_serializations
-from angorapy.tasks.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.datatypes import mpi_condense_stats, StatBundle, condense_stats
 from angorapy.utilities.error import ComponentError
 from angorapy.utilities.model_utils import is_recurrent_model, get_layer_names, get_component, requires_batch_size, \
@@ -67,7 +68,7 @@ class PPOAgent:
 
     def __init__(self,
                  model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
-                 environment: BaseWrapper,
+                 environment: TaskWrapper,
                  horizon: int = 1024,
                  workers: int = 8,
                  learning_rate: float = 0.001,
@@ -131,7 +132,7 @@ class PPOAgent:
         assert lr_schedule is None or isinstance(lr_schedule, str)
 
         # environment info
-        self.env: BaseWrapper = environment
+        self.env: TaskWrapper = environment
         self.env_name = self.env.unwrapped.spec.id
         self.state_dim, self.n_actions = env_extract_dims(self.env)
         if isinstance(self.env.action_space, (Discrete, MultiDiscrete)):
@@ -1025,10 +1026,10 @@ class PPOAgent:
         if is_root:
             print(f"Loading from iteration {from_iteration}.")
 
-        env = make_env(parameters["env_name"] if force_env_name is None else force_env_name,
-                       reward_config=parameters.get("reward_configuration"),
-                       transformers=transformers_from_serializations(parameters["transformers"]),
-                       render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
+        env = make_task(parameters["env_name"] if force_env_name is None else force_env_name,
+                        reward_config=parameters.get("reward_configuration"),
+                        transformers=transformers_from_serializations(parameters["transformers"]),
+                        render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)
 

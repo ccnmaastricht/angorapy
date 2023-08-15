@@ -11,7 +11,6 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.const import VISION_WH
 from angorapy.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
-from angorapy.tasks.wrappers import make_env
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -182,6 +181,8 @@ def build_shadow_brain_models(env: gym.Env, distribution: BasePolicyDistribution
 
 
 if __name__ == "__main__":
+    from angorapy import make_task
+
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     # tf.config.experimental.set_memory_growth(tf.config.list_physical_devices("GPU")[0], True)
@@ -192,7 +193,7 @@ if __name__ == "__main__":
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     # without vision
-    env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
@@ -208,7 +209,7 @@ if __name__ == "__main__":
     joint.summary()
 
     # with vision
-    env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
+    env = make_task("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=False,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
