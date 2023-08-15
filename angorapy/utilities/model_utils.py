@@ -4,11 +4,12 @@ from typing import List, Union, Callable
 import numpy
 import numpy as np
 import tensorflow as tf
+from keras import backend
 from tensorflow.keras.layers import TimeDistributed
 
 import angorapy
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import BaseWrapper
 from angorapy.utilities.error import IncompatibleModelException
 from angorapy.utilities.util import flatten, env_extract_dims
 
@@ -109,7 +110,8 @@ def build_sub_model_to(network: tf.keras.Model, tos: Union[List[str], List[tf.ke
     if not isinstance(inbound_layers, list):
         inbound_layers = [inbound_layers]
 
-    outputs = [il.output if not hasattr(il, "layers") else build_sub_model_to(network, [il])(network.inputs) for il in inbound_layers]
+    outputs = [il.output if not hasattr(il, "layers") else build_sub_model_to(network, [il])(network.inputs) for il in
+               inbound_layers]
 
     subnetwork_to_parent = tf.keras.Model(inputs=network.inputs, outputs=outputs)
     subnetwork_to_layer = tf.keras.Model(inputs=parent.inputs, outputs=layer.output)
@@ -146,15 +148,39 @@ def get_component(model: tf.keras.Model, name: str):
             return layer
 
 
-def reset_states_masked(model: tf.keras.Model, mask: List):
+@tf.function
+def reset_states_masked_tf(recurrent_layers: List[tf.keras.layers.RNN], mask: List):
     """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
 
     The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
     and zeros otherwise (booleans possible too)."""
 
-    # extract recurrent layers by their superclass RNN
-    recurrent_layers = [layer for layer in model.submodules if isinstance(layer, tf.keras.layers.RNN)]
+    for layer in recurrent_layers:
+        current_states = layer.states
+        new_states = []
+        # new_states = tf.TensorArray(tf.float32, size=len(current_states))
+        for i_state in range(len(current_states)):
+            current_state = current_states[i_state]
+            expanded_mask = tf.tile(
+                tf.transpose(
+                    tf.expand_dims(mask, axis=0)
+                ),(1, current_state.shape[-1])
+            )  # TODO why did we reverse?
 
+            masked_reset_state = tf.where(expanded_mask, 0., current_state)
+            new_states.append(masked_reset_state)
+            # new_states.write(i_state, masked_reset_state)
+
+        # we need to do this by hand here because Keras' reset_states() method does not work with tf.function
+        flat_states = tf.nest.flatten(layer.states)
+        for i, state in enumerate(flat_states):
+            state.assign(new_states[i])
+
+def reset_states_masked(recurrent_layers: List[tf.keras.Model], mask: List):
+    """Reset a stateful model's states only at the samples in the batch that are specified by the mask.
+
+    The mask should be a list of length 'batch size' and contain one at every position where the state should be reset,
+    and zeros otherwise (booleans possible too)."""
     for layer in recurrent_layers:
         current_states = [state.numpy() for state in layer.states]
         initial_states = 0
@@ -189,9 +215,6 @@ def calc_max_memory_usage(model: tf.keras.Model):
     return total_memory * 1.1641532182693481 * 10 ** -10
 
 
-
-
-
 CONVOLUTION_BASE_CLASS = tf.keras.layers.Conv2D.__bases__[0]
 
 
@@ -202,7 +225,7 @@ def is_conv(layer):
 
 # Building helpers
 
-def make_input_layers(env, bs, sequence_length = None):
+def make_input_layers(env, bs, sequence_length=None):
     """Build input layers for a model acting on the given environment.
 
     If the model is not recurrent, provide None for the sequence_length (default)"""
@@ -212,9 +235,9 @@ def make_input_layers(env, bs, sequence_length = None):
     inputs = []
 
     for modality in state_dimensionality.keys():
-        shape = (bs, )
+        shape = (bs,)
         if sequence_length is not None:
-            shape += (sequence_length, )
+            shape += (sequence_length,)
         shape += tuple(state_dimensionality[modality])
 
         the_input = tf.keras.Input(batch_shape=shape, name=modality)

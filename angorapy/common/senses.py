@@ -65,7 +65,7 @@ class Sensation(dict):
         return iter((self.vision, self.touch, self.proprioception, self.goal, self.asymmetric))
 
     def __len__(self):
-        return 5
+        return len(self.dict())
 
     def __list__(self):
         return list(self.dict())
@@ -81,6 +81,9 @@ class Sensation(dict):
             self.__dict__[key] = value
         else:
             raise ValueError(f"{key} is not a sense")
+
+    def items(self):
+        return self.dict().items()
 
     # MAGIC MATH
     def __add__(self, other):

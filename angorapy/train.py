@@ -1,13 +1,15 @@
 import logging
 import re
 
-logging.getLogger("requests").setLevel(logging.WARNING)
+# logging.getLogger("requests").setLevel(logging.WARNING)
 
 import sys
 import os
 
+import gymnasium as gym
+
 os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pprint
 import traceback
@@ -20,25 +22,25 @@ import distance
 import numpy as np
 
 import tensorflow as tf
-from tensorflow.keras import mixed_precision
+
 
 import argparse
 import logging
 
 import argcomplete
-from gym.spaces import Box, Discrete, MultiDiscrete
+from gymnasium.spaces import Box, Discrete, MultiDiscrete
 
 from angorapy.configs import hp_config
 from angorapy.common.policies import get_distribution_by_short_name
 from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
-from angorapy.utilities.util import env_extract_dims
-from angorapy.common.wrappers import make_env
+from angorapy.utilities.util import env_extract_dims, mpi_print
+from angorapy.tasks.wrappers import make_env
 from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 from angorapy.agent.ppo_agent import PPOAgent
 
-from angorapy.environments import *
+from angorapy.tasks import *
 
 from mpi4py import MPI
 
@@ -83,6 +85,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     # choose and make policy distribution
     if settings["distribution"] is None:
         distribution = autoselect_distribution(env)
+        settings["distribution"] = distribution.short_name
     else:
         distribution = get_distribution_by_short_name(settings["distribution"])(env)
 
@@ -144,6 +147,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     if len(tf.config.list_physical_devices('GPU')) > 0:
         agent.set_gpu(not settings["cpu"])
     else:
+        print("No GPU found, running on CPU.")
         agent.set_gpu(False)
 
     monitor = None
@@ -158,11 +162,13 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                           experiment_group=settings["experiment_group"])
 
     try:
+        # tf.profiler.experimental.start("logdir")
         agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
                     monitor=monitor, save_every=settings["save_every"], separate_eval=settings["eval"],
                     stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
+        # tf.profiler.experimental.stop()
     except KeyboardInterrupt:
-        print("test")
+        mpi_print("Ended by user.")
     except Exception:
         if mpi_rank == 0:
             traceback.print_exc()
@@ -267,6 +273,8 @@ if __name__ == "__main__":
         tf.config.run_functions_eagerly(True)
         if is_root:
             logging.warning("YOU ARE RUNNING IN DEBUG MODE!")
+    else:
+        tf.config.run_functions_eagerly(False)
 
     try:
         run_experiment(args.env, vars(args), use_monitor=not args.no_monitor)

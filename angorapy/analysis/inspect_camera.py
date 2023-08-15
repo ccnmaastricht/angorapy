@@ -4,7 +4,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import tensorflow as tf
 
-from angorapy.common.wrappers import make_env
+from angorapy.tasks.wrappers import make_env
 
 import matplotlib.pyplot as plt
 

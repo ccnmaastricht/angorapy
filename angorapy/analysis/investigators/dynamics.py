@@ -9,7 +9,7 @@ import tensorflow as tf
 from angorapy.analysis.sindy.autoencoder import SindyAutoencoder
 from angorapy.analysis.util.sindy import compute_z_derivatives, sindy_library_tf
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import BaseWrapper
 from angorapy.utilities import util
 
 import pysindy as ps
