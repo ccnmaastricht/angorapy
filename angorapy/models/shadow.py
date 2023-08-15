@@ -105,6 +105,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
                   "lstm": tf.keras.layers.LSTM,
                   "gru": tf.keras.layers.GRU}[model_type]
 
+    print(state_dimensionality)
     # inputs
     visual_input = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["vision"],), name="vision")
     proprio_in = tf.keras.Input(batch_shape=(bs, sequence_length, *state_dimensionality["proprioception"],),

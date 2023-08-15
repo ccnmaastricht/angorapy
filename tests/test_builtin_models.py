@@ -1,5 +1,3 @@
-import unittest
-
 from angorapy import make_env, get_model_builder
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution, \
     CategoricalPolicyDistribution
@@ -34,26 +32,16 @@ def perform_test_on_model(model_name):
             action, action_probability = distr.act(*predicted_distribution_parameters)
 
 
-class ModelTest(unittest.TestCase):
-
-    def test_simple(self):
-        """Test simple model."""
-        perform_test_on_model("simple")
-
-        self.assertEqual(True, True)  # add assertion here
-
-    def test_wider(self):
-        """Test simple model."""
-        perform_test_on_model("wider")
-
-        self.assertEqual(True, True)  # add assertion here
-
-    def test_deeper(self):
-        """Test deeper model."""
-        perform_test_on_model("deeper")
-
-        self.assertEqual(True, True)
+def test_simple(self):
+    """Test simple model."""
+    perform_test_on_model("simple")
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_wider(self):
+    """Test simple model."""
+    perform_test_on_model("wider")
+
+
+def test_deeper(self):
+    """Test deeper model."""
+    perform_test_on_model("deeper")

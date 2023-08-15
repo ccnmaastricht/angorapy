@@ -189,13 +189,6 @@ class Reach(BaseShadowHandEnv):
 
         return super().step(action)
 
-    def get_proprioception(self):
-        """Get proprioception sensor readings."""
-        robot_qpos, robot_qvel = robot_get_obs(self.model, self.data)
-        proprioception = np.concatenate([robot_qpos, robot_qvel, self.get_fingertip_positions()])
-
-        return proprioception
-
     def _get_info(self):
         return {
             **super()._get_info(),

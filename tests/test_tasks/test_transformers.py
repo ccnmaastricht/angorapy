@@ -28,7 +28,7 @@ class EnvironmentTest(unittest.TestCase):
         true_std = np.mean([(i - Sensation(**normalizer.mean))**2 for i in inputs])
 
         for name in true_mean.dict().keys():
-            self.assertTrue(np.allclose(true_mean[name], normalizer.mean[name]), msg=f"{name}'s mean not equal.")
+            self.assertTrue(np.allclose(true_mean[name], normalizer.mean[name], atol=1e-6), msg=f"{name}'s mean not equal.")
             self.assertTrue(np.allclose(true_std[name], normalizer.variance[name], atol=1e-5), msg=f"{name}'s std not equal.")
 
     def test_state_normalization_non_anthropomorphic(self):

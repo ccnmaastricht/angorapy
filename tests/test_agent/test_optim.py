@@ -9,7 +9,6 @@ from angorapy.utilities.util import flatten
 
 
 def test_model_state_reset():
-    # keras model with 3 fully connected, two LSTM layers, stateful
     env = make_env("LunarLanderContinuous-v2")
     model, _, _ = build_wider_models(env, BetaPolicyDistribution(env), bs=5)
 

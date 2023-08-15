@@ -149,7 +149,6 @@ gym.envs.register(
 )
 
 
-
 gym.envs.register(
     id="HanoiTower-v0",
     entry_point="angorapy.tasks:HanoiEnv",
