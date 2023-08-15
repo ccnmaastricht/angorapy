@@ -5,7 +5,7 @@ from typing import Any, \
     Callable, \
     Dict, \
     Optional, \
-    Union
+    Union, Tuple
 
 import dm_control
 import gymnasium as gym
@@ -14,6 +14,7 @@ import numpy as np
 from dm_control.mjcf import RootElement
 from gymnasium import spaces
 from gymnasium.utils import seeding
+from mujoco import MjModel
 
 from angorapy.common.const import N_SUBSTEPS, \
     VISION_WH
@@ -23,6 +24,47 @@ from angorapy.tasks import reward
 from angorapy.tasks.world_building.entities import _Entity
 from angorapy.tasks.utils import mj_get_category_names, \
     mj_qpos_dict_to_qpos_vector, convert_observation_to_space
+
+
+def _parse_model_definition(model_definition: Union[str, RootElement, _Entity]) -> Tuple[MjModel, RootElement]:
+    """Parse a variable model definition into a MuJoCo model and a MJCF Model.
+
+    Possible model definitions are:
+        - a path to a model xml file
+        - a dm_control.mjcf.RootElement object
+        - a angorapy.tasks.world_building.entities._Entity object
+
+    Args:
+        model_definition (Union[str, RootElement, _Entity]): The model definition to parse.
+
+    Returns:
+        Tuple[MjModel, RootElement]: The parsed MuJoCo model and MuJoCo XML model.
+    """
+    if isinstance(model_definition, str):
+        model_path = model_definition
+        if model_path.startswith("/"):
+            fullpath = model_path
+        else:
+            fullpath = path.join(path.dirname(__file__), "models", model_path)
+
+        if not path.exists(fullpath):
+            raise OSError(f"File {fullpath} does not exist")
+
+        model = mujoco.MjModel.from_xml_path(filename=fullpath)
+        mjcf_model = dm_control.mjcf.from_path(fullpath)
+    elif isinstance(model_definition, dm_control.mjcf.RootElement):
+        model = mujoco.MjModel.from_xml_string(xml=model_definition.to_xml_string(),
+                                               assets=model_definition.get_assets())
+        mjcf_model = model_definition
+    elif isinstance(model_definition, _Entity):
+        model = mujoco.MjModel.from_xml_string(xml=model_definition.mjcf_model.to_xml_string(),
+                                               assets=model_definition.mjcf_model.get_assets())
+        mjcf_model = model_definition._mjcf_root.root_model
+    else:
+        raise ValueError(f"model must be either a path to a model xml file or mjcf.RootElement, "
+                         f"not {type(model_definition)}")
+
+    return model, mjcf_model
 
 
 class AnthropomorphicEnv(gym.Env, ABC):
@@ -80,31 +122,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             frame_skip=N_SUBSTEPS,
             n_substeps: int = N_SUBSTEPS,
     ):
-        # get the mujoco model and data
-        if isinstance(model, str):
-            model_path = model
-            if model_path.startswith("/"):
-                fullpath = model_path
-            else:
-                fullpath = path.join(path.dirname(__file__), "models", model_path)
-
-            if not path.exists(fullpath):
-                raise OSError(f"File {fullpath} does not exist")
-
-            self.model = mujoco.MjModel.from_xml_path(filename=fullpath)
-            self.mjcf_model = dm_control.mjcf.from_path(fullpath)
-        elif isinstance(model, dm_control.mjcf.RootElement):
-            self.model = mujoco.MjModel.from_xml_string(xml=model.to_xml_string(),
-                                                        assets=model.get_assets())
-            self.mjcf_model = model
-        elif isinstance(model, _Entity):
-            print(model.mjcf_model.to_xml_string())
-            self.model = mujoco.MjModel.from_xml_string(xml=model.mjcf_model.to_xml_string(),
-                                                        assets=model.mjcf_model.get_assets())
-            self.mjcf_model = model._mjcf_root.root_model
-        else:
-            raise ValueError(f"model must be either a path to a model xml file or a mujoco.MjModel object, "
-                             f"not {type(model)}")
+        self.model, self.mjcf_model = _parse_model_definition(model)
 
         self.model.vis.global_.offwidth = VISION_WH
         self.model.vis.global_.offheight = VISION_WH

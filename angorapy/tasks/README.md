@@ -20,29 +20,33 @@ A side note: The terms _task_ and _environment_ are often used interchangeably. 
 
 ### World Building
 
-Anthropomorphic environments are environments that are designed to be solved by anthropomorphic bodies. They are composed of a body, a task, and a world. The body is the anthropomorphic robot that is used to solve the task. The task is the goal that the body is trying to achieve. The world is the environment that the body and task are placed in.
+Anthropomorphic environments are environments that can host tasks designed to be solved by an anthropomorphic body. We define them to be composed of a body, external objects, and the world these are placed in. AngoraPy offers the _PhysicalWorld_ interface to standardize and facilitate the creation of worlds. This physical world consists of a _robot_, which is the body the brain component of the agent controls, optional _external objects_ that the body can interact with, and the _stage_ they are placed in. The (physical) environment can however also be build entirely without this interface. In any case, certain standards need to be followed to allow the task API to correctly identify the separate components of any anthropomorphic environment.
 
-An anthropomorphic environment is simulated in its _PhysicalWorld_. This physical world consists of a _robot_, which is the body the brain component of the agent controls, optional _external objects_ that the body can interact with, and a _stage_ that the body and external objects are placed in.
+To build any world model, and its components, AngoraPy relies on MuJoCo. MuJoCo models are defined in the MJCF format and can be build statically in XML or programmatically using dm_control's mjcf module. For either, consult the [MuJoCo (XML) documentation](https://mujoco.readthedocs.io/en/latest/modeling.html), and for the latter additionally [this guide](https://github.com/deepmind/dm_control/blob/main/dm_control/mjcf/README.md).
 
-#### The Robot
+#### Modeling with PhysicalWorld
 
-Every world _must_ contain _exactly one_ robot entity. The actuators of this robot will be controlled by the brain component of the agent.
+The PhysicalWorld interface allows a streamlined, simple standard to define, reuse and recombine components of anthropomorphic environments.
+
+##### The Robot
+
+Every world _must_ contain _exactly one_ robot entity. The actuators of this robot will be controlled by the brain component of the agent. All the components of the robot must be named according to 
 
 A minimal robot could be defined as follows:
 
 TODO
 
-#### External Objects
+##### External Objects
 
 External objects are entities that are not controlled by the agent's brain component, but can be interacted with by the agent's body. There can be any number of external objects in a world, including none.
 
-#### The Stage
+##### The Stage
 
 In a world's _Stage_, the robot and external objects are placed.
 
-### Modeling: Conventions & Guidelines
+#### Modeling in XML and Other Ways
 
-## The Wrapping System
+# The Wrapping System
 
 AngoraPy uses wrappers to standardize the communication between its training components and any given Gymnasium or AngoraPy task. Wrappers are additionally used to inject behaviour into tasks that may be useful for any given application and not task specific.
 

@@ -1,5 +1,6 @@
 import angorapy.agent
 from angorapy.agent import PPOAgent as Agent
+from angorapy.common import policies, transformers, senses
 from angorapy.tasks.wrappers import make_env
 from angorapy.models import get_model_builder, register_model
 from angorapy.utilities.monitoring import Monitor
