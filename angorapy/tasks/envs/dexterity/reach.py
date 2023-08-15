@@ -27,7 +27,7 @@ class Reach(BaseShadowHandEnv):
                  n_substeps=N_SUBSTEPS,
                  relative_control=True,
                  vision=False,
-                 touch=False,
+                 touch=True,
                  force_finger=None,
                  render_mode: Optional[str] = None):
         assert force_finger in list(range(5)) + [None], "Forced finger index out of range [0, 5]."

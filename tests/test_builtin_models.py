@@ -32,16 +32,16 @@ def perform_test_on_model(model_name):
             action, action_probability = distr.act(*predicted_distribution_parameters)
 
 
-def test_simple(self):
+def test_simple():
     """Test simple model."""
     perform_test_on_model("simple")
 
 
-def test_wider(self):
+def test_wider():
     """Test simple model."""
     perform_test_on_model("wider")
 
 
-def test_deeper(self):
+def test_deeper():
     """Test deeper model."""
     perform_test_on_model("deeper")

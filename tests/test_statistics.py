@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from angorapy.utilities.statistics import increment_mean_var
 
@@ -19,5 +18,5 @@ def test_incremental_mean_var():
     np_mean = np.mean(samples, axis=0)
     np_var = np.var(samples, axis=0)
 
-    pytest.assertTrue(np.allclose(mean, np_mean),
-                      np.allclose(mean, np_var))
+    assert np.allclose(mean, np_mean)
+    assert np.allclose(var, np_var)

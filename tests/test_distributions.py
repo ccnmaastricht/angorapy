@@ -25,8 +25,8 @@ def test_gaussian_pdf():
     result_pdf = distro.probability(x, mu, sig).numpy()
     result_log_pdf = np.exp(distro.log_probability(x, mu, np.log(sig)).numpy())
 
-    pytest.assertTrue(np.allclose(result_reference, result_pdf), msg="Gaussian PDF returns wrong Result")
-    pytest.assertTrue(np.allclose(result_pdf, result_log_pdf), msg="Gaussian Log PDF returns wrong Result")
+    assert np.allclose(result_reference, result_pdf), "Gaussian PDF returns wrong Result"
+    assert np.allclose(result_pdf, result_log_pdf), "Gaussian Log PDF returns wrong Result"
 
 
 def test_gaussian_entropy():
@@ -39,8 +39,8 @@ def test_gaussian_entropy():
     result_log = distro.entropy([mu, np.log(sig)]).numpy()
     result = distro._entropy_from_params(sig).numpy()
 
-    pytest.assertTrue(np.allclose(result_reference, result), msg="Gaussian entropy returns wrong result")
-    pytest.assertTrue(np.allclose(result_log, result_reference), msg="Gaussian entropy from log returns wrong result")
+    assert np.allclose(result_reference, result), "Gaussian entropy returns wrong result"
+    assert np.allclose(result_log, result_reference), "Gaussian entropy from log returns wrong result"
 
 
 # BETA
@@ -55,8 +55,8 @@ def test_beta_pdf():
     result_pdf = distro.probability(x, alphas, betas).numpy()
     result_log_pdf = np.exp(distro.log_probability(x, alphas, betas).numpy())
 
-    pytest.assertTrue(np.allclose(result_reference, result_log_pdf), msg="Beta Log PDF returns wrong Result")
-    pytest.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
+    assert np.allclose(result_reference, result_log_pdf), "Beta Log PDF returns wrong Result"
+    assert np.allclose(result_reference, result_pdf), "Beta PDF returns wrong Result"
 
 
 def test_beta_entropy():
@@ -68,7 +68,7 @@ def test_beta_entropy():
     result_reference = np.sum(beta.entropy(alphas, betas), axis=-1)
     result_pdf = distro._entropy_from_params((alphas, betas)).numpy()
 
-    pytest.assertTrue(np.allclose(result_reference, result_pdf), msg="Beta PDF returns wrong Result")
+    assert np.allclose(result_reference, result_pdf), "Beta PDF returns wrong Result"
 
 
 # CATEGORICAL
@@ -83,8 +83,8 @@ def test_categorical_entropy():
     result_log = distro._entropy_from_log_pmf(np.log(probs)).numpy()
     result = distro._entropy_from_pmf(probs).numpy()
 
-    pytest.assertTrue(np.allclose(result_reference, result), msg="Discrete entropy returns wrong result")
-    pytest.assertTrue(np.allclose(result_log, result_reference), msg="Discrete entropy from log returns wrong result")
+    assert np.allclose(result_reference, result), "Discrete entropy returns wrong result"
+    assert np.allclose(result_log, result_reference), "Discrete entropy from log returns wrong result"
 
 
 def test_extract_discrete_action_probabilities():
@@ -94,7 +94,7 @@ def test_extract_discrete_action_probabilities():
     result_reference = tf.convert_to_tensor([5, 3, 2, 4, 0, 4, 4, 5])
     result = extract_discrete_action_probabilities(action_probs, actions)
 
-    pytest.assertTrue(tf.reduce_all(tf.equal(result, result_reference)).numpy().item())
+    assert tf.reduce_all(tf.equal(result, result_reference)).numpy().item()
 
 
 def test_extract_discrete_action_probabilities_with_recurrence():
@@ -108,4 +108,4 @@ def test_extract_discrete_action_probabilities_with_recurrence():
     result_reference = tf.convert_to_tensor([[5, 5], [3, 3], [2, 2], [4, 4], [0, 0], [4, 4], [4, 4], [5, 5]])
     result = extract_discrete_action_probabilities(action_probs, actions)
 
-    pytest.assertTrue(tf.reduce_all(tf.equal(result, result_reference)).numpy().item())
+    assert tf.reduce_all(tf.equal(result, result_reference)).numpy().item()

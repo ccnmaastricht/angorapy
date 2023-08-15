@@ -23,9 +23,9 @@ def test_masked_state_reset():
         [True, True, False, True, False, False, True]
     )
 
-    pytest.assertTrue(np.allclose([s.numpy() for s in model.get_layer("larry").states],
-                                  [s.numpy() for s in model.get_layer("harry").states]))
-    pytest.assertTrue(np.allclose([s.numpy() for s in model.get_layer("larry").states], [
+    assert np.allclose([s.numpy() for s in model.get_layer("larry").states],
+                       [s.numpy() for s in model.get_layer("harry").states])
+    assert np.allclose([s.numpy() for s in model.get_layer("larry").states], [
         [0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0],
         [9, 9, 9, 9, 9],
@@ -33,4 +33,4 @@ def test_masked_state_reset():
         [9, 9, 9, 9, 9],
         [9, 9, 9, 9, 9],
         [0, 0, 0, 0, 0],
-    ]))
+    ])
