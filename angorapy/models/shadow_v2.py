@@ -1,19 +1,15 @@
-#!/usr/bin/env python
-"""Hybrid policy networks that utilize both visual and unstructured input data."""
 import os
 
-import gym
+import gymnasium as gym
 import keras_cortex
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
-from angorapy.common.activations import LiF, lif
 from angorapy.common.const import VISION_WH
 from angorapy.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
-from angorapy.common.wrappers import make_env
-from angorapy.models import _build_openai_encoder
+from angorapy.tasks.wrappers import make_env
 from angorapy.utilities.util import env_extract_dims
 
 
@@ -207,7 +203,7 @@ if __name__ == "__main__":
     optimizer: tf.keras.optimizers.Optimizer = tf.keras.optimizers.SGD()
 
     # without vision
-    env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    env = make_env("ManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_v2_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=True,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)
@@ -223,7 +219,7 @@ if __name__ == "__main__":
     })
 
     # with vision
-    env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0")
+    env = make_env("VisualManipulateBlockDiscreteAsynchronous-v0")
     _, _, joint = build_shadow_v2_brain_base(env, MultiCategoricalPolicyDistribution(env), bs=batch_size, blind=False,
                                           sequence_length=sequence_length, model_type="gru")
     plot_model(joint, to_file=f"{joint.name}.png", expand_nested=True, show_shapes=True)

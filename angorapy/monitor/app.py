@@ -56,9 +56,11 @@ def overview():
             model_path = os.path.join(BASE_SAVE_PATH, eid)
 
             if os.path.isfile(os.path.join(exp_path, "progress.json")):
-                print(eid)
-                with open(os.path.join(exp_path, "progress.json"), "r") as f:
-                    progress = json.load(f)
+                try:
+                    with open(os.path.join(exp_path, "progress.json"), "r") as f:
+                        progress = json.load(f)
+                except:
+                    continue
 
                 try:
                     with open(os.path.join(exp_path, "meta.json"), "r") as f:
@@ -71,8 +73,8 @@ def overview():
                 if os.path.isfile(os.path.join(model_path, "best/weights.index")):
                     model_available = True
 
-                    with open(os.path.join(model_path, "best/parameters.json")) as f:
-                        agent_parameters = json.load(f)
+                    # with open(os.path.join(model_path, "best/parameters.json")) as f:
+                    #     agent_parameters = json.load(f)
 
                 reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                     meta["environment"]["reward_threshold"])

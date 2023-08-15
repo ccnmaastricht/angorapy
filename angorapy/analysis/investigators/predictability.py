@@ -1,19 +1,15 @@
 from typing import List
 
 import numpy as np
-import sklearn.linear_model
 import tensorflow as tf
 import tqdm
-from scipy.spatial import transform
 from sklearn.linear_model import Ridge
 
 from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import stack_sensations
-from angorapy.common.wrappers import BaseWrapper
-from angorapy.environments.rotations import quat2mat, quat2axisangle
+from angorapy.tasks.wrappers import BaseWrapper
 from angorapy.utilities.util import flatten, stack_dicts
-import tensorflow_graphics.geometry.transformation as tfg
 
 
 class Predictability(base_investigator.Investigator):
