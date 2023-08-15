@@ -19,7 +19,7 @@ from angorapy.tasks.wrappers import make_env
 from angorapy.models import get_model_builder
 
 
-def _test_drill(env_name, model_builder=None,):
+def _test_drill(env_name, model_builder=None, ):
     """Test drilling an agent."""
     wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
     env = make_env(env_name, reward_config=None, transformers=wrappers)
@@ -56,7 +56,8 @@ def test_drill_manipulate_multicategorical():
         wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
         env = make_env("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, transformers=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
-        agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=MultiCategoricalPolicyDistribution(env))
+        agent = PPOAgent(build_models, env, workers=2, horizon=128,
+                         distribution=MultiCategoricalPolicyDistribution(env))
         agent.drill(n=2, epochs=2, batch_size=64)
     except Exception:
         pytest.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")
