@@ -57,7 +57,7 @@ class TaskWrapper(gym.ObservationWrapper):
 
         return Sensation(proprioception=observation)
 
-    def step(self, action) -> tuple[Sensation, SupportsFloat, bool, bool, dict[str, Any]]:
+    def step(self, action) -> Tuple[Sensation, SupportsFloat, bool, bool, Dict[str, Any]]:
         observation, reward, terminated, truncated, info = self.env.step(action)
 
         if hasattr(observation, "keys") and "achieved_goal" in observation.keys():
