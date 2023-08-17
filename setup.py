@@ -10,10 +10,10 @@ long_description = (this_directory / "README.md").read_text()
 setup(
     name='angorapy',
     version='0.10.0',
-    description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
+    description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
-    url='https://github.com/ccnmaastricht/angorapy',
+    url='http://www.angorapy.org',
     author='Tonio Weidler',
     author_email='research@tonioweidler.de',
     license='GPL-3.0',
