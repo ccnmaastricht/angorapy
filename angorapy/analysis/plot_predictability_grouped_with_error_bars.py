@@ -9,10 +9,10 @@ font = {'family' : 'Times',
         'size'   : 12}
 
 matplotlib.rc('font', **font)
-with open("../../storage/predictability_repeated_april08.json", "r") as f:
+with open("storage/predictability_repeated_august19a.json", "r") as f:
     results = json.load(f)
 
-included_regions = ["M1_activation", "pmc_recurrent_layer", "goal"]
+included_regions = ["M1_internal", "pmc_recurrent_layer", "goal"]
 included_targets = ["translation", "translation_to_10", "translation_to_50"]
 # included_regions = ["M1_activation", "pmc_recurrent_layer"]
 # included_targets = ["reward", "goal"]

@@ -5,16 +5,25 @@ import json
 import os
 import sys
 
+from angorapy import register_model
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../dexterity-fpn')))
 
 from mpi4py import MPI
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.analysis import investigators
+from dexterity.model import build_fpn_models, build_fpn_v2_models, build_fpn_v3_models
+
+register_model(build_fpn_models)
+register_model(build_fpn_v2_models)
+register_model(build_fpn_v3_models)
 
 mpi_comm = MPI.COMM_WORLD
 
 parser = argparse.ArgumentParser(description="Inspect an episode of an agent.")
-parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1679142835973298)
+parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default=1692003322304510)
 parser.add_argument("--state", type=str, help="state, either iteration or 'best'", default="best")
 parser.add_argument("--repeats", type=int, help="number of repetitions of the process", default=10)
 parser.add_argument("--n-states", type=int, help="states per repeat", default=200000)
@@ -25,6 +34,7 @@ args = parser.parse_args()
 worker_base, worker_extra = divmod(args.repeats, mpi_comm.size)
 worker_split = [worker_base + (r < worker_extra) for r in range(mpi_comm.size)]
 workers_n = worker_split[mpi_comm.rank]
+
 
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
@@ -64,20 +74,37 @@ targets = ["proprioception",
            "goals_achieved_so_far",
            # "needed_thumb"
 ]
+# results = {
+#     "noise": {},
+#     "proprioception": {},
+#     "vision": {},
+#     "touch": {},
+#     "goal": {},
+#     "SSC_activation_1": {},
+#     "SSC_activation_2": {},
+#     "LPFC_activation": {},
+#     "MCC_activation": {},
+#     "IPL_activation": {},
+#     "SPL_activation": {},
+#     "IPS_activation": {},
+#     "M1_activation": {},
+#     # "lstm_cell_1": {},
+#     "pmc_recurrent_layer": {},
+# }
+
 results = {
     "noise": {},
     "proprioception": {},
     "vision": {},
     "touch": {},
     "goal": {},
-    "SSC_activation_1": {},
-    "SSC_activation_2": {},
-    "LPFC_activation": {},
-    "MCC_activation": {},
-    "IPL_activation": {},
-    "SPL_activation": {},
-    "IPS_activation": {},
-    "M1_activation": {},
+    "SSC_internal": {},
+    "LPFC_internal": {},
+    "MCC_internal": {},
+    "IPL_internal": {},
+    "SPL_internal": {},
+    "IPS_internal": {},
+    "M1_internal": {},
     # "lstm_cell_1": {},
     "pmc_recurrent_layer": {},
 }
@@ -94,17 +121,16 @@ for i in range(workers_n):
         print(f"Collecting for repeat {i + 1}/{workers_n}")
     investigator.prepare(env,
                          layers=[
-                             "SSC_activation_1",
-                             "SSC_activation_2",
-                             "LPFC_activation",
-                             "MCC_activation",
-                             "IPL_activation",
-                             "SPL_activation",
-                             "IPS_activation",
+                             "SSC_internal",
+                             "LPFC_internal",
+                             "MCC_internal",
+                             "IPL_internal",
+                             "SPL_internal",
+                             "IPS_internal",
                              "pmc_recurrent_layer",
                              # "lstm_cell_1",
-                             "M1_activation",
-                         ], n_states=args.n_states)
+                             "M1_internal",
+                         ], n_states=args.n_states, verbose=mpi_comm.rank == 0)
 
     for information in targets:
         if mpi_comm.rank == 0:
@@ -121,5 +147,5 @@ if mpi_comm.rank == 0:
             for information in result[source].keys():
                 merged_results[source][information].extend(result[source][information])
 
-    with open("storage/predictability_repeated_april08.json", "w") as f:
+    with open("storage/predictability_repeated_august19a.json", "w") as f:
         json.dump(merged_results, f)

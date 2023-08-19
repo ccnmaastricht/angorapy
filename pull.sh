@@ -27,6 +27,11 @@ POSARGS=($ARGS)
 HOST=${POSARGS[0]}
 BASE_DIRECTORY=$(ssh $HOST echo $BASE_DIRECTORY)
 
+if [ -z ${BASE_DIRECTORY} ]; then
+  echo "Could not connect to host."
+  exit 1
+fi
+
 echo "PULLING $ID"
 echo "FROM $BASE_DIRECTORY"
 

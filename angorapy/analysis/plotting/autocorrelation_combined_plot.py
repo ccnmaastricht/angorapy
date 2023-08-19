@@ -7,8 +7,13 @@ import seaborn as sns
 import statsmodels.api as sm
 from tqdm import tqdm
 
+from angorapy import register_model
 from angorapy.agent import PPOAgent
+from dexterity.model import build_fpn_models, build_fpn_v2_models, build_fpn_v3_models
 
+register_model(build_fpn_models)
+register_model(build_fpn_v2_models)
+register_model(build_fpn_v3_models)
 
 def get_timeseries_data(agent, random_steps=True):
     env = agent.env
@@ -90,7 +95,7 @@ if __name__ == '__main__':
     acf_ax5 = plt.subplot2grid((3, 3), (2, 1), colspan=1)
     acf_ax6 = plt.subplot2grid((3, 3), (2, 2), colspan=1)
 
-    agent = PPOAgent.from_agent_state(1673350499432390, from_iteration="best", path_modifier="../../../")
+    agent = PPOAgent.from_agent_state(1692396321151529, from_iteration="best", path_modifier="../../../")
     autocorrelations, crosscorrelations, statewise_correlations = [], [], []
     for i in tqdm(range(n_samples)):
         data = get_timeseries_data(agent)

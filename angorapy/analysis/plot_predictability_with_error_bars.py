@@ -9,7 +9,7 @@ font = {'family' : 'Times',
         'size'   : 12}
 
 matplotlib.rc('font', **font)
-with open("../../storage/predictability_repeated_april08.json", "r") as f:
+with open("./storage/predictability_repeated_august19a.json", "r") as f:
     results = json.load(f)
 
 # remove entries from results that are contain no underscore in their name

@@ -4,7 +4,7 @@ import re
 import numpy as np
 from matplotlib import pyplot as plt
 
-with open("results/predictability_repeated_april03.json", "r") as f:
+with open("results/predictability_repeated_april08.json", "r") as f:
     results = json.load(f)
 
 # remove entries from results that are contain no underscore in their name
