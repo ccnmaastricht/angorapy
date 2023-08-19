@@ -41,7 +41,7 @@ args.state = int(args.state) if args.state not in ["b", "best", "last"] else arg
 agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="./")
 investigator = investigators.Predictability.from_agent(agent)
 env = agent.env
-
+exit()
 # nx_model = nx.drawing.nx_pydot.from_pydot(model_to_dot(investigator.network, expand_nested=True, subgraph=True))
 #
 # model_to_dot(investigator.network, expand_nested=True).write_png("dot_sankey.png")
