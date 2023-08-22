@@ -24,6 +24,8 @@ class Predictability(base_investigator.Investigator):
 
     def prepare(self, env: TaskWrapper, layers: List[str], n_states=1000, verbose=True):
         """Prepare samples to predict from."""
+        self.data, self.train_data, self.val_data = None, None, None
+
         self.network.reset_states()
         state, info = env.reset(return_info=True)
 
@@ -56,6 +58,9 @@ class Predictability(base_investigator.Investigator):
             other["fingertip_positions"] = env.unwrapped.get_fingertip_positions()
             other["translation"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-1])
             other["translation_to_10"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-10])
+            other["translation_to_20"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-20])
+            other["translation_to_30"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-30])
+            other["translation_to_40"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-40])
             other["translation_to_50"] = env.unwrapped._goal_distance(info["achieved_goal"], prev_achieved_goals[-50])
             other["object_orientation"] = env.unwrapped.data.jnt('block/object:joint/').qpos.copy()[3:]
             # other["relative_angle"] = tfg.quaternion.relative_angle(
@@ -97,10 +102,16 @@ class Predictability(base_investigator.Investigator):
         stacked_other_collection = stack_dicts(other_collection)
         stacked_other_collection["translation"][:-1] = stacked_other_collection["translation"][1:]
         stacked_other_collection["translation_to_10"][:-10] = stacked_other_collection["translation_to_10"][10:]
+        stacked_other_collection["translation_to_20"][:-20] = stacked_other_collection["translation_to_20"][20:]
+        stacked_other_collection["translation_to_30"][:-30] = stacked_other_collection["translation_to_30"][30:]
+        stacked_other_collection["translation_to_40"][:-40] = stacked_other_collection["translation_to_40"][40:]
         stacked_other_collection["translation_to_50"][:-50] = stacked_other_collection["translation_to_50"][50:]
 
         stacked_other_collection["translation"][-1:] = stacked_other_collection["translation"][-1]
         stacked_other_collection["translation_to_10"][-10:] = stacked_other_collection["translation"][-1]
+        stacked_other_collection["translation_to_20"][-20:] = stacked_other_collection["translation"][-1]
+        stacked_other_collection["translation_to_30"][-30:] = stacked_other_collection["translation"][-1]
+        stacked_other_collection["translation_to_40"][-40:] = stacked_other_collection["translation"][-1]
         stacked_other_collection["translation_to_50"][-50:] = stacked_other_collection["translation"][-1]
 
         self._data = tf.data.Dataset.from_tensor_slices({

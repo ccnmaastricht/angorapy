@@ -39,9 +39,8 @@ workers_n = worker_split[mpi_comm.rank]
 args.state = int(args.state) if args.state not in ["b", "best", "last"] else args.state
 
 agent = PPOAgent.from_agent_state(args.id, args.state, path_modifier="./")
-investigator = investigators.Predictability.from_agent(agent)
 env = agent.env
-exit()
+
 # nx_model = nx.drawing.nx_pydot.from_pydot(model_to_dot(investigator.network, expand_nested=True, subgraph=True))
 #
 # model_to_dot(investigator.network, expand_nested=True).write_png("dot_sankey.png")
@@ -58,16 +57,20 @@ exit()
 # make output
 # nx.drawing.nx_pydot.to_pydot(nx_model).write_png("sankey.png")
 
-targets = ["proprioception",
+targets = [
+            # "proprioception",
            # "vision",
            # "touch",
            "reward",
-           "fingertip_positions",
+           # "fingertip_positions",
            "goal",
            "translation",
            "translation_to_10",
+           "translation_to_20",
+           "translation_to_30",
+           "translation_to_40",
            "translation_to_50",
-           "object_orientation",
+           # "object_orientation",
            # "rotation_matrix",
            # "rotation_matrix_last_10",
            # "current_rotational_axis",
@@ -104,7 +107,7 @@ results = {
     "IPL_internal": {},
     "SPL_internal": {},
     "IPS_internal": {},
-    "M1_internal": {},
+    "m1_internal": {},
     # "lstm_cell_1": {},
     "pmc_recurrent_layer": {},
 }
@@ -119,6 +122,7 @@ for information in targets:
 for i in range(workers_n):
     if mpi_comm.rank == 0:
         print(f"Collecting for repeat {i + 1}/{workers_n}")
+    investigator = investigators.Predictability.from_agent(agent)
     investigator.prepare(env,
                          layers=[
                              "SSC_internal",
@@ -129,7 +133,7 @@ for i in range(workers_n):
                              "IPS_internal",
                              "pmc_recurrent_layer",
                              # "lstm_cell_1",
-                             "M1_internal",
+                             "m1_internal",
                          ], n_states=args.n_states, verbose=mpi_comm.rank == 0)
 
     for information in targets:
@@ -147,5 +151,5 @@ if mpi_comm.rank == 0:
             for information in result[source].keys():
                 merged_results[source][information].extend(result[source][information])
 
-    with open("storage/predictability_repeated_august19a.json", "w") as f:
+    with open("storage/predictability_repeated_august19e.json", "w") as f:
         json.dump(merged_results, f)
