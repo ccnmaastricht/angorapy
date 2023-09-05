@@ -70,7 +70,7 @@ def load_unrendered_dataset(path):
 
 def gen_cube_quats_prediction_data(n: int, save_path: str):
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    agent = PPOAgent.from_agent_state(1670596186987840, "best", path_modifier="../")
+    agent = PPOAgent.from_agent_state(1692003322304510, "best", path_modifier="../")
     agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1, sequence_length=1)
 
     hand_env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0", transformers=agent.env.transformers, render_mode="rgb_array")

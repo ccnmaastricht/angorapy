@@ -8,8 +8,8 @@ from matplotlib import pyplot as plt
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from angorapy import make_env
-from angorapy.environments.anthrobotics import AnthropomorphicEnv
+from angorapy import make_task
+from angorapy.tasks.core import AnthropomorphicEnv
 
 from angorapy.models.convolutional import OpenAIEncoder
 
@@ -55,7 +55,7 @@ def positional_diff_metric(y_true, y_pred):
     return tf.linalg.norm(pos_true - pos_pred, axis=-1) * 1000
 
 
-hand_env = make_env("HumanoidVisualManipulateBlockDiscreteAsynchronous-v0",
+hand_env = make_task("ManipulateBlockDiscreteAsynchronous-v0",
                     render_mode="rgb_array")
 
 env_unwrapped: AnthropomorphicEnv = hand_env.unwrapped
@@ -325,7 +325,7 @@ if __name__ == "__main__":
         epochs=args.epochs,
         n_samples=n_samples,
         n_cameras=n_cameras,
-        load_data=True,
+        load_data=False,
         name=args.name,
         load_from=args.load,
     )
