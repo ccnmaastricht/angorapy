@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MODIFIED VERSION of shadow hand. -->
+
+<mujoco>
+    <compiler angle="radian" coordinate="local" meshdir="../assets/original_gym" texturedir="../textures"/>
+    <option timestep="0.002" iterations="20" apirate="200">
+        <flag warmstart="enable"/>
+    </option>
+
+    <size njmax="500" nconmax="100" nuser_jnt="1" nuser_site="1" nuser_tendon="1" nuser_sensor="1" nuser_actuator="16"
+          nstack="600000"/>
+
+    <visual>
+        <map fogstart="3" fogend="5" force="0.1"/>
+        <quality shadowsize="4096"/>
+    </visual>
+
+    <default>
+        <default class="rh_asset_class">
+            <geom friction="1 0.005 0.001" condim="3" margin="0.0005" contype="1" conaffinity="1"/>
+            <joint limited="true" damping="0.1" armature="0.001" margin="0.01" frictionloss="0.001"/>
+            <site size="0.005" rgba="0.4 0.9 0.4 1"/>
+            <general ctrllimited="true" forcelimited="true"/>
+        </default>
+        <default class="rh_D_Touch">
+            <site type="box" size="0.009 0.004 0.013" pos="0 -0.004 0.018" rgba="0.8 0.8 0.8 0.15" group="4"/>
+        </default>
+        <default class="rh_DC_Hand">
+            <geom material="rh_MatColl" contype="1" conaffinity="0" group="4"/>
+        </default>
+        <default class="rh_D_Vizual">
+            <geom material="rh_MatViz" contype="0" conaffinity="0" group="1" type="mesh"/>
+        </default>
+        <default class="rh_free">
+            <joint type="free" damping="0" armature="0" limited="false"/>
+        </default>
+    </default>
+
+    <contact>
+        <pair geom1="rh_C_ffdistal" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_ffmiddle" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_ffproximal" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_mfproximal" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_mfdistal" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_rfdistal" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_lfdistal" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_palm0" geom2="rh_C_thdistal" condim="1"/>
+        <pair geom1="rh_C_mfdistal" geom2="rh_C_ffdistal" condim="1"/>
+        <pair geom1="rh_C_rfdistal" geom2="rh_C_mfdistal" condim="1"/>
+        <pair geom1="rh_C_lfdistal" geom2="rh_C_rfdistal" condim="1"/>
+        <pair geom1="rh_C_mfproximal" geom2="rh_C_ffproximal" condim="1"/>
+        <pair geom1="rh_C_rfproximal" geom2="rh_C_mfproximal" condim="1"/>
+        <pair geom1="rh_C_lfproximal" geom2="rh_C_rfproximal" condim="1"/>
+        <pair geom1="rh_C_lfdistal" geom2="rh_C_rfdistal" condim="1"/>
+        <pair geom1="rh_C_lfdistal" geom2="rh_C_mfdistal" condim="1"/>
+        <pair geom1="rh_C_lfdistal" geom2="rh_C_rfmiddle" condim="1"/>
+        <pair geom1="rh_C_lfmiddle" geom2="rh_C_rfdistal" condim="1"/>
+        <pair geom1="rh_C_lfmiddle" geom2="rh_C_rfmiddle" condim="1"/>
+    </contact>
+
+    <tendon>
+        <fixed name="rh_T_WRJ1r" limited="true" range="-0.032 0.032" user="1236">
+            <joint joint="rh_WRJ1" coef="0.0325"/>
+        </fixed>
+        <fixed name="rh_T_WRJ1l" limited="true" range="-0.032 0.032" user="1237">
+            <joint joint="rh_WRJ1" coef="-0.0325"/>
+        </fixed>
+        <fixed name="rh_T_WRJ0u" limited="true" range="-0.032 0.032" user="1236">
+            <joint joint="rh_WRJ0" coef="0.0175"/>
+        </fixed>
+        <fixed name="rh_T_WRJ0d" limited="true" range="-0.032 0.032" user="1237">
+            <joint joint="rh_WRJ0" coef="-0.0175"/>
+        </fixed>
+        <fixed name="rh_T_FFJ3r" limited="true" range="-0.018 0.018" user="1204">
+            <joint joint="rh_FFJ3" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_FFJ3l" limited="true" range="-0.018 0.018" user="1205">
+            <joint joint="rh_FFJ3" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_FFJ2u" limited="true" range="-0.007 0.03" user="1202">
+            <joint joint="rh_FFJ2" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_FFJ2d" limited="true" range="-0.03 0.007" user="1203">
+            <joint joint="rh_FFJ2" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_FFJ1c" limited="true" range="-0.001 0.001">
+            <joint joint="rh_FFJ0" coef="0.00705"/>
+            <joint joint="rh_FFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_FFJ1u" limited="true" range="-0.007 0.03" user="1200">
+            <joint joint="rh_FFJ0" coef="0.00705"/>
+            <joint joint="rh_FFJ1" coef="0.00805"/>
+        </fixed>
+        <fixed name="rh_T_FFJ1d" limited="true" range="-0.03 0.007" user="1201">
+            <joint joint="rh_FFJ0" coef="-0.00705"/>
+            <joint joint="rh_FFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_MFJ3r" limited="true" range="-0.018 0.018" user="1210">
+            <joint joint="rh_MFJ3" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_MFJ3l" limited="true" range="-0.018 0.018" user="1211">
+            <joint joint="rh_MFJ3" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_MFJ2u" limited="true" range="-0.007 0.03" user="1208">
+            <joint joint="rh_MFJ2" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_MFJ2d" limited="true" range="-0.03 0.007" user="1209">
+            <joint joint="rh_MFJ2" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_MFJ1c" limited="true" range="-0.001 0.001">
+            <joint joint="rh_MFJ0" coef="0.00705"/>
+            <joint joint="rh_MFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_MFJ1u" limited="true" range="-0.007 0.03" user="1206">
+            <joint joint="rh_MFJ0" coef="0.00705"/>
+            <joint joint="rh_MFJ1" coef="0.00805"/>
+        </fixed>
+        <fixed name="rh_T_MFJ1d" limited="true" range="-0.03 0.007" user="1207">
+            <joint joint="rh_MFJ0" coef="-0.00705"/>
+            <joint joint="rh_MFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_RFJ3r" limited="true" range="-0.018 0.018" user="1216">
+            <joint joint="rh_RFJ3" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_RFJ3l" limited="true" range="-0.018 0.018" user="1217">
+            <joint joint="rh_RFJ3" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_RFJ2u" limited="true" range="-0.007 0.03" user="1214">
+            <joint joint="rh_RFJ2" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_RFJ2d" limited="true" range="-0.03 0.007" user="1215">
+            <joint joint="rh_RFJ2" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_RFJ1c" limited="true" range="-0.001 0.001">
+            <joint joint="rh_RFJ0" coef="0.00705"/>
+            <joint joint="rh_RFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_RFJ1u" limited="true" range="-0.007 0.03" user="1212">
+            <joint joint="rh_RFJ0" coef="0.00705"/>
+            <joint joint="rh_RFJ1" coef="0.00805"/>
+        </fixed>
+        <fixed name="rh_T_RFJ1d" limited="true" range="-0.03 0.007" user="1213">
+            <joint joint="rh_RFJ0" coef="-0.00705"/>
+            <joint joint="rh_RFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_LFJ4u" limited="true" range="-0.007 0.03" user="1224">
+            <joint joint="rh_LFJ4" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_LFJ4d" limited="true" range="-0.03 0.007" user="1225">
+            <joint joint="rh_LFJ4" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_LFJ3r" limited="true" range="-0.018 0.018" user="1222">
+            <joint joint="rh_LFJ3" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_LFJ3l" limited="true" range="-0.018 0.018" user="1223">
+            <joint joint="rh_LFJ3" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_LFJ2u" limited="true" range="-0.007 0.03" user="1220">
+            <joint joint="rh_LFJ2" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_LFJ2d" limited="true" range="-0.03 0.007" user="1221">
+            <joint joint="rh_LFJ2" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_LFJ1c" limited="true" range="-0.001 0.001">
+            <joint joint="rh_LFJ0" coef="0.00705"/>
+            <joint joint="rh_LFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_LFJ1u" limited="true" range="-0.007 0.03" user="1218">
+            <joint joint="rh_LFJ0" coef="0.00705"/>
+            <joint joint="rh_LFJ1" coef="0.00805"/>
+        </fixed>
+        <fixed name="rh_T_LFJ1d" limited="true" range="-0.03 0.007" user="1219">
+            <joint joint="rh_LFJ0" coef="-0.00705"/>
+            <joint joint="rh_LFJ1" coef="-0.00805"/>
+        </fixed>
+        <fixed name="rh_T_THJ4a" limited="true" range="-0.018 0.018" user="1234">
+            <joint joint="rh_THJ4" coef="0.01636"/>
+        </fixed>
+        <fixed name="rh_T_THJ4c" limited="true" range="-0.018 0.018" user="1235">
+            <joint joint="rh_THJ4" coef="-0.01636"/>
+        </fixed>
+        <fixed name="rh_T_THJ3u" limited="true" range="-0.007 0.03" user="1232">
+            <joint joint="rh_THJ3" coef="0.01"/>
+        </fixed>
+        <fixed name="rh_T_THJ3d" limited="true" range="-0.03 0.007" user="1233">
+            <joint joint="rh_THJ3" coef="-0.01"/>
+        </fixed>
+        <fixed name="rh_T_THJ2u" limited="true" range="-0.018 0.018" user="1230">
+            <joint joint="rh_THJ2" coef="0.011"/>
+        </fixed>
+        <fixed name="rh_T_THJ2d" limited="true" range="-0.018 0.018" user="1231">
+            <joint joint="rh_THJ2" coef="-0.011"/>
+        </fixed>
+        <fixed name="rh_T_THJ1r" limited="true" range="-0.018 0.018" user="1228">
+            <joint joint="rh_THJ1" coef="0.011"/>
+        </fixed>
+        <fixed name="rh_T_THJ1l" limited="true" range="-0.018 0.018" user="1229">
+            <joint joint="rh_THJ1" coef="-0.011"/>
+        </fixed>
+        <fixed name="rh_T_THJ0r" limited="true" range="-0.03 0.007" user="1226">
+            <joint joint="rh_THJ0" coef="0.009"/>
+        </fixed>
+        <fixed name="rh_T_THJ0l" limited="true" range="-0.007 0.03" user="1227">
+            <joint joint="rh_THJ0" coef="-0.009"/>
+        </fixed>
+    </tendon>
+
+    <sensor>
+        <jointpos name="rh_Sjp_WRJ1" joint="rh_WRJ1"/>
+        <jointpos name="rh_Sjp_WRJ0" joint="rh_WRJ0"/>
+        <jointpos name="rh_Sjp_FFJ3" joint="rh_FFJ3"/>
+        <jointpos name="rh_Sjp_FFJ2" joint="rh_FFJ2"/>
+        <jointpos name="rh_Sjp_FFJ1" joint="rh_FFJ1"/>
+        <jointpos name="rh_Sjp_FFJ0" joint="rh_FFJ0"/>
+        <jointpos name="rh_Sjp_MFJ3" joint="rh_MFJ3"/>
+        <jointpos name="rh_Sjp_MFJ2" joint="rh_MFJ2"/>
+        <jointpos name="rh_Sjp_MFJ1" joint="rh_MFJ1"/>
+        <jointpos name="rh_Sjp_MFJ0" joint="rh_MFJ0"/>
+        <jointpos name="rh_Sjp_RFJ3" joint="rh_RFJ3"/>
+        <jointpos name="rh_Sjp_RFJ2" joint="rh_RFJ2"/>
+        <jointpos name="rh_Sjp_RFJ1" joint="rh_RFJ1"/>
+        <jointpos name="rh_Sjp_RFJ0" joint="rh_RFJ0"/>
+        <jointpos name="rh_Sjp_LFJ4" joint="rh_LFJ4"/>
+        <jointpos name="rh_Sjp_LFJ3" joint="rh_LFJ3"/>
+        <jointpos name="rh_Sjp_LFJ2" joint="rh_LFJ2"/>
+        <jointpos name="rh_Sjp_LFJ1" joint="rh_LFJ1"/>
+        <jointpos name="rh_Sjp_LFJ0" joint="rh_LFJ0"/>
+        <jointpos name="rh_Sjp_THJ4" joint="rh_THJ4"/>
+        <jointpos name="rh_Sjp_THJ3" joint="rh_THJ3"/>
+        <jointpos name="rh_Sjp_THJ2" joint="rh_THJ2"/>
+        <jointpos name="rh_Sjp_THJ1" joint="rh_THJ1"/>
+        <jointpos name="rh_Sjp_THJ0" joint="rh_THJ0"/>
+        <touch name="rh_ST_Tch_fftip" site="rh_Tch_fftip"/>
+        <touch name="rh_ST_Tch_mftip" site="rh_Tch_mftip"/>
+        <touch name="rh_ST_Tch_rftip" site="rh_Tch_rftip"/>
+        <touch name="rh_ST_Tch_lftip" site="rh_Tch_lftip"/>
+        <touch name="rh_ST_Tch_thtip" site="rh_Tch_thtip"/>
+    </sensor>
+
+    <actuator>
+        <position name="rh_A_WRJ1" class="rh_asset_class" user="2038" joint="rh_WRJ1"
+                  ctrlrange="-0.489 0.14" kp="5" forcerange="-4.785 4.785"/>
+        <position name="rh_A_WRJ0" class="rh_asset_class" user="2036" joint="rh_WRJ0"
+                  ctrlrange="-0.698 0.489" kp="5" forcerange="-2.175 2.175"/>
+        <position name="rh_A_FFJ3" class="rh_asset_class" user="2004" joint="rh_FFJ3"
+                  ctrlrange="-0.349 0.349" kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_FFJ2" class="rh_asset_class" user="2002" joint="rh_FFJ2" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_FFJ1" class="rh_asset_class" user="2000" joint="rh_FFJ1" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.7245 0.7245"/>
+        <position name="rh_A_MFJ3" class="rh_asset_class" user="2010" joint="rh_MFJ3"
+                  ctrlrange="-0.349 0.349" kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_MFJ2" class="rh_asset_class" user="2008" joint="rh_MFJ2" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_MFJ1" class="rh_asset_class" user="2006" joint="rh_MFJ1" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.7245 0.7245"/>
+        <position name="rh_A_RFJ3" class="rh_asset_class" user="2016" joint="rh_RFJ3"
+                  ctrlrange="-0.349 0.349" kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_RFJ2" class="rh_asset_class" user="2014" joint="rh_RFJ2" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_RFJ1" class="rh_asset_class" user="2012" joint="rh_RFJ1" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.7245 0.7245"/>
+        <position name="rh_A_LFJ4" class="rh_asset_class" user="2024" joint="rh_LFJ4" ctrlrange="0 0.785"
+                  kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_LFJ3" class="rh_asset_class" user="2022" joint="rh_LFJ3"
+                  ctrlrange="-0.349 0.349" kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_LFJ2" class="rh_asset_class" user="2020" joint="rh_LFJ2" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.9 0.9"/>
+        <position name="rh_A_LFJ1" class="rh_asset_class" user="2018" joint="rh_LFJ1" ctrlrange="0 1.571"
+                  kp="1" forcerange="-0.7245 0.7245"/>
+        <position name="rh_A_THJ4" class="rh_asset_class" user="2034" joint="rh_THJ4"
+                  ctrlrange="-1.047 1.047" kp="1" forcerange="-2.3722 2.3722"/>
+        <position name="rh_A_THJ3" class="rh_asset_class" user="2032" joint="rh_THJ3" ctrlrange="0 1.222"
+                  kp="1" forcerange="-1.45 1.45"/>
+        <position name="rh_A_THJ2" class="rh_asset_class" user="2030" joint="rh_THJ2"
+                  ctrlrange="-0.209 0.209" kp="1" forcerange="-0.99 0.99"/>
+        <position name="rh_A_THJ1" class="rh_asset_class" user="2028" joint="rh_THJ1"
+                  ctrlrange="-0.524 0.524" kp="1" forcerange="-0.99 0.99"/>
+        <position name="rh_A_THJ0" class="rh_asset_class" user="2026" joint="rh_THJ0" ctrlrange="-1.571 0"
+                  kp="1" forcerange="-0.81 0.81"/>
+    </actuator>
+
+    <sensor>
+
+        <!--PALM-->
+        <touch name="rh_TS_palm_b0" site="rh_T_palm_b0"/>
+        <touch name="rh_TS_palm_bl" site="rh_T_palm_bl"/>
+        <touch name="rh_TS_palm_bm" site="rh_T_palm_bm"/>
+        <touch name="rh_TS_palm_br" site="rh_T_palm_br"/>
+        <touch name="rh_TS_palm_fl" site="rh_T_palm_fl"/>
+        <touch name="rh_TS_palm_fm" site="rh_T_palm_fm"/>
+        <touch name="rh_TS_palm_fr" site="rh_T_palm_fr"/>
+        <touch name="rh_TS_palm_b1" site="rh_T_palm_b1"/>
+
+        <!--FOREFINGER-->
+        <touch name="rh_TS_ffproximal_front_left_bottom" site="rh_T_ffproximal_front_left_bottom"/>
+        <touch name="rh_TS_ffproximal_front_right_bottom" site="rh_T_ffproximal_front_right_bottom"/>
+        <touch name="rh_TS_ffproximal_front_left_top" site="rh_T_ffproximal_front_left_top"/>
+        <touch name="rh_TS_ffproximal_front_right_top" site="rh_T_ffproximal_front_right_top"/>
+        <touch name="rh_TS_ffproximal_back_left" site="rh_T_ffproximal_back_left"/>
+        <touch name="rh_TS_ffproximal_back_right" site="rh_T_ffproximal_back_right"/>
+        <touch name="rh_TS_ffproximal_tip" site="rh_T_ffproximal_tip"/>
+
+        <touch name="rh_TS_ffmiddle_front_left" site="rh_T_ffmiddle_front_left"/>
+        <touch name="rh_TS_ffmiddle_front_right" site="rh_T_ffmiddle_front_right"/>
+        <touch name="rh_TS_ffmiddle_back_left" site="rh_T_ffmiddle_back_left"/>
+        <touch name="rh_TS_ffmiddle_back_right" site="rh_T_ffmiddle_back_right"/>
+        <touch name="rh_TS_ffmiddle_tip" site="rh_T_ffmiddle_tip"/>
+
+        <touch name="rh_TS_fftip_front_left" site="rh_T_fftip_front_left"/>
+        <touch name="rh_TS_fftip_front_right" site="rh_T_fftip_front_right"/>
+        <touch name="rh_TS_fftip_back_left" site="rh_T_fftip_back_left"/>
+        <touch name="rh_TS_fftip_back_right" site="rh_T_fftip_back_right"/>
+        <touch name="rh_TS_fftip_tip" site="rh_T_fftip_tip"/>
+
+        <!-- MIDDLE FINGER -->
+        <touch name="rh_TS_mfproximal_front_left_bottom" site="rh_T_mfproximal_front_left_bottom"/>
+        <touch name="rh_TS_mfproximal_front_right_bottom" site="rh_T_mfproximal_front_right_bottom"/>
+        <touch name="rh_TS_mfproximal_front_left_top" site="rh_T_mfproximal_front_left_top"/>
+        <touch name="rh_TS_mfproximal_front_right_top" site="rh_T_mfproximal_front_right_top"/>
+        <touch name="rh_TS_mfproximal_back_left" site="rh_T_mfproximal_back_left"/>
+        <touch name="rh_TS_mfproximal_back_right" site="rh_T_mfproximal_back_right"/>
+        <touch name="rh_TS_mfproximal_tip" site="rh_T_mfproximal_tip"/>
+
+        <touch name="rh_TS_mfmiddle_front_left" site="rh_T_mfmiddle_front_left"/>
+        <touch name="rh_TS_mfmiddle_front_right" site="rh_T_mfmiddle_front_right"/>
+        <touch name="rh_TS_mfmiddle_back_left" site="rh_T_mfmiddle_back_left"/>
+        <touch name="rh_TS_mfmiddle_back_right" site="rh_T_mfmiddle_back_right"/>
+        <touch name="rh_TS_mfmiddle_tip" site="rh_T_mfmiddle_tip"/>
+
+        <touch name="rh_TS_mftip_front_left" site="rh_T_mftip_front_left"/>
+        <touch name="rh_TS_mftip_front_right" site="rh_T_mftip_front_right"/>
+        <touch name="rh_TS_mftip_back_left" site="rh_T_mftip_back_left"/>
+        <touch name="rh_TS_mftip_back_right" site="rh_T_mftip_back_right"/>
+        <touch name="rh_TS_mftip_tip" site="rh_T_mftip_tip"/>
+
+        <!-- RING FINGER -->
+        <touch name="rh_TS_rfproximal_front_left_bottom" site="rh_T_rfproximal_front_left_bottom"/>
+        <touch name="rh_TS_rfproximal_front_right_bottom" site="rh_T_rfproximal_front_right_bottom"/>
+        <touch name="rh_TS_rfproximal_front_left_top" site="rh_T_rfproximal_front_left_top"/>
+        <touch name="rh_TS_rfproximal_front_right_top" site="rh_T_rfproximal_front_right_top"/>
+        <touch name="rh_TS_rfproximal_back_left" site="rh_T_rfproximal_back_left"/>
+        <touch name="rh_TS_rfproximal_back_right" site="rh_T_rfproximal_back_right"/>
+        <touch name="rh_TS_rfproximal_tip" site="rh_T_rfproximal_tip"/>
+
+        <touch name="rh_TS_rfmiddle_front_left" site="rh_T_rfmiddle_front_left"/>
+        <touch name="rh_TS_rfmiddle_front_right" site="rh_T_rfmiddle_front_right"/>
+        <touch name="rh_TS_rfmiddle_back_left" site="rh_T_rfmiddle_back_left"/>
+        <touch name="rh_TS_rfmiddle_back_right" site="rh_T_rfmiddle_back_right"/>
+        <touch name="rh_TS_rfmiddle_tip" site="rh_T_rfmiddle_tip"/>
+
+        <touch name="rh_TS_rftip_front_left" site="rh_T_rftip_front_left"/>
+        <touch name="rh_TS_rftip_front_right" site="rh_T_rftip_front_right"/>
+        <touch name="rh_TS_rftip_back_left" site="rh_T_rftip_back_left"/>
+        <touch name="rh_TS_rftip_back_right" site="rh_T_rftip_back_right"/>
+        <touch name="rh_TS_rftip_tip" site="rh_T_rftip_tip"/>
+
+        <!-- LITTLE FINGER -->
+        <touch name="rh_TS_lfmetacarpal_front" site="rh_T_lfmetacarpal_front"/>
+
+        <touch name="rh_TS_lfproximal_front_left_bottom" site="rh_T_lfproximal_front_left_bottom"/>
+        <touch name="rh_TS_lfproximal_front_right_bottom" site="rh_T_lfproximal_front_right_bottom"/>
+        <touch name="rh_TS_lfproximal_front_left_top" site="rh_T_lfproximal_front_left_top"/>
+        <touch name="rh_TS_lfproximal_front_right_top" site="rh_T_lfproximal_front_right_top"/>
+        <touch name="rh_TS_lfproximal_back_left" site="rh_T_lfproximal_back_left"/>
+        <touch name="rh_TS_lfproximal_back_right" site="rh_T_lfproximal_back_right"/>
+        <touch name="rh_TS_lfproximal_tip" site="rh_T_lfproximal_tip"/>
+
+        <touch name="rh_TS_lfmiddle_front_left" site="rh_T_lfmiddle_front_left"/>
+        <touch name="rh_TS_lfmiddle_front_right" site="rh_T_lfmiddle_front_right"/>
+        <touch name="rh_TS_lfmiddle_back_left" site="rh_T_lfmiddle_back_left"/>
+        <touch name="rh_TS_lfmiddle_back_right" site="rh_T_lfmiddle_back_right"/>
+        <touch name="rh_TS_lfmiddle_tip" site="rh_T_lfmiddle_tip"/>
+
+        <touch name="rh_TS_lftip_front_left" site="rh_T_lftip_front_left"/>
+        <touch name="rh_TS_lftip_front_right" site="rh_T_lftip_front_right"/>
+        <touch name="rh_TS_lftip_back_left" site="rh_T_lftip_back_left"/>
+        <touch name="rh_TS_lftip_back_right" site="rh_T_lftip_back_right"/>
+        <touch name="rh_TS_lftip_tip" site="rh_T_lftip_tip"/>
+
+        <!--THUMB-->
+        <touch name="rh_TS_thproximal_front_left" site="rh_T_thproximal_front_left"/>
+        <touch name="rh_TS_thproximal_front_right" site="rh_T_thproximal_front_right"/>
+        <touch name="rh_TS_thproximal_back_left" site="rh_T_thproximal_back_left"/>
+        <touch name="rh_TS_thproximal_back_right" site="rh_T_thproximal_back_right"/>
+        <touch name="rh_TS_thproximal_tip" site="rh_T_thproximal_tip"/>
+
+        <touch name="rh_TS_thmiddle_front_left" site="rh_T_thmiddle_front_left"/>
+        <touch name="rh_TS_thmiddle_front_right" site="rh_T_thmiddle_front_right"/>
+        <touch name="rh_TS_thmiddle_back_left" site="rh_T_thmiddle_back_left"/>
+        <touch name="rh_TS_thmiddle_back_right" site="rh_T_thmiddle_back_right"/>
+        <touch name="rh_TS_thmiddle_tip" site="rh_T_thmiddle_tip"/>
+
+        <touch name="rh_TS_thtip_front_left" site="rh_T_thtip_front_left"/>
+        <touch name="rh_TS_thtip_front_right" site="rh_T_thtip_front_right"/>
+        <touch name="rh_TS_thtip_back_left" site="rh_T_thtip_back_left"/>
+        <touch name="rh_TS_thtip_back_right" site="rh_T_thtip_back_right"/>
+        <touch name="rh_TS_thtip_tip" site="rh_T_thtip_tip"/>
+
+    </sensor>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="1 1 1" rgb2="1 1 1" width="32" height="32"/>
+
+        <texture name="rh_texplane" type="2d" builtin="checker" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" width="512"
+                 height="512"/>
+        <texture name="rh_texgeom" type="cube" builtin="flat" mark="cross" width="127" height="127"
+                 rgb1="0.3 0.6 0.5" rgb2="0.3 0.6 0.5" markrgb="0 0 0" random="0.01"/>
+
+        <material name="rh_MatGnd" reflectance="0.5" texture="rh_texplane" texrepeat="1 1" texuniform="true"/>
+        <material name="rh_MatColl" specular="1" shininess="0.3" reflectance="0.5" rgba="0.4 0.5 0.6 1"/>
+        <material name="rh_MatViz" specular="0.75" shininess="0.1" reflectance="0.5" rgba="0.04 0.04 0.04 1"/>
+        <material name="rh_object" texture="rh_texgeom" texuniform="false"/>
+        <material name="floor_mat" specular="0" shininess="0.5" reflectance="0" rgba="0.2 0.2 0.2 0"/>
+
+        <mesh name="rh_forearm" file="forearm_electric.stl"/>
+        <mesh name="rh_forearm_cvx" file="forearm_electric_cvx.stl"/>
+        <mesh name="rh_wrist" scale="0.001 0.001 0.001" file="wrist.stl"/>
+        <mesh name="rh_palm" scale="0.001 0.001 0.001" file="palm.stl"/>
+        <mesh name="rh_knuckle" scale="0.001 0.001 0.001" file="knuckle.stl"/>
+        <mesh name="rh_F3" scale="0.001 0.001 0.001" file="F3.stl"/>
+        <mesh name="rh_F2" scale="0.001 0.001 0.001" file="F2.stl"/>
+        <mesh name="rh_F1" scale="0.001 0.001 0.001" file="F1.stl"/>
+        <mesh name="rh_lfmetacarpal" scale="0.001 0.001 0.001" file="lfmetacarpal.stl"/>
+        <mesh name="rh_TH3_z" scale="0.001 0.001 0.001" file="TH3_z.stl"/>
+        <mesh name="rh_TH2_z" scale="0.001 0.001 0.001" file="TH2_z.stl"/>
+        <mesh name="rh_TH1_z" scale="0.001 0.001 0.001" file="TH1_z.stl"/>
+    </asset>
+
+    <worldbody>
+        <body name="rh_hand mount" pos="0 0 0">
+            <inertial mass="0.1" pos="0 0 0" diaginertia="0.001 0.001 0.001"/>
+            <body childclass="rh_asset_class" name="rh_forearm" quat="1 -1 1 -1">
+                <inertial pos="0.001 -0.002 0.29" quat="0.982 -0.016 0 -0.188" mass="4" diaginertia="0.01 0.01 0.0075"/>
+                <geom class="rh_D_Vizual" pos="0 0.01 0.04" name="rh_V_forearm" mesh="rh_forearm"
+                      euler="0 0 1.57"/>
+                <geom class="rh_DC_Hand" name="rh_C_forearm" type="mesh" mesh="rh_forearm_cvx" pos="0 0.01 0.04"
+                      euler="0 0 1.57" rgba="0.4 0.5 0.6 0.7"/>
+                <body name="rh_wrist" pos="0 0 0.256">
+                    <inertial pos="0.003 0 0.016" quat="0.504 0.496 0.495 0.504" mass="0.3"
+                              diaginertia="0.001 0.001 0.001"/>
+                    <joint name="rh_WRJ1" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.489 0.14" damping="0.5"
+                           armature="0.005" user="1123"/>
+                    <geom class="rh_D_Vizual" name="rh_V_wrist" mesh="rh_wrist"/>
+                    <geom class="rh_DC_Hand" name="rh_C_wrist" type="capsule" pos="0 0 0" quat="0.707 0.707 0 0"
+                          size="0.015 0.01" rgba="0.4 0.5 0.6 0.1"/>
+                    <body name="rh_palm" pos="0 0 0.034">
+                        <inertial pos="0.006 0 0.036" quat="0.716 0.044 0.075 0.693" mass="0.3"
+                                  diaginertia="0.001 0.001 0.001"/>
+                        <joint name="rh_WRJ0" type="hinge" pos="0 0 0" axis="1 0 0" range="-0.698 0.489" damping="0.5"
+                               armature="0.005" user="1122"/>
+                        <geom class="rh_D_Vizual" name="rh_V_palm" mesh="rh_palm"/>
+                        <geom class="rh_DC_Hand" name="rh_C_palm0" type="box" pos="0.011 0 0.038"
+                              size="0.032 0.0111 0.049" rgba="0.4 0.5 0.6 0.1"/>
+                        <site name="palm_center_site" pos="0 .0 0.05" group="4" rgba="0 0 0 1"/>
+
+                        <site name="rh_T_palm_b0" type="box" pos="0.011 -0.005 0.006" size="0.033 0.007 0.019"
+                              rgba="0 0 0 0"/>
+                        <site name="rh_T_palm_bl" type="box" pos="-0.011 -0.005 0.041" size="0.011 0.007 0.016"
+                              rgba="1 0 0 0"/>
+                        <site name="rh_T_palm_bm" type="box" pos="0.011 -0.005 0.041" size="0.011 0.007 0.016"
+                              rgba="0 0 0 0"/>
+                        <site name="rh_T_palm_br" type="box" pos="0.033 -0.005 0.041" size="0.011 0.007 0.016"
+                              rgba="1 0 0 0"/>
+                        <site name="rh_T_palm_fl" type="box" pos="-0.011 -0.005 0.073" size="0.011 0.007 0.016"
+                              rgba="0 0 0 0"/>
+                        <site name="rh_T_palm_fm" type="box" pos="0.011 -0.005 0.073" size="0.011 0.007 0.016"
+                              rgba="1 0 0 0"/>
+                        <site name="rh_T_palm_fr" type="box" pos="0.033 -0.005 0.073" size="0.011 0.007 0.016"
+                              rgba="0 0 0 0"/>
+                        <geom class="rh_DC_Hand" name="rh_C_palm1" type="box" pos="-0.032 0 0.014"
+                              size="0.011 0.0111 0.025" rgba="0.4 0.5 0.6 0.1"/>
+                        <site name="rh_T_palm_b1" type="box" pos="-0.0325 -0.005 0.014" size="0.012 0.007 0.027"
+                              rgba="0 0 0 0"/>
+                        <body name="rh_ffknuckle" pos="0.033 0 0.095">
+                            <inertial pos="0 0 0" quat="0.52 0.854 0.006 -0.003" mass="0.008"
+                                      diaginertia="1e-05 1e-05 1e-05"/>
+                            <joint name="rh_FFJ3" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.349 0.349"
+                                   user="1103"/>
+                            <geom class="rh_D_Vizual" name="rh_V_ffknuckle" mesh="rh_knuckle"/>
+                            <body name="rh_ffproximal" pos="0 0 0">
+                                <inertial pos="0 0 0.023" quat="0.707 -0.004 0.004 0.707" mass="0.014"
+                                          diaginertia="1e-05 1e-05 1e-05"/>
+                                <joint name="rh_FFJ2" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                       user="1102"/>
+                                <geom class="rh_D_Vizual" name="rh_V_ffproximal" mesh="rh_F3"/>
+                                <geom class="rh_DC_Hand" name="rh_C_ffproximal" type="capsule" pos="0 0 0.0225"
+                                      size="0.01 0.0225"/>
+                                <site name="rh_T_ffproximal_front_left_bottom" type="box" pos="-0.005 -0.005 0.00625"
+                                      size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="rh_T_ffproximal_front_right_bottom" type="box" pos="0.005 -0.005 0.00625"
+                                      size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="rh_T_ffproximal_front_left_top" type="box" pos="-0.005 -0.005 0.03875"
+                                      size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="rh_T_ffproximal_front_right_top" type="box" pos="0.005 -0.005 0.03875"
+                                      size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="rh_T_ffproximal_back_left" type="box" pos="-0.005 0.005 0.0225"
+                                      size="0.005 0.005 0.0325" rgba="0 0 0 0"/>
+                                <site name="rh_T_ffproximal_back_right" type="box" pos="0.005 0.005 0.0225"
+                                      size="0.005 0.005 0.0325" rgba="1 0 0 0"/>
+                                <site name="rh_T_ffproximal_tip" type="sphere" pos="0 0 0.045" size="0.011"
+                                      rgba="1 1 0 0"/>
+                                <body name="rh_ffmiddle" pos="0 0 0.045">
+                                    <inertial pos="0 0 0.011" quat="0.707 0 0 0.707" mass="0.012"
+                                              diaginertia="1e-05 1e-05 1e-05"/>
+                                    <joint name="rh_FFJ1" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                           user="1101"/>
+                                    <geom class="rh_D_Vizual" name="rh_V_ffmiddle" mesh="rh_F2"/>
+                                    <geom class="rh_DC_Hand" name="rh_C_ffmiddle" type="capsule" pos="0 0 0.0125"
+                                          size="0.00805 0.0125"/>
+                                    <site name="rh_T_ffmiddle_front_left" type="box" pos="-0.00451 -0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="rh_T_ffmiddle_front_right" type="box" pos="0.00451 -0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="rh_T_ffmiddle_back_left" type="box" pos="-0.00451 0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="rh_T_ffmiddle_back_right" type="box" pos="0.00451 0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="rh_T_ffmiddle_tip" type="sphere" pos="0 0 0.025" size="0.009"
+                                          rgba="1 1 0 0"/>
+                                    <body name="rh_ffdistal" pos="0 0 0.025">
+                                        <inertial pos="0 0 0.015" quat="0.707 -0.003 0.003 0.707" mass="0.01"
+                                                  diaginertia="1e-05 1e-05 1e-05"/>
+                                        <joint name="rh_FFJ0" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                               user="1100"/>
+                                        <geom class="rh_D_Vizual" name="rh_V_ffdistal" pos="0 0 0.001"
+                                              mesh="rh_F1"/>
+                                        <geom class="rh_DC_Hand" name="rh_C_ffdistal" type="capsule" pos="0 0 0.012"
+                                              size="0.00705 0.012" condim="4"/>
+                                        <site name="rh_S_fftip" pos="0 0 0.026" group="3"/>
+                                        <site class="rh_D_Touch" name="rh_Tch_fftip"/>
+                                        <site name="rh_T_fftip_front_left" type="box" pos="-0.00451 -0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="rh_T_fftip_front_right" type="box" pos="0.00451 -0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="rh_T_fftip_back_left" type="box" pos="-0.00451 0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="rh_T_fftip_back_right" type="box" pos="0.00451 0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="rh_T_fftip_tip" type="sphere" pos="0 0 0.024" size="0.008"
+                                              rgba="1 1 0 0"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                        <body name="rh_mfknuckle" pos="0.011 0 0.099">
+                            <inertial pos="0 0 0" quat="0.52 0.854 0.006 -0.003" mass="0.008"
+                                      diaginertia="1e-05 1e-05 1e-05"/>
+                            <joint name="rh_MFJ3" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.349 0.349"
+                                   user="1107"/>
+                            <geom class="rh_D_Vizual" name="rh_V_mfknuckle" mesh="rh_knuckle"/>
+                            <body name="rh_mfproximal" pos="0 0 0">
+                                <inertial pos="0 0 0.023" quat="0.707 -0.004 0.004 0.707" mass="0.014"
+                                          diaginertia="1e-05 1e-05 1e-05"/>
+                                <joint name="rh_MFJ2" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                       user="1106"/>
+                                <geom class="rh_D_Vizual" name="rh_V_mfproximal" mesh="rh_F3"/>
+                                <geom class="rh_DC_Hand" name="rh_C_mfproximal" type="capsule" pos="0 0 0.0225"
+                                      size="0.01 0.0225"/>
+                                <site name="rh_T_mfproximal_front_left_bottom" type="box" pos="-0.005 -0.005 0.00625"
+                                      size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="rh_T_mfproximal_front_right_bottom" type="box" pos="0.005 -0.005 0.00625"
+                                      size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="rh_T_mfproximal_front_left_top" type="box" pos="-0.005 -0.005 0.03875"
+                                      size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="rh_T_mfproximal_front_right_top" type="box" pos="0.005 -0.005 0.03875"
+                                      size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="rh_T_mfproximal_back_left" type="box" pos="-0.005 0.005 0.0225"
+                                      size="0.005 0.005 0.0325" rgba="0 0 0 0"/>
+                                <site name="rh_T_mfproximal_back_right" type="box" pos="0.005 0.005 0.0225"
+                                      size="0.005 0.005 0.0325" rgba="1 0 0 0"/>
+                                <site name="rh_T_mfproximal_tip" type="sphere" pos="0 0 0.045" size="0.011"
+                                      rgba="1 1 0 0"/>
+                                <body name="rh_mfmiddle" pos="0 0 0.045">
+                                    <inertial pos="0 0 0.012" quat="0.707 0 0 0.707" mass="0.012"
+                                              diaginertia="1e-05 1e-05 1e-05"/>
+                                    <joint name="rh_MFJ1" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                           user="1105"/>
+                                    <geom class="rh_D_Vizual" name="rh_V_mfmiddle" mesh="rh_F2"/>
+                                    <geom class="rh_DC_Hand" name="rh_C_mfmiddle" type="capsule" pos="0 0 0.0125"
+                                          size="0.00805 0.0125"/>
+                                    <site name="rh_T_mfmiddle_front_left" type="box" pos="-0.00451 -0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="rh_T_mfmiddle_front_right" type="box" pos="0.00451 -0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="rh_T_mfmiddle_back_left" type="box" pos="-0.00451 0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="rh_T_mfmiddle_back_right" type="box" pos="0.00451 0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="rh_T_mfmiddle_tip" type="sphere" pos="0 0 0.025" size="0.009"
+                                          rgba="1 1 0 0"/>
+                                    <body name="rh_mfdistal" pos="0 0 0.025">
+                                        <inertial pos="0 0 0.015" quat="0.707 -0.003 0.003 0.707" mass="0.01"
+                                                  diaginertia="1e-05 1e-05 1e-05"/>
+                                        <joint name="rh_MFJ0" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                               user="1104"/>
+                                        <geom class="rh_D_Vizual" name="rh_V_mfdistal" mesh="rh_F1"/>
+                                        <geom class="rh_DC_Hand" name="rh_C_mfdistal" type="capsule" pos="0 0 0.012"
+                                              size="0.00705 0.012" condim="4"/>
+                                        <site name="rh_S_mftip" pos="0 0 0.026" group="3"/>
+                                        <site class="rh_D_Touch" name="rh_Tch_mftip"/>
+                                        <site name="rh_T_mftip_front_left" type="box" pos="-0.00451 -0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="rh_T_mftip_front_right" type="box" pos="0.00451 -0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="rh_T_mftip_back_left" type="box" pos="-0.00451 0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="rh_T_mftip_back_right" type="box" pos="0.00451 0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="rh_T_mftip_tip" type="sphere" pos="0 0 0.024" size="0.008"
+                                              rgba="1 1 0 0"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                        <body name="rh_rfknuckle" pos="-0.011 0 0.095">
+                            <inertial pos="0 0 0" quat="0.52 0.854 0.006 -0.003" mass="0.008"
+                                      diaginertia="1e-05 1e-05 1e-05"/>
+                            <joint name="rh_RFJ3" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.349 0.349"
+                                   user="1111"/>
+                            <geom class="rh_D_Vizual" name="rh_V_rfknuckle" mesh="rh_knuckle"/>
+                            <body name="rh_rfproximal" pos="0 0 0">
+                                <inertial pos="0 0 0.023" quat="0.707 -0.004 0.004 0.707" mass="0.014"
+                                          diaginertia="1e-05 1e-05 1e-05"/>
+                                <joint name="rh_RFJ2" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                       user="1110"/>
+                                <geom class="rh_D_Vizual" name="rh_V_rfproximal" mesh="rh_F3"/>
+                                <geom class="rh_DC_Hand" name="rh_C_rfproximal" type="capsule" pos="0 0 0.0225"
+                                      size="0.01 0.0225"/>
+                                <site name="rh_T_rfproximal_front_left_bottom" type="box" pos="-0.005 -0.005 0.00625"
+                                      size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="rh_T_rfproximal_front_right_bottom" type="box" pos="0.005 -0.005 0.00625"
+                                      size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="rh_T_rfproximal_front_left_top" type="box" pos="-0.005 -0.005 0.03875"
+                                      size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                <site name="rh_T_rfproximal_front_right_top" type="box" pos="0.005 -0.005 0.03875"
+                                      size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                <site name="rh_T_rfproximal_back_left" type="box" pos="-0.005 0.005 0.0225"
+                                      size="0.005 0.005 0.0325" rgba="0 0 0 0"/>
+                                <site name="rh_T_rfproximal_back_right" type="box" pos="0.005 0.005 0.0225"
+                                      size="0.005 0.005 0.0325" rgba="1 0 0 0"/>
+                                <site name="rh_T_rfproximal_tip" type="sphere" pos="0 0 0.045" size="0.011"
+                                      rgba="1 1 0 0"/>
+                                <body name="rh_rfmiddle" pos="0 0 0.045">
+                                    <inertial pos="0 0 0.012" quat="0.707 0 0 0.707" mass="0.012"
+                                              diaginertia="1e-05 1e-05 1e-05"/>
+                                    <joint name="rh_RFJ1" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                           user="1109"/>
+                                    <geom class="rh_D_Vizual" name="rh_V_rfmiddle" mesh="rh_F2"/>
+                                    <geom class="rh_DC_Hand" name="rh_C_rfmiddle" type="capsule" pos="0 0 0.0125"
+                                          size="0.00805 0.0125"/>
+                                    <site name="rh_T_rfmiddle_front_left" type="box" pos="-0.00451 -0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="rh_T_rfmiddle_front_right" type="box" pos="0.00451 -0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="rh_T_rfmiddle_back_left" type="box" pos="-0.00451 0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                    <site name="rh_T_rfmiddle_back_right" type="box" pos="0.00451 0.00451 0.0125"
+                                          size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                    <site name="rh_T_rfmiddle_tip" type="sphere" pos="0 0 0.025" size="0.009"
+                                          rgba="1 1 0 0"/>
+                                    <body name="rh_rfdistal" pos="0 0 0.025">
+                                        <inertial pos="0 0 0.015" quat="0.707 -0.003 0.003 0.707" mass="0.01"
+                                                  diaginertia="1e-05 1e-05 1e-05"/>
+                                        <joint name="rh_RFJ0" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                               user="1108"/>
+                                        <geom class="rh_D_Vizual" name="rh_V_rfdistal" mesh="rh_F1"
+                                              pos="0 0 0.001"/>
+                                        <geom class="rh_DC_Hand" name="rh_C_rfdistal" type="capsule" pos="0 0 0.012"
+                                              size="0.00705 0.012" condim="4"/>
+                                        <site name="rh_S_rftip" pos="0 0 0.026" group="3"/>
+                                        <site class="rh_D_Touch" name="rh_Tch_rftip"/>
+                                        <site name="rh_T_rftip_front_left" type="box" pos="-0.00451 -0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="rh_T_rftip_front_right" type="box" pos="0.00451 -0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="rh_T_rftip_back_left" type="box" pos="-0.00451 0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                        <site name="rh_T_rftip_back_right" type="box" pos="0.00451 0.00451 0.012"
+                                              size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                        <site name="rh_T_rftip_tip" type="sphere" pos="0 0 0.024" size="0.008"
+                                              rgba="1 1 0 0"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                        <body name="rh_lfmetacarpal" pos="-0.017 0 0.044">
+                            <inertial pos="-0.014 0.001 0.014" quat="0.709 -0.092 -0.063 0.696" mass="0.075"
+                                      diaginertia="1e-05 1e-05 1e-05"/>
+                            <joint name="rh_LFJ4" type="hinge" pos="0 0 0" axis="0.571 0 0.821" range="0 0.785"
+                                   user="1116"/>
+                            <geom class="rh_D_Vizual" name="rh_V_lfmetacarpal" pos="-0.016 0 -0.023"
+                                  mesh="rh_lfmetacarpal"/>
+                            <geom class="rh_DC_Hand" name="rh_C_lfmetacarpal" type="box" pos="-0.0165 0 0.01"
+                                  size="0.0095 0.0111 0.025" rgba="0.4 0.5 0.6 0.2"/>
+                            <site name="rh_T_lfmetacarpal_front" type="box" pos="-0.0165 -0.005 0.00975"
+                                  size="0.01 0.007 0.026" rgba="1 0 0 0"/>
+                            <body name="rh_lfknuckle" pos="-0.017 0 0.044">
+                                <inertial pos="0 0 0" quat="0.52 0.854 0.006 -0.003" mass="0.008"
+                                          diaginertia="1e-05 1e-05 1e-05"/>
+                                <joint name="rh_LFJ3" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.349 0.349"
+                                       user="1115"/>
+                                <geom class="rh_D_Vizual" name="rh_V_lfknuckle" mesh="rh_knuckle"/>
+                                <body name="rh_lfproximal" pos="0 0 0">
+                                    <inertial pos="0 0 0.023" quat="0.707 -0.004 0.004 0.707" mass="0.014"
+                                              diaginertia="1e-05 1e-05 1e-05"/>
+                                    <joint name="rh_LFJ2" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                           user="1114"/>
+                                    <geom class="rh_D_Vizual" name="rh_V_lfproximal" mesh="rh_F3"/>
+                                    <geom class="rh_DC_Hand" name="rh_C_lfproximal" type="capsule" pos="0 0 0.0225"
+                                          size="0.01 0.0225"/>
+                                    <site name="rh_T_lfproximal_front_left_bottom" type="box"
+                                          pos="-0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                    <site name="rh_T_lfproximal_front_right_bottom" type="box"
+                                          pos="0.005 -0.005 0.00625" size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                    <site name="rh_T_lfproximal_front_left_top" type="box" pos="-0.005 -0.005 0.03875"
+                                          size="0.005 0.005 0.01625" rgba="0 0 0 0"/>
+                                    <site name="rh_T_lfproximal_front_right_top" type="box" pos="0.005 -0.005 0.03875"
+                                          size="0.005 0.005 0.01625" rgba="1 0 0 0"/>
+                                    <site name="rh_T_lfproximal_back_left" type="box" pos="-0.005 0.005 0.0225"
+                                          size="0.005 0.005 0.0325" rgba="0 0 0 0"/>
+                                    <site name="rh_T_lfproximal_back_right" type="box" pos="0.005 0.005 0.0225"
+                                          size="0.005 0.005 0.0325" rgba="1 0 0 0"/>
+                                    <site name="rh_T_lfproximal_tip" type="sphere" pos="0 0 0.045" size="0.011"
+                                          rgba="1 1 0 0"/>
+                                    <body name="rh_lfmiddle" pos="0 0 0.045">
+                                        <inertial pos="0 0 0.012" quat="0.707 0 0 0.707" mass="0.012"
+                                                  diaginertia="1e-05 1e-05 1e-05"/>
+                                        <joint name="rh_LFJ1" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                               user="1113"/>
+                                        <geom class="rh_D_Vizual" name="rh_V_lfmiddle" mesh="rh_F2"/>
+                                        <geom class="rh_DC_Hand" name="rh_C_lfmiddle" type="capsule"
+                                              pos="0 0 0.0125" size="0.00805 0.0125"/>
+                                        <site name="rh_T_lfmiddle_front_left" type="box" pos="-0.00451 -0.00451 0.0125"
+                                              size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                        <site name="rh_T_lfmiddle_front_right" type="box" pos="0.00451 -0.00451 0.0125"
+                                              size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                        <site name="rh_T_lfmiddle_back_left" type="box" pos="-0.00451 0.00451 0.0125"
+                                              size="0.00451 0.00451 0.02055" rgba="1 0 0 0"/>
+                                        <site name="rh_T_lfmiddle_back_right" type="box" pos="0.00451 0.00451 0.0125"
+                                              size="0.00451 0.00451 0.02055" rgba="0 0 0 0"/>
+                                        <site name="rh_T_lfmiddle_tip" type="sphere" pos="0 0 0.025" size="0.009"
+                                              rgba="1 1 0 0"/>
+                                        <body name="rh_lfdistal" pos="0 0 0.025">
+                                            <inertial pos="0 0 0.015" quat="0.707 -0.003 0.003 0.707" mass="0.01"
+                                                      diaginertia="1e-05 1e-05 1e-05"/>
+                                            <joint name="rh_LFJ0" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.571"
+                                                   user="1112"/>
+                                            <geom class="rh_D_Vizual" name="rh_V_lfdistal" mesh="rh_F1"
+                                                  pos="0 0 0.001"/>
+                                            <geom class="rh_DC_Hand" name="rh_C_lfdistal" type="capsule"
+                                                  pos="0 0 0.012" size="0.00705 0.012" condim="4"/>
+                                            <site name="rh_S_lftip" pos="0 0 0.026" group="3"/>
+                                            <site class="rh_D_Touch" name="rh_Tch_lftip"/>
+                                            <site name="rh_T_lftip_front_left" type="box" pos="-0.00451 -0.00451 0.012"
+                                                  size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                            <site name="rh_T_lftip_front_right" type="box" pos="0.00451 -0.00451 0.012"
+                                                  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                            <site name="rh_T_lftip_back_left" type="box" pos="-0.00451 0.00451 0.012"
+                                                  size="0.00451 0.00451 0.01905" rgba="0 0 0 0"/>
+                                            <site name="rh_T_lftip_back_right" type="box" pos="0.00451 0.00451 0.012"
+                                                  size="0.00451 0.00451 0.01905" rgba="1 0 0 0"/>
+                                            <site name="rh_T_lftip_tip" type="sphere" pos="0 0 0.024" size="0.008"
+                                                  rgba="1 1 0 0"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                        <body name="rh_thbase" pos="0.034 -0.009 0.029" axisangle="0 1 0 0.785">
+                            <inertial pos="0 0 0" mass="0.01" diaginertia="1e-05 1e-05 1e-05"/>
+                            <joint name="rh_THJ4" type="hinge" pos="0 0 0" axis="0 0 -1" range="-1.047 1.047"
+                                   user="1121"/>
+                            <geom name="rh_V_thbase" type="box" group="1" pos="0 0 0" size="0.001 0.001 0.001"/>
+                            <body name="rh_thproximal" pos="0 0 0">
+                                <inertial pos="0 0 0.017" quat="0.982 0 0.001 0.191" mass="0.016"
+                                          diaginertia="1e-05 1e-05 1e-05"/>
+                                <joint name="rh_THJ3" type="hinge" pos="0 0 0" axis="1 0 0" range="0 1.222"
+                                       user="1120"/>
+                                <geom class="rh_D_Vizual" name="rh_V_thproximal" mesh="rh_TH3_z"/>
+                                <geom class="rh_DC_Hand" name="rh_C_thproximal" type="capsule" pos="0 0 0.019"
+                                      size="0.013 0.019" rgba="0.4 0.5 0.6 0.1"/>
+                                <site name="rh_T_thproximal_front_left" type="box" pos="-0.007 -0.007 0.019"
+                                      size="0.007 0.007 0.032" rgba="0 0 0 0"/>
+                                <site name="rh_T_thproximal_front_right" type="box" pos="0.007 -0.007 0.019"
+                                      size="0.007 0.007 0.032" rgba="1 0 0 0"/>
+                                <site name="rh_T_thproximal_back_left" type="box" pos="-0.007 0.007 0.019"
+                                      size="0.007 0.007 0.032" rgba="1 0 0 0"/>
+                                <site name="rh_T_thproximal_back_right" type="box" pos="0.007 0.007 0.019"
+                                      size="0.007 0.007 0.032" rgba="0 0 0 0"/>
+                                <site name="rh_T_thproximal_tip" type="sphere" pos="0 0 0.038" size="0.014"
+                                      rgba="1 1 0 0"/>
+                                <body name="rh_thhub" pos="0 0 0.038">
+                                    <inertial pos="0 0 0" mass="0.002" diaginertia="1e-05 1e-05 1e-05"/>
+                                    <joint name="rh_THJ2" type="hinge" pos="0 0 0" axis="1 0 0" range="-0.209 0.209"
+                                           user="1119"/>
+                                    <geom name="rh_V_thhub" type="box" group="1" pos="0 0 0" size="0.001 0.001 0.001"/>
+                                    <body name="rh_thmiddle" pos="0 0 0">
+                                        <inertial pos="0 0 0.016" quat="1 -0.001 -0.007 0.003" mass="0.016"
+                                                  diaginertia="1e-05 1e-05 1e-05"/>
+                                        <joint name="rh_THJ1" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.524 0.524"
+                                               user="1118"/>
+                                        <geom class="rh_D_Vizual" name="rh_V_thmiddle" mesh="rh_TH2_z"/>
+                                        <geom class="rh_DC_Hand" name="rh_C_thmiddle" type="capsule" pos="0 0 0.016"
+                                              size="0.011 0.016"/>
+                                        <site name="rh_T_thmiddle_front_left" type="box" pos="-0.006 -0.006 0.016"
+                                              size="0.006 0.006 0.027" rgba="1 0 0 0"/>
+                                        <site name="rh_T_thmiddle_front_right" type="box" pos="0.006 -0.006 0.016"
+                                              size="0.006 0.006 0.027" rgba="0 0 0 0"/>
+                                        <site name="rh_T_thmiddle_back_left" type="box" pos="-0.006 0.006 0.016"
+                                              size="0.006 0.006 0.027" rgba="0 0 0 0"/>
+                                        <site name="rh_T_thmiddle_back_right" type="box" pos="0.006 0.006 0.016"
+                                              size="0.006 0.006 0.027" rgba="1 0 0 0"/>
+                                        <site name="rh_T_thmiddle_tip" type="sphere" pos="0 0 0.032" size="0.012"
+                                              rgba="1 1 0 0"/>
+                                        <body name="rh_thdistal" pos="0 0 0.032">
+                                            <inertial pos="0 0 0.016" quat="0.999 -0.005 -0.047 0.005" mass="0.016"
+                                                      diaginertia="1e-05 1e-05 1e-05"/>
+                                            <joint name="rh_THJ0" type="hinge" pos="0 0 0" axis="0 1 0" range="-1.571 0"
+                                                   user="1117"/>
+                                            <geom class="rh_D_Vizual" name="rh_V_thdistal" mesh="rh_TH1_z"/>
+                                            <geom class="rh_DC_Hand" name="rh_C_thdistal" type="capsule"
+                                                  pos="0 0 0.013" size="0.00918 0.013" condim="4"/>
+                                            <site name="rh_S_thtip" pos="0 0 0.0275" group="3"/>
+                                            <site class="rh_D_Touch" name="rh_Tch_thtip" size="0.005 0.011 0.016"
+                                                  pos="-0.005 0 0.02"/>
+                                            <site name="rh_T_thtip_front_left" type="box" pos="-0.0056 -0.0056 0.013"
+                                                  size="0.0056 0.0056 0.02218" rgba="0 0 0 0"/>
+                                            <site name="rh_T_thtip_front_right" type="box" pos="0.0056 -0.0056 0.013"
+                                                  size="0.0056 0.0056 0.02218" rgba="1 0 0 0"/>
+                                            <site name="rh_T_thtip_back_left" type="box" pos="-0.0056 0.0056 0.013"
+                                                  size="0.0056 0.0056 0.02218" rgba="1 0 0 0"/>
+                                            <site name="rh_T_thtip_back_right" type="box" pos="0.0056 0.0056 0.013"
+                                                  size="0.0056 0.0056 0.02218" rgba="0 0 0 0"/>
+                                            <site name="rh_T_thtip_tip" type="sphere" pos="0 0 0.026" size="0.01"
+                                                  rgba="1 1 0 0"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>

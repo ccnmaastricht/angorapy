@@ -10,42 +10,46 @@ long_description = (this_directory / "README.md").read_text()
 setup(
     name='angorapy',
     version='0.10.0',
-    description='ANthropomorphic Goal-ORiented Modeling, Learning and Analysis for Neuroscience',
+    description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
-    url='https://github.com/ccnmaastricht/angorapy',
+    url='http://www.angorapy.org',
     author='Tonio Weidler',
     author_email='research@tonioweidler.de',
     license='GPL-3.0',
     packages=find_packages(),
-    include_package_data=True,
     install_requires=[
-        "swig",
-        "imageio",
-        "numpy",
-        "box2d-py",
-        "gym[all]",
-        "mujoco",
-        "tensorflow",
-        "tensorflow_probability",
-        "tensorflow_graphics",
-        "mpi4py",
+        "swig==4.1.1",
+        "imageio==2.28.1",
+        # "numpy",
+
+        # tensorflow and extensions
+        "tensorflow==2.12.0",
+        "tensorflow_probability==0.20.0",
+        "tensorflow_graphics==2021.12.3",
+        "mpi4py==3.1.4",
         "tqdm",
         "simplejson",
         "psutil",
         "scipy",
-        "scikit-learn",
         "argcomplete",
         "matplotlib",
-        "scikit-learn==0.24.1",
+        "scikit-learn==1.2.2",
         "pandas==1.4.4",
         "nvidia-ml-py3",
         "seaborn",
         "distance",
-        "protobuf",
         "panda_gym==3.0.6",
-        
-        # "keras_cortex==0.0.7",
+        "statsmodels==0.14.0",
+        "keras_cortex==0.0.8",
+
+        # environments
+        "box2d-py==2.3.5",
+        "gymnasium[box2d,mujoco]==0.28.1",
+        "mujoco",
+        "dm_control==1.0.12",
+        "mujoco_utils",
+        "tensorflow_datasets",
 
         # webinterface
         "itsdangerous==2.0.1",
@@ -56,8 +60,9 @@ setup(
         "flask_jsglue",
     ],
 
+    include_package_data=True,
     package_data={
-        "angorapy": ["environments/assets/**/*"],
+        "angorapy": ["tasks/**/*"],
     },
 
     classifiers=[
@@ -66,9 +71,9 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
+    python_requires=">=3.8",
 )

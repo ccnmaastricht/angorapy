@@ -5,32 +5,32 @@ import os
 from contextlib import suppress
 from typing import Tuple
 
-import gym
+import gymnasium as gym
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
     MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
-from angorapy.common.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.models.components import _build_encoding_sub_model
 from angorapy.utilities.model_utils import make_input_layers
 from angorapy.utilities.util import env_extract_dims
 
 
-def build_ffn_models(env: BaseWrapper,
+def build_ffn_models(env: TaskWrapper,
                      distribution: BasePolicyDistribution,
                      shared: bool = False,
                      layer_sizes: Tuple = (64, 64)):
-    """Build a simple fully connected feed-forward model model."""
+    """Build a simple fully connected feed-forward model."""
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
-
     input_list = make_input_layers(env, None, None)
 
     if len(input_list) > 1:
-        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
+        policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
+        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
         inputs = input_list[0]
 
@@ -42,9 +42,10 @@ def build_ffn_models(env: BaseWrapper,
 
     # value network
     if "asymmetric" in state_dimensionality.keys():
-        asymmetric_inputs = tf.keras.Input(shape=state_dimensionality["asymmetric"], name="asymmetric")
-        inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
-        input_list.append(asymmetric_inputs)
+        inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
+            [inputs, list(filter(lambda i: i.name == "asymmetric", input_list))[0]]
+        )
+
     if not shared:
         value_latent = _build_encoding_sub_model(inputs.shape[1:], None, layer_sizes=layer_sizes, name="value_encoder")(inputs)
         value_out = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
@@ -59,7 +60,7 @@ def build_ffn_models(env: BaseWrapper,
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, value_out], name="policy_value")
 
 
-def build_rnn_models(env: BaseWrapper,
+def build_rnn_models(env: TaskWrapper,
                      distribution: BasePolicyDistribution,
                      shared: bool = False,
                      bs: int = 1,
@@ -71,21 +72,20 @@ def build_rnn_models(env: BaseWrapper,
     Args:
         sequence_length:
     """
-    # TODO: remove current workaround: solve issue with stateful masked RNNs by fixing the models sequence length
 
     state_dimensionality, n_actions = env_extract_dims(env)
-
     input_list = make_input_layers(env, bs=bs, sequence_length=sequence_length)
 
     if len(input_list) > 1:
-        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(input_list)
+        policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
+        inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
         inputs = input_list[0]
 
     if "asymmetric" in state_dimensionality.keys():
-        asymmetric_inputs = tf.keras.Input(batch_shape=(bs, sequence_length,) + state_dimensionality["asymmetric"], name="asymmetric")
-        value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")([inputs, asymmetric_inputs])
-        input_list.append(asymmetric_inputs)
+        value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
+            [inputs, list(filter(lambda i: i.name == "asymmetric", input_list))[0]]
+        )
     else:
         value_inputs = inputs
 
@@ -144,11 +144,11 @@ def build_rnn_models(env: BaseWrapper,
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, out_value], name="simple_rnn")
 
 
-def build_simple_models(env: BaseWrapper,
+def build_simple_models(env: TaskWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
                         bs: int = 1,
-                        sequence_length: int = None,
+                        sequence_length: int = 1,
                         model_type: str = "gru",
                         **kwargs):
     """Build simple networks (policy, value, joint) for given parameter settings."""
@@ -161,7 +161,7 @@ def build_simple_models(env: BaseWrapper,
                                 layer_sizes=(64, 64))
 
 
-def build_deeper_models(env: BaseWrapper,
+def build_deeper_models(env: TaskWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
                         bs: int = 1,
@@ -178,7 +178,7 @@ def build_deeper_models(env: BaseWrapper,
                                 model_type=model_type, layer_sizes=(64, 64, 64, 32, 32))
 
 
-def build_wider_models(env: BaseWrapper,
+def build_wider_models(env: TaskWrapper,
                        distribution: BasePolicyDistribution,
                        shared: bool = False,
                        bs: int = 1,
@@ -196,9 +196,11 @@ def build_wider_models(env: BaseWrapper,
 
 
 if __name__ == '__main__':
+    from angorapy import make_task
+
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    cont_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0")
+    cont_env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0")
     discrete_env = gym.make("LunarLander-v2")
     multi_discrete_env = gym.make("ManipulateBlockDiscreteRelative-v0")
 

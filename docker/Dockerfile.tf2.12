@@ -1,0 +1,82 @@
+FROM nvidia/cuda:11.8.0-base-ubuntu22.04 as base
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG C.UTF-8
+
+COPY docker/setup.sources.sh /setup.sources.sh
+COPY docker/setup.packages.sh /setup.packages.sh
+COPY docker/gpu.packages.txt /gpu.packages.txt
+RUN /setup.sources.sh
+RUN /setup.packages.sh /gpu.packages.txt
+
+ARG PYTHON_VERSION=python3.10
+ARG TENSORFLOW_PACKAGE=tensorflow==2.12.0
+COPY docker/setup.python.sh /setup.python.sh
+COPY docker/gpu.requirements.txt /gpu.requirements.txt
+RUN /setup.python.sh $PYTHON_VERSION /gpu.requirements.txt
+RUN apt-get install --reinstall python3-apt -y
+RUN pip install --no-cache-dir ${TENSORFLOW_PACKAGE}
+COPY docker/setup.cuda.sh /setup.cuda.sh
+RUN /setup.cuda.sh
+
+COPY docker/bashrc /etc/bash.bashrc
+RUN chmod a+rwx /etc/bash.bashrc
+
+# install packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    swig \
+    wget \
+    virtualenv \
+    libgl1-mesa-dev \
+    libgl1-mesa-glx \
+    libglew-dev \
+    libc6-dev \
+    libosmesa6-dev \
+    patchelf \
+    software-properties-common \
+    gfortran \
+    && apt-get install --no-install-recommends -y file g++ gcc make gdb strace ca-certificates \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get clean
+#    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get install -y libopenexr-dev
+RUN apt-get install -y openexr
+RUN apt-get install -y zlib1g-dev
+
+# INSTALL MPI
+RUN wget -q http://www.mpich.org/static/downloads/3.1.4/mpich-3.1.4.tar.gz
+RUN tar xf mpich-3.1.4.tar.gz
+WORKDIR mpich-3.1.4
+RUN ./configure --disable-fortran --enable-fast=all,O3 --prefix=/usr
+RUN make -j$(nproc)
+RUN make install
+RUN ldconfig
+WORKDIR /
+
+RUN pip install pip --upgrade
+RUN pip install --upgrade setuptools
+
+# INSTALL TOOL
+RUN mkdir /ang_tmp
+COPY . /ang_tmp
+
+RUN pip install /ang_tmp --default-timeout=100 \
+    && rm -rf /ang_tmp
+
+RUN pip install protobuf==3.20.0
+
+# matplotlib
+ENV MPLCONFIGDIR=/var/cache/matplotlib
+
+WORKDIR /
+
+COPY angorapy/train.py train.py
+COPY angorapy/pretrain.py pretrain.py
+COPY angorapy/analysis/predictability.py predictability.py
+
+# FINAL
+CMD [ "/bin/bash" ]

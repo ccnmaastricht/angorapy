@@ -4,13 +4,13 @@ from collections import namedtuple
 from typing import List, Dict
 
 import numpy as np
+import gymnasium as gym
 
 from angorapy.common.senses import Sensation
 from angorapy.common.const import NP_FLOAT_PREC, EPSILON
 from angorapy.utilities.dtypes import StepTuple
 from angorapy.utilities.util import env_extract_dims
 
-from angorapy.environments import *
 
 TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "env_id", "data"])
 
@@ -46,7 +46,7 @@ class BaseTransformer(abc.ABC):
         """Just for the sake of interchangeability, all transformers have an update method even if they do not update."""
         pass
 
-    def warmup(self, env: "BaseWrapper", n_steps=10):
+    def warmup(self, env: "TaskWrapper", n_steps=10):
         """Warm up the transformer for n steps."""
         pass
 
@@ -188,7 +188,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
 
         return normed_o, r, terminated, truncated, info
 
-    def warmup(self, env: "BaseWrapper", n_steps=10):
+    def warmup(self, env: "TaskWrapper", n_steps=10):
         """Warmup the transformer by sampling the observation space."""
         return  # todo we cannot do this like this, the update will be based on a transformed input this way
         env.reset()
@@ -226,7 +226,7 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
 
         return o, r, terminated, truncated, info
 
-    def warmup(self, env: "BaseWrapper", n_steps=10):
+    def warmup(self, env: "TaskWrapper", n_steps=10):
         """Warmup the transformer by randomly stepping the environment through action space sampling."""
         env.reset()
         for i in range(n_steps):

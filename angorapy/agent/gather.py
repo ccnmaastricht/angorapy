@@ -8,15 +8,15 @@ from typing import Tuple, Any
 
 import numpy as np
 import tensorflow as tf
-from gym.spaces import Box
+from gymnasium.spaces import Box
 from tqdm import tqdm
 
-from angorapy.agent.core import estimate_episode_advantages
+from angorapy.agent.utils import estimate_episode_advantages
 from angorapy.agent.dataio import tf_serialize_example, make_dataset_and_stats, serialize_sample
 from angorapy.common.data_buffers import ExperienceBuffer, TimeSequenceExperienceBuffer
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import Sensation
-from angorapy.common.wrappers import BaseWrapper, make_env
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.common.const import STORAGE_DIR, DETERMINISTIC
 from angorapy.utilities.datatypes import StatBundle
 from angorapy.utilities.model_utils import is_recurrent_model
@@ -30,7 +30,7 @@ class BaseGatherer(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: BaseWrapper) -> ExperienceBuffer:
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: TaskWrapper) -> ExperienceBuffer:
         pass
 
     @abc.abstractmethod
@@ -48,7 +48,7 @@ class Gatherer(BaseGatherer):
             self,
             worker_id: int,
             exp_id: int,
-            distribution: BasePolicyDistribution, 
+            distribution: BasePolicyDistribution,
             horizon: int,
             discount: float,
             lam: float,
@@ -75,14 +75,14 @@ class Gatherer(BaseGatherer):
 
     def collect(self,
                 joint: tf.keras.Model,
-                env: BaseWrapper,
+                env: TaskWrapper,
                 collector_id: int) -> StatBundle:
         """Collect a batch shard of experience for a given number of time steps.
 
         Args:
             joint:          network returning both policy and value
             env:            environment from which to gather the data
-            horizon:        the number of steps gatherd by this worker
+            horizon:        the number of steps gathered by this worker
             discount:       discount factor
             lam:            lambda parameter of GAE balancing the tradeoff between bias and variance
             subseq_length:  the length of connected subsequences for TBPTT
@@ -116,6 +116,7 @@ class Gatherer(BaseGatherer):
         achieved_goals = []
         state, info = env.reset()
 
+        joint.__call__ = tf.function(joint.__call__)
         with tqdm(total=self.horizon, disable=self.worker_id != 0, desc="Gathering experience...") as pbar:
             while t < self.horizon:
                 current_subseq_length += 1
@@ -123,18 +124,22 @@ class Gatherer(BaseGatherer):
                 # based on given state, predict action distribution and state value; need flatten due to tf eager bug
                 prepared_state = state.with_leading_dims(time=is_recurrent).dict_as_tf()
                 policy_out = flatten(joint(prepared_state, training=False))
+                # policy_out = fake_joint_output(joint)
 
                 predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
                 # from the action distribution sample an action and remember both the action and its probability
                 action, action_probability = self.select_action(predicted_distribution_parameters)
+                # action, action_probability = env.action_space.sample(), 0.5
 
                 states.append(state)
                 values.append(np.squeeze(value))
                 actions.append(action)
+
                 action_probabilities.append(action_probability)  # should probably ensure that no probability is ever 0
 
                 # make a step based on the chosen action and collect the reward for this state
-                observation, reward, terminated, truncated, info = env.step(np.atleast_1d(action) if is_continuous else action)
+                observation, reward, terminated, truncated, info = env.step(
+                    np.atleast_1d(action) if is_continuous else action)
                 done = terminated or truncated
                 current_episode_return += (reward if "original_reward" not in info else info["original_reward"])
                 rewards.append(reward)
@@ -209,7 +214,8 @@ class Gatherer(BaseGatherer):
                     buffer.auxiliary_performances[key] = []
 
         # get last non-visited state value to incorporate it into the advantage estimation of last visited state
-        values.append(np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
+        values.append(
+            np.squeeze(joint(add_state_dims(state, dims=2 if is_recurrent else 1).dict(), training=False)[-1]))
 
         # if there was at least one step in the environment after the last episode end, calculate advantages for them
         if episode_steps > 1:
@@ -258,16 +264,16 @@ class Gatherer(BaseGatherer):
 
         return stats
 
-    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: BaseWrapper):
+    def postprocess(self, buffer: ExperienceBuffer, model: tf.keras.Model, env: TaskWrapper):
         """Postprocess the gathered data."""
         buffer.normalize_advantages()
 
         return buffer
 
-    def select_action(self, predicted_parameters: list) -> Tuple[tf.Tensor, np.ndarray]:
+    def select_action(self, predicted_parameters: list) -> np.ndarray:
         """Standard action selection where an action is sampled fully from the predicted distribution."""
-        action, action_probability = self.distribution.act(*predicted_parameters)
-        action = action if not DETERMINISTIC else np.zeros(action.shape)
+        action, action_probability = self.distribution.act_numpy(*predicted_parameters)
+        action = action if not DETERMINISTIC else np.zeros_like(action)
 
         return action, action_probability
 
@@ -289,7 +295,7 @@ class EpsilonGreedyGatherer(Gatherer):
         return action, action_probability
 
 
-def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyDistribution,
+def evaluate(policy: tf.keras.Model, env: TaskWrapper, distribution: BasePolicyDistribution,
              act_confidently=False) -> Tuple[int, int, Any, dict]:
     """Evaluate one episode of the given environment following the given policy."""
     policy.reset_states()
@@ -329,7 +335,7 @@ def evaluate(policy: tf.keras.Model, env: BaseWrapper, distribution: BasePolicyD
     return steps, cumulative_reward, eps_class, auxiliary_performances
 
 
-def fake_env_step(env: BaseWrapper):
+def fake_env_step(env: TaskWrapper):
     """Return a random step imitating the given environment without actually stepping the environment."""
     return env.observation(env.observation_space.sample()), 1, False, {}
 
@@ -341,5 +347,5 @@ def fake_joint_output(joint):
         outshape[i] = [d if d is not None else 1 for d in outshape[i]]
 
     return np.float32(np.random.random(outshape[0])), \
-           np.float32(np.random.random(outshape[1])), \
-           np.float32(np.random.random(outshape[2]))
+        np.float32(np.random.random(outshape[1])), \
+        np.float32(np.random.random(outshape[2]))

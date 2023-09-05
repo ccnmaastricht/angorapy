@@ -1,0 +1,1 @@
+The original MJCF Shadow Hand model is the work of DeepMind and part of the [MuJoCo Menagerie](https://github.com/deepmind/mujoco_menagerie) licensed under Apache-2.0. The model has been modified for AngoraPy, changes are licensed under the main license of this repository.

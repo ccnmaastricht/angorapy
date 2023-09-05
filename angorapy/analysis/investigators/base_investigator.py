@@ -4,12 +4,12 @@ import os
 from time import sleep
 from typing import List, Union
 
-import gym
+import gymnasium as gym
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
@@ -192,6 +192,10 @@ class Investigator:
 
     def render_episode(self, env: gym.Env, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
+        if not env.render_mode == "human":
+            print("WARNING: Rendering is not set to human mode. You will not see any output. Rebuild the environment"
+                  "in human render mode.")
+
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
 
@@ -211,6 +215,7 @@ class Investigator:
                 action, _ = self.distribution.act(*probabilities)
 
             observation, reward, terminated, truncated, info = env.step(action)
+
             cumulative_reward += (reward if "original_reward" not in info else info["original_reward"])
             done = terminated or truncated
 
@@ -219,7 +224,7 @@ class Investigator:
         print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
-    def render_episode_jupyter(self, env: BaseWrapper, substeps_per_step=1, act_confidently=True) -> None:
+    def render_episode_jupyter(self, env: TaskWrapper, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
         from IPython import display, core
 

@@ -11,9 +11,9 @@ from tqdm import tqdm
 from angorapy.agent import PPOAgent
 from angorapy.common.const import VISION_WH
 from angorapy.common.loss import multi_point_euclidean_distance
-from angorapy.common.wrappers import make_env
-from angorapy.environments import *
-from angorapy.environments.anthrobotics import AnthropomorphicEnv
+from angorapy import make_task
+from angorapy.tasks import *
+from angorapy.tasks.core import AnthropomorphicEnv
 import tensorflow_graphics.geometry.transformation as tfg
 
 
@@ -73,7 +73,7 @@ def gen_cube_quats_prediction_data(n: int, save_path: str):
     agent = PPOAgent.from_agent_state(1670596186987840, "best", path_modifier="../")
     agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1, sequence_length=1)
 
-    hand_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0", transformers=agent.env.transformers)
+    hand_env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0", transformers=agent.env.transformers, render_mode="rgb_array")
     env_unwrapped: AnthropomorphicEnv = hand_env.unwrapped
 
     os.makedirs("storage/data/pretraining", exist_ok=True)

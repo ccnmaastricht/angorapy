@@ -5,15 +5,18 @@ import datetime
 import os
 import socket
 import time
-from importlib.metadata import version
+import sys
+
+
 from inspect import getfullargspec as fargs
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy
+import pkg_resources
 import simplejson as json
 import tensorflow as tf
-from gym.spaces import Box
+from gymnasium.spaces import Box
 from matplotlib import animation
 from mpi4py import MPI
 
@@ -21,10 +24,11 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common import const
 from angorapy.common.const import PATH_TO_EXPERIMENTS
 from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from angorapy.common.wrappers import BaseWrapper
+from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.models.mighty_maker import get_model_type
 from angorapy.utilities.util import add_state_dims, flatten
 
+import angorapy
 
 def scale(vector):
     """Min Max scale a vector."""
@@ -37,7 +41,7 @@ class Monitor:
 
     def __init__(self,
                  agent: PPOAgent,
-                 env: BaseWrapper = None,
+                 env: TaskWrapper = None,
                  frequency: int = 1,
                  gif_every: int = 0,
                  id=None,
@@ -123,7 +127,7 @@ class Monitor:
             host=socket.gethostname(),
             n_cpus=MPI.COMM_WORLD.size,
             n_gpus=self.agent.n_optimizers,
-            angorapy_version=version("angorapy"),
+            angorapy_version=None, #pkg_resources.get_distribution("angorapy").version,
             experiment_group=self.experiment_group,
             iterations=self.iterations,
             environment=dict(

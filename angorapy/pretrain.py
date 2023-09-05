@@ -289,6 +289,11 @@ def pretrain_on_rendered_object_pose(pretrainable_component: tf.keras.Model,
 
 
 if __name__ == "__main__":
+    tf.get_logger().setLevel('INFO')
+    gpus = tf.config.list_physical_devices("GPU")
+    if gpus:
+        tf.config.experimental.set_memory_growth(gpus[0], True)
+
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
 
