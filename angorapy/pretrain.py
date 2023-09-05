@@ -32,11 +32,13 @@ from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, l
 
 import tensorflow_graphics.geometry.transformation as tfg
 
-# tf.get_logger().setLevel('INFO')
-gpus = tf.config.list_physical_devices("GPU")
-if gpus:
-    tf.config.experimental.set_memory_growth(gpus[0], True)
+from mpi4py import MPI
 
+mpi_rank = MPI.COMM_WORLD.Get_rank()
+is_root = mpi_rank == 0
+
+if not is_root:
+    tf.config.set_visible_devices([], 'GPU')
 
 @tf.function
 def rotational_diff_metric(y_true, y_pred):
@@ -145,14 +147,18 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
                             name="visual_op",
                             load_from: str = None):
     """Pretrain a visual component on prediction of cube position."""
-    data_path = f"storage/data/pretraining/pose_data_{n_samples}_{n_cameras}c.tfrecord"
+    data_name = f"angorapy/storage/data/pretraining/pose_data_{n_samples}_{n_cameras}c"
+    data_path = f"{data_name}_{mpi_rank}.tfrecord"
     if not load_data:
-        dataset = gen_cube_quats_prediction_data(
+        gen_cube_quats_prediction_data(
             n_samples,
             data_path,
         )
-    else:
-        dataset = load_unrendered_dataset(data_path)
+
+    # get all filenames starting with data_name from the data directory
+    filenames = tf.io.gfile.glob(f"{data_name}*.tfrecord")
+
+    dataset = load_unrendered_dataset(filenames)
 
     dataset = dataset.map(lambda x, y: tf.py_function(func=render, inp=[x], Tout=[tf.float32, tf.float32]))
     # dataset = dataset.map(lambda x, y: render(x))
@@ -164,13 +170,13 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
     trainset = dataset.skip(n_testset)
     valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
 
-    trainset = trainset.batch(1, drop_remainder=True, num_parallel_calls=1)
+    trainset = trainset.batch(1, drop_remainder=True)
     trainset = trainset.prefetch(AUTOTUNE)
 
-    valset = valset.batch(1, drop_remainder=True, num_parallel_calls=1)
+    valset = valset.batch(1, drop_remainder=True)
     valset = valset.prefetch(AUTOTUNE)
 
-    testset = testset.batch(1, drop_remainder=True, num_parallel_calls=1)
+    testset = testset.batch(1, drop_remainder=True)
     testset = testset.prefetch(AUTOTUNE)
 
     if load_from is None:
@@ -290,9 +296,9 @@ def pretrain_on_rendered_object_pose(pretrainable_component: tf.keras.Model,
 
 if __name__ == "__main__":
     tf.get_logger().setLevel('INFO')
-    gpus = tf.config.list_physical_devices("GPU")
-    if gpus:
-        tf.config.experimental.set_memory_growth(gpus[0], True)
+    # gpus = tf.config.list_physical_devices("GPU")
+    # if gpus:
+    #     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
@@ -311,7 +317,7 @@ if __name__ == "__main__":
 
     # parameters
     n_cameras = 3
-    n_samples = 10000
+    n_samples = 100
 
     visual_component = OpenAIEncoder(shape=(128, 128, 3), name=args.name, n_cameras=n_cameras)
     # visual_component = keras_cortex.cornet.cornet_z.PoseCORNetZ(7, name=args.name)

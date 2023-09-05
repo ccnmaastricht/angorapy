@@ -1,20 +1,13 @@
 """Generation of auxiliary datasets."""
 import os
-from typing import Tuple
 
-import mujoco
 import numpy as np
 import tensorflow as tf
-from matplotlib import pyplot as plt
 from tqdm import tqdm
 
+from angorapy import make_task
 from angorapy.agent import PPOAgent
 from angorapy.common.const import VISION_WH
-from angorapy.common.loss import multi_point_euclidean_distance
-from angorapy import make_task
-from angorapy.tasks import *
-from angorapy.tasks.core import AnthropomorphicEnv
-import tensorflow_graphics.geometry.transformation as tfg
 
 
 def _bytes_feature(value):
@@ -26,8 +19,8 @@ def _bytes_feature(value):
 
 def serialize_example(image, pose):
     feature = {
-      'sim_state': _bytes_feature(image),
-      'pose': _bytes_feature(pose),
+        'sim_state': _bytes_feature(image),
+        'pose': _bytes_feature(pose),
     }
 
     example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
@@ -70,17 +63,17 @@ def load_unrendered_dataset(path):
 
 def gen_cube_quats_prediction_data(n: int, save_path: str):
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    agent = PPOAgent.from_agent_state(1692003322304510, "best", path_modifier="../")
-    agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1, sequence_length=1)
+    agent = PPOAgent.from_agent_state(1692003322304510, "best", path_modifier="")
+    agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1,
+                                                                sequence_length=1)
 
-    hand_env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0", transformers=agent.env.transformers, render_mode="rgb_array")
-    env_unwrapped: AnthropomorphicEnv = hand_env.unwrapped
+    hand_env = agent.env
 
     os.makedirs("storage/data/pretraining", exist_ok=True)
     with tf.io.TFRecordWriter(save_path) as writer:
         state, _ = hand_env.reset()
         for i in tqdm(range(n), desc="Sampling Data"):
-            action = agent.act(state, joint=agent.joint)
+            action = agent.act(state)
             sample, r, terminated, truncated, info = hand_env.step(action)
             done = terminated or truncated
 
@@ -96,13 +89,12 @@ def gen_cube_quats_prediction_data(n: int, save_path: str):
 
             state = sample
 
-    return load_unrendered_dataset(save_path)
-
 
 def gen_cube_quats_prediction_data_rendered(n: int, save_path: str, binocular=False, n_cameras: int = 1):
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
     agent = PPOAgent.from_agent_state(1670596186987840, "best", path_modifier="../")
-    agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1, sequence_length=1)
+    agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1,
+                                                                sequence_length=1)
 
     hand_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0",
                         # render_mode="rgb_array",

@@ -292,14 +292,21 @@ class PPOAgent:
             is_optimization_process = True
 
         if not is_optimization_process:
-            tf.config.set_visible_devices([], "GPU")
-            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+            try:
+                if tf.config.get_visible_devices("GPU"):
+                    tf.config.set_visible_devices([], "GPU")
+                os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+            except:
+                pass
         else:
-            if len(gpus) > 0:
-                tf.config.experimental.set_memory_growth(gpus[0], True)
+            try:
+                if len(gpus) > 0:
+                    tf.config.experimental.set_memory_growth(gpus[0], True)
+            except:
+                pass
 
-        optimization_ranks = [r for r in mpi_comm.allgather(MPI.COMM_WORLD.rank if is_optimization_process else -1) if
-                              r != -1]
+        optimization_ranks = [r for r in mpi_comm.allgather(MPI.COMM_WORLD.rank if is_optimization_process else -1)
+                              if r != -1]
         if limit_to_n_optimizers is not None and limit_to_n_optimizers != 0:
             optimization_ranks = optimization_ranks[:limit_to_n_optimizers]
             is_optimization_process = mpi_comm.rank in optimization_ranks
@@ -347,6 +354,8 @@ class PPOAgent:
                 except:
                     raise ValueError("Observation in state dict must be a Sensation or dict convertible into "
                                      "an observation.")
+        elif isinstance(state, Sensation):
+            pass
         else:
             raise ValueError("State must be a Sensation or a dictionary with an 'observation' key.")
 
