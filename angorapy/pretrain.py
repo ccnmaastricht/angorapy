@@ -3,6 +3,7 @@
 import os
 import sys
 
+import keras_cortex
 import mujoco
 from matplotlib import pyplot as plt
 
@@ -33,6 +34,9 @@ from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, l
 import tensorflow_graphics.geometry.transformation as tfg
 
 from mpi4py import MPI
+
+BATCH_SIZE = 32
+
 
 mpi_rank = MPI.COMM_WORLD.Get_rank()
 is_root = mpi_rank == 0
@@ -95,8 +99,8 @@ def render(sim_state):
     p = np.random.random()
 
     # Get the quaternion for the current orientation of the body
-    object = data.jnt("object:joint")
-    quat = data.jnt("object:joint").qpos[3:]
+    object = data.jnt("block/object:joint/")
+    quat = data.jnt("block/object:joint/").qpos[3:]
     original_qpos = object.qpos.copy()
 
     if p < 0.0:  # Leave the object pose as is
@@ -147,7 +151,7 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
                             name="visual_op",
                             load_from: str = None):
     """Pretrain a visual component on prediction of cube position."""
-    data_name = f"angorapy/storage/data/pretraining/pose_data_{n_samples}_{n_cameras}c"
+    data_name = f"storage/data/pretraining/pose_data_{n_samples}_{n_cameras}c"
     data_path = f"{data_name}_{mpi_rank}.tfrecord"
     if not load_data:
         gen_cube_quats_prediction_data(
@@ -155,67 +159,70 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
             data_path,
         )
 
-    # get all filenames starting with data_name from the data directory
-    filenames = tf.io.gfile.glob(f"{data_name}*.tfrecord")
+    if is_root:
+        # get all filenames starting with data_name from the data directory
+        filenames = tf.io.gfile.glob(f"{data_name}*.tfrecord")
+        print(filenames)
 
-    dataset = load_unrendered_dataset(filenames)
+        dataset = load_unrendered_dataset(filenames)
 
-    dataset = dataset.map(lambda x, y: tf.py_function(func=render, inp=[x], Tout=[tf.float32, tf.float32]))
-    # dataset = dataset.map(lambda x, y: render(x))
+        dataset = dataset.map(lambda x, y: tf.py_function(func=render, inp=[x], Tout=[tf.float32, tf.float32]))
+        # dataset = dataset.map(lambda x, y: render(x))
 
-    n_testset = 1000
-    n_valset = 500
+        n_testset = 1000
+        n_valset = 500
 
-    testset = dataset.take(n_testset)
-    trainset = dataset.skip(n_testset)
-    valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
+        testset = dataset.take(n_testset)
+        trainset = dataset.skip(n_testset)
+        valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
 
-    trainset = trainset.batch(1, drop_remainder=True)
-    trainset = trainset.prefetch(AUTOTUNE)
+        trainset = trainset.batch(BATCH_SIZE, drop_remainder=True)
+        # trainset = trainset.prefetch(AUTOTUNE)
 
-    valset = valset.batch(1, drop_remainder=True)
-    valset = valset.prefetch(AUTOTUNE)
+        valset = valset.batch(BATCH_SIZE, drop_remainder=True)
+        # valset = valset.prefetch(AUTOTUNE)
 
-    testset = testset.batch(1, drop_remainder=True)
-    testset = testset.prefetch(AUTOTUNE)
+        testset = testset.batch(BATCH_SIZE, drop_remainder=True)
+        # testset = testset.prefetch(AUTOTUNE)
 
-    if load_from is None:
-        model = pretrainable_component
+        if load_from is None:
+            model = pretrainable_component
 
-        build_sample = tf.expand_dims(next(iter(dataset))[0], 0)
-        model(build_sample)
+            build_sample = next(iter(trainset))
+            print(model(build_sample[0]))
+            print(build_sample[1])
 
-        # chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
-        # chunk_mean = np.mean(chunk, axis=0)
-        # output_layer = model.get_layer("output")
-        # output_weights = output_layer.get_weights()
-        # output_weights[1] = chunk_mean
-        # output_layer.set_weights(output_weights)
+            # chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
+            # chunk_mean = np.mean(chunk, axis=0)
+            # output_layer = model.get_layer("output")
+            # output_weights = output_layer.get_weights()
+            # output_weights[1] = chunk_mean
+            # output_layer.set_weights(output_weights)
 
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
-        model.compile(optimizer, loss="mse", metrics=[])
-        # model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
+            model.compile(optimizer, loss="mse", metrics=[])
+            # model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
 
-        # train and save encoder
-        model.fit(x=trainset,
-                  epochs=epochs,
-                  validation_data=valset,
-                  # callbacks=[
-                  #     tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
-                  # ],
-                  shuffle=True)
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
-    else:
-        print("Loading model...")
-        model = tf.keras.models.load_model(load_from)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
-        print("Model loaded successfully.")
+            # train and save encoder
+            model.fit(x=trainset,
+                      epochs=epochs,
+                      validation_data=valset,
+                      # callbacks=[
+                      #     tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
+                      # ],
+                      shuffle=True)
+            pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
+        else:
+            print("Loading model...")
+            model = tf.keras.models.load_model(load_from)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
+            print("Model loaded successfully.")
 
-    train_mean = np.mean(list(tfds.as_numpy(trainset.unbatch().take(5000).map(lambda x, y: y))), axis=0)
-    test_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
-    print(f"This model achieves {model.evaluate(testset)}")
-    print(f"A mean model would achieve {np.mean((test_numpy - train_mean) ** 2)}")
+        train_mean = np.mean(list(tfds.as_numpy(trainset.unbatch().take(5000).map(lambda x, y: y))), axis=0)
+        test_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
+        print(f"This model achieves {model.evaluate(testset)}")
+        print(f"A mean model would achieve {np.mean((test_numpy - train_mean) ** 2)}")
 
 
 def pretrain_on_rendered_object_pose(pretrainable_component: tf.keras.Model,
@@ -309,7 +316,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=2, help=f"number of pretraining epochs")
+    parser.add_argument("--epochs", type=int, default=200, help=f"number of pretraining epochs")
 
     # read arguments
     argcomplete.autocomplete(parser)
@@ -317,10 +324,10 @@ if __name__ == "__main__":
 
     # parameters
     n_cameras = 3
-    n_samples = 100
+    n_samples = 2000
 
     visual_component = OpenAIEncoder(shape=(128, 128, 3), name=args.name, n_cameras=n_cameras)
-    # visual_component = keras_cortex.cornet.cornet_z.PoseCORNetZ(7, name=args.name)
+    # visual_component = keras_cortex.cornet.cornet_z.PoseCORNetZ(name=args.name)
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
 
@@ -331,7 +338,7 @@ if __name__ == "__main__":
         epochs=args.epochs,
         n_samples=n_samples,
         n_cameras=n_cameras,
-        load_data=False,
+        load_data=True,
         name=args.name,
         load_from=args.load,
     )

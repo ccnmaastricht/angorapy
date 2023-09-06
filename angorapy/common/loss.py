@@ -38,3 +38,12 @@ class EuclideanDistanceLoss(tf.keras.losses.Loss):
         y_true = tf.cast(y_true, y_pred.dtype)
 
         return multi_point_euclidean_distance(y_pred, y_true)
+
+
+class GeodesicDistanceLoss(tf.keras.losses.Loss):
+
+    def call(self, y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+
+        return tf.reduce_mean(tf.math.cos(tf.math.log(y_true * tf.transpose(y_pred)) / 2))

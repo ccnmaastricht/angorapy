@@ -77,7 +77,7 @@ def gen_cube_quats_prediction_data(n: int, save_path: str):
             sample, r, terminated, truncated, info = hand_env.step(action)
             done = terminated or truncated
 
-            quaternion = info["achieved_goal"]
+            quaternion = tf.cast(info["achieved_goal"], dtype=tf.float32)
             sim_state = hand_env.get_state()
             sim_state = tf.cast(np.concatenate([sim_state["qpos"], sim_state["qvel"]]), dtype=tf.float32)
 
