@@ -7,6 +7,8 @@ import keras_cortex
 import mujoco
 from matplotlib import pyplot as plt
 
+from angorapy.common.loss import PoseEstimationLoss
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from angorapy import make_task
@@ -41,8 +43,14 @@ BATCH_SIZE = 32
 mpi_rank = MPI.COMM_WORLD.Get_rank()
 is_root = mpi_rank == 0
 
+# deallocate the GPU from all but the root process
 if not is_root:
     tf.config.set_visible_devices([], 'GPU')
+
+# Prevent "Failed to find dnn implementation" error
+gpus = tf.config.list_physical_devices("GPU")
+if gpus:
+    tf.config.experimental.set_memory_growth(gpus[0], True)
 
 @tf.function
 def rotational_diff_metric(y_true, y_pred):
@@ -169,8 +177,8 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         dataset = dataset.map(lambda x, y: tf.py_function(func=render, inp=[x], Tout=[tf.float32, tf.float32]))
         # dataset = dataset.map(lambda x, y: render(x))
 
-        n_testset = 1000
-        n_valset = 500
+        n_testset = 1024
+        n_valset = 512
 
         testset = dataset.take(n_testset)
         trainset = dataset.skip(n_testset)
@@ -200,16 +208,16 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
             # output_layer.set_weights(output_weights)
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
-            model.compile(optimizer, loss="mse", metrics=[])
+            model.compile(optimizer, loss=PoseEstimationLoss(), metrics=["mse"])
             # model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
 
             # train and save encoder
             model.fit(x=trainset,
                       epochs=epochs,
                       validation_data=valset,
-                      # callbacks=[
-                      #     tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
-                      # ],
+                      callbacks=[
+                          tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
+                      ],
                       shuffle=True)
             pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
         else:
@@ -222,7 +230,11 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         train_mean = np.mean(list(tfds.as_numpy(trainset.unbatch().take(5000).map(lambda x, y: y))), axis=0)
         test_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
         print(f"This model achieves {model.evaluate(testset)}")
-        print(f"A mean model would achieve {np.mean((test_numpy - train_mean) ** 2)}")
+        print(
+            f"A mean model would achieve\n"
+            f"\t{np.mean((test_numpy - train_mean) ** 2)} (mse) \n"
+            f"\t{tf.reduce_mean(tf.norm(test_numpy[:, :3] - train_mean[:3], axis=-1, ord='euclidean'))} (pos: euclidean)."
+        )
 
 
 def pretrain_on_rendered_object_pose(pretrainable_component: tf.keras.Model,
@@ -303,9 +315,6 @@ def pretrain_on_rendered_object_pose(pretrainable_component: tf.keras.Model,
 
 if __name__ == "__main__":
     tf.get_logger().setLevel('INFO')
-    # gpus = tf.config.list_physical_devices("GPU")
-    # if gpus:
-    #     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     # parse commandline arguments
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
@@ -316,7 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=200, help=f"number of pretraining epochs")
+    parser.add_argument("--epochs", type=int, default=20, help=f"number of pretraining epochs")
 
     # read arguments
     argcomplete.autocomplete(parser)
@@ -324,7 +333,7 @@ if __name__ == "__main__":
 
     # parameters
     n_cameras = 3
-    n_samples = 2000
+    n_samples = 2048
 
     visual_component = OpenAIEncoder(shape=(128, 128, 3), name=args.name, n_cameras=n_cameras)
     # visual_component = keras_cortex.cornet.cornet_z.PoseCORNetZ(name=args.name)

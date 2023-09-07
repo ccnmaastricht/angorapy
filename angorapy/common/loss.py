@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_graphics as tfg
 
 
 def multi_point_euclidean_distance(a: tf.Tensor, b: tf.Tensor):
@@ -40,10 +41,25 @@ class EuclideanDistanceLoss(tf.keras.losses.Loss):
         return multi_point_euclidean_distance(y_pred, y_true)
 
 
-class GeodesicDistanceLoss(tf.keras.losses.Loss):
+class PoseEstimationLoss(tf.keras.losses.Loss):
+
+    beta = 0.001
 
     def call(self, y_true, y_pred):
         y_pred = tf.convert_to_tensor(y_pred)
         y_true = tf.cast(y_true, y_pred.dtype)
 
-        return tf.reduce_mean(tf.math.cos(tf.math.log(y_true * tf.transpose(y_pred)) / 2))
+        position_pred = y_pred[:, :3]
+        position_true = y_true[:, :3]
+
+        rotation_pred = y_pred[:, 3:]
+        rotation_true = y_true[:, 3:]
+
+        # find the euclidean distance between the two positions in the pose
+        position_loss = tf.reduce_mean(tf.norm(position_pred - position_true, ord="euclidean", axis=-1))
+
+        # find the shortest geodesic rotation between the two quaternions in the pose
+        batch_dot_product = tf.reduce_sum(rotation_pred * rotation_true, axis=-1)
+        rotational_loss = tf.reduce_mean(1.0 - tf.pow(batch_dot_product, 2))
+
+        return position_loss + rotational_loss
