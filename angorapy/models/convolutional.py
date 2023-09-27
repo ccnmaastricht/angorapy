@@ -2,55 +2,7 @@
 """Convolutional components/networks."""
 import keras_cortex.layers
 import tensorflow as tf
-
-
-def _residual_block(x, filters, kernel_size=3, stride=1, conv_shortcut=True, name=None):
-    """A residual block.
-    Args:
-      x: input tensor.
-      filters: integer, filters of the bottleneck layer.
-      kernel_size: default 3, kernel size of the bottleneck layer.
-      stride: default 1, stride of the first layer.
-      conv_shortcut: default True, use convolution shortcut if True,
-          otherwise identity shortcut.
-      name: string, block label.
-    Returns:
-      Output tensor for the residual block.
-    """
-    bn_axis = 3 if tf.keras.backend.image_data_format() == "channels_last" else 1
-
-    if conv_shortcut:
-        shortcut = tf.keras.layers.Conv2D(
-            4 * filters, 1, strides=stride, name=name + "_0_conv"
-        )(x)
-        shortcut = tf.keras.layers.BatchNormalization(
-            axis=bn_axis, epsilon=1.001e-5, name=name + "_0_bn"
-        )(shortcut)
-    else:
-        shortcut = x
-
-    x = tf.keras.layers.Conv2D(filters, 1, strides=stride, name=name + "_1_conv")(x)
-    x = tf.keras.layers.BatchNormalization(
-        axis=bn_axis, epsilon=1.001e-5, name=name + "_1_bn"
-    )(x)
-    x = tf.keras.layers.Activation("relu", name=name + "_1_relu")(x)
-
-    x = tf.keras.layers.Conv2D(
-        filters, kernel_size, padding="SAME", name=name + "_2_conv"
-    )(x)
-    x = tf.keras.layers.BatchNormalization(
-        axis=bn_axis, epsilon=1.001e-5, name=name + "_2_bn"
-    )(x)
-    x = tf.keras.layers.Activation("relu", name=name + "_2_relu")(x)
-
-    x = tf.keras.layers.Conv2D(4 * filters, 1, name=name + "_3_conv")(x)
-    x = tf.keras.layers.BatchNormalization(
-        axis=bn_axis, epsilon=1.001e-5, name=name + "_3_bn"
-    )(x)
-
-    x = tf.keras.layers.Add(name=name + "_add")([shortcut, x])
-    x = tf.keras.layers.Activation("relu", name=name + "_out")(x)
-    return x
+import tensorflow_models as tfm
 
 
 def _residual_stack(x, filters, blocks, stride1=2, name=None):
@@ -64,11 +16,11 @@ def _residual_stack(x, filters, blocks, stride1=2, name=None):
     Returns:
       Output tensor for the stacked blocks.
     """
-    x = _residual_block(x, filters, stride=stride1, name=name + "_block1")
+    x = tfm.vision.layers.ResidualBlock(filters, strides=stride1, name=name + "_block1", use_projection=True)(x)
     for i in range(2, blocks + 1):
-        x = _residual_block(
-            x, filters, conv_shortcut=False, name=name + "_block" + str(i)
-        )
+        x = tfm.vision.layers.ResidualBlock(
+            filters, strides=1, use_projection=False, name=name + "_block" + str(i)
+        )(x)
     return x
 
 
@@ -77,11 +29,15 @@ def _residual_stack(x, filters, blocks, stride1=2, name=None):
 
 class OpenAIEncoder(tf.keras.Model):
 
-    def __init__(self, shape, n_cameras=1, **kwargs):
+    def __init__(self, shape, n_cameras=1, mode="pose", **kwargs):
         super().__init__(**kwargs)
+
+        assert mode in ["pose", "classification"]
+        self.mode = mode
 
         self.n_cameras = n_cameras
 
+        self.rescale = tf.keras.layers.Rescaling(1.0 / 255)
         self.resnet_encoder = _build_openai_resnets(shape=shape,
                                                     batch_size=kwargs.get("batch_size"))
 
@@ -90,22 +46,36 @@ class OpenAIEncoder(tf.keras.Model):
         self.flatten = tf.keras.layers.Flatten()
         self.softmax = keras_cortex.layers.SpatialSoftmax()
 
-        self.pos_dense = tf.keras.layers.Dense(3, kernel_initializer=tf.keras.initializers.GlorotUniform(),
-                                    bias_initializer=tf.keras.initializers.Constant(0),
-                                    kernel_regularizer=tf.keras.regularizers.L2(0.001),
-                                    bias_regularizer=tf.keras.regularizers.L2(0.001))
-        self.rot_dense = tf.keras.layers.Dense(4, kernel_initializer=tf.keras.initializers.GlorotUniform(),
-                                    bias_initializer=tf.keras.initializers.Constant(0),
-                                    kernel_regularizer=tf.keras.regularizers.L2(0.001),
-                                    bias_regularizer=tf.keras.regularizers.L2(0.001))
+        if mode == "pose":
+            self.pos_dense = tf.keras.layers.Dense(3, kernel_initializer=tf.keras.initializers.GlorotUniform(),
+                                                   bias_initializer=tf.keras.initializers.Constant(0),
+                                                   kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                                                   bias_regularizer=tf.keras.regularizers.L2(0.001))
+            self.rot_dense = tf.keras.layers.Dense(4, kernel_initializer=tf.keras.initializers.GlorotUniform(),
+                                                   bias_initializer=tf.keras.initializers.Constant(0),
+                                                   kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                                                   bias_regularizer=tf.keras.regularizers.L2(0.001))
+        elif mode == "classification":
+            self.data_augmentation = tf.keras.Sequential(
+                [
+                    tf.keras.layers.RandomFlip("horizontal"),
+                    tf.keras.layers.RandomRotation(0.1),
+                ]
+            )
+
+            self.classifier = tf.keras.layers.Dense(1000, activation="softmax")
 
     def call(self, inputs, training=None, mask=None):
         per_camera_output = []
 
+        inputs = self.rescale(inputs)
         inputs = tf.split(inputs, num_or_size_splits=self.n_cameras, axis=-1)
-        assert isinstance(inputs, list)
 
         for camera in inputs:
+
+            if self.mode == "classification":
+                camera = self.data_augmentation(camera, training=training)
+
             x = self.resnet_encoder(camera)
             x = self.softmax(x)
             x = self.flatten(x)
@@ -120,11 +90,16 @@ class OpenAIEncoder(tf.keras.Model):
         x = self.relu(x)
 
         # output
-        pos = self.pos_dense(x)
-        rot = self.rot_dense(x)
-        rot = tf.math.l2_normalize(rot, axis=-1)  # ensure quaternions are quaternions
+        if self.mode == "pose":
+            pos = self.pos_dense(x)
+            rot = self.rot_dense(x)
+            rot = tf.math.l2_normalize(rot, axis=-1)  # ensure quaternions are quaternions
 
-        outputs = tf.keras.layers.concatenate([pos, rot], axis=-1)
+            outputs = tf.keras.layers.concatenate([pos, rot], axis=-1)
+        elif self.mode == "classification":
+            outputs = self.classifier(x)
+        else:
+            raise NotImplementedError("Unknown mode: {}".format(self.mode))
 
         return outputs
 
@@ -186,13 +161,13 @@ def _build_openai_encoder(shape, name="visual_component", batch_size=None):
 
     # output
     pos = tf.keras.layers.Dense(3, kernel_initializer=tf.keras.initializers.GlorotUniform(),
-                                  bias_initializer=tf.keras.initializers.Constant(0),
-                                  kernel_regularizer=tf.keras.regularizers.L2(0.001),
-                                  bias_regularizer=tf.keras.regularizers.L2(0.001))(x)
+                                bias_initializer=tf.keras.initializers.Constant(0),
+                                kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                                bias_regularizer=tf.keras.regularizers.L2(0.001))(x)
     rot = tf.keras.layers.Dense(4, kernel_initializer=tf.keras.initializers.GlorotUniform(),
-                                  bias_initializer=tf.keras.initializers.Constant(0),
-                                  kernel_regularizer=tf.keras.regularizers.L2(0.001),
-                                  bias_regularizer=tf.keras.regularizers.L2(0.001))(x)
+                                bias_initializer=tf.keras.initializers.Constant(0),
+                                kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                                bias_regularizer=tf.keras.regularizers.L2(0.001))(x)
     rot = tf.math.l2_normalize(rot, axis=-1)  # ensure quaternions are quaternions
 
     outputs = tf.concat([pos, rot], axis=-1)
@@ -297,9 +272,9 @@ def _build_visual_decoder(input_dim):
 
 
 if __name__ == "__main__":
-    conv_comp = _build_openai_encoder((128, 128, 3))
-    print(conv_comp(tf.random.normal((1, 128, 128, 3))).shape)
-    conv_comp.summary()
+    conv_comp = OpenAIEncoder((64, 64, 3), 1, mode="classification")
+    print(conv_comp(tf.random.normal((1, 64, 64, 3))).shape)
+    conv_comp.summary(expand_nested=True, )
     #
     # print("\n\n\n")
     # conv_comp = _build_openai_encoder((200, 200, 3), 7)

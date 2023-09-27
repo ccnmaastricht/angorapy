@@ -136,8 +136,6 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         return super(BaseShadowHandEnv, self)._get_info()
 
     def viewer_setup(self):
-        mpi_print(f"Setting up color scheme {self.color_scheme}.")
-
         # hand color
         if self.color_scheme == "default":
             pass
@@ -154,14 +152,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         if self.viewer is None:
             return
 
-        mpi_print(f"Setting up camera with viewpoint '{self.viewpoint}'.")
-
         if self.viewpoint == "topdown":
             # rotate camera to top down view
             self.viewer.cam.distance = 0.5  # zoom in
             self.viewer.cam.azimuth = 0.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
-            self.viewer.cam.lookat[0] += 0.3  # slightly move forward
+            self.viewer.cam.lookat[0] = 0.35  # slightly move forward
         elif self.viewpoint == "topdown-far":
             # rotate camera to top down view
             self.viewer.cam.distance = 0.7  # increased values zoom out
@@ -183,6 +179,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         else:
             raise NotImplementedError(f"Unknown Viewpoint {self.viewpoint}.")
 
+        mpi_print(f"Set up color scheme {self.color_scheme}.")
+        mpi_print(f"Set up camera with viewpoint '{self.viewpoint}'.")
         mpi_print("Camera setup finished.")
 
 

@@ -409,32 +409,34 @@ class AnthropomorphicEnv(gym.Env, ABC):
             "rgb_array",
             "depth_array",
         }:
-            camera_id = self.camera_id
-            camera_name = self.camera_name
+            # camera_id = self.camera_id
+            # camera_name = self.camera_name
+            #
+            # if camera_id is not None and camera_name is not None:
+            #     raise ValueError(
+            #         "Both `camera_id` and `camera_name` cannot be"
+            #         " specified at the same time."
+            #     )
+            #
+            # no_camera_specified = camera_name is None and camera_id is None
+            # if no_camera_specified:
+            #     camera_name = "track"
+            #
+            # if camera_id is None:
+            #     camera_id = mujoco.mj_name2id(
+            #         self.model,
+            #         mujoco.mjtObj.mjOBJ_CAMERA,
+            #         camera_name,
+            #     )
 
-            if camera_id is not None and camera_name is not None:
-                raise ValueError(
-                    "Both `camera_id` and `camera_name` cannot be"
-                    " specified at the same time."
-                )
-
-            no_camera_specified = camera_name is None and camera_id is None
-            if no_camera_specified:
-                camera_name = "track"
-
-            if camera_id is None:
-                camera_id = mujoco.mj_name2id(
-                    self.model,
-                    mujoco.mjtObj.mjOBJ_CAMERA,
-                    camera_name,
-                )
-
-                self._get_viewer(self.render_mode).render(camera_id=camera_id, render_mode=self.render_mode)
+            print("hello")
+            self._get_viewer(self.render_mode).render(render_mode=self.render_mode)
 
         if self.render_mode == "rgb_array":
             data = self._get_viewer(self.render_mode).render(camera_id=-1, render_mode=self.render_mode)
             # original image is upside-down, so flip it
-            return data[::-1, :, :]
+            # return data[::-1, :, :]
+            return data
         elif self.render_mode == "depth_array":
             self._get_viewer(self.render_mode).render()
             # Extract depth part of the render() tuple
