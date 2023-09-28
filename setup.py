@@ -27,6 +27,7 @@ setup(
         "tensorflow==2.12.0",
         "tensorflow_probability==0.20.0",
         "tensorflow_graphics==2021.12.3",
+        "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
         "tqdm",
         "simplejson",

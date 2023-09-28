@@ -2,7 +2,6 @@
 """Convolutional components/networks."""
 import keras_cortex.layers
 import tensorflow as tf
-import tensorflow_models as tfm
 
 
 def _residual_stack(x, filters, blocks, stride1=2, name=None):
