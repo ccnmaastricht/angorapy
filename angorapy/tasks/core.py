@@ -559,3 +559,12 @@ class AnthropomorphicEnv(gym.Env, ABC):
             initial_qpos = self.data.qpos[:]
 
         return initial_qpos
+
+    # MODEL PROPERTIES
+    @property
+    def actuator_names(self):
+        return mj_get_category_names(self.model, "actuator")[0]
+
+    @property
+    def joint_names(self):
+        return mj_get_category_names(self.model, "jnt")[0]
