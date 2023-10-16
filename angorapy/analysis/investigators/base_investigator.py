@@ -133,7 +133,7 @@ class Investigator:
         else:
             raise ValueError("Recurrent layer type not understood. Is it custom?")
 
-    def get_layer_activations(self, layer_names: List[str], input_tensor=None):
+    def get_layer_activations(self, layer_names: List[str], input_tensor=None, recurrent_strategy="first"):
         """Get activations of a layer. If no input tensor is given, a random tensor is used."""
         activations = {}
 
@@ -149,7 +149,10 @@ class Investigator:
 
         for key in activations.keys():
             if isinstance(activations[key], list):
-                activations[key] = activations[key][0]
+                if recurrent_strategy == "first":
+                    activations[key] = activations[key][0]
+                elif recurrent_strategy == "all":
+                    activations[key] = tf.concat(activations[key][1:], axis=-1)
 
         # release the hook to prevent infinite nesting
         clear_hooks(self.network)
