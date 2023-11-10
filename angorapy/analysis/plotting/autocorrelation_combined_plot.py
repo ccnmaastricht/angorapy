@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
+from matplotlib import colors
 from tqdm import tqdm
 
 from angorapy import register_model
@@ -14,6 +15,7 @@ from dexterity.model import build_fpn_models, build_fpn_v2_models, build_fpn_v3_
 register_model(build_fpn_models)
 register_model(build_fpn_v2_models)
 register_model(build_fpn_v3_models)
+
 
 def get_timeseries_data(agent, random_steps=True):
     env = agent.env
@@ -42,7 +44,7 @@ def get_timeseries_data(agent, random_steps=True):
         if terminated:
             state, info = env.reset()
 
-    data = np.diff(np.array(state_trace), 0)  # - np.mean(state_trace, axis=0)
+    data = np.diff(np.array(state_trace), 0)
 
     return data
 
@@ -63,7 +65,6 @@ def calculate_timewise_crosscorrelations(data, n_lags=30):
     for i_var in range(data.shape[1]):
         timeseries_i = data[:, i_var]
 
-        # acorr = sm.tsa.acf(timeseries, nlags=n_lags)
         for j_var in range(i_var, data.shape[1]):
             timeseries_j = data[:, j_var]
             for lag in range(n_lags):
@@ -84,8 +85,12 @@ def calculate_statewise_correlation(data, n_lags=30):
 
 
 if __name__ == '__main__':
-    n_samples = 2
+    # EXPERIMENTAL PARAMETERS
+    n_samples = 15
     n_lags = 30
+
+    # PLOT PARAMETERS
+    MARKER_SIZE = 4
 
     violin_ax = plt.subplot2grid((3, 3), (0, 0), colspan=3, title="Pairwise Cross-correlations")
     acf_ax1 = plt.subplot2grid((3, 3), (1, 0), colspan=1, title="Pairwise Cross-correlations")
@@ -105,47 +110,129 @@ if __name__ == '__main__':
         crosscorrelations.append(calculate_timewise_crosscorrelations(data, n_lags=n_lags + 1))
         statewise_correlations.append(calculate_statewise_correlation(data, n_lags=n_lags + 1))
 
-    autocorrelation = np.mean(np.stack(autocorrelations, 0), 0)
-    crosscorrelation = np.mean(np.stack(crosscorrelations, 0), 0)
-    statewise_correlation = np.mean(np.stack(statewise_correlations, 0), 0)
+    # stack samples
+    sample_mean_autocorrelation = np.mean(np.stack(autocorrelations, 0), 0)
+    sample_mean_crosscorrelation = np.mean(np.stack(crosscorrelations, 0), 0)
+    sample_mean_statewise_correlation = np.mean(np.stack(statewise_correlations, 0), 0)
 
-    lags = (np.ones_like(crosscorrelation) * np.expand_dims(np.arange(len(crosscorrelation)), 1)).flatten().astype(int)
-    df = pd.DataFrame({"lag": lags, "correlation": np.array(crosscorrelation).flatten()})
+    # make crosscorrelation violin plot
+    lags = (np.ones_like(sample_mean_crosscorrelation) * np.expand_dims(
+        np.arange(sample_mean_crosscorrelation.shape[0]), [1])).flatten().astype(int)
+    df = pd.DataFrame({"Lag": lags, "Correlation": np.array(sample_mean_crosscorrelation).flatten()})
 
     plt.gcf().set_size_inches(16, 8)
-    sns.violinplot(data=df, x="lag", y="correlation", ax=violin_ax)
-    # sns.swarmplot(data=df, x="lag", y="correlation", size=5 * 0.09, ax=violin_ax)
-    # for i, l in enumerate(total_corr):
-    #     plt.scatter(np.ones((len(l),)) * i, l)
 
+    # violoinplot with all violins filled with color lightblue
+    sns.violinplot(
+        data=df,
+        x="Lag",
+        y="Correlation",
+        ax=violin_ax,
+        linecolor="tab:blue",
+        color="skyblue",
+        inner_kws=dict(
+            box_width=3,
+            whis_width=0,
+            markerfacecolor="black",
+            markeredgecolor="black",
+        )
+    )
+
+    # make auto and crosscorrelation plots
     ax_i = 0
     acf_axes = [acf_ax1, acf_ax4, acf_ax2, acf_ax5]
-    for include_cross_correlation, combine_by in itertools.product([True, False], ["mean", "max"]):
-        print(f"plotting combined by {combine_by} with{'out' if not include_cross_correlation else ''} cross-correlation")
-
-        a_or_c_corr = autocorrelation if not include_cross_correlation else crosscorrelation
+    for a_or_c_corr, combine_by in itertools.product([sample_mean_crosscorrelation, sample_mean_autocorrelation],
+                                                     ["mean", "max"]):
         if combine_by == "mean":
-            corrs_by_lags = np.mean(a_or_c_corr, axis=1)
+            variable_mean_correlations = np.mean(a_or_c_corr, axis=-1)
         elif combine_by == "max":
-            corrs_by_lags = np.max(a_or_c_corr, axis=1)
+            variable_mean_correlations = np.max(a_or_c_corr, axis=-1)
+        else:
+            raise ValueError(f"combine_by must be 'mean' or 'max', not {combine_by}")
 
-        acf_axes[ax_i].stem(range(n_lags + 1), corrs_by_lags)
+        variable_se_correlations = (
+                np.std(a_or_c_corr, axis=-1)
+                / np.sqrt(a_or_c_corr.shape[-1])
+        )
+
+        acf_axes[ax_i].fill_between(
+            range(n_lags + 1),
+            variable_mean_correlations - variable_se_correlations,
+            variable_mean_correlations + variable_se_correlations,
+            color="skyblue"
+        )
+
+        markerline, stemlines, baseline = acf_axes[ax_i].stem(range(n_lags + 1), variable_mean_correlations)
+        markerline.set_markersize(MARKER_SIZE)
+
+        acf_axes[ax_i].vlines(
+            16,
+            ymin=0,
+            ymax=1,
+            linestyles="dashed",
+            color="red"
+        )
+
         acf_axes[ax_i].set_xlabel("Lag")
         acf_axes[ax_i].set_ylabel(f"{combine_by.capitalize()} Absolute Correlation")
         acf_axes[ax_i].set_ylim(0, 1.1)
 
         ax_i += 1
 
-    acf_ax3.stem(range(n_lags + 1), np.mean(statewise_correlation, axis=0))
-    acf_ax3.set_xlabel("Lag")
-    acf_ax3.set_ylabel("Mean Correlation")
+    # make statewise correlation plot
+    variable_mean_correlations = np.mean(sample_mean_statewise_correlation, axis=-2)
+    variable_ci_statewise_correlation = (
+            np.std(sample_mean_statewise_correlation, axis=-2)
+            / np.sqrt(sample_mean_statewise_correlation.shape[-2])
+    )
 
-    acf_ax6.stem(range(n_lags + 1), np.mean(np.abs(statewise_correlation), axis=0))
+    markerline, stemlines, baseline = acf_ax6.stem(range(n_lags + 1), variable_mean_correlations)
+    markerline.set_markersize(MARKER_SIZE)
+    acf_ax6.fill_between(
+        range(n_lags + 1),
+        variable_mean_correlations - variable_ci_statewise_correlation,
+        variable_mean_correlations + variable_ci_statewise_correlation,
+        color="skyblue"
+    )
     acf_ax6.set_xlabel("Lag")
-    acf_ax6.set_ylabel("Mean Absolute Correlation")
-    acf_ax6.set_ylim(0, 1.1)
+    acf_ax6.set_ylabel("Mean Correlation")
+
+    acf_ax6.vlines(
+        16,
+        ymin=0,
+        ymax=1,
+        linestyles="dashed",
+        color="red"
+    )
+
+    # make statewise correlation plot
+    variable_mean_correlations = np.mean(np.abs(sample_mean_statewise_correlation), axis=-2)
+    variable_ci_statewise_correlation = (
+            np.std(np.abs(sample_mean_statewise_correlation), axis=-2)
+            / np.sqrt(sample_mean_statewise_correlation.shape[-2])
+    )
+
+    markerline, stemlines, baseline = acf_ax3.stem(range(n_lags + 1), variable_mean_correlations)
+    markerline.set_markersize(MARKER_SIZE)
+    acf_ax3.fill_between(
+        range(n_lags + 1),
+        variable_mean_correlations - variable_ci_statewise_correlation,
+        variable_mean_correlations + variable_ci_statewise_correlation,
+        color="skyblue"
+    )
+    acf_ax3.set_xlabel("Lag")
+    acf_ax3.set_ylabel("Mean Absolute Correlation")
+    acf_ax3.set_ylim(0, 1.1)
+
+    acf_ax3.vlines(
+        16,
+        ymin=0,
+        ymax=1,
+        linestyles="dashed",
+        color="red"
+    )
 
     plt.tight_layout()
 
-    # plt.savefig("../../../docs/figures/combined-correlation-plot.pdf", format="pdf", bbox_inches="tight")
+    plt.savefig("../../../docs/figures/combined-correlation-plot.pdf", format="pdf", bbox_inches="tight")
     plt.show()
