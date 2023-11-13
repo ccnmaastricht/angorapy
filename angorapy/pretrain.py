@@ -3,9 +3,17 @@
 import os
 import sys
 
+import tensorflow as tf
+import numpy as np
+
+# set random seeds for tensorflow and numpy
+tf.random.set_seed(0)
+np.random.seed(0)
+tf.keras.utils.set_random_seed(0)
+
 import mujoco
 
-from angorapy.common.loss import PoseEstimationLoss
+from angorapy.common.loss import PoseEstimationLoss, euclidean_distance, geodesic_loss
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -15,26 +23,18 @@ from angorapy.tasks.core import AnthropomorphicEnv
 from angorapy.models.convolutional import OpenAIEncoder
 
 import argparse
-import math
 
-import numpy as np
 import tensorflow_datasets as tfds
-from tensorflow.python.data import AUTOTUNE
 
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-from typing import Tuple
 
 import argcomplete
-import tensorflow as tf
 
 from angorapy.common.const import PRETRAINED_COMPONENTS_PATH, VISION_WH
-from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, load_dataset, load_unrendered_dataset
+from angorapy.utilities.data_generation import gen_cube_quats_prediction_data, load_unrendered_dataset
 
 import tensorflow_graphics.geometry.transformation as tfg
 
 from mpi4py import MPI
-
 
 mpi_rank = MPI.COMM_WORLD.Get_rank()
 is_root = mpi_rank == 0
@@ -47,24 +47,6 @@ if not is_root:
 gpus = tf.config.list_physical_devices("GPU")
 if gpus:
     tf.config.experimental.set_memory_growth(gpus[0], True)
-
-
-@tf.function
-def rotational_diff_metric(y_true, y_pred):
-    rot_true = y_true[..., 3:]
-    rot_pred = y_pred[..., 3:]
-
-    return tfg.quaternion.relative_angle(rot_true, rot_pred) * tf.constant(180. / math.pi)
-
-
-@tf.function
-def positional_diff_metric(y_true, y_pred):
-    """Gives positional difference in millimeters."""
-    pos_true = y_true[..., :3]
-    pos_pred = y_pred[..., :3]
-
-    return tf.linalg.norm(pos_true - pos_pred, axis=-1) * 1000
-
 
 hand_env = make_task("ManipulateBlockDiscreteAsynchronous-v0",
                      render_mode="rgb_array")
@@ -113,7 +95,7 @@ def render(sim_state):
     quat = data.jnt("block/object:joint/").qpos[3:]
     original_qpos = object.qpos.copy()
 
-    if p < 0.2:  # Leave the object pose as is
+    if p < 1.2:  # Leave the object pose as is  # TODO activate
         pass
     elif p < .6:  # Rotate the object by 90 degrees around its main axes
         # define the rotation
@@ -147,7 +129,7 @@ def render(sim_state):
     qpos = object.qpos.copy()
     object.qpos = original_qpos
 
-    images = tf.cast(tf.concat(images, axis=-1) / 255, dtype=tf.float32)
+    images = tf.cast(tf.concat(images, axis=-1), dtype=tf.float32)
     qpos = tf.cast(qpos, dtype=tf.float32)
 
     # print(tf.reduce_max(images), tf.reduce_mean(images), tf.reduce_min(images))
@@ -195,16 +177,36 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         dataset = dataset.map(lambda x, y: tf.py_function(func=render, inp=[x], Tout=[tf.float32, tf.float32]))
         # dataset = dataset.map(lambda x, y: render(x))
 
-        n_testset = 512
-        n_valset = 256
+        n_testset = 1024 * 3  # * 16 TODO increase
+        n_valset = 64 * 1  # * 2 TODO increase
 
         testset = dataset.take(n_testset)
         trainset = dataset.skip(n_testset)
-        valset, trainset = trainset.take(n_valset), trainset.skip(n_valset)
+        valset, trainset = trainset.take(n_valset), trainset.take(n_valset)
 
         trainset = trainset.batch(batch_size, drop_remainder=True)
         valset = valset.batch(batch_size, drop_remainder=True)
         testset = testset.batch(batch_size, drop_remainder=True)
+
+        train_mean = np.expand_dims(
+            np.mean(list(tfds.as_numpy(trainset.unbatch().take(3000).map(lambda x, y: y))), axis=0), 0)
+        test_y_numpy = np.stack(list(tfds.as_numpy(valset.unbatch().map(lambda x, y: y))))
+        test_x_numpy = np.stack(list(tfds.as_numpy(valset.unbatch().map(lambda x, y: x))))
+
+        print(
+            f"A mean model would achieve\n"
+            f"\t{np.mean((test_y_numpy - train_mean) ** 2)} (mse) \n"
+            f"\t{tf.reduce_mean(tf.norm(test_y_numpy[:, :3] - train_mean[:, :3], axis=-1, ord='euclidean'))} (pos: euclidean). \n"
+            f"\t{geodesic_loss(test_y_numpy[:, 3:], train_mean[:, 3:])} (rot: geodesic).\n"
+            f"based on the following mean: {train_mean}"
+        )
+
+        print(
+            f"Samples have values in range [{np.min(test_x_numpy)}, {np.max(test_x_numpy)}].\n"
+            f"Mean is {np.mean(test_x_numpy)}.\n"
+            f"Std is {np.std(test_x_numpy)}.\n"
+            f"Shape is {test_x_numpy.shape}."
+        )
 
         if load_from is None:
             model = pretrainable_component
@@ -213,8 +215,9 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
             model(build_sample[0])
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
-            model.compile(optimizer, loss=PoseEstimationLoss(), metrics=["mse"])
-            # model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
+            model.compile(optimizer, loss=PoseEstimationLoss(), metrics=[euclidean_distance, geodesic_loss])
+
+            # model.compile(optimizer, loss="mse", metrics=[geodesic_distance, euclidean_distance])
 
             def step_decay(epoch, lr):
                 drop = 0.5
@@ -230,7 +233,7 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
                       epochs=epochs,
                       validation_data=valset,
                       callbacks=[
-                          tf.keras.callbacks.LearningRateScheduler(step_decay, verbose=1)
+                          # tf.keras.callbacks.LearningRateScheduler(step_decay, verbose=1)
                       ],
                       shuffle=True)
             pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
@@ -238,74 +241,15 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
             print("Loading model...")
             model = tf.keras.models.load_model(load_from)
             optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
+            model.compile(optimizer, loss="mse", metrics=[])
             print("Model loaded successfully.")
 
-        train_mean = np.mean(list(tfds.as_numpy(trainset.unbatch().take(5000).map(lambda x, y: y))), axis=0)
-        test_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
         print(f"This model achieves {model.evaluate(testset)}")
         print(
             f"A mean model would achieve\n"
-            f"\t{np.mean((test_numpy - train_mean) ** 2)} (mse) \n"
-            f"\t{tf.reduce_mean(tf.norm(test_numpy[:, :3] - train_mean[:3], axis=-1, ord='euclidean'))} (pos: euclidean)."
+            f"\t{np.mean((test_y_numpy - train_mean) ** 2)} (mse) \n"
+            f"\t{tf.reduce_mean(tf.norm(test_y_numpy[:, :3] - train_mean[:3], axis=-1, ord='euclidean'))} (pos: euclidean)."
         )
-
-
-def pretrain_on_imagenet(pretrainable_component: tf.keras.Model,
-                         epochs: int,
-                         name="visual_op",
-                         load_from: str = None,
-                         batch_size: int = 128):
-    """Pretrain a visual component on prediction of cube position."""
-    trainset = tfds.load("imagenet_resized/64x64", split="train", shuffle_files=True, as_supervised=True)
-    testset = tfds.load("imagenet_resized/64x64", split="validation", shuffle_files=True, as_supervised=True)
-
-    valset, trainset = trainset.take(10000), trainset.skip(10000)
-
-    trainset = trainset.batch(batch_size, drop_remainder=True)
-    trainset = trainset.prefetch(AUTOTUNE)
-
-    valset = valset.batch(batch_size, drop_remainder=True)
-    valset = valset.prefetch(AUTOTUNE)
-
-    testset = testset.batch(batch_size, drop_remainder=True)
-    testset = testset.prefetch(AUTOTUNE)
-
-    if load_from is None:
-        model = pretrainable_component
-        model(next(iter(trainset))[0])
-
-        # chunk = list(tfds.as_numpy(dataset.take(8000).map(lambda x, y: y)))
-        # chunk_mean = np.mean(chunk, axis=0)
-        # output_layer = model.get_layer("output")
-        # output_weights = output_layer.get_weights()
-        # output_weights[1] = chunk_mean
-        # output_layer.set_weights(output_weights)
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.003)
-        model.compile(optimizer, loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy",
-                                                                                  "sparse_top_k_categorical_accuracy"])
-
-        # train and save encoder
-        model.fit(x=trainset,
-                  epochs=epochs,
-                  validation_data=valset,
-                  callbacks=[
-                      tf.keras.callbacks.ReduceLROnPlateau(patience=3, factor=0.5, verbose=1)
-                  ],
-                  shuffle=True)
-        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
-    else:
-        print("Loading model...")
-        model = tf.keras.models.load_model(load_from)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="mse", metrics=[rotational_diff_metric, positional_diff_metric])
-        print("Model loaded successfully.")
-
-    train_mean = np.mean(list(tfds.as_numpy(trainset.unbatch().take(5000).map(lambda x, y: y))), axis=0)
-    test_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
-    print(f"This model achieves {model.evaluate(testset)}")
-    print(f"A mean model would achieve {np.mean((test_numpy - train_mean) ** 2)}")
 
 
 if __name__ == "__main__":
@@ -315,8 +259,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pretrain a visual component on classification or reconstruction.")
 
     # general parameters
-    parser.add_argument("task", nargs="?", type=str, choices=["classify", "reconstruct", "hand", "object",
-                                                              "c", "r", "h", "o", "hp", "op"], default="o")
     parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
@@ -328,36 +270,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    mode = "pose"
     n_cameras = 3
     n_samples = 83392 // 2
     batch_size = args.batch_size
 
-    visual_component = OpenAIEncoder(shape=(128, 128, 3), name=args.name, n_cameras=n_cameras, mode=mode)
-    # visual_component = keras_cortex.cornet.cornet_z.PoseCORNetZ(name=args.name)
-
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
+    args.name = args.name
 
-    args.name = args.name + "_" + args.task[0]
-
-    if mode == "classification":
-        pretrain_on_imagenet(
-            visual_component,
-            epochs=args.epochs,
-            name=args.name,
-            load_from=args.load,
-            batch_size=batch_size
-        )
-    elif mode == "pose":
-        pretrain_on_object_pose(
-            visual_component,
-            epochs=args.epochs,
-            batch_size=batch_size,
-            n_samples=n_samples,
-            n_cameras=n_cameras,
-            load_data=True,
-            name=args.name,
-            load_from=args.load,
-        )
-    else:
-        raise ValueError(f"Unknown mode {mode}.")
+    visual_component = OpenAIEncoder(shape=(VISION_WH, VISION_WH, 3), name=args.name, n_cameras=n_cameras)
+    pretrain_on_object_pose(
+        visual_component,
+        epochs=args.epochs,
+        batch_size=batch_size,
+        n_samples=n_samples,
+        n_cameras=n_cameras,
+        load_data=True,
+        name=args.name,
+        load_from=args.load,
+    )

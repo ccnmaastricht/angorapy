@@ -2,7 +2,6 @@
 from typing import Callable
 
 from angorapy.models.components import _build_fcn_component, _build_encoding_sub_model
-from angorapy.models.convolutional import _build_visual_decoder, _build_openai_encoder
 from angorapy.models.mighty_maker import *
 from angorapy.models.shadow import build_shadow_brain_models, build_shadow_brain_base
 from angorapy.models.shadow_v2 import build_shadow_v2_brain_models, build_shadow_v2_brain_base
