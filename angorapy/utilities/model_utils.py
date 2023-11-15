@@ -4,14 +4,11 @@ from typing import List, Union, Callable
 import numpy
 import numpy as np
 import tensorflow as tf
-from keras import backend
 from tensorflow.keras.layers import TimeDistributed
 
-import angorapy
-from angorapy.common.policies import BasePolicyDistribution
 from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.error import IncompatibleModelException
-from angorapy.utilities.util import flatten, env_extract_dims
+from angorapy.utilities.core import flatten, env_extract_dims
 
 
 def is_recurrent_model(model: tf.keras.Model):
@@ -248,7 +245,7 @@ def make_input_layers(env, bs, sequence_length=None):
 
 # Validators
 
-def validate_model_builder(model_function: Callable, env: TaskWrapper, distribution: BasePolicyDistribution) -> None:
+def validate_model_builder(model_function: Callable, env: TaskWrapper, distribution: "BasePolicyDistribution") -> None:
     models = model_function(env, distribution)
 
     # validate model order

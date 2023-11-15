@@ -1,10 +1,10 @@
-import angorapy.agent
-from angorapy.agent import PPOAgent as Agent
-from angorapy.common import policies, transformers, senses
-from angorapy.tasks.registration import make_task, make_env
-from angorapy.models import get_model_builder, register_model
-from angorapy.utilities.monitoring import Monitor
-from angorapy.analysis.investigators import Investigator
-import angorapy.analysis
-import angorapy.models
-import angorapy.tasks
+from angorapy import agent
+from angorapy import common
+from angorapy import models
+
+from angorapy.tasks.registration import make_task
+
+# Builtin models
+from angorapy.models import simple
+from angorapy.models import shadow
+from angorapy.models import shadow_v2

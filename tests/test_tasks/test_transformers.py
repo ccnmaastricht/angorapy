@@ -7,7 +7,7 @@ from angorapy.tasks.registration import make_task
 from angorapy.common.senses import Sensation
 from angorapy.common.transformers import RewardNormalizationTransformer, merge_transformers, \
     StateNormalizationTransformer
-from angorapy.utilities.util import env_extract_dims
+from angorapy.utilities.core import env_extract_dims
 
 
 def test_state_normalization():

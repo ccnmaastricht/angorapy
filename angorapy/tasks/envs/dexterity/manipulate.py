@@ -8,14 +8,14 @@ from scipy.spatial import transform
 import angorapy.tasks.utils
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.senses import Sensation
-from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS
+from angorapy.tasks.envs.dexterity.consts import DEFAULT_INITIAL_QPOS
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
 from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
 from angorapy.tasks.envs.dexterity.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
+from angorapy.tasks.envs.dexterity.reward import manipulate
 from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
-from angorapy.tasks.reward import manipulate
-from angorapy.tasks.reward_config import MANIPULATE_BASE
-from angorapy.tasks.utils import robot_get_obs, mj_qpos_dict_to_qpos_vector
-
+from angorapy.tasks.envs.dexterity.reward_configs import MANIPULATE_BASE
+from angorapy.tasks.utils import robot_get_obs
 
 
 class BaseManipulate(BaseShadowHandEnv):
@@ -90,7 +90,8 @@ class BaseManipulate(BaseShadowHandEnv):
         self.target_position = target_position
         self.target_rotation = target_rotation
         self.target_position_range = target_position_range
-        self.parallel_quats = [angorapy.tasks.utils.euler2quat(r) for r in angorapy.tasks.utils.get_parallel_rotations()]
+        self.parallel_quats = [angorapy.tasks.utils.euler2quat(r) for r in
+                               angorapy.tasks.utils.get_parallel_rotations()]
         self.randomize_initial_rotation = randomize_initial_rotation
         self.randomize_initial_position = randomize_initial_position
         self.distance_threshold = distance_threshold
@@ -423,9 +424,9 @@ class BaseManipulate(BaseShadowHandEnv):
     def _get_info(self):
         return {
             **super()._get_info(),
-            "is_success"   : self._is_success(self.goal, self.get_object_pose()),
+            "is_success": self._is_success(self.goal, self.get_object_pose()),
             "achieved_goal": self.get_object_pose().copy(),
-            "desired_goal" : self.goal.copy(),
+            "desired_goal": self.goal.copy(),
         }
 
 

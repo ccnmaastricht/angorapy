@@ -9,7 +9,7 @@ import gymnasium as gym
 from angorapy.common.senses import Sensation
 from angorapy.common.const import NP_FLOAT_PREC, EPSILON
 from angorapy.utilities.dtypes import StepTuple
-from angorapy.utilities.util import env_extract_dims
+from angorapy.utilities.core import env_extract_dims
 
 
 TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "env_id", "data"])

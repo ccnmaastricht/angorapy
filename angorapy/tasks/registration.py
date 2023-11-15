@@ -4,14 +4,14 @@ import gymnasium as gym
 
 from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer, BaseTransformer
 from angorapy.tasks.wrappers import TaskWrapper, TransformationWrapper
-from angorapy.utilities.util import env_extract_dims
+from angorapy.utilities.core import env_extract_dims
 
 
 def make_task(env_name,
               reward_config: Union[str, dict] = None,
               reward_function: Union[str, dict] = None,
               transformers=None,
-              **kwargs) -> TaskWrapper:
+              **kwargs):
     """Make environment, including a possible reward config and transformers.
 
     If transformers is None, the default transformers are used, i.e. StateNormalizationTransformer and
@@ -53,4 +53,4 @@ def make_task(env_name,
     return env
 
 
-make_env = make_task
+make_env = make_task  # alias for backwards compatibility

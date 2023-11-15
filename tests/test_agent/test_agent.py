@@ -4,13 +4,6 @@ import pytest
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-try:
-    from mpi4py import MPI
-
-    is_root = MPI.COMM_WORLD.rank == 0
-except:
-    is_root = True
-
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution
 from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
@@ -18,6 +11,12 @@ from angorapy import make_task
 
 from angorapy.models import get_model_builder
 
+try:
+    from mpi4py import MPI
+
+    is_root = MPI.COMM_WORLD.rank == 0
+except:
+    is_root = True
 
 def _test_drill(env_name, model_builder=None, ):
     """Test drilling an agent."""
@@ -55,9 +54,15 @@ def test_drill_manipulate_multicategorical():
     try:
         wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
         env = make_task("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, transformers=wrappers)
-        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
-        agent = PPOAgent(build_models, env, workers=2, horizon=128,
-                         distribution=MultiCategoricalPolicyDistribution(env))
+        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False, blind=True)
+        agent = PPOAgent(
+            build_models,
+            env,
+            workers=2,
+            horizon=128,
+            distribution=MultiCategoricalPolicyDistribution(env)
+        )
+
         agent.drill(n=2, epochs=2, batch_size=64)
     except Exception:
         pytest.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")

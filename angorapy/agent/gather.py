@@ -20,7 +20,7 @@ from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.common.const import STORAGE_DIR, DETERMINISTIC
 from angorapy.utilities.datatypes import StatBundle
 from angorapy.utilities.model_utils import is_recurrent_model
-from angorapy.utilities.util import add_state_dims, flatten, env_extract_dims
+from angorapy.utilities.core import add_state_dims, flatten, env_extract_dims
 
 
 class BaseGatherer(abc.ABC):

@@ -1,11 +1,12 @@
 import abc
 from abc import ABC
 from os import path
-from typing import Any, \
-    Callable, \
-    Dict, \
-    Optional, \
-    Union, Tuple
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import dm_control
 import gymnasium as gym
@@ -16,14 +17,14 @@ from gymnasium import spaces
 from gymnasium.utils import seeding
 from mujoco import MjModel
 
-from angorapy.common.const import N_SUBSTEPS, \
-    VISION_WH
+from angorapy.common.const import N_SUBSTEPS
+from angorapy.common.const import VISION_WH
 from angorapy.common.senses import Sensation
 from angorapy.tasks.reward_config import resolve_config_name
-from angorapy.tasks import reward
+from angorapy.tasks.utils import convert_observation_to_space
+from angorapy.tasks.utils import mj_get_category_names
+from angorapy.tasks.utils import mj_qpos_dict_to_qpos_vector
 from angorapy.tasks.world_building.entities import _Entity
-from angorapy.tasks.utils import mj_get_category_names, \
-    mj_qpos_dict_to_qpos_vector, convert_observation_to_space
 
 
 def _parse_model_definition(model_definition: Union[str, RootElement, _Entity]) -> Tuple[MjModel, RootElement]:

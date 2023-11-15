@@ -1,6 +1,4 @@
 import tensorflow as tf
-from matplotlib import pyplot as plt
-from tensorflow.keras import backend as K
 
 
 # @tf.function
@@ -83,6 +81,8 @@ class LiF(tf.keras.layers.Layer):
 
 
 if __name__ == '__main__':
+    from matplotlib import pyplot as plt
+
     inputs = tf.linspace(-2, 10, 100)
 
     for i in range(10):

@@ -35,7 +35,7 @@ from angorapy.common.policies import get_distribution_by_short_name
 from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
-from angorapy.utilities.util import env_extract_dims, mpi_print
+from angorapy.utilities.core import env_extract_dims, mpi_print
 from angorapy import make_task
 from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
 from angorapy.agent.ppo_agent import PPOAgent
