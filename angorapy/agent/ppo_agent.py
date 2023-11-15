@@ -48,8 +48,8 @@ from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.policies import CategoricalPolicyDistribution
 from angorapy.common.policies import GaussianPolicyDistribution
 from angorapy.common.senses import Sensation
-from angorapy.common.transformers import BaseRunningMeanTransformer
-from angorapy.common.transformers import transformers_from_serializations
+from angorapy.common.postprocessors import BaseRunningMeanPostProcessor
+from angorapy.common.postprocessors import postprocessors_from_serializations
 from angorapy.tasks.registration import make_task
 from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.core import env_extract_dims
@@ -335,7 +335,7 @@ class PPOAgent:
         """Records the stats from RunningMeanWrappers."""
         for transformer in self.env.transformers:
             if transformer.name not in self.wrapper_stat_history.keys() or not isinstance(transformer,
-                                                                                          BaseRunningMeanTransformer):
+                                                                                          BaseRunningMeanPostProcessor):
                 continue
 
             self.wrapper_stat_history[transformer.__class__.__name__]["mean"].append(transformer.simplified_mean())
@@ -991,7 +991,7 @@ class PPOAgent:
 
         env = make_task(parameters["env_name"] if force_env_name is None else force_env_name,
                         reward_config=parameters.get("reward_configuration"),
-                        transformers=transformers_from_serializations(parameters["transformers"]),
+                        transformers=postprocessors_from_serializations(parameters["transformers"]),
                         render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
         model_builder = getattr(models, parameters["builder_function_name"])
         distribution = getattr(policies, parameters["distribution"])(env)

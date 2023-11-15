@@ -16,8 +16,8 @@ from mpi4py import MPI
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common import const
 from angorapy.common.const import PATH_TO_EXPERIMENTS
-from angorapy.common.transformers import RewardNormalizationTransformer
-from angorapy.common.transformers import StateNormalizationTransformer
+from angorapy.common.postprocessors import RewardNormalizer
+from angorapy.common.postprocessors import StateNormalizer
 from angorapy.models import get_model_type
 from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.core import add_state_dims
@@ -150,8 +150,8 @@ class Monitor:
                 GAE_lambda=str(self.agent.lam),
                 gradient_clipping=str(self.agent.gradient_clipping),
                 clip_values=str(self.agent.clip_values),
-                reward_norming=str(any([isinstance(t, RewardNormalizationTransformer) for t in self.env.transformers])),
-                state_norming=str(any([isinstance(t, StateNormalizationTransformer) for t in self.env.transformers])),
+                reward_norming=str(any([isinstance(t, RewardNormalizer) for t in self.env.transformers])),
+                state_norming=str(any([isinstance(t, StateNormalizer) for t in self.env.transformers])),
                 TBPTT_sequence_length=str(self.agent.tbptt_length),
                 architecture=self.agent.builder_function_name,
                 gatherer=str(self.agent.gatherer_class),

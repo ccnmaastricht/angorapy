@@ -2,7 +2,7 @@ from typing import Union
 
 import gymnasium as gym
 
-from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer, BaseTransformer
+from angorapy.common.postprocessors import StateNormalizer, RewardNormalizer, BasePostProcessor
 from angorapy.tasks.wrappers import TaskWrapper, TransformationWrapper
 from angorapy.utilities.core import env_extract_dims
 
@@ -27,14 +27,14 @@ def make_task(env_name,
         TaskWrapper: A wrapped instance of the task.
     """
     if transformers is None:
-        transformers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+        transformers = [StateNormalizer, RewardNormalizer]
 
     base_env = gym.make(env_name, **kwargs)
     state_dim, n_actions = env_extract_dims(base_env)
 
     if transformers is None:
         transformers = []
-    elif all(isinstance(t, BaseTransformer) for t in transformers):
+    elif all(isinstance(t, BasePostProcessor) for t in transformers):
         transformers = transformers
     elif all(callable(t) for t in transformers):
         transformers = [t(env_name, state_dim, n_actions) for t in transformers]
