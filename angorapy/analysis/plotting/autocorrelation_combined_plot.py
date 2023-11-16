@@ -130,6 +130,7 @@ if __name__ == '__main__':
         ax=violin_ax,
         linecolor="tab:blue",
         color="skyblue",
+        saturation=1,
         inner_kws=dict(
             box_width=3,
             whis_width=0,
@@ -145,22 +146,22 @@ if __name__ == '__main__':
                                                      ["mean", "max"]):
         if combine_by == "mean":
             variable_mean_correlations = np.mean(a_or_c_corr, axis=-1)
+
+            variable_se_correlations = (
+                    np.std(a_or_c_corr, axis=-1)
+                    / np.sqrt(a_or_c_corr.shape[-1])
+            )
+
+            acf_axes[ax_i].fill_between(
+                range(n_lags + 1),
+                variable_mean_correlations - variable_se_correlations,
+                variable_mean_correlations + variable_se_correlations,
+                color="skyblue"
+            )
         elif combine_by == "max":
             variable_mean_correlations = np.max(a_or_c_corr, axis=-1)
         else:
             raise ValueError(f"combine_by must be 'mean' or 'max', not {combine_by}")
-
-        variable_se_correlations = (
-                np.std(a_or_c_corr, axis=-1)
-                / np.sqrt(a_or_c_corr.shape[-1])
-        )
-
-        acf_axes[ax_i].fill_between(
-            range(n_lags + 1),
-            variable_mean_correlations - variable_se_correlations,
-            variable_mean_correlations + variable_se_correlations,
-            color="skyblue"
-        )
 
         markerline, stemlines, baseline = acf_axes[ax_i].stem(range(n_lags + 1), variable_mean_correlations)
         markerline.set_markersize(MARKER_SIZE)
