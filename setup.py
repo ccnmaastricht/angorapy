@@ -46,7 +46,7 @@ setup(
         # environments
         "box2d-py==2.3.5",
         "gymnasium[box2d,mujoco]==0.28.1",
-        "mujoco",
+        "mujoco==2.3.7",
         "dm_control==1.0.12",
         "mujoco_utils",
         "tensorflow_datasets",

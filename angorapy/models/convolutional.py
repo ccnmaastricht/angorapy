@@ -109,14 +109,14 @@ class OpenAIEncoder(tf.keras.Model):
         self.pos_dense = tf.keras.layers.Dense(
             3,
             kernel_initializer=tf.keras.initializers.GlorotUniform(),
-            bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.32801157, 0.00065984, 0.02937366]),
+            # bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.32801157, 0.00065984, 0.02937366]),
             # kernel_regularizer=tf.keras.regularizers.L2(0.001),
             # bias_regularizer=tf.keras.regularizers.L2(0.001)
         )
         self.rot_dense = tf.keras.layers.Dense(
             4,
             kernel_initializer=tf.keras.initializers.GlorotUniform(),
-            bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.6211242, -0.02646778, 0.02921998, -0.00490309]),
+            # bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.6211242, -0.02646778, 0.02921998, -0.00490309]),
             # kernel_regularizer=tf.keras.regularizers.L2(0.001),
             # bias_regularizer=tf.keras.regularizers.L2(0.001)
         )
