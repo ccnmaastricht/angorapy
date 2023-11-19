@@ -279,8 +279,6 @@ class PPOAgent:
         gpus = tf.config.list_physical_devices('GPU')
         is_root = mpi_comm.rank == 0
 
-        if is_root:
-            print(f"Detected {len(gpus)} GPU devices.")
         if len(gpus) > 0:
             node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
             node_comm = mpi_comm.Split(color=node_names.index(MPI.Get_processor_name()))
@@ -1073,8 +1071,6 @@ class PPOAgent:
                 loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
                                                                     parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
-            if is_root:
-                print("Loaded optimizer.")
 
         # mark the loading
         loaded_agent.loading_history.append([loaded_agent.iteration])
