@@ -61,7 +61,7 @@ class ActivityAutocorrelation(base_investigator.Investigator):
         self._data = stack_dicts([stack_dicts(ac) for ac in repeated_collections])
         self.prepared = True
 
-    def fit(self):
+    def fit(self, n_lags=30):
         """Measure the predictability of target_information based on the information in source_layer's activation."""
         assert self.prepared, "Need to prepare before investigating."
 
@@ -70,7 +70,10 @@ class ActivityAutocorrelation(base_investigator.Investigator):
         for layer in self._data.keys():
             layer_autocorrelations = []
             for repeat in range(self._data[layer].shape[0]):
-                layer_autocorrelations.append(self.calculate_statewise_correlation(np.squeeze(self._data[layer][repeat])))
+                layer_autocorrelations.append(self.calculate_statewise_correlation(
+                    np.squeeze(self._data[layer][repeat])),
+                    n_lags=n_lags
+                )
 
             autocorrelation[layer] = np.mean(layer_autocorrelations, axis=0)
 
