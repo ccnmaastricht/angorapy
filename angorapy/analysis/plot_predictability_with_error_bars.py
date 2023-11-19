@@ -9,7 +9,7 @@ font = {'family' : 'Times',
         'size'   : 12}
 
 matplotlib.rc('font', **font)
-with open("../../storage/predictability_repeated_april08.json", "r") as f:
+with open("./storage/predictability_repeated_august19a.json", "r") as f:
     results = json.load(f)
 
 # remove entries from results that are contain no underscore in their name
@@ -17,6 +17,7 @@ results = {k: v for k, v in results.items() if "_" in k}
 
 # create x labels by removing 'activation' potentially surrounded by underscores from the x label name
 x_labels = [re.sub(r"(_)?activation(_)?", "", s) for s in results.keys()]
+x_labels = [re.sub(r"(_)?internal(_)?", "", s) for s in x_labels]
 
 # rename x label "pmc_recurrent_layer" to "PMC"
 x_labels = [re.sub(r"pmc_recurrent_layer", "PMC", s) for s in x_labels]
@@ -45,7 +46,7 @@ for target in possible_targets:
     plt.xticks(rotation="vertical")
 
     # set figure size to 8x2 inches
-    fig.set_size_inches(4, 2)
+    fig.set_size_inches(12, 2)
 
     # plt.show()
 
