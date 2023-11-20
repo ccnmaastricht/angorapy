@@ -3,11 +3,6 @@ import gymnasium as gym
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.const import SHADOWHAND_MAX_STEPS
-from angorapy.tasks.envs.adapted import HalfCheetahNoVelEnv
-from angorapy.tasks.envs.adapted import InvertedPendulumNoVelEnv
-from angorapy.tasks.envs.adapted import LunarLanderContinuousNoVel
-from angorapy.tasks.envs.adapted import LunarLanderMultiDiscrete
-from angorapy.tasks.envs.adapted import ReacherNoVelEnv
 from angorapy.tasks.envs.cognitive.hanoi import HanoiEnv
 from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlock
 from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlockAsymmetric
