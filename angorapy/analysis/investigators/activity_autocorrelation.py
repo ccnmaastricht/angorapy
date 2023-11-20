@@ -5,16 +5,13 @@ from typing import List
 import numpy as np
 import tensorflow as tf
 import tqdm
+from angorapy.utilities.core import flatten
+from angorapy.utilities.core import stack_dicts
 from matplotlib import pyplot as plt
-from sklearn.linear_model import Ridge
 
-from angorapy import register_model
-from angorapy.agent import PPOAgent
 from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
-from angorapy.common.senses import stack_sensations
 from angorapy.tasks.wrappers import TaskWrapper
-from angorapy.utilities.util import flatten, stack_dicts
 
 
 class ActivityAutocorrelation(base_investigator.Investigator):

@@ -1,10 +1,9 @@
 """A collection of builder functions for models usable with different envs in PPO."""
 import inspect
-from typing import Callable
-
 import itertools
 from collections import OrderedDict
 from functools import partial
+from typing import Callable
 
 # registry for base models
 MODELS_AVAILABLE = {}
@@ -16,6 +15,12 @@ def register_model(model_name):
         assert all(p in inspect.signature(func).parameters for p in ["env", "distribution", "bs", "sequence_length"]), \
             (f"Model builder {func.__name__} must have the following parameters: env, distribution, bs, sequence_length"
              f"but has {inspect.signature(func).parameters}")
+
+        # check that no parts of the model name are in the arguments later added
+        assert all(p not in model_name for p in ["build", "models", "ffn", "rnn",
+                                                 "lstm", "gru", "shared", "distinct", "blind"]), \
+            ("Model name must not contain any of the following reserved name parts: "
+             "build, models, ffn, rnn, lstm, gru, shared, distinct, blind")
 
         MODELS_AVAILABLE[model_name] = func
 
@@ -42,6 +47,29 @@ def register_model(model_name):
     return inner
 
 
+def get_model_shortname(model_builder_name: str) -> str:
+    """Get short name of model builder.
+
+    Accounts for underscores in the model name.
+
+    Args:
+        model_builder_name: Name of model builder function.
+
+    Returns:
+        Short name of model builder function.
+    """
+
+    # split name into parts
+    parts = model_builder_name.split("_")
+
+    # remove "build" and "models", and all parts related to arguments set in register_model
+    parts = [p for p in parts if
+             p not in ["build", "models", "ffn", "rnn", "lstm", "gru", "shared", "distinct", "blind"]]
+
+    # merge parts to build short name
+    return "_".join(parts)
+
+
 def get_model_type(model_builder) -> str:
     """Get short name of type of model builder."""
     return model_builder.keywords["model_type"]
@@ -57,7 +85,3 @@ def get_model_builder(model="simple", model_type: str = "ffn", shared: bool = Fa
 
     params = [str(val) for key, val in sorted(params.items(), key=lambda x: x[0]) if val != ""]
     return MODEL_BUILDERS[f"build_{model}_{'_'.join(params)}_models"]
-
-
-# def register_model(builder):
-#     globals().update({builder.__name__: builder})

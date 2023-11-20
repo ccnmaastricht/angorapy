@@ -266,8 +266,17 @@ def postprocessors_from_serializations(list_of_serializations: List[PostProcesso
 
     for cereal in list_of_serializations:
         cereal = PostProcessorSerialization(*cereal)
+
+        class_name = cereal.class_name
+
+        # backward compatibility with formerly used class names
+        if class_name == "StateNormalizationTransformer":
+            class_name = "StateNormalizer"
+        elif class_name == "RewardNormalizationTransformer":
+            class_name = "RewardNormalizer"
+
         transformers.append(
-            getattr(sys.modules[__name__], cereal.class_name).recover(cereal.env_id, state_dim, n_actions, cereal.data)
+            getattr(sys.modules[__name__], class_name).recover(cereal.env_id, state_dim, n_actions, cereal.data)
         )
 
     return transformers
