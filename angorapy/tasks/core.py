@@ -429,7 +429,6 @@ class AnthropomorphicEnv(gym.Env, ABC):
             #         camera_name,
             #     )
 
-            print("hello")
             self._get_viewer(self.render_mode).render(render_mode=self.render_mode)
 
         if self.render_mode == "rgb_array":

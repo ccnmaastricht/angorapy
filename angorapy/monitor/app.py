@@ -100,7 +100,7 @@ def overview():
                         "date": meta["date"],
                         "host": meta["host"] if "host" in meta else "unknown",
                         "iterations": iterations,
-                        "max_reward": max_performance if iterations > 0 else "N/A",
+                        "max_reward": max_performance if iterations > 0 else None,
                         "is_success": is_success,
                         "bookmark": meta["bookmark"] if "bookmark" in meta else False,
                         "config_name": meta["config"] if "config" in meta else "unknown",

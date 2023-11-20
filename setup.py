@@ -21,7 +21,6 @@ setup(
     install_requires=[
         "swig==4.1.1",
         "imageio==2.28.1",
-        # "numpy",
 
         # tensorflow and extensions
         "tensorflow==2.12.0",
