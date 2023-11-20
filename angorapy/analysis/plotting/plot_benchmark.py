@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as st
 
-from common.const import QUALITATIVE_COLOR_PALETTE
+from dexterity.design.common import QUALITATIVE_COLOR_PALETTE
 from utilities.plotting import plot_with_confidence
 
 parser = argparse.ArgumentParser()

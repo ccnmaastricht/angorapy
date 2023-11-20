@@ -1,13 +1,14 @@
-from setuptools import setup, find_packages
-
 from pathlib import Path
+
+from setuptools import find_packages
+from setuptools import setup
+
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
-
 setup(
     name='angorapy',
-    version='0.10.1',
+    version='0.10.3',
     description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
@@ -17,7 +18,6 @@ setup(
     license='GPL-3.0',
     packages=find_packages(),
     install_requires=[
-        "swig==4.1.1",
         "imageio==2.28.1",
 
         # tensorflow and extensions
@@ -37,26 +37,27 @@ setup(
         "nvidia-ml-py3",
         "seaborn",
         "distance",
-        "panda_gym==3.0.6",
         "statsmodels==0.14.0",
         "keras_cortex==0.0.8",
 
         # environments
-        "box2d-py==2.3.5",
-        "gymnasium[box2d,mujoco]==0.28.1",
+        "gymnasium[mujoco]==0.28.1",
         "mujoco",
         "dm_control==1.0.12",
         "mujoco_utils",
         "tensorflow_datasets",
-
-        # webinterface
-        "itsdangerous==2.0.1",
-        "werkzeug==2.0.3",
-        "Flask~=1.1.2",
-        "Jinja2==3.0.0",
-        "bokeh==2.3.3",
-        "flask_jsglue",
     ],
+
+    extras_require={
+        "box2d": ["box2d-py==2.3.5",
+                  "gymnasium[box2d]==0.28.1"],
+        "webinterface": ["itsdangerous==2.0.1",
+                         "werkzeug==2.0.3",
+                         "Flask~=1.1.2",
+                         "Jinja2==3.0.0",
+                         "bokeh==2.3.3",
+                         "flask_jsglue"],
+    },
 
     include_package_data=True,
     package_data={
