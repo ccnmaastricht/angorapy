@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.10.0',
+    version='0.10.1',
     description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
@@ -25,7 +25,7 @@ setup(
         "tensorflow_probability==0.20.0",
         "tensorflow_graphics==2021.12.3",
         "tensorflow_graphics==2021.12.3",
-        # "mpi4py==3.1.4",
+
         "tqdm",
         "simplejson",
         "psutil",

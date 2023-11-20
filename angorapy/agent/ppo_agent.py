@@ -946,9 +946,14 @@ class PPOAgent:
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
         """
-        mpi_comm = MPI.COMM_WORLD
-        gpus = tf.config.list_physical_devices('GPU')
-        is_root = mpi_comm.rank == 0
+        if MPI is None:
+            mpi_comm = MPI.COMM_WORLD
+            gpus = tf.config.list_physical_devices('GPU')
+            is_root = mpi_comm.rank == 0
+        else:
+            mpi_comm = None
+            gpus = tf.config.experimental.list_physical_devices('GPU')
+            is_root = True
 
         optimization_comm, is_optimization_process = PPOAgent.get_optimization_comm(limit_to_n_optimizers=n_optimizers)
 
