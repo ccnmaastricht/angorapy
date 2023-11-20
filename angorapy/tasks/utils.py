@@ -1,6 +1,7 @@
 import itertools
 from collections import OrderedDict
-from typing import Dict, Tuple
+from typing import Dict
+from typing import Tuple
 
 import numpy as np
 from gymnasium import spaces
@@ -48,8 +49,6 @@ def mj_qpos_dict_to_qpos_vector(model, qpos_dict: Dict):
 
 _FLOAT_EPS = np.finfo(np.float64).eps
 _EPS4 = _FLOAT_EPS * 4.0
-
-
 
 # Copyright (c) 2009-2017, Matthew Brett and Christoph Gohlke
 #    All rights reserved.
@@ -153,6 +152,7 @@ TODO / Missing
     - (Maybe) define everything as to/from matricies, for simplicity
 """
 
+
 def euler2mat(euler):
     """Convert Euler Angles to Rotation Matrix.  See rotation.py for notes"""
     euler = np.asarray(euler, dtype=np.float64)
@@ -217,9 +217,11 @@ def mat2euler(mat):
     )
     return euler
 
+
 def quat2euler(quat):
     """Convert Quaternion to Euler Angles.  See rotation.py for notes"""
     return mat2euler(quat2mat(quat))
+
 
 def quat2mat(quat):
     """Convert Quaternion to rotation angle.  See rotation.py for notes"""
@@ -290,6 +292,7 @@ def quat2axisangle(quat):
         axis = quat[1:] / sin_theta
 
     return axis, theta
+
 
 def get_parallel_rotations():
     mult90 = [0, np.pi / 2, -np.pi / 2, np.pi]

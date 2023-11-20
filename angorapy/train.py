@@ -35,9 +35,9 @@ from angorapy.common.policies import get_distribution_by_short_name
 from angorapy.models import get_model_builder, MODELS_AVAILABLE
 from angorapy.common.const import COLORS
 from angorapy.utilities.monitoring import Monitor
-from angorapy.utilities.util import env_extract_dims, mpi_print
+from angorapy.utilities.core import env_extract_dims, mpi_print
 from angorapy import make_task
-from angorapy.common.transformers import StateNormalizationTransformer, RewardNormalizationTransformer
+from angorapy.common.postprocessors import StateNormalizer, RewardNormalizer
 from angorapy.agent.ppo_agent import PPOAgent
 
 from angorapy.tasks import *
@@ -67,8 +67,8 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     # determine relevant transformers
     wrappers = []
-    wrappers.append(StateNormalizationTransformer) if not settings["no_state_norming"] else None
-    wrappers.append(RewardNormalizationTransformer) if not settings["no_reward_norming"] else None
+    wrappers.append(StateNormalizer) if not settings["no_state_norming"] else None
+    wrappers.append(RewardNormalizer) if not settings["no_reward_norming"] else None
 
     # setup environment and extract and report information
     env = make_task(environment,

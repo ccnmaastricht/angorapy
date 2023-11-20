@@ -4,6 +4,13 @@ import pytest
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+from angorapy.agent.ppo_agent import PPOAgent
+from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution
+from angorapy.common.postprocessors import RewardNormalizer, StateNormalizer
+from angorapy import make_task
+
+from angorapy.models import get_model_builder
+
 try:
     from mpi4py import MPI
 
@@ -11,17 +18,9 @@ try:
 except:
     is_root = True
 
-from angorapy.agent.ppo_agent import PPOAgent
-from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution
-from angorapy.common.transformers import RewardNormalizationTransformer, StateNormalizationTransformer
-from angorapy import make_task
-
-from angorapy.models import get_model_builder
-
-
 def _test_drill(env_name, model_builder=None, ):
     """Test drilling an agent."""
-    wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+    wrappers = [StateNormalizer, RewardNormalizer]
     env = make_task(env_name, reward_config=None, transformers=wrappers)
     if model_builder is None:
         build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
@@ -53,11 +52,17 @@ def test_drill_manipulate_multicategorical():
     """Test drilling of discrete agent (LunarLander)."""
 
     try:
-        wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+        wrappers = [StateNormalizer, RewardNormalizer]
         env = make_task("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, transformers=wrappers)
-        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
-        agent = PPOAgent(build_models, env, workers=2, horizon=128,
-                         distribution=MultiCategoricalPolicyDistribution(env))
+        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False, blind=True)
+        agent = PPOAgent(
+            build_models,
+            env,
+            workers=2,
+            horizon=128,
+            distribution=MultiCategoricalPolicyDistribution(env)
+        )
+
         agent.drill(n=2, epochs=2, batch_size=64)
     except Exception:
         pytest.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")
@@ -67,7 +72,7 @@ def test_drill_manipulate_continuous():
     """Test drilling of discrete agent (LunarLander)."""
 
     try:
-        wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+        wrappers = [StateNormalizer, RewardNormalizer]
         env = make_task("ManipulateBlockAsynchronous-v0", reward_config=None, transformers=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
         agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
@@ -80,7 +85,7 @@ def test_drill_reach():
     """Test drilling of discrete agent (LunarLander)."""
 
     try:
-        wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+        wrappers = [StateNormalizer, RewardNormalizer]
         env = make_task("ReachAbsolute-v0", reward_config=None, transformers=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
         agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
@@ -93,7 +98,7 @@ def test_drill_freereach():
     """Test drilling of free reach agent."""
 
     try:
-        wrappers = [StateNormalizationTransformer, RewardNormalizationTransformer]
+        wrappers = [StateNormalizer, RewardNormalizer]
         env = make_task("FreeReachAbsolute-v0", reward_config=None, transformers=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
         agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))

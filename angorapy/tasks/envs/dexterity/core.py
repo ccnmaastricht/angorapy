@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 """BaseShadowHandEnv Environment Wrappers."""
 import abc
-import copy
 from typing import Optional
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-from gymnasium.utils import seeding
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.tasks.core import AnthropomorphicEnv
-from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES, DEFAULT_INITIAL_QPOS
+from angorapy.tasks.envs.dexterity.consts import DEFAULT_INITIAL_QPOS
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
 from angorapy.tasks.envs.dexterity.mujoco_model.robot import ShadowHand
 from angorapy.tasks.utils import mj_get_category_names
-from angorapy.utilities.util import mpi_print
+from angorapy.utilities.core import mpi_print
 
 
 class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
@@ -182,18 +181,3 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         mpi_print(f"Set up color scheme {self.color_scheme}.")
         mpi_print(f"Set up camera with viewpoint '{self.viewpoint}'.")
         mpi_print("Camera setup finished.")
-
-
-if __name__ == '__main__':
-    class TestShadowHandEnv(BaseShadowHandEnv):
-        def _set_default_reward_function_and_config(self):
-            pass
-
-        def assert_reward_setup(self):
-            pass
-
-        def _sample_goal(self):
-            return np.zeros(1)
-
-    test_env = TestShadowHandEnv()
-    test_env.reset()

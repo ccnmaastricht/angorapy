@@ -9,14 +9,14 @@ import gymnasium as gym
 from angorapy.common.senses import Sensation
 from angorapy.common.const import NP_FLOAT_PREC, EPSILON
 from angorapy.utilities.dtypes import StepTuple
-from angorapy.utilities.util import env_extract_dims
+from angorapy.utilities.core import env_extract_dims
 
 
-TransformerSerialization = namedtuple("TransformerSerialization", ["class_name", "env_id", "data"])
+PostProcessorSerialization = namedtuple("PostProcessorSerialization", ["class_name", "env_id", "data"])
 
 
-class BaseTransformer(abc.ABC):
-    """Abstract base class for preprocessors."""
+class BasePostProcessor(abc.ABC):
+    """Abstract base class for postprocessors."""
 
     def __init__(self, env_name: str, state_dim, n_actions):
         self.n = 1e-4  # make this at least epsilon so that first measure is not all zeros
@@ -56,7 +56,7 @@ class BaseTransformer(abc.ABC):
         pass
 
     @staticmethod
-    def from_serialization(serialization: TransformerSerialization):
+    def from_serialization(serialization: PostProcessorSerialization):
         """Create transformer from a serialization."""
         return getattr(sys.modules[__name__], serialization.class_name).recover(serialization.data)
 
@@ -82,13 +82,13 @@ class BaseTransformer(abc.ABC):
         self.n = self.n - deduction
 
 
-class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
+class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
     """Abstract base class for transformers implementing a running mean over some statistic."""
 
     mean: Dict[str, np.ndarray]
     variance: Dict[str, np.ndarray]
 
-    def __add__(self, other) -> "BaseRunningMeanTransformer":
+    def __add__(self, other) -> "BaseRunningMeanPostProcessor":
         nt = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
         nt.n = self.n + other.n
 
@@ -114,16 +114,16 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
             self.variance[name] = np.array((m_a + np.square(delta) * (self.n - 1) / self.n) / self.n,
                                            dtype=NP_FLOAT_PREC)
 
-    def serialize(self) -> TransformerSerialization:
+    def serialize(self) -> PostProcessorSerialization:
         """Serialize the transformer to allow for saving it in a file."""
-        return TransformerSerialization(self.__class__.__name__,
-                                        self.env_name,
-                                        [self.n,
+        return PostProcessorSerialization(self.__class__.__name__,
+                                          self.env_name,
+                                          [self.n,
                                          {n: m.tolist() for n, m in self.mean.items()},
                                          {n: v.tolist() for n, v in self.variance.items()}])
 
     @classmethod
-    def recover(cls, env_id, state_dim, n_actions, data: TransformerSerialization):
+    def recover(cls, env_id, state_dim, n_actions, data: PostProcessorSerialization):
         """Recover a running mean transformer from its serialization"""
         transformer = cls(env_id, state_dim, n_actions)
         transformer.n = np.array(data[0])
@@ -152,7 +152,7 @@ class BaseRunningMeanTransformer(BaseTransformer, abc.ABC):
         return {n: np.sqrt(np.mean(v)).item() for n, v in self.variance.items()}
 
 
-class StateNormalizationTransformer(BaseRunningMeanTransformer):
+class StateNormalizer(BaseRunningMeanPostProcessor):
     """Transformer for state normalization using running mean and variance estimations."""
 
     def __init__(self, env_name: str, state_dim, n_actions):
@@ -196,7 +196,7 @@ class StateNormalizationTransformer(BaseRunningMeanTransformer):
             self.update(env.step(env.action_space.sample())[0].dict())
 
 
-class RewardNormalizationTransformer(BaseRunningMeanTransformer):
+class RewardNormalizer(BaseRunningMeanPostProcessor):
     """Transformer for reward normalization using running mean and variance estimations."""
 
     def __init__(self, env_name: str, state_dim, n_action):
@@ -233,21 +233,21 @@ class RewardNormalizationTransformer(BaseRunningMeanTransformer):
             self.update({"reward": env.step(env.action_space.sample())[1]})
 
 
-class StateMemory(BaseTransformer):
+class StateMemory(BasePostProcessor):
     pass
 
 
-def merge_transformers(transformers: List[BaseTransformer]) -> BaseTransformer:
+def merge_postprocessors(transformers: List[BasePostProcessor]) -> BasePostProcessor:
     """Merge a list of transformers into a single transformer.
 
     Args:
         transformers:           list of transformers
     """
     assert all(type(t) is type(transformers[0]) for t in transformers), \
-        "To merge transformers, they must be of same type."
+        "To merge postprocessors, they must be of same type."
 
     # merge the list of transformers into a single transformer
-    merged_transformer = BaseTransformer.from_collection(transformers)
+    merged_transformer = BasePostProcessor.from_collection(transformers)
 
     # adjust for overcounting
     merged_transformer.correct_sample_size((len(transformers) - 1) * transformers[0].previous_n)
@@ -258,14 +258,14 @@ def merge_transformers(transformers: List[BaseTransformer]) -> BaseTransformer:
     return merged_transformer
 
 
-def transformers_from_serializations(list_of_serializations: List[TransformerSerialization]) -> List[BaseTransformer]:
+def postprocessors_from_serializations(list_of_serializations: List[PostProcessorSerialization]) -> List[BasePostProcessor]:
     """From a list of TransformerSerializations recover the respective transformers."""
     transformers = []
-    reference_env = gym.make(TransformerSerialization(*list_of_serializations[0]).env_id, render_mode="rgb_array")  # todo could leak memory
+    reference_env = gym.make(PostProcessorSerialization(*list_of_serializations[0]).env_id, render_mode="rgb_array")  # todo could leak memory
     state_dim, n_actions = env_extract_dims(reference_env)
 
     for cereal in list_of_serializations:
-        cereal = TransformerSerialization(*cereal)
+        cereal = PostProcessorSerialization(*cereal)
         transformers.append(
             getattr(sys.modules[__name__], cereal.class_name).recover(cereal.env_id, state_dim, n_actions, cereal.data)
         )

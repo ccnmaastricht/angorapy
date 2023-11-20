@@ -10,7 +10,7 @@ from angorapy.analysis.sindy.autoencoder import SindyAutoencoder
 from angorapy.analysis.util.sindy import compute_z_derivatives, sindy_library_tf
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.tasks.wrappers import TaskWrapper
-from angorapy.utilities import util
+from angorapy.utilities import core
 
 import pysindy as ps
 

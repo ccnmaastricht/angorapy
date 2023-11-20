@@ -5,17 +5,17 @@ import mujoco
 import numpy as np
 
 from angorapy.common.const import N_SUBSTEPS
-from angorapy.tasks.envs.dexterity.mujoco_model.worlds.reach import ShadowHandReachWorld
-from angorapy.tasks.reward_config import REACH_BASE
-from angorapy.tasks.envs.dexterity.consts import DEFAULT_INITIAL_QPOS, \
-    FINGERTIP_SITE_NAMES
+from angorapy.tasks.envs.dexterity.consts import DEFAULT_INITIAL_QPOS
+from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
 from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
-from angorapy.tasks.envs.dexterity.utils import generate_random_sim_qpos, \
-    get_fingertip_distance
-from angorapy.tasks.reward import free_reach, \
-    reach, \
-    sequential_free_reach, \
-    sequential_reach
+from angorapy.tasks.envs.dexterity.mujoco_model.worlds.reach import ShadowHandReachWorld
+from angorapy.tasks.envs.dexterity.reward import free_reach
+from angorapy.tasks.envs.dexterity.reward import reach
+from angorapy.tasks.envs.dexterity.reward import sequential_free_reach
+from angorapy.tasks.envs.dexterity.reward import sequential_reach
+from angorapy.tasks.envs.dexterity.utils import generate_random_sim_qpos
+from angorapy.tasks.envs.dexterity.utils import get_fingertip_distance
+from angorapy.tasks.envs.dexterity.reward_configs import REACH_BASE
 from angorapy.tasks.utils import mj_qpos_dict_to_qpos_vector
 
 
@@ -194,8 +194,8 @@ class Reach(BaseShadowHandEnv):
             **super()._get_info(),
             "target_finger": self.current_target_finger,
             "achieved_goal": self._get_achieved_goal().copy(),
-            "desired_goal" : self.goal.copy(),
-            "is_success"   : self._is_success(self._get_achieved_goal(), self.goal),
+            "desired_goal": self.goal.copy(),
+            "is_success": self._is_success(self._get_achieved_goal(), self.goal),
         }
 
     def _get_obs(self):

@@ -2,16 +2,14 @@ from typing import Union
 
 import tensorflow as tf
 
-from angorapy.agent.utils import extract_discrete_action_probabilities
 from angorapy.agent.ppo import loss
-from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import Sensation
 
 
 @tf.function
 def learn_on_batch(batch,
                    joint: tf.keras.Model,
-                   distribution: BasePolicyDistribution,
+                   distribution,
                    continuous_control: bool,
                    clip_values: bool,
                    clipping_bound: tf.Tensor,

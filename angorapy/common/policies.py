@@ -12,8 +12,7 @@ import tensorflow as tf
 from angorapy.agent.utils import extract_discrete_action_probabilities
 from angorapy.common.const import EPSILON
 from angorapy.common.layers import StdevLayer, BetaDistributionSpreadLayer
-from angorapy.utilities.util import env_extract_dims
-import tensorflow_probability as tfp
+from angorapy.utilities.core import env_extract_dims
 
 
 class BasePolicyDistribution(abc.ABC):

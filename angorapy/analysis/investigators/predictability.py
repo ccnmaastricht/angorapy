@@ -9,7 +9,7 @@ from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.senses import stack_sensations
 from angorapy.tasks.wrappers import TaskWrapper
-from angorapy.utilities.util import flatten, stack_dicts
+from angorapy.utilities.core import flatten, stack_dicts
 
 
 class Predictability(base_investigator.Investigator):

@@ -14,7 +14,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
-from angorapy.utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
+from angorapy.utilities.core import add_state_dims, flatten, insert_unknown_shape_dimensions
 
 
 class Investigator:

@@ -3,14 +3,15 @@ import tensorflow as tf
 
 from angorapy import make_task
 from angorapy.common.policies import BetaPolicyDistribution
-from angorapy.models import build_shadow_v2_brain_models, build_wider_models
 from angorapy.utilities.model_utils import reset_states_masked, reset_states_masked_tf
-from angorapy.utilities.util import flatten
+from angorapy.utilities.core import flatten
+from angorapy.models import get_model_builder
 
 
 def test_model_state_reset():
     env = make_task("LunarLanderContinuous-v2")
-    model, _, _ = build_wider_models(env, BetaPolicyDistribution(env), bs=5)
+    model_builder = get_model_builder("simple", model_type="lstm")
+    model, _, _ = model_builder(env, BetaPolicyDistribution(env), bs=5)
 
     # copy of model with same weights
     model_copy = tf.keras.models.clone_model(model)
