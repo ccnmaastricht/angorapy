@@ -4,7 +4,11 @@ from typing import List, OrderedDict, Tuple, Dict, Any, SupportsFloat
 
 import gymnasium as gym
 import numpy
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
 
 from angorapy.common.senses import Sensation
 from angorapy.common.postprocessors import BasePostProcessor, merge_postprocessors
@@ -132,6 +136,9 @@ class TransformationWrapper(TaskWrapper):
 
     def _mpi_sync(self):
         """Synchronise the transformers of the wrapper over all MPI ranks."""
+        if MPI is None:
+            return
+
         synced_transformers = []
         for transformer in self.transformers:
             collection = MPI.COMM_WORLD.gather(transformer, root=0)

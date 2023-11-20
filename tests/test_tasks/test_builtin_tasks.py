@@ -9,6 +9,9 @@ def _test_any_task(task: TaskWrapper):
     for _ in range(100):
         state, r, dterm, dtrunc, info = task.step(task.action_space.sample())
 
+        if dtrunc or dterm:
+            state = task.reset()
+
 
 def test_manipulate():
     _test_any_task(angorapy.tasks.registration.make_task("ManipulateBlock-v0"))

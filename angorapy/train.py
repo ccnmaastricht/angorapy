@@ -1,15 +1,10 @@
-import logging
-import re
-
-# logging.getLogger("requests").setLevel(logging.WARNING)
-
-import sys
 import os
+import re
+import sys
 
 import gymnasium as gym
 
 os.environ['MPLCONFIGDIR'] = os.getcwd() + "/configs/"
-# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pprint
 import traceback
@@ -23,12 +18,11 @@ import numpy as np
 
 import tensorflow as tf
 
-
 import argparse
 import logging
 
 import argcomplete
-from gymnasium.spaces import Box, Discrete, MultiDiscrete
+from gymnasium.spaces import Box
 
 from angorapy.configs import hp_config
 from angorapy.common.policies import get_distribution_by_short_name
@@ -40,9 +34,10 @@ from angorapy import make_task
 from angorapy.common.postprocessors import StateNormalizer, RewardNormalizer
 from angorapy.agent.ppo_agent import PPOAgent
 
-from angorapy.tasks import *
-
-from mpi4py import MPI
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
 
 
 class InconsistentArgumentError(Exception):
@@ -57,8 +52,13 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         tf.config.set_visible_devices([], "GPU")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-    mpi_rank = MPI.COMM_WORLD.rank
-    is_root = mpi_rank == 0
+    # setup MPI
+    if MPI is not None:
+        mpi_rank = MPI.COMM_WORLD.rank
+        is_root = mpi_rank == 0
+    else:
+        mpi_rank = 0
+        is_root = True
 
     # sanity checks and warnings for given parameters
     if settings["preload"] is not None and settings["load_from"] is not None:
@@ -91,11 +91,12 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
 
     # setting appropriate model building function
     try:
-        blind = not("vision" in list(env.observation_space["observation"].keys())
-                    and len(env.observation_space["observation"]["vision"].shape) > 1)
+        blind = not ("vision" in list(env.observation_space["observation"].keys())
+                     and len(env.observation_space["observation"]["vision"].shape) > 1)
     except:
         blind = True
-    build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"], shared=settings["shared"],
+    build_models = get_model_builder(model=settings["architecture"], model_type=settings["model"],
+                                     shared=settings["shared"],
                                      blind=blind)
 
     # announce experiment
@@ -225,7 +226,8 @@ if __name__ == "__main__":
 
     # gathering parameters
     parser.add_argument("--workers", type=int, default=8, help=f"the number of workers exploring the environment")
-    parser.add_argument("--horizon", type=int, default=2048, help=f"number of time steps one worker generates per cycle")
+    parser.add_argument("--horizon", type=int, default=2048,
+                        help=f"number of time steps one worker generates per cycle")
     parser.add_argument("--discount", type=float, default=0.99, help=f"discount factor for future rewards")
     parser.add_argument("--lam", type=float, default=0.97, help=f"lambda parameter in the GAE algorithm")
     parser.add_argument("--no-state-norming", action="store_true", help=f"do not normalize states")
@@ -245,9 +247,13 @@ if __name__ == "__main__":
     parser.add_argument("--clip-values", action="store_true", help=f"clip value objective")
     parser.add_argument("--stop-early", action="store_true", help=f"stop early if threshold of env was surpassed")
 
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    is_root = rank == 0
+    if MPI is not None:
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        is_root = rank == 0
+    else:
+        rank = 0
+        is_root = True
 
     # read arguments
     argcomplete.autocomplete(parser)

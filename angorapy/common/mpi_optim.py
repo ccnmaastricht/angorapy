@@ -1,17 +1,20 @@
 from typing import List, Tuple, Iterable
 
 import tensorflow as tf
-from mpi4py import MPI
 
-
-class AdamSynchronizationError(Exception):
-    pass
-
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
 
 try:
     ADAM_BASE = tf.keras.optimizers.legacy.Adam
 except:
     ADAM_BASE = tf.keras.optimizers.Adam
+
+
+class AdamSynchronizationError(Exception):
+    pass
 
 
 class MpiAdam(ADAM_BASE):
@@ -20,25 +23,36 @@ class MpiAdam(ADAM_BASE):
     def __init__(self, comm, learning_rate=0.001, epsilon=1e-7):
         super().__init__(learning_rate=learning_rate, epsilon=epsilon)
         self.comm = comm
+        self.comm_size = comm.Get_size() if comm is not None else 1
+        self.comm_rank = comm.Get_rank() if comm is not None else 0
 
     def _sync_parameters(self):
-        root_variables = self.comm.bcast(self.weights(), int_root=0)
+        """Syncs all Adam parameters across all MPI processes."""
+        if MPI is None:
+            root_variables = self.comm.bcast(self.weights(), int_root=0)
+        else:
+            root_variables = self.weights()
         self.set_weights(root_variables)
 
     def apply_gradients(self, grads_and_vars: Iterable[Tuple[tf.Tensor, tf.Variable]], name=None, **kwargs):
         """ Apply the gradients after averaging over processes."""
-        if self.comm.size > 1:
+        if self.comm is not None and self.comm.size > 1:
             grads_and_vars = [(self.comm.allreduce(g, op=MPI.SUM) / self.comm.Get_size(), v)
                               for g, v in grads_and_vars]
 
         context = super().apply_gradients(grads_and_vars)
 
         # wait for all processes before continuing
-        self.comm.Barrier()
+        if self.comm is not None:
+            self.comm.Barrier()
+
         return context
 
     def validate_synced_parameters(self):
         """Validate if all optimization processes share the same Adam parameters (moments)."""
+        if self.comm is None:
+            return
+
         all_variables = self.comm.gather(self.weights())
         is_in_sync = all(elem == all_variables[0] for elem in all_variables)
 

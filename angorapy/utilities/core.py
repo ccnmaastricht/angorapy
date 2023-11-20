@@ -26,13 +26,13 @@ from angorapy.utilities.error import UninterpretableObservationSpace
 
 def mpi_flat_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
-    if MPI is not None and MPI.COMM_WORLD.Get_rank() == 0:
+    if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         print(f"\r{string}", end="")
 
 
 def mpi_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
-    if MPI is not None and MPI.COMM_WORLD.Get_rank() == 0:
+    if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         print(string)
 
 

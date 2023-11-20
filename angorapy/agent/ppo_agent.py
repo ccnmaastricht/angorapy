@@ -133,12 +133,16 @@ class PPOAgent:
         if MPI is not None:
             self.mpi_comm = MPI.COMM_WORLD
             self.is_root = self.mpi_comm.rank == 0
+            self.comm_size = self.mpi_comm.size
+            self.comm_rank = self.mpi_comm.rank
 
             self.optimization_comm, self.is_optimization_process = self.get_optimization_comm(
                 limit_to_n_optimizers=n_optimizers)
             self.n_optimizers = int(self.mpi_comm.allreduce(self.is_optimization_process, op=MPI.SUM))
         else:
             self.mpi_comm = None
+            self.comm_size = 1
+            self.comm_rank = 0
             self.is_root = True
             self.optimization_comm = None
             self.is_optimization_process = True
@@ -160,8 +164,7 @@ class PPOAgent:
 
         self.env.warmup()
 
-        if MPI.COMM_WORLD.rank == 0:
-            print(f"Using {self.env.transformers} for preprocessing.")
+        mpi_print(f"Using {self.env.transformers} for preprocessing.")
 
         # hyperparameters
         self.horizon = horizon
@@ -243,7 +246,10 @@ class PPOAgent:
         self.optimization_fps = 0
         self.device = "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
-        self.agent_id = self.mpi_comm.bcast(f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}", root=0)
+        self.agent_id = f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}"
+        if MPI is not None:
+            self.agent_id = self.mpi_comm.bcast(self.agent_id, root=0)
+
         self.agent_directory = f"{BASE_SAVE_PATH}/{self.agent_id}/"
         self.experiment_directory = f"{PATH_TO_EXPERIMENTS}/{self.agent_id}/"
         if _make_dirs:
@@ -414,24 +420,28 @@ class PPOAgent:
         self.batch_size = batch_size
 
         # determine the number of independent repeated gatherings required on this worker
-        worker_base, worker_extra = divmod(self.n_workers, MPI.COMM_WORLD.size)
-        worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
+        worker_base, worker_extra = divmod(self.n_workers, self.comm_size)
+        worker_split = [worker_base + (r < worker_extra) for r in range(self.comm_size)]
         worker_collection_ids = list(range(self.n_workers))[
-                                sum(worker_split[:self.mpi_comm.rank]):sum(worker_split[:self.mpi_comm.rank + 1])]
+                                sum(worker_split[:self.comm_rank]):sum(worker_split[:self.comm_rank + 1])]
 
         # determine the split of worker outputs over optimizers
         optimizer_base, optimizer_extra = divmod(self.n_workers, self.n_optimizers)
         optimizer_split = [optimizer_base + (r < optimizer_extra) for r in range(self.n_optimizers)]
-        optimizer_collection_ids = list(range(self.n_workers))[sum(optimizer_split[:self.optimizer.comm.rank]):sum(
-            optimizer_split[:self.optimizer.comm.rank + 1])]
+        optimizer_collection_ids = list(range(self.n_workers))[sum(optimizer_split[:self.optimizer.comm_rank]):sum(
+            optimizer_split[:self.optimizer.comm_rank + 1])]
 
-        list_of_worker_collection_id_lists = self.mpi_comm.gather(worker_collection_ids, root=0)
-        list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
+        if MPI is not None:
+            list_of_worker_collection_id_lists = self.mpi_comm.gather(worker_collection_ids, root=0)
+            list_of_optimizer_collection_id_lists = self.optimizer.comm.gather(optimizer_collection_ids, root=0)
+        else:
+            list_of_worker_collection_id_lists = [worker_collection_ids]
+            list_of_optimizer_collection_id_lists = [optimizer_collection_ids]
 
         if self.is_root:
-            print(f"\n\nDrill started using {MPI.COMM_WORLD.size} processes for {self.n_workers} workers of which "
+            print(f"\n\nDrill started using {self.comm_size} processes for {self.n_workers} workers of which "
                   f"{self.n_optimizers} are optimizers."
-                  f" Worker distribution: {[worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]}.\n"
+                  f" Worker distribution: {[worker_base + (r < worker_extra) for r in range(self.comm_size)]}.\n"
                   f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
                   f"IDs over Optimizers: {list_of_optimizer_collection_id_lists}")
 
@@ -497,7 +507,7 @@ class PPOAgent:
             subprocess_start = time.time()
 
             # distribute parameters from rank 0 to all goal ranks
-            joint_weights = self.mpi_comm.bcast(joint_weights, root=0)
+            joint_weights = self.mpi_comm.bcast(joint_weights, root=0) if MPI is not None else joint_weights
             self.joint.set_weights(joint_weights)
             actor_joint.set_weights(joint_weights)
 
@@ -510,7 +520,9 @@ class PPOAgent:
 
             # merge gatherings from all workers
             stats = mpi_condense_stats(worker_stats)
-            stats = self.mpi_comm.bcast(stats, root=0)
+
+            if MPI is not None:
+                stats = self.mpi_comm.bcast(stats, root=0)
 
             # sync the envs to share statistics for transformers etc.
             self.env.mpi_sync()
@@ -530,7 +542,7 @@ class PPOAgent:
                         stats_with_evaluation = evaluation_stats
                     else:
                         stats_with_evaluation = mpi_condense_stats([stats, evaluation_stats])
-            elif MPI.COMM_WORLD.rank == 0 and stats.numb_completed_episodes == 0:
+            elif self.comm_rank == 0 and stats.numb_completed_episodes == 0:
                 print("WARNING: You are using a horizon that caused this cycle to not finish a single episode. "
                       "Consider activating separate evaluation in drill() to get meaningful statistics.")
 
@@ -622,7 +634,7 @@ class PPOAgent:
                     # calculate processing speed in fps
                     self.current_fps = stats.numb_processed_frames / (
                         sum([v for v in time_dict.values() if v is not None]))
-                    self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, MPI.COMM_WORLD.size)) / (
+                    self.gathering_fps = (stats.numb_processed_frames // min(self.n_workers, self.comm_size)) / (
                         time_dict["gathering"])
                     self.optimization_fps = (stats.numb_processed_frames * epochs) / (time_dict["optimizing"])
                     self.time_dicts.append(time_dict)
@@ -677,8 +689,11 @@ class PPOAgent:
 
     def _make_actor(self, horizon, discount, lam, subseq_length) -> Gatherer:
         # create the Gatherer
-        return self.gatherer_class(worker_id=MPI.COMM_WORLD.rank, exp_id=self.agent_id, distribution=self.distribution,
-                                   horizon=horizon, discount=discount, lam=lam, subseq_length=subseq_length)
+        return self.gatherer_class(
+            worker_id=self.comm_rank,
+            exp_id=self.agent_id,
+            distribution=self.distribution,
+            horizon=horizon, discount=discount, lam=lam, subseq_length=subseq_length)
 
     def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: int,
                  effective_batch_sizes: Union[int, Tuple[int, int]]) -> None:
@@ -763,7 +778,8 @@ class PPOAgent:
                     value_loss_history.append(tf.reduce_mean(value_epoch_losses).numpy().item())
                     entropy_history.append(tf.reduce_mean(entropies).numpy().item())
 
-        self.optimization_comm.Barrier()
+        if MPI is not None:
+            self.optimization_comm.Barrier()
 
         # store statistics in agent history
         self.policy_loss_history.append(statistics.mean(policy_loss_history))
@@ -795,7 +811,7 @@ class PPOAgent:
 
         stats = condense_stats(stat_bundles)
 
-        if save and MPI.COMM_WORLD.rank == 0:
+        if save and self.is_root:
             os.makedirs(f"{const.PATH_TO_EXPERIMENTS}/{self.agent_id}/", exist_ok=True)
 
             previous_evaluations = {}
@@ -812,7 +828,7 @@ class PPOAgent:
 
     def report(self, total_iterations, verbose=False):
         """Print a report of the current state of the training."""
-        if MPI.COMM_WORLD.rank != 0:
+        if not self.is_root:
             return
 
         sc, nc, ec, ac = COLORS["OKGREEN"], COLORS["OKBLUE"], COLORS["ENDC"], COLORS["FAIL"]

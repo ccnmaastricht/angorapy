@@ -8,7 +8,6 @@ from typing import Union, Tuple, List
 
 import numpy as np
 import tensorflow as tf
-from mpi4py import MPI
 
 from angorapy.common.const import STORAGE_DIR
 from angorapy.common.senses import Sensation
