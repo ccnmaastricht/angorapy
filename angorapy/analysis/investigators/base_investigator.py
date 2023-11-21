@@ -229,22 +229,18 @@ class Investigator:
 
     def render_episode_jupyter(self, env: TaskWrapper, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
-        from IPython import display, core
+        import mediapy as media
 
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
 
         done, step = False, 0
 
+        frames = []
         state, _ = env.reset()
         cumulative_reward = 0
-        img = plt.imshow(env.render())
         while not done:
-            img.set_data(env.render())
-            plt.axis("off")
-            display.display(plt.gcf())
-            display.clear_output(wait=True)
-
+            frames.append(env.render())
             step += 1
 
             prepared_state = state.with_leading_dims(time=is_recurrent).dict()
@@ -261,7 +257,7 @@ class Investigator:
 
             state = observation
 
-        return
+        return media.show_video(frames, fps=30)
 
 
 if __name__ == "__main__":

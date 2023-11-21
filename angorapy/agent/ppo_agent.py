@@ -949,10 +949,11 @@ class PPOAgent:
         if MPI is not None:
             mpi_comm = MPI.COMM_WORLD
             is_root = mpi_comm.rank == 0
+            optimization_comm, is_optimization_process = PPOAgent.get_optimization_comm(
+                limit_to_n_optimizers=n_optimizers)
         else:
             is_root = True
-
-        optimization_comm, is_optimization_process = PPOAgent.get_optimization_comm(limit_to_n_optimizers=n_optimizers)
+            optimization_comm, is_optimization_process = None, True
 
         # TODO also load the state of the optimizers
         agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"

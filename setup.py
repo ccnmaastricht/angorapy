@@ -8,7 +8,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.10.4',
+    version='0.10.5',
     description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
@@ -39,6 +39,7 @@ setup(
         "distance",
         "statsmodels==0.14.0",
         "keras_cortex==0.0.8",
+        "mediapy",
 
         # environments
         "gymnasium[mujoco]==0.28.1",
