@@ -257,7 +257,7 @@ class Investigator:
 
             state = observation
 
-        return media.show_video(frames, fps=30)
+        return media.show_video(frames, fps=20)
 
 
 if __name__ == "__main__":

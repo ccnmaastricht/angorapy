@@ -209,7 +209,7 @@ if __name__ == "__main__":
     parser.add_argument("--experiment-group", type=str, default="default", help="experiment group identifier")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
-    parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
+    parser.add_argument("--gi-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--component-dir", type=str, default=None, help=f"path to pretrained components")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")

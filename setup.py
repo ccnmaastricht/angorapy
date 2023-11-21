@@ -8,7 +8,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.10.5',
+    version='0.10.6',
     description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
