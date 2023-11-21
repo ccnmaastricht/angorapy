@@ -42,6 +42,12 @@ def register_model(model_name):
             MODEL_BUILDERS[func_name] = partial(func, **pd)
             MODEL_BUILDERS[func_name].__name__ = func_name
 
+            # backwards compatibility
+            name_parts["model"] = model_name
+            func_name = f"build_{'_'.join([str(val) for n, val in sorted(name_parts.items(), key=lambda x: x[0]) if val])}_models"
+            MODEL_BUILDERS[func_name] = partial(func, **pd)
+            MODEL_BUILDERS[func_name].__name__ = func_name
+
         return func
 
     return inner

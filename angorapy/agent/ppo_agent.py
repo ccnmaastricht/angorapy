@@ -1010,7 +1010,7 @@ class PPOAgent:
                         reward_config=parameters.get("reward_configuration"),
                         transformers=postprocessors_from_serializations(parameters["transformers"]),
                         render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
-        model_builder = models.MODELS_AVAILABLE[models.get_model_shortname(parameters["builder_function_name"])]
+        model_builder = models.MODEL_BUILDERS[parameters["builder_function_name"]]
         distribution = getattr(policies, parameters["distribution"])(env)
 
         loaded_agent = PPOAgent(model_builder, environment=env, horizon=parameters["horizon"],

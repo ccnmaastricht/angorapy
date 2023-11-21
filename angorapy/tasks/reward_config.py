@@ -1,4 +1,4 @@
-"""Configuration dictionaries providing parameter collections for reard functions."""
+from angorapy.tasks.envs.dexterity.reward_configs import *
 
 
 def resolve_config_name(config_name: str):
