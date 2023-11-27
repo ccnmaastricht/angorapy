@@ -934,8 +934,13 @@ class PPOAgent:
         return parameters
 
     @staticmethod
-    def from_agent_state(agent_id: int, from_iteration: Union[int, str] = None, force_env_name=None, path_modifier="",
-                         n_optimizers: int = None) -> "PPOAgent":
+    def from_agent_state(
+            agent_id: int,
+            from_iteration: Union[int, str] = None,
+            force_env_name=None,
+            path_modifier="",
+            n_optimizers: int = None
+    ) -> "PPOAgent":
         """Build an agent from a previously saved state.
 
         Args:
@@ -956,7 +961,7 @@ class PPOAgent:
             optimization_comm, is_optimization_process = None, True
 
         # TODO also load the state of the optimizers
-        agent_path = path_modifier + BASE_SAVE_PATH + f"/{agent_id}" + "/"
+        agent_path = os.path.join(path_modifier, BASE_SAVE_PATH, f"{agent_id}")
 
         if not os.path.isdir(agent_path):
             raise FileNotFoundError(

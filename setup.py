@@ -51,11 +51,11 @@ setup(
 
     extras_require={
         "box2d": ["box2d-py==2.3.5",
-                  "gymnasium[box2d]==0.28.1"],
+                  "gymnasium[mujoco,box2d]==0.28.1"],
         "webinterface": ["itsdangerous==2.0.1",
                          "werkzeug==2.0.3",
                          "Flask~=1.1.2",
-                         "Jinja2==3.0.0",
+                         "Jinja2==3.0.3",
                          "bokeh==2.3.3",
                          "flask_jsglue"],
     },
