@@ -9,7 +9,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='angorapy',
-    version='0.10.0',
+    version='0.11.0',
     description='Build Goal-driven Models of the Sensorimotor Cortex with Ease.',
     long_description_content_type='text/markdown',
     long_description=long_description,
@@ -24,8 +24,8 @@ setup(
         # "numpy",
 
         # tensorflow and extensions
-        "tensorflow==2.12.0",
-        "tensorflow_probability==0.20.0",
+        "tensorflow==2.15.*",
+        "tensorflow_probability==0.23.*",
         "tensorflow_graphics==2021.12.3",
         "mpi4py==3.1.4",
         "tqdm",
@@ -35,7 +35,7 @@ setup(
         "argcomplete",
         "matplotlib",
         "scikit-learn==1.2.2",
-        "pandas==1.4.4",
+        "pandas",
         "nvidia-ml-py3",
         "seaborn",
         "distance",
@@ -44,8 +44,7 @@ setup(
         "keras_cortex==0.0.8",
 
         # environments
-        "box2d-py==2.3.5",
-        "gymnasium[box2d,mujoco]==0.28.1",
+        "gymnasium[mujoco]==0.29.1",
         "mujoco==2.3.7",
         "dm_control==1.0.12",
         "mujoco_utils",
