@@ -6,7 +6,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from angorapy import make_task
-from angorapy.agent import PPOAgent
+from angorapy.agent import Agent
 from angorapy.common.const import VISION_WH
 
 
@@ -63,7 +63,7 @@ def load_unrendered_dataset(path):
 
 def gen_cube_quats_prediction_data(n: int, save_path: str):
     """Generate dataset of hand images with cubes as data points and the pos and rotation of the cube as targets."""
-    agent = PPOAgent.from_agent_state(1692003322304510, "best", path_modifier="")
+    agent = Agent.from_agent_state(1692003322304510, "best", path_modifier="")
     agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1,
                                                                 sequence_length=1)
 
@@ -96,7 +96,7 @@ def gen_cube_quats_prediction_data_rendered(n: int, save_path: str, binocular=Fa
     agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(), batch_size=1,
                                                                 sequence_length=1)
 
-    hand_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0",
+    hand_env = make_task("HumanoidManipulateBlockDiscreteAsynchronous-v0",
                         # render_mode="rgb_array",
                         transformers=agent.env.transformers)
 

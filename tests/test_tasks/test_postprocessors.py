@@ -5,15 +5,15 @@ import numpy as np
 
 from angorapy.tasks.registration import make_task
 from angorapy.common.senses import Sensation
-from angorapy.common.transformers import RewardNormalizationTransformer, merge_transformers, \
-    StateNormalizationTransformer
-from angorapy.utilities.util import env_extract_dims
+from angorapy.common.postprocessors import RewardNormalizer, merge_postprocessors, \
+    StateNormalizer
+from angorapy.utilities.core import env_extract_dims
 
 
 def test_state_normalization():
     env_name = "ManipulateBlockDiscreteAsynchronous-v0"
     env = make_task(env_name)
-    normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+    normalizer = StateNormalizer(env_name, *env_extract_dims(env))
 
     env.reset()
     inputs = [env.step(env.action_space.sample())[0] for _ in range(150)]
@@ -32,7 +32,7 @@ def test_state_normalization():
 def test_state_normalization_non_anthropomorphic():
     env_name = "LunarLanderContinuous-v2"
     env = make_task(env_name)
-    normalizer = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+    normalizer = StateNormalizer(env_name, *env_extract_dims(env))
 
     env.reset()
     inputs = [env.step(env.action_space.sample())[0] for _ in range(150)]
@@ -50,9 +50,9 @@ def test_state_normalization_non_anthropomorphic():
 def test_state_normalization_adding():
     env_name = "LunarLanderContinuous-v2"
     env = make_task(env_name)
-    normalizer_a = StateNormalizationTransformer(env_name, *env_extract_dims(env))
-    normalizer_b = StateNormalizationTransformer(env_name, *env_extract_dims(env))
-    normalizer_c = StateNormalizationTransformer(env_name, *env_extract_dims(env))
+    normalizer_a = StateNormalizer(env_name, *env_extract_dims(env))
+    normalizer_b = StateNormalizer(env_name, *env_extract_dims(env))
+    normalizer_c = StateNormalizer(env_name, *env_extract_dims(env))
 
     inputs_a = [env.observation_space.sample() for _ in range(100)]
     inputs_b = [env.observation_space.sample() for _ in range(100)]
@@ -71,7 +71,7 @@ def test_state_normalization_adding():
         normalizer_c.update({"proprioception": sample})
 
     combined_normalizer = normalizer_a + normalizer_b + normalizer_c
-    merged_normalizer = merge_transformers([normalizer_a, normalizer_b, normalizer_c])
+    merged_normalizer = merge_postprocessors([normalizer_a, normalizer_b, normalizer_c])
 
     assert np.allclose(true_mean, combined_normalizer.mean["proprioception"], atol=1e-6)
     assert np.allclose(true_mean, merged_normalizer.mean["proprioception"], atol=1e-6)
@@ -81,9 +81,9 @@ def test_state_normalization_adding():
 def test_reward_normalization_adding():
     env_name = "LunarLanderContinuous-v2"
     env = make_task(env_name)
-    normalizer_a = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
-    normalizer_b = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
-    normalizer_c = RewardNormalizationTransformer(env_name, *env_extract_dims(env))
+    normalizer_a = RewardNormalizer(env_name, *env_extract_dims(env))
+    normalizer_b = RewardNormalizer(env_name, *env_extract_dims(env))
+    normalizer_c = RewardNormalizer(env_name, *env_extract_dims(env))
 
     inputs_a = [random.random() * 10 for _ in range(1000)]
     inputs_b = [random.random() * 20 for _ in range(1000)]

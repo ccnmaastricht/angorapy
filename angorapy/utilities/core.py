@@ -1,36 +1,38 @@
 """Helper functions."""
+import os
 import random
 import sys
-from typing import Tuple, Union, List, Dict
-import os
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
 
 import gymnasium as gym
 import numpy
 import numpy as np
 import tensorflow as tf
 from gymnasium import spaces
-from gymnasium.spaces import Discrete, Box, MultiDiscrete
-from mpi4py import MPI
-from tensorflow.python.client import device_lib
+from gymnasium.spaces import Box
+from gymnasium.spaces import Discrete
+from gymnasium.spaces import MultiDiscrete
+
+try:
+    from mpi4py import MPI
+except:
+    MPI = None
 
 from angorapy.utilities.error import UninterpretableObservationSpace
 
 
-def get_available_gpus():
-    """Get list of available GPUs."""
-    local_device_protos = device_lib.list_local_devices()
-    return [x.name for x in local_device_protos if x.device_type == 'GPU']
-
-
 def mpi_flat_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
-    if MPI.COMM_WORLD.Get_rank() == 0:
+    if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         print(f"\r{string}", end="")
 
 
 def mpi_print(string: str):
     """A bit of a workaround to no new line printing to have it work in PyCharm."""
-    if MPI.COMM_WORLD.Get_rank() == 0:
+    if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         print(string)
 
 
@@ -49,14 +51,16 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], Tuple[int]]:
     if isinstance(env.observation_space, spaces.Dict):
         # dict observation with observation field, for all GoalEnvs
         if isinstance(env.observation_space["observation"], spaces.Box):
-            obs_dim = {"proprioception": env.observation_space["observation"].shape, "goal": env.observation_space["desired_goal"].shape}
+            obs_dim = {"proprioception": env.observation_space["observation"].shape,
+                       "goal": env.observation_space["desired_goal"].shape}
         elif isinstance(env.observation_space["observation"], spaces.Dict):
             # made for sensation
             obs_dim = {name: field.shape for name, field in env.observation_space["observation"].spaces.items()}
         else:
-            raise UninterpretableObservationSpace(f"Cannot extract the dimensionality from a spaces.Dict observation space "
-                                                  f"where the observation is of type "
-                                                  f"{type(env.observation_space['observation']).__name__}")
+            raise UninterpretableObservationSpace(
+                f"Cannot extract the dimensionality from a spaces.Dict observation space "
+                f"where the observation is of type "
+                f"{type(env.observation_space['observation']).__name__}")
     elif isinstance(env.observation_space, gym.spaces.Box):  # standard observation in box form
         obs_dim = {"proprioception": env.observation_space.shape}
     elif isinstance(env.observation_space, gym.spaces.tuple.Tuple):
@@ -223,31 +227,9 @@ def keras_model_memory_usage_in_bytes(model, *, batch_size: int):
     )
 
     total_memory = (
-        batch_size * shapes_mem_count
-        + internal_model_mem_count
-        + trainable_count
-        + non_trainable_count
+            batch_size * shapes_mem_count
+            + internal_model_mem_count
+            + trainable_count
+            + non_trainable_count
     )
     return total_memory
-
-
-if __name__ == "__main__":
-    from angorapy.configs import hp_config
-
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
-    conf = hp_config.manipulate
-    # conf["workers"] = 8
-    # conf["batch_size"] = 256
-
-    n_optimizers = 32
-
-    for wf in [True, False]:
-        optimizer_tiling = find_optimal_tile_shape(
-            (conf["workers"] // n_optimizers, conf["horizon"] // conf["tbptt"] // n_optimizers),
-            tile_size=conf["batch_size"] // conf["tbptt"] // n_optimizers,
-            width_first=wf
-        )
-
-        print(f"Optimizer's Tiling: {optimizer_tiling} with {['width', 'height'][wf]} first")

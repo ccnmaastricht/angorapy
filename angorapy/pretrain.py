@@ -97,7 +97,7 @@ rotation_quats = (
 )
 
 
-# @tf.py_function(Tout=[tf.float32, tf.float32])
+@tf.py_function(Tout=[tf.float32, tf.float32])
 def render_from_sim_state(sim_state):
     hand_env.set_state(sim_state[:model.nq], sim_state[model.nq:])
 
@@ -137,7 +137,7 @@ def render_from_sim_state(sim_state):
     for cam in cameras:
         renderer.update_scene(data, camera=cam)
         images.append(renderer.render())
-    #
+
     # plt.title("IN RENDER")
     # plt.imshow(images[0])
     # plt.show()
@@ -152,6 +152,7 @@ def render_from_sim_state(sim_state):
 
 def tf_render(sim_state, pose):
     output_shape = (VISION_WH, VISION_WH, 3 * len(cameras))
+
     images, qpos = render_from_sim_state(sim_state)
     images.set_shape(output_shape)
 
@@ -175,7 +176,6 @@ def prepare_dataset(name: str, load_data=True):
             raise FileNotFoundError(f"Could not find any files matching {name}*.tfrecord")
 
         dataset = load_unrendered_dataset(filenames)
-
         # dataset = dataset.map(tf_render)
 
         return dataset
@@ -222,7 +222,7 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         n_valset = 16 * 1  # * 2 TODO increase
 
         testset = dataset.take(n_testset)
-        trainset = dataset.skip(n_testset)
+        trainset = dataset.skip(n_testset).take(1024)
         valset = trainset.take(n_valset)
 
         trainset = trainset.batch(batch_size, drop_remainder=True)
@@ -273,24 +273,33 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
             # train and save encoder
             for i_epoch in range(epochs):
                 print(f"Epoch {i_epoch + 1}/{epochs}")
-                for inputs, targets in trainset:
+
+                epoch_loss = 0
+                epoch_batch_i = 0
+                for inputs, targets in tqdm(trainset):
                     # transform with render
                     rendered_inputs, rendered_targets = [], []
-                    for data in tqdm(tf.unstack(inputs, 0)):
+                    for data in tf.unstack(inputs, axis=0):
                         rendered_data, rendered_pose = render_from_sim_state(data)
                         rendered_inputs.append(rendered_data)
                         rendered_targets.append(rendered_pose)
 
-                        fig, axs = plt.subplots(1, len(cameras))
-                        for i in range(len(cameras)):
-                            ax = axs[i] if len(cameras) > 1 else axs
-                            camera_img = rendered_data[:, :, 3 * i:3 * (i + 1)] / 255
-                            ax.imshow(camera_img)
-                        plt.show()
+                        # fig, axs = plt.subplots(1, len(cameras))
+                        # for i in range(len(cameras)):
+                        #     ax = axs[i] if len(cameras) > 1 else axs
+                        #     camera_img = rendered_data[:, :, 3 * i:3 * (i + 1)] / 255
+                        #     ax.imshow(camera_img)
+                        # plt.show()
 
                     inputs, targets = tf.stack(rendered_inputs), tf.stack(rendered_targets)
 
-                    model.train_on_batch(inputs, targets)
+                    loss = model.train_on_batch(inputs, targets)
+                    epoch_loss += loss
+                    epoch_batch_i += 1
+
+                epoch_loss /= epoch_batch_i
+                print(f"Epoch loss: {epoch_loss}")
+
 
             pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
         else:

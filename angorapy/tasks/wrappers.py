@@ -4,10 +4,14 @@ from typing import List, OrderedDict, Tuple, Dict, Any, SupportsFloat
 
 import gymnasium as gym
 import numpy
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
 
 from angorapy.common.senses import Sensation
-from angorapy.common.transformers import BaseTransformer, merge_transformers
+from angorapy.common.postprocessors import BasePostProcessor, merge_postprocessors
 
 
 class TaskWrapper(gym.ObservationWrapper):
@@ -95,7 +99,7 @@ class TaskWrapper(gym.ObservationWrapper):
 class TransformationWrapper(TaskWrapper):
     """Wrapper transforming rewards and observation based on running means."""
 
-    def __init__(self, env, transformers: List[BaseTransformer]):
+    def __init__(self, env, transformers: List[BasePostProcessor]):
         super().__init__(env)
 
         # TODO maybe change this to expect list of types to build itself?
@@ -132,12 +136,15 @@ class TransformationWrapper(TaskWrapper):
 
     def _mpi_sync(self):
         """Synchronise the transformers of the wrapper over all MPI ranks."""
+        if MPI is None:
+            return
+
         synced_transformers = []
         for transformer in self.transformers:
             collection = MPI.COMM_WORLD.gather(transformer, root=0)
 
             if MPI.COMM_WORLD.Get_rank() == 0:
-                synced_transformers.append(merge_transformers(collection))
+                synced_transformers.append(merge_postprocessors(collection))
 
         self.transformers = MPI.COMM_WORLD.bcast(synced_transformers, root=0)
 

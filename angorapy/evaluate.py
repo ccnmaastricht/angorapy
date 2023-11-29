@@ -18,7 +18,12 @@ import time
 
 from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.common.const import BASE_SAVE_PATH
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
+
 import tensorflow as tf
 
 physical_devices = tf.config.list_physical_devices('GPU')
@@ -32,8 +37,15 @@ parser.add_argument("-n", type=int, help="number of evaluation episodes", defaul
 parser.add_argument("--act-confidently", action="store_true", help="act deterministically without stochasticity")
 args = parser.parse_args()
 
-mpi_comm = MPI.COMM_WORLD
-is_root = mpi_comm.rank == 0
+if MPI is None:
+    mpi_comm = MPI.COMM_WORLD
+    rank = mpi_comm.rank
+    is_root = rank == 0
+    comm_size = mpi_comm.size
+else:
+    is_root = True
+    rank = 0
+    comm_size = 1
 
 if args.id is None:
     ids = map(int, os.listdir(BASE_SAVE_PATH))
@@ -50,9 +62,9 @@ if is_root:
 
 
 # determine number of repetitions on this worker
-worker_base, worker_extra = divmod(args.n, MPI.COMM_WORLD.size)
-worker_split = [worker_base + (r < worker_extra) for r in range(MPI.COMM_WORLD.size)]
-workers_n = worker_split[mpi_comm.rank]
+worker_base, worker_extra = divmod(args.n, comm_size)
+worker_split = [worker_base + (r < worker_extra) for r in range(comm_size)]
+workers_n = worker_split[rank]
 
 stat_bundles, _ = agent.evaluate(workers_n, act_confidently=args.act_confidently)
 stats = mpi_condense_stats([stat_bundles])

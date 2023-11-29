@@ -14,7 +14,7 @@ from angorapy.agent.ppo_agent import PPOAgent
 from angorapy.utilities.hooks import register_hook, clear_hooks
 from angorapy.utilities.model_utils import is_recurrent_model, list_layer_names, get_layers_by_names, build_sub_model_to, \
     extract_layers, CONVOLUTION_BASE_CLASS, is_conv
-from angorapy.utilities.util import add_state_dims, flatten, insert_unknown_shape_dimensions
+from angorapy.utilities.core import add_state_dims, flatten, insert_unknown_shape_dimensions
 
 
 class Investigator:
@@ -133,7 +133,7 @@ class Investigator:
         else:
             raise ValueError("Recurrent layer type not understood. Is it custom?")
 
-    def get_layer_activations(self, layer_names: List[str], input_tensor=None):
+    def get_layer_activations(self, layer_names: List[str], input_tensor=None, recurrent_strategy="first"):
         """Get activations of a layer. If no input tensor is given, a random tensor is used."""
         activations = {}
 
@@ -149,7 +149,10 @@ class Investigator:
 
         for key in activations.keys():
             if isinstance(activations[key], list):
-                activations[key] = activations[key][0]
+                if recurrent_strategy == "first":
+                    activations[key] = activations[key][0]
+                elif recurrent_strategy == "all":
+                    activations[key] = tf.concat(activations[key][1:], axis=-1)
 
         # release the hook to prevent infinite nesting
         clear_hooks(self.network)
@@ -226,22 +229,18 @@ class Investigator:
 
     def render_episode_jupyter(self, env: TaskWrapper, substeps_per_step=1, act_confidently=True) -> None:
         """Render an episode in the given environment."""
-        from IPython import display, core
+        import mediapy as media
 
         is_recurrent = is_recurrent_model(self.network)
         self.network.reset_states()
 
         done, step = False, 0
 
+        frames = []
         state, _ = env.reset()
         cumulative_reward = 0
-        img = plt.imshow(env.render())
         while not done:
-            img.set_data(env.render())
-            plt.axis("off")
-            display.display(plt.gcf())
-            display.clear_output(wait=True)
-
+            frames.append(env.render())
             step += 1
 
             prepared_state = state.with_leading_dims(time=is_recurrent).dict()
@@ -258,7 +257,7 @@ class Investigator:
 
             state = observation
 
-        return
+        return media.show_video(frames, fps=20)
 
 
 if __name__ == "__main__":

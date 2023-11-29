@@ -9,7 +9,8 @@ from tensorflow.keras.utils import plot_model
 
 from angorapy.common.const import VISION_WH
 from angorapy.common.policies import BasePolicyDistribution, MultiCategoricalPolicyDistribution
-from angorapy.utilities.util import env_extract_dims
+from angorapy.models import register_model
+from angorapy.utilities.core import env_extract_dims
 
 
 class OrthogonalMP(tf.keras.initializers.Orthogonal):
@@ -94,6 +95,7 @@ def build_mc_module(batch_and_sequence_shape, lpfc_input_shape, spl_input_shape,
                           outputs=[pmc, m1], name="MotorCortex")
 
 
+@register_model("shadowv2")
 def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int = 1, model_type: str = "rnn",
                             blind: bool = False, sequence_length=1, activation=tf.keras.layers.ReLU, **kwargs):
     """Build network for the shadow hand task, version 2."""
@@ -177,18 +179,6 @@ def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistributio
                            name="shadow_v2" + ("_visual" if not blind else ""))
 
     return policy, value, joint
-
-
-def build_shadow_v2_brain_models(env: gym.Env, distribution: BasePolicyDistribution, bs: int = 1, model_type: str = "lstm",
-                              blind: bool = False, activation=tf.keras.layers.ReLU, **kwargs):
-    """Build shadow brain networks (policy, value, joint) for given parameter settings."""
-
-    # this function is just a wrapper routing the requests for broader options to specific functions
-    if model_type == "ffn":
-        raise NotImplementedError("No non recurrent version of this ShadowBrain abailable.")
-
-    return build_shadow_v2_brain_base(env=env, distribution=distribution, bs=bs, model_type=model_type, blind=blind,
-                                   activation=activation)
 
 
 if __name__ == "__main__":

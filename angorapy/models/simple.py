@@ -12,10 +12,11 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from angorapy.common.policies import BasePolicyDistribution, CategoricalPolicyDistribution, BetaPolicyDistribution, \
     MultiCategoricalPolicyDistribution, RBetaPolicyDistribution, GaussianPolicyDistribution
+from angorapy.models import register_model
 from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.models.components import _build_encoding_sub_model
 from angorapy.utilities.model_utils import make_input_layers
-from angorapy.utilities.util import env_extract_dims
+from angorapy.utilities.core import env_extract_dims
 
 
 def build_ffn_models(env: TaskWrapper,
@@ -144,6 +145,7 @@ def build_rnn_models(env: TaskWrapper,
     return policy, value, tf.keras.Model(inputs=input_list, outputs=[out_policy, out_value], name="simple_rnn")
 
 
+@register_model("simple")
 def build_simple_models(env: TaskWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
@@ -161,6 +163,7 @@ def build_simple_models(env: TaskWrapper,
                                 layer_sizes=(64, 64))
 
 
+@register_model("deeper")
 def build_deeper_models(env: TaskWrapper,
                         distribution: BasePolicyDistribution,
                         shared: bool = False,
@@ -178,6 +181,7 @@ def build_deeper_models(env: TaskWrapper,
                                 model_type=model_type, layer_sizes=(64, 64, 64, 32, 32))
 
 
+@register_model("wider")
 def build_wider_models(env: TaskWrapper,
                        distribution: BasePolicyDistribution,
                        shared: bool = False,

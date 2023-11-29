@@ -6,7 +6,12 @@ from collections import namedtuple
 from typing import List, Union
 
 import numpy as np
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
+
 
 StatBundle = namedtuple("StatBundle", ["numb_completed_episodes", "numb_processed_frames",
                                        "episode_rewards", "episode_lengths", "tbptt_underflow",
@@ -35,9 +40,14 @@ def condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None]:
 
 def mpi_condense_stats(stat_bundles: List[StatBundle]) -> Union[StatBundle, None]:
     """Pull together the StatBundle lists from the buffer on all workers and infer a single StatBundle."""
-    stat_bundles = MPI.COMM_WORLD.gather(stat_bundles, root=0)
+    if MPI is not None:
+        stat_bundles = MPI.COMM_WORLD.gather(stat_bundles, root=0)
+        rank = MPI.COMM_WORLD.Get_rank()
+    else:
+        stat_bundles = [stat_bundles]
+        rank = 0
 
-    if MPI.COMM_WORLD.Get_rank() == 0:
+    if rank == 0:
         stat_bundles = list(itertools.chain(*stat_bundles))
         return condense_stats(stat_bundles)
     else:

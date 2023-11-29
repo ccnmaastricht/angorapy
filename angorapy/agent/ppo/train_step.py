@@ -3,8 +3,8 @@ from typing import Dict
 import tensorflow as tf
 
 from angorapy.agent.ppo.optim import learn_on_batch
-from angorapy.utilities.model_utils import reset_states_masked, reset_states_masked_tf
-from angorapy.utilities.util import detect_finished_episodes
+from angorapy.utilities.model_utils import reset_states_masked_tf
+from angorapy.utilities.core import detect_finished_episodes
 
 
 def ff_train_step(batch,

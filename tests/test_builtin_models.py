@@ -1,8 +1,10 @@
-from angorapy import make_task, get_model_builder
+from angorapy import make_task
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution, \
     CategoricalPolicyDistribution
 from angorapy.utilities.model_utils import is_recurrent_model
-from angorapy.utilities.util import flatten
+from angorapy.utilities.core import flatten
+
+from angorapy.models import get_model_builder
 
 
 def perform_test_on_model(model_name):
