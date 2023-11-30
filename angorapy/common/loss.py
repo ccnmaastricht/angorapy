@@ -39,4 +39,4 @@ class PoseEstimationLoss(tf.keras.losses.Loss):
         # find the shortest geodesic rotation between the two quaternions in the pose
         rotational_loss = geodesic_loss(y_pred, y_true)
 
-        return position_loss  # + rotational_loss
+        return position_loss + rotational_loss

@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 """Pretrain the visual component."""
+import itertools
 import os
 import sys
 
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
+
+from angorapy.common.metrics.distance import distance_in_millimeters
+from angorapy.common.metrics.distance import rotational_distance_in_degrees
 
 # set random seeds for tensorflow and numpy
 tf.random.set_seed(0)
@@ -82,11 +86,6 @@ for i in range(1, 3):
 for i in range(1000):
     renderer.update_scene(data, camera=cameras[0])
 
-# for c in cameras:
-#     renderer.update_scene(data, camera=c)
-#     plt.imshow(renderer.render())
-#     plt.show()
-
 rotation_quats = (
     (tfg.quaternion.from_axis_angle(np.array([[1., 0., 0.]]), np.array([[-1 * np.pi / 2]])),
      tfg.quaternion.from_axis_angle(np.array([[1., 0., 0.]]), np.array([[1 * np.pi / 2]]))),
@@ -97,50 +96,45 @@ rotation_quats = (
 )
 
 
-@tf.py_function(Tout=[tf.float32, tf.float32])
 def render_from_sim_state(sim_state):
-    hand_env.set_state(sim_state[:model.nq], sim_state[model.nq:])
+    hand_env.unwrapped.set_state(sim_state[:model.nq], sim_state[model.nq:])
 
     # Get the quaternion for the current orientation of the body
     block = data.jnt("block/object:joint/")
     quat = data.jnt("block/object:joint/").qpos[3:]
     original_qpos = block.qpos.copy()
 
-    # p = np.random.random()
-    # if p < 0.0:  # Leave the block pose as is  # TODO activate
-    #     pass
-    # elif p < .6:  # Rotate the block by 90 degrees around its main axes
-    #     # define the rotation
-    #     axis = np.random.choice([0, 1, 2])
-    #     sign = np.random.choice([0, 1])
-    #
-    #     # rotate the body by 90 degrees around the chosen axis
-    #     rotation_quat = rotation_quats[axis][sign]
-    #
-    #     # Apply the rotation to the body quaternion
-    #     new_quat = tfg.quaternion.multiply(quat, rotation_quat)
-    #     block.qpos[3:] = new_quat
-    # else:  # "Jitter" the block by adding Gaussian noise to position and orientation
-    #     # Add Gaussian noise to the block position
-    #     noise_pos = np.random.normal(loc=0, scale=0.01, size=3)
-    #     block.qpos[:3] += noise_pos
-    #
-    #     # Add Gaussian noise to the block orientation
-    #     noise_quat = np.random.normal(loc=0, scale=0.01, size=4)
-    #     noise_quat /= np.linalg.norm(noise_quat)
-    #     new_quat = tfg.quaternion.multiply(quat, noise_quat)
-    #     block.qpos[3:] = new_quat
+    p = np.random.random()
+    if p < .2:  # Leave the block pose as is
+        pass
+    elif p < .6:  # Rotate the block by 90 degrees around its main axes
+        # define the rotation
+        axis = np.random.choice([0, 1, 2])
+        sign = np.random.choice([0, 1])
 
-    # mujoco.mj_forward(model, data)
+        # rotate the body by 90 degrees around the chosen axis
+        rotation_quat = rotation_quats[axis][sign]
+
+        # Apply the rotation to the body quaternion
+        new_quat = tfg.quaternion.multiply(quat, rotation_quat)
+        block.qpos[3:] = new_quat
+    else:  # "Jitter" the block by adding Gaussian noise to position and orientation
+        # Add Gaussian noise to the block position
+        noise_pos = np.random.normal(loc=0, scale=0.01, size=3)
+        block.qpos[:3] += noise_pos
+
+        # Add Gaussian noise to the block orientation
+        noise_quat = np.random.normal(loc=0, scale=0.01, size=4)
+        noise_quat /= np.linalg.norm(noise_quat)
+        new_quat = tfg.quaternion.multiply(quat, noise_quat)
+        block.qpos[3:] = new_quat
+
+    mujoco.mj_forward(model, data)
 
     images = []
     for cam in cameras:
         renderer.update_scene(data, camera=cam)
         images.append(renderer.render())
-
-    # plt.title("IN RENDER")
-    # plt.imshow(images[0])
-    # plt.show()
 
     qpos = tf.cast(block.qpos.copy(), dtype=tf.float32)
     block.qpos = original_qpos
@@ -168,44 +162,19 @@ def prepare_dataset(name: str, load_data=True):
             path,
         )
 
-    if is_root:
-        # get all filenames starting with name from the data directory
-        filenames = tf.io.gfile.glob(f"{name}*.tfrecord")
+    # get all filenames starting with name from the data directory
+    filenames = tf.io.gfile.glob(f"{name}*.tfrecord")
 
-        if len(filenames) == 0:
-            raise FileNotFoundError(f"Could not find any files matching {name}*.tfrecord")
+    if len(filenames) == 0:
+        raise FileNotFoundError(f"Could not find any files matching {name}*.tfrecord")
 
-        dataset = load_unrendered_dataset(filenames)
-        # dataset = dataset.map(tf_render)
+    dataset = load_unrendered_dataset(filenames)
 
-        return dataset
-
-
-def prepare_pre_rendered_dataset(name, load_data=True):
-    path = f"{name}_{mpi_rank}.tfrecord"
-    if not load_data:
-        gen_cube_quats_prediction_data(
-            n_samples,
-            path,
-        )
-
-    if is_root:
-        # get all filenames starting with name from the data directory
-        filenames = tf.io.gfile.glob(f"{name}*.tfrecord")
-
-        if len(filenames) == 0:
-            raise FileNotFoundError(f"Could not find any files matching {name}*.tfrecord")
-
-        dataset = load_unrendered_dataset(filenames)
-        dataset = dataset.take(1024 * 2)
-
-        dataset = dataset.map(lambda x, y: tf.py_function(func=render_from_sim_state, inp=[x], Tout=[tf.float32, tf.float32]))
-
-        return dataset
+    return dataset
 
 
 def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
-                            epochs: int,
+                            n_batches: int,
                             batch_size: int,
                             n_samples: int,
                             n_cameras=1,
@@ -215,103 +184,110 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
     """Pretrain a visual component on prediction of cube position."""
     data_name = f"storage/data/pretraining/pose_data_{n_samples}"
     dataset = prepare_dataset(data_name, load_data=load_data)
-    # dataset = prepare_pre_rendered_dataset(data_name, load_data=load_data)
+
+    n_testset = 512 * 16
+    n_valset = 512 * 2
+
+    testset = dataset.take(n_testset)
+    trainset = dataset.skip(n_testset)
+
+    trainset = trainset.repeat(n_batches // (trainset.cardinality() // batch_size))
+
+    trainset = trainset.batch(batch_size, drop_remainder=True)
+    testset = testset.batch(batch_size, drop_remainder=True)
 
     if is_root:
-        n_testset = 512 * 1  # * 16 TODO increase
-        n_valset = 16 * 1  # * 2 TODO increase
-
-        testset = dataset.take(n_testset)
-        trainset = dataset.skip(n_testset).take(1024)
-        valset = trainset.take(n_valset)
-
-        trainset = trainset.batch(batch_size, drop_remainder=True)
-        valset = valset.batch(batch_size, drop_remainder=True)
-        testset = testset.batch(batch_size, drop_remainder=True)
-
         train_mean = np.expand_dims(
             np.mean(list(tfds.as_numpy(trainset.unbatch().take(3000).map(lambda x, y: y))), axis=0), 0)
-        test_y_numpy = np.stack(list(tfds.as_numpy(valset.unbatch().map(lambda x, y: y))))
-        test_x_numpy = np.stack(list(tfds.as_numpy(valset.unbatch().map(lambda x, y: x))))
+        test_y_numpy = np.stack(list(tfds.as_numpy(testset.unbatch().map(lambda x, y: y))))
 
-        # print(
-        #     f"A mean model would achieve\n"
-        #     f"\t{np.mean((test_y_numpy - train_mean) ** 2)} (mse) \n"
-        #     f"\t{tf.reduce_mean(tf.norm(test_y_numpy[:, :3] - train_mean[:, :3], axis=-1, ord='euclidean'))} (pos: euclidean). \n"
-        #     f"\t{geodesic_loss(test_y_numpy[:, 3:], train_mean[:, 3:])} (rot: geodesic).\n"
-        #     f"based on the following mean: {train_mean}"
-        # )
-        #
-        # print(
-        #     f"Samples have values in range [{np.min(test_x_numpy)}, {np.max(test_x_numpy)}].\n"
-        #     f"Mean is {np.mean(test_x_numpy)}.\n"
-        #     f"Std is {np.std(test_x_numpy)}.\n"
-        #     f"Shape is {test_x_numpy.shape}."
-        # )
+        print(
+            f"A mean model would achieve\n"
+            f"\t{np.mean((test_y_numpy - train_mean) ** 2)} (mse) \n"
+            f"\t{np.round(distance_in_millimeters(test_y_numpy, train_mean), 2)} mm (pos). \n"
+            f"\t{np.round(rotational_distance_in_degrees(test_y_numpy, train_mean), 2)} deg (rot).\n"
+            f"based on the following mean: {train_mean}"
+        )
 
-        if load_from is None:
+    if load_from is None:
+
+        if is_root:
             model = pretrainable_component
 
             build_sample = tf.expand_dims(render_from_sim_state(next(iter(testset))[0][0])[0], 0)
             model(build_sample)
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
-            # model.compile(optimizer, loss=PoseEstimationLoss(), metrics=[euclidean_distance, geodesic_loss])
-            model.compile(optimizer, loss="mse")
+            loss_fn = PoseEstimationLoss()
+            metrics = [distance_in_millimeters, rotational_distance_in_degrees]
 
-            # model.compile(optimizer, loss="mse", metrics=[geodesic_distance, euclidean_distance])
+        @tf.function
+        def train_on_batch(x, y):
+            with tf.GradientTape() as tape:
+                predictions = model(x, training=True)
+                loss_value = loss_fn(y, predictions)
 
-            def step_decay(epoch, lr):
-                drop = 0.5
-                epochs_drop = 1.0
+            grads = tape.gradient(loss_value, model.trainable_weights)
+            optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-                if epoch % epochs_drop == 0 and epoch > 1:
-                    return lr * drop
-                else:
-                    return lr
+            metric_results = []
+            for metric in metrics:
+                metric_results.append(metric(tf.cast(y, dtype=tf.float32), predictions))
 
-            # train and save encoder
-            for i_epoch in range(epochs):
-                print(f"Epoch {i_epoch + 1}/{epochs}")
+            return loss_value, *metric_results
 
-                epoch_loss = 0
-                epoch_batch_i = 0
-                for inputs, targets in tqdm(trainset):
-                    # transform with render
-                    rendered_inputs, rendered_targets = [], []
-                    for data in tf.unstack(inputs, axis=0):
-                        rendered_data, rendered_pose = render_from_sim_state(data)
-                        rendered_inputs.append(rendered_data)
-                        rendered_targets.append(rendered_pose)
+        # train and save encoder
+        report_every = 200
 
-                        # fig, axs = plt.subplots(1, len(cameras))
-                        # for i in range(len(cameras)):
-                        #     ax = axs[i] if len(cameras) > 1 else axs
-                        #     camera_img = rendered_data[:, :, 3 * i:3 * (i + 1)] / 255
-                        #     ax.imshow(camera_img)
-                        # plt.show()
+        batch_i = 0
+        batch_losses = []
+        for inputs, targets in tqdm(
+                trainset,
+                desc=f"Training on {n_batches} batches.",
+                leave=False,
+                total=n_batches,
+                disable=not is_root
+        ):
 
-                    inputs, targets = tf.stack(rendered_inputs), tf.stack(rendered_targets)
+            # transform with render
+            rendered_inputs, rendered_targets = [], []
+            unstacked_data = tf.unstack(inputs, axis=0)
+            worker_distributed_data = np.array_split(np.array(unstacked_data), MPI.COMM_WORLD.Get_size(), axis=0)[mpi_rank]
 
-                    loss = model.train_on_batch(inputs, targets)
-                    epoch_loss += loss
-                    epoch_batch_i += 1
+            for data in worker_distributed_data:
+                rendered_data, rendered_pose = render_from_sim_state(data)
+                rendered_inputs.append(rendered_data)
+                rendered_targets.append(rendered_pose)
 
-                epoch_loss /= epoch_batch_i
-                print(f"Epoch loss: {epoch_loss}")
+            # gather on root process
+            if MPI.COMM_WORLD.Get_size() > 1:
+                rendered_inputs = MPI.COMM_WORLD.gather(rendered_inputs, root=0)
+                rendered_targets = MPI.COMM_WORLD.gather(rendered_targets, root=0)
 
+            if is_root:
+                # skip chaining if only one process is used
+                if MPI.COMM_WORLD.Get_size() > 1:
+                    rendered_inputs = tf.stack(list(itertools.chain(*rendered_inputs)), axis=0)
+                    rendered_targets = tf.stack(list(itertools.chain(*rendered_targets)), axis=0)
+                loss = np.array(train_on_batch(rendered_inputs, rendered_targets))
+                batch_losses.append(loss)
 
-            pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
-        else:
-            print("Loading model...")
-            model = tf.keras.models.load_model(load_from)
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            model.compile(optimizer, loss="mse", metrics=[])
-            print("Model loaded successfully.")
+                if batch_i % report_every == 0:
+                    print(f"\rBatch {batch_i} - loss: {np.mean(batch_losses[-report_every:], axis=0)}")
 
-        print(f"This model achieves {model.evaluate(trainset)} (train)")
-        print(f"This model achieves {model.evaluate(valset)} (val)")
-        print(f"This model achieves {model.evaluate(testset)} (test)")
+                if batch_i % 20000 == 0 and batch_i > 0:
+                    optimizer.learning_rate = optimizer.learning_rate / 2
+                    print(f"Learning rate reduced to {optimizer.learning_rate}")
+
+            batch_i += 1
+
+        pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
+    else:
+        print("Loading model...")
+        model = tf.keras.models.load_model(load_from)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        model.compile(optimizer, loss="mse", metrics=[])
+        print("Model loaded successfully.")
 
 
 if __name__ == "__main__":
@@ -324,8 +300,8 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default="visual_component",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
-    parser.add_argument("--epochs", type=int, default=25, help=f"number of pretraining epochs")
-    parser.add_argument("--batch-size", type=int, default=16, help=f"number of samples per minibatch")
+    parser.add_argument("--n-training-batches", type=int, default=400000, help=f"number of pretraining epochs")
+    parser.add_argument("--batch-size", type=int, default=64, help=f"number of samples per minibatch")
 
     # read arguments
     argcomplete.autocomplete(parser)
@@ -334,7 +310,6 @@ if __name__ == "__main__":
     # parameters
     n_cameras = 3
     n_samples = 83392 // 2
-    batch_size = args.batch_size
 
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
     args.name = args.name
@@ -342,8 +317,8 @@ if __name__ == "__main__":
     visual_component = OpenAIEncoder(shape=(VISION_WH, VISION_WH, 3), name=args.name, n_cameras=n_cameras)
     pretrain_on_object_pose(
         visual_component,
-        epochs=args.epochs,
-        batch_size=batch_size,
+        n_batches=args.n_training_batches,
+        batch_size=args.batch_size,
         n_samples=n_samples,
         n_cameras=n_cameras,
         load_data=True,

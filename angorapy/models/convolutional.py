@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Convolutional components/networks."""
-import keras_cortex.layers
+import kortex
 import tensorflow as tf
 import tensorflow_models as tfm
 
@@ -21,8 +21,8 @@ def _residual_stack(x, filters, blocks, stride1=2, name=None):
         strides=stride1,
         name=name + "_block1",
         use_projection=True,
-        # kernel_regularizer=tf.keras.regularizers.L2(0.001),
-        # bias_regularizer=tf.keras.regularizers.L2(0.001),
+        kernel_regularizer=tf.keras.regularizers.L2(0.001),
+        bias_regularizer=tf.keras.regularizers.L2(0.001),
     )(x)
 
     for i in range(2, blocks + 1):
@@ -31,8 +31,8 @@ def _residual_stack(x, filters, blocks, stride1=2, name=None):
             strides=1,
             use_projection=False,
             name=name + "_block" + str(i),
-            # kernel_regularizer=tf.keras.regularizers.L2(0.001),
-            # bias_regularizer=tf.keras.regularizers.L2(0.001),
+            kernel_regularizer=tf.keras.regularizers.L2(0.001),
+            bias_regularizer=tf.keras.regularizers.L2(0.001),
         )(x)
     return x
 
@@ -45,15 +45,15 @@ def _build_openai_resnets(shape, batch_size=None):
 
     # first layer
     x = tf.keras.layers.Conv2D(32, 5, 1, padding="valid",
-                               # kernel_regularizer=tf.keras.regularizers.L2(0.001),
-                               # bias_regularizer=tf.keras.regularizers.L2(0.001),
+                               kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                               bias_regularizer=tf.keras.regularizers.L2(0.001),
                                )(inputs)  # 196 x 196
     x = tf.keras.layers.Activation("relu")(x)
 
     # second layer
     x = tf.keras.layers.Conv2D(32, 3, 1, padding="valid",
-                               # kernel_regularizer=tf.keras.regularizers.L2(0.001),
-                               # bias_regularizer=tf.keras.regularizers.L2(0.001),
+                               kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                               bias_regularizer=tf.keras.regularizers.L2(0.001),
                                )(x)  # 195 x 195
     x = tf.keras.layers.Activation("relu")(x)
 
@@ -87,38 +87,38 @@ class OpenAIEncoder(tf.keras.Model):
             tf.keras.layers.Dense(
                 256,
                 activation="relu",
-                # kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                kernel_regularizer=tf.keras.regularizers.L2(0.001),
             ),
             tf.keras.layers.BatchNormalization(),
             tf.keras.layers.Dense(
                 256,
                 activation="relu",
-                # kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                kernel_regularizer=tf.keras.regularizers.L2(0.001),
             ),
             tf.keras.layers.BatchNormalization(),
             tf.keras.layers.Dense(
                 128,
                 activation="relu",
-                # kernel_regularizer=tf.keras.regularizers.L2(0.001),
+                kernel_regularizer=tf.keras.regularizers.L2(0.001),
             ),
         ])
 
         self.relu = tf.keras.layers.Activation("relu")
-        self.softmax = tf.keras.layers.Flatten()  #  keras_cortex.layers.SpatialSoftargmax()
+        self.softmax = kortex.layers.SpatialSoftargmax()
 
         self.pos_dense = tf.keras.layers.Dense(
             3,
             kernel_initializer=tf.keras.initializers.GlorotUniform(),
-            # bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.32801157, 0.00065984, 0.02937366]),
-            # kernel_regularizer=tf.keras.regularizers.L2(0.001),
-            # bias_regularizer=tf.keras.regularizers.L2(0.001)
+            bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.32801157, 0.00065984, 0.02937366]),
+            kernel_regularizer=tf.keras.regularizers.L2(0.001),
+            bias_regularizer=tf.keras.regularizers.L2(0.001)
         )
         self.rot_dense = tf.keras.layers.Dense(
             4,
             kernel_initializer=tf.keras.initializers.GlorotUniform(),
-            # bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.6211242, -0.02646778, 0.02921998, -0.00490309]),
-            # kernel_regularizer=tf.keras.regularizers.L2(0.001),
-            # bias_regularizer=tf.keras.regularizers.L2(0.001)
+            bias_initializer=lambda shape, dtype: tf.convert_to_tensor([0.6211242, -0.02646778, 0.02921998, -0.00490309]),
+            kernel_regularizer=tf.keras.regularizers.L2(0.001),
+            bias_regularizer=tf.keras.regularizers.L2(0.001)
         )
 
     def call(self, inputs, training=None, mask=None):

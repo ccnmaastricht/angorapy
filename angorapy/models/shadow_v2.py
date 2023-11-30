@@ -1,7 +1,7 @@
 import os
 
 import gymnasium as gym
-import keras_cortex
+import kortex
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model
@@ -123,7 +123,7 @@ def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistributio
     if blind:
         vc = visual_input
     else:
-        visual_component = keras_cortex.cornet.CORNetZ(7)
+        visual_component = kortex.cornet.CORNetZ(7)
         vc = TD(visual_component, name="visual_component")(visual_input)
 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=vc.shape)(vc)
