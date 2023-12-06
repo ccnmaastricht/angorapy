@@ -21,8 +21,7 @@ setup(
         "imageio==2.28.1",
 
         # tensorflow and extensions
-        "tensorflow==2.12.0",
-        "tensorflow_probability==0.20.0",
+        "tensorflow_probability==0.22.0",
         "tensorflow_graphics==2021.12.3",
         "tensorflow_graphics==2021.12.3",
 
