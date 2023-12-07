@@ -316,6 +316,18 @@ class BaseManipulate(BaseShadowHandEnv):
 
         mujoco.mj_forward(self.model, self.data)
 
+    def get_vision(self):
+        if not self.vision:
+            object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
+            vision = object_qpos.astype(np.float32)
+        else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision = self.render()
+            self.render_mode = tmp_render_mode
+
+        return vision
+
     def _get_obs(self):
 
         """Gather humanoid senses and asymmetric information."""
@@ -323,13 +335,7 @@ class BaseManipulate(BaseShadowHandEnv):
         object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
 
         # vision
-        if not self.vision:
-            vision_input = object_qpos.astype(np.float32)
-        else:
-            tmp_render_mode = self.render_mode
-            self.render_mode = "rgb_array"
-            vision_input = self.render()
-            self.render_mode = tmp_render_mode
+        vision_input = self.get_vision()
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]
@@ -378,7 +384,6 @@ class BaseManipulate(BaseShadowHandEnv):
         obj_center_pos = self.data.site(self.object_center_id).xpos
 
         # determine palm center position
-        # palm_center_pos = self.data.site("robot/palm_center_site").xpos
         palm_center_pos = self.data.site("robot/palm_center_site").xpos
 
         dropped = (
@@ -470,3 +475,41 @@ class ManipulateBlockDiscreteAsymmetric(ManipulateBlockDiscrete):
 class ManipulateBlockAsymmetric(ManipulateBlockDiscrete):
     asymmetric = True
     continuous = True
+
+
+class NoisyManipulateBlock(ManipulateBlock):
+    """Manipulate Environment with a Block as an object."""
+
+    asymmetric = True
+    continuous = False
+
+    def get_vision(self):
+        """Get (surrogate) vision with added noise."""
+
+        if not self.vision:
+            object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
+            vision = object_qpos.astype(np.float32)
+
+            # get random quaternion rotating by max 5 degrees in total
+            random_total_angle = np.random.uniform(-np.pi / 36, np.pi / 36)
+            angle_split = np.random.uniform(0, 1, 3)
+            angle_split /= angle_split.sum()
+            angle_noise_by_axis = angle_split * random_total_angle
+
+            x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], [1, 0, 0])
+            y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], [0, 1, 0])
+            z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], [0, 0, 1])
+
+            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
+                                                                      y_rotation_noise_quaternion)
+            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
+                                                                      z_rotation_noise_quaternion)
+
+            vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+        else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision = self.render()
+            self.render_mode = tmp_render_mode
+
+        return vision
