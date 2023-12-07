@@ -4,6 +4,8 @@ import gymnasium as gym
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.const import SHADOWHAND_MAX_STEPS
 
+from angorapy.tasks.envs import dexterity
+from angorapy.tasks.envs import cognitive
 
 # REACHING
 for vision_mode in ["Visual", ""]:
