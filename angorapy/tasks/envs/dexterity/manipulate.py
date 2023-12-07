@@ -496,9 +496,9 @@ class NoisyManipulateBlock(ManipulateBlock):
             angle_split /= angle_split.sum()
             angle_noise_by_axis = angle_split * random_total_angle
 
-            x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], [1, 0, 0])
-            y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], [0, 1, 0])
-            z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], [0, 0, 1])
+            x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
+            y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
+            z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
 
             rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
                                                                       y_rotation_noise_quaternion)
