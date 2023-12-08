@@ -513,3 +513,60 @@ class NoisyManipulateBlock(ManipulateBlock):
             self.render_mode = tmp_render_mode
 
         return vision
+
+
+class TestCaseManipulateBlock(ManipulateBlock):
+
+    asymmetric = True
+    continuous = False
+
+    def __init__(self,
+                 target_position='ignore',
+                 target_rotation='xyz',
+                 touch_get_obs='sensordata',
+                 relative_control=True,
+                 vision: bool = False,
+                 delta_t: float = 0.002,
+                 render_mode: Optional[str] = None):
+        utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
+        BaseManipulate.__init__(self,
+                                touch_get_obs=touch_get_obs,
+                                target_rotation=target_rotation,
+                                target_position=target_position,
+                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                                vision=vision,
+                                relative_control=relative_control,
+                                delta_t=delta_t,
+                                render_mode=render_mode
+                                )
+
+        initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:]
+
+        # get rotations for all 24 possible orientations
+        deg90 = np.pi / 2
+        deg180 = np.pi
+        x_axis = np.array([1., 0., 0.])
+        y_axis = np.array([0., 1., 0.])
+        z_axis = np.array([0., 0., 1.])
+
+        base_up_faces = [
+            initial_block_rotation,
+            quat_from_angle_and_axis(deg90, x_axis),
+            quat_from_angle_and_axis(-deg90, x_axis),
+            quat_from_angle_and_axis(deg90, y_axis),
+            quat_from_angle_and_axis(-deg90, y_axis),
+            quat_from_angle_and_axis(deg180, y_axis),
+        ]
+
+        self.test_cases_block_rotations = []
+        self.test_cases_block_rotations += base_up_faces
+        for base_up_face in base_up_faces:
+            self.test_cases_block_rotations.append(
+                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
+            )
+            self.test_cases_block_rotations.append(
+                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
+            )
+            self.test_cases_block_rotations.append(
+                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
+            )
