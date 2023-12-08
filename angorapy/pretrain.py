@@ -4,21 +4,16 @@ import itertools
 import os
 import sys
 
-import tensorflow as tf
+import mujoco
 import numpy as np
+import tensorflow as tf
+from matplotlib import pyplot as plt
+from tensorflow import keras
 from tqdm import tqdm
 
+from angorapy.common.loss import PoseEstimationLoss
 from angorapy.common.metrics.distance import distance_in_millimeters
 from angorapy.common.metrics.distance import rotational_distance_in_degrees
-
-# set random seeds for tensorflow and numpy
-tf.random.set_seed(0)
-np.random.seed(0)
-tf.keras.utils.set_random_seed(0)
-
-import mujoco
-
-from angorapy.common.loss import PoseEstimationLoss, euclidean_distance, geodesic_loss
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -34,7 +29,6 @@ import tensorflow_datasets as tfds
 import matplotlib
 
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 
 import argcomplete
 
@@ -191,7 +185,7 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
     testset = dataset.take(n_testset)
     trainset = dataset.skip(n_testset)
 
-    trainset = trainset.repeat(n_batches // (trainset.cardinality() // batch_size))
+    trainset = trainset.repeat()
 
     trainset = trainset.batch(batch_size, drop_remainder=True)
     testset = testset.batch(batch_size, drop_remainder=True)
@@ -203,91 +197,103 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
 
         print(
             f"A mean model would achieve\n"
-            f"\t{np.mean((test_y_numpy - train_mean) ** 2)} (mse) \n"
-            f"\t{np.round(distance_in_millimeters(test_y_numpy, train_mean), 2)} mm (pos). \n"
-            f"\t{np.round(rotational_distance_in_degrees(test_y_numpy, train_mean), 2)} deg (rot).\n"
+            f"\t{np.round(np.mean((test_y_numpy - train_mean) ** 2), 5)} (mse) \n"
+            f"\t{np.round(PoseEstimationLoss()(test_y_numpy, train_mean), 5)} (pose loss) \n"
+            f"\t{np.round(distance_in_millimeters(test_y_numpy, train_mean), 5)} mm (position). \n"
+            f"\t{np.round(rotational_distance_in_degrees(test_y_numpy, train_mean), 5)} degrees (rotation).\n"
             f"based on the following mean: {train_mean}"
         )
 
-    if load_from is None:
+        model = pretrainable_component
+
+        build_sample = tf.expand_dims(render_from_sim_state(next(iter(testset))[0][0])[0], 0)
+        model(build_sample)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0003)
+        loss_fn = PoseEstimationLoss()
+        metrics = [
+            distance_in_millimeters,
+            rotational_distance_in_degrees,
+            keras.metrics.MeanSquaredError(),
+        ]
+
+    @tf.function
+    def train_on_batch(x, y):
+        with tf.GradientTape() as tape:
+            predictions = model(x, training=True)
+            loss_value = loss_fn(y, predictions)
+
+        grads = tape.gradient(loss_value, model.trainable_weights)
+        optimizer.apply_gradients(zip(grads, model.trainable_weights))
+
+        metric_results = []
+        for metric in metrics:
+            metric_results.append(metric(tf.cast(y, dtype=tf.float32), predictions))
+
+        return loss_value, *metric_results
+
+    # train and save encoder
+    report_every = 200
+
+    batch_i = 0
+    batch_losses = []
+    windowed_mean_batch_losses = []
+    for inputs, targets in tqdm(
+            trainset,
+            desc=f"Training on {n_batches} batches.",
+            leave=False,
+            total=n_batches,
+            disable=not is_root
+    ):
+
+        # transform with render
+        rendered_inputs, rendered_targets = [], []
+        unstacked_data = tf.unstack(inputs, axis=0)
+        worker_distributed_data = np.array_split(np.array(unstacked_data), MPI.COMM_WORLD.Get_size(), axis=0)[mpi_rank]
+
+        for data in worker_distributed_data:
+            rendered_data, rendered_pose = render_from_sim_state(data)
+            rendered_inputs.append(rendered_data)
+            rendered_targets.append(rendered_pose)
+
+        # gather on root process
+        if MPI.COMM_WORLD.Get_size() > 1:
+            rendered_inputs = MPI.COMM_WORLD.gather(rendered_inputs, root=0)
+            rendered_targets = MPI.COMM_WORLD.gather(rendered_targets, root=0)
 
         if is_root:
-            model = pretrainable_component
-
-            build_sample = tf.expand_dims(render_from_sim_state(next(iter(testset))[0][0])[0], 0)
-            model(build_sample)
-
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
-            loss_fn = PoseEstimationLoss()
-            metrics = [distance_in_millimeters, rotational_distance_in_degrees]
-
-        @tf.function
-        def train_on_batch(x, y):
-            with tf.GradientTape() as tape:
-                predictions = model(x, training=True)
-                loss_value = loss_fn(y, predictions)
-
-            grads = tape.gradient(loss_value, model.trainable_weights)
-            optimizer.apply_gradients(zip(grads, model.trainable_weights))
-
-            metric_results = []
-            for metric in metrics:
-                metric_results.append(metric(tf.cast(y, dtype=tf.float32), predictions))
-
-            return loss_value, *metric_results
-
-        # train and save encoder
-        report_every = 200
-
-        batch_i = 0
-        batch_losses = []
-        for inputs, targets in tqdm(
-                trainset,
-                desc=f"Training on {n_batches} batches.",
-                leave=False,
-                total=n_batches,
-                disable=not is_root
-        ):
-
-            # transform with render
-            rendered_inputs, rendered_targets = [], []
-            unstacked_data = tf.unstack(inputs, axis=0)
-            worker_distributed_data = np.array_split(np.array(unstacked_data), MPI.COMM_WORLD.Get_size(), axis=0)[mpi_rank]
-
-            for data in worker_distributed_data:
-                rendered_data, rendered_pose = render_from_sim_state(data)
-                rendered_inputs.append(rendered_data)
-                rendered_targets.append(rendered_pose)
-
-            # gather on root process
+            # skip chaining if only one process is used
             if MPI.COMM_WORLD.Get_size() > 1:
-                rendered_inputs = MPI.COMM_WORLD.gather(rendered_inputs, root=0)
-                rendered_targets = MPI.COMM_WORLD.gather(rendered_targets, root=0)
+                rendered_inputs = tf.stack(list(itertools.chain(*rendered_inputs)), axis=0)
+                rendered_targets = tf.stack(list(itertools.chain(*rendered_targets)), axis=0)
+            loss = np.array(train_on_batch(rendered_inputs, rendered_targets))
+            batch_losses.append(loss)
 
-            if is_root:
-                # skip chaining if only one process is used
-                if MPI.COMM_WORLD.Get_size() > 1:
-                    rendered_inputs = tf.stack(list(itertools.chain(*rendered_inputs)), axis=0)
-                    rendered_targets = tf.stack(list(itertools.chain(*rendered_targets)), axis=0)
-                loss = np.array(train_on_batch(rendered_inputs, rendered_targets))
-                batch_losses.append(loss)
+            if batch_i % report_every == 0:
+                windowed_mean_batch_losses.append(np.mean(batch_losses[-report_every:], axis=0))
+                print(f"\rBatch {batch_i} - loss: {windowed_mean_batch_losses[-1]}")
 
-                if batch_i % report_every == 0:
-                    print(f"\rBatch {batch_i} - loss: {np.mean(batch_losses[-report_every:], axis=0)}")
+                if batch_i >= report_every:
+                    plt.plot(range(report_every, batch_i + 1, report_every), np.array(windowed_mean_batch_losses)[1:, 0], label="loss")
+                    plt.plot(range(report_every, batch_i + 1, report_every), np.array(windowed_mean_batch_losses)[1:, 1], label="position")
+                    plt.plot(range(report_every, batch_i + 1, report_every), np.array(windowed_mean_batch_losses)[1:, 2], label="rotation")
 
-                if batch_i % 20000 == 0 and batch_i > 0:
-                    optimizer.learning_rate = optimizer.learning_rate / 2
-                    print(f"Learning rate reduced to {optimizer.learning_rate}")
+                    plt.legend()
+                    plt.savefig(f"storage/data/pretraining/{name}_loss.png")
+                    plt.gcf().clear()
 
-            batch_i += 1
+            # if batch_i % 20000 == 0 and batch_i > 0:
+            #     optimizer.learning_rate = optimizer.learning_rate / 2
+            #     print(f"Learning rate reduced to {optimizer.learning_rate}")
 
+        batch_i += 1
+
+        if batch_i >= n_batches:
+            break
+
+    if is_root:
+        print(f"Trained for {batch_i} batches. Saving model to {PRETRAINED_COMPONENTS_PATH}/{name}...")
         pretrainable_component.save(PRETRAINED_COMPONENTS_PATH + f"/{name}")
-    else:
-        print("Loading model...")
-        model = tf.keras.models.load_model(load_from)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer, loss="mse", metrics=[])
-        print("Model loaded successfully.")
 
 
 if __name__ == "__main__":
@@ -314,7 +320,15 @@ if __name__ == "__main__":
     os.makedirs(PRETRAINED_COMPONENTS_PATH, exist_ok=True)
     args.name = args.name
 
+    # fix the seeds
+    np.random.seed(0)
+    tf.random.set_seed(0)
+    keras.utils.set_random_seed(812)
+
+    # set up the visual component
     visual_component = OpenAIEncoder(shape=(VISION_WH, VISION_WH, 3), name=args.name, n_cameras=n_cameras)
+
+    # pretrain the visual component
     pretrain_on_object_pose(
         visual_component,
         n_batches=args.n_training_batches,
