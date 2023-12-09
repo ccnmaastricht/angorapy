@@ -113,9 +113,10 @@ class Stage(_Entity):
         self._mjcf_root.visual.scale.contactheight = 0.03
 
         # Lights.
-        self._mjcf_root.worldbody.add("light", pos=(0, 0, 1))
-        self._mjcf_root.worldbody.add(
-            "light", pos=(0.3, 0, 1.5), dir=(0, 0, -1), directional=True
+        self._mjcf_root.visual.headlight.set_attributes(
+            ambient=(0.4, 0.4, 0.4),
+            diffuse=(0.8, 0.8, 0.8),
+            specular=(0.8, 0.8, 0.8),
         )
 
         # Dark checkerboard floor.
@@ -123,8 +124,7 @@ class Stage(_Entity):
             "texture",
             name="grid",
             type="2d",
-            builtin="checker",
-            mark="cross",
+            builtin="flat",
             width=256,
             height=256,
             # rgb1=[0.2, 0.3, 0.4],
