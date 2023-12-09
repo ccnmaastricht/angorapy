@@ -153,10 +153,12 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
 
         if self.viewpoint == "topdown":
             # rotate camera to top down view
-            self.viewer.cam.distance = 0.5  # zoom in
+            self.viewer.cam.distance = 0.42  # zoom
             self.viewer.cam.azimuth = 0.0  # wrist to the bottom
             self.viewer.cam.elevation = -90.0  # top down view
             self.viewer.cam.lookat[0] = 0.35  # slightly move forward
+            self.viewer.cam.lookat[1] = 0  # slightly move left
+            self.viewer.cam.lookat[2] = 0  # slightly move left
         elif self.viewpoint == "topdown-far":
             # rotate camera to top down view
             self.viewer.cam.distance = 0.7  # increased values zoom out
