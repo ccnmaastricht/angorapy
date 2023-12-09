@@ -3,16 +3,9 @@ import gymnasium as gym
 
 from angorapy.common.const import N_SUBSTEPS
 from angorapy.common.const import SHADOWHAND_MAX_STEPS
-from angorapy.tasks.envs.cognitive.hanoi import HanoiEnv
-from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlock
-from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlockAsymmetric
-from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlockDiscrete
-from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlockDiscrete
-from angorapy.tasks.envs.dexterity.manipulate import ManipulateBlockDiscreteAsymmetric
-from angorapy.tasks.envs.dexterity.reach import FreeReach
-from angorapy.tasks.envs.dexterity.reach import FreeReachSequential
-from angorapy.tasks.envs.dexterity.reach import Reach
-from angorapy.tasks.envs.dexterity.reach import ReachSequential
+
+from angorapy.tasks.envs import dexterity
+from angorapy.tasks.envs import cognitive
 
 # REACHING
 for vision_mode in ["Visual", ""]:
@@ -145,6 +138,20 @@ gym.envs.register(
     id=f'ManipulateBlockVisualAsynchronous-v0',
     entry_point='angorapy.tasks.envs.dexterity.manipulate:ManipulateBlockAsymmetric',
     kwargs={"delta_t": 0.008, "vision": True},
+    max_episode_steps=50 * 100,
+)
+
+gym.envs.register(
+    id=f"NoisyManipulateBlock-v0",
+    entry_point="angorapy.tasks.envs.dexterity.manipulate:NoisyManipulateBlock",
+    kwargs={"delta_t": 0.008, "vision": False},
+    max_episode_steps=50 * 100,
+)
+
+gym.envs.register(
+    id=f"TestCaseManipulateBlock-v0",
+    entry_point="angorapy.tasks.envs.dexterity.manipulate:TestCaseManipulateBlock",
+    kwargs={"delta_t": 0.008, "vision": False},
     max_episode_steps=50 * 100,
 )
 

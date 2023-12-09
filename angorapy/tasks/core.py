@@ -219,18 +219,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
         pass
 
     def set_reward_function(self,
-                            function: Union[str, Callable]):
-        """Set the environment reward function by its config identifier or a callable."""
-        if isinstance(function, str):
-            try:
-                function = getattr(reward, function.split(".")[0])
-            except AttributeError:
-                raise AttributeError("Reward function unknown.")
-        elif isinstance(function, Callable):
-            pass
-        else:
-            raise ValueError("Unknown format for given reward function. Provide a string or a Callable.")
-
+                            function: Callable):
+        """Set the environment reward function."""
         self.reward_function = function
 
     def set_reward_config(self,

@@ -4,6 +4,8 @@ from angorapy import models
 from angorapy import tasks
 from angorapy import utilities
 from angorapy import analysis
+from angorapy.common import policies
+from angorapy.utilities.monitoring import Monitor
 
 from angorapy.tasks.registration import make_task
 from angorapy.tasks.registration import make_task as make_env  # For backwards compatibility

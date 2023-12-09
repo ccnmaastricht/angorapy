@@ -161,10 +161,7 @@ class PPOAgent:
             self.continuous_control = True
         else:
             raise NotImplementedError(f"PPO cannot handle unknown Action Space Typ: {self.env.action_space}")
-
         self.env.warmup()
-
-        mpi_print(f"Using {self.env.transformers} for preprocessing.")
 
         # hyperparameters
         self.horizon = horizon
@@ -211,7 +208,6 @@ class PPOAgent:
         validate_env_model_compatibility(self.env, self.joint)
 
         if pretrained_components is not None:
-            print("Loading pretrained components:")
             for pretraining_name in pretrained_components:
                 component_path = os.path.join(PRETRAINED_COMPONENTS_PATH, f"{pretraining_name}.h5")
                 if os.path.isfile(component_path):

@@ -316,6 +316,18 @@ class BaseManipulate(BaseShadowHandEnv):
 
         mujoco.mj_forward(self.model, self.data)
 
+    def get_vision(self):
+        if not self.vision:
+            object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
+            vision = object_qpos.astype(np.float32)
+        else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision = self.render()
+            self.render_mode = tmp_render_mode
+
+        return vision
+
     def _get_obs(self):
 
         """Gather humanoid senses and asymmetric information."""
@@ -323,13 +335,7 @@ class BaseManipulate(BaseShadowHandEnv):
         object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
 
         # vision
-        if not self.vision:
-            vision_input = object_qpos.astype(np.float32)
-        else:
-            tmp_render_mode = self.render_mode
-            self.render_mode = "rgb_array"
-            vision_input = self.render()
-            self.render_mode = tmp_render_mode
+        vision_input = self.get_vision()
 
         # goal
         target_orientation = self.goal.ravel().copy()[3:]
@@ -378,7 +384,6 @@ class BaseManipulate(BaseShadowHandEnv):
         obj_center_pos = self.data.site(self.object_center_id).xpos
 
         # determine palm center position
-        # palm_center_pos = self.data.site("robot/palm_center_site").xpos
         palm_center_pos = self.data.site("robot/palm_center_site").xpos
 
         dropped = (
@@ -470,3 +475,98 @@ class ManipulateBlockDiscreteAsymmetric(ManipulateBlockDiscrete):
 class ManipulateBlockAsymmetric(ManipulateBlockDiscrete):
     asymmetric = True
     continuous = True
+
+
+class NoisyManipulateBlock(ManipulateBlock):
+    """Manipulate Environment with a Block as an object."""
+
+    asymmetric = True
+    continuous = False
+
+    def get_vision(self):
+        """Get (surrogate) vision with added noise."""
+
+        if not self.vision:
+            object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
+            vision = object_qpos.astype(np.float32)
+
+            # get random quaternion rotating by max 5 degrees in total
+            random_total_angle = np.random.uniform(-np.pi / 36, np.pi / 36)
+            angle_split = np.random.uniform(0, 1, 3)
+            angle_split /= angle_split.sum()
+            angle_noise_by_axis = angle_split * random_total_angle
+
+            x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
+            y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
+            z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
+
+            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
+                                                                      y_rotation_noise_quaternion)
+            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
+                                                                      z_rotation_noise_quaternion)
+
+            vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+        else:
+            tmp_render_mode = self.render_mode
+            self.render_mode = "rgb_array"
+            vision = self.render()
+            self.render_mode = tmp_render_mode
+
+        return vision
+
+
+class TestCaseManipulateBlock(ManipulateBlock):
+
+    asymmetric = True
+    continuous = False
+
+    def __init__(self,
+                 target_position='ignore',
+                 target_rotation='xyz',
+                 touch_get_obs='sensordata',
+                 relative_control=True,
+                 vision: bool = False,
+                 delta_t: float = 0.002,
+                 render_mode: Optional[str] = None):
+        utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
+        BaseManipulate.__init__(self,
+                                touch_get_obs=touch_get_obs,
+                                target_rotation=target_rotation,
+                                target_position=target_position,
+                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+                                vision=vision,
+                                relative_control=relative_control,
+                                delta_t=delta_t,
+                                render_mode=render_mode
+                                )
+
+        initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:]
+
+        # get rotations for all 24 possible orientations
+        deg90 = np.pi / 2
+        deg180 = np.pi
+        x_axis = np.array([1., 0., 0.])
+        y_axis = np.array([0., 1., 0.])
+        z_axis = np.array([0., 0., 1.])
+
+        base_up_faces = [
+            initial_block_rotation,
+            quat_from_angle_and_axis(deg90, x_axis),
+            quat_from_angle_and_axis(-deg90, x_axis),
+            quat_from_angle_and_axis(deg90, y_axis),
+            quat_from_angle_and_axis(-deg90, y_axis),
+            quat_from_angle_and_axis(deg180, y_axis),
+        ]
+
+        self.test_cases_block_rotations = []
+        self.test_cases_block_rotations += base_up_faces
+        for base_up_face in base_up_faces:
+            self.test_cases_block_rotations.append(
+                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
+            )
+            self.test_cases_block_rotations.append(
+                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
+            )
+            self.test_cases_block_rotations.append(
+                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
+            )

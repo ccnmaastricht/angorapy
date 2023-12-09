@@ -56,7 +56,8 @@ This library is developed as part of the [Human Brain Project](https://www.human
 AngoraPy is available on PyPI. First, install requirements:
 
 ```bash
-sudo apt install swig libopenmpi-dev
+sudo apt install libopenmpi-dev
+pip install --extra-index-url https://pypi.nvidia.com tensorrt-bindings==8.6.1 tensorrt-libs==8.6.1
 ```
 
 Then install AngoraPy from pip.
