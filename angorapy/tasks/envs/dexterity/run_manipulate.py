@@ -8,7 +8,7 @@ from PIL import Image
 from angorapy.common.const import VISION_WH
 
 env = make_task("TestCaseManipulateBlock-v0", render_mode="rgb_array")
-env.warmup()
+env.reset()
 
 model = env.unwrapped.model
 data = env.unwrapped.data

@@ -1,7 +1,12 @@
 import os
 
 import gymnasium as gym
-import kortex as keras_cortex
+
+try:
+    import kortex as keras_cortex
+except:
+    import keras_cortex as kortex
+
 import tensorflow as tf
 from tensorflow.keras.layers import TimeDistributed as TD
 # from tensorflow_core.python.keras.utils import plot_model

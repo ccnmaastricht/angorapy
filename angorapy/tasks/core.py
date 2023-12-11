@@ -288,8 +288,10 @@ class AnthropomorphicEnv(gym.Env, ABC):
         super().reset(seed=seed)
 
         did_reset_sim = False
-        while not did_reset_sim:
+        i = 0
+        while not did_reset_sim or i < 5:
             did_reset_sim = self._reset_sim()
+            i += 1
 
         self.goal = self._sample_goal()
         obs = self._get_obs()

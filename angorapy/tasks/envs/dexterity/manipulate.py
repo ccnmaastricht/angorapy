@@ -535,7 +535,7 @@ class TestCaseManipulateBlock(ManipulateBlock):
                                 render_mode=render_mode
                                 )
 
-        initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:]
+        initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:].copy()
 
         # get rotations for all 24 possible orientations
         deg90 = np.pi / 2
