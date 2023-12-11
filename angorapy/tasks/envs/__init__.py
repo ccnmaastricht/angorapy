@@ -149,6 +149,13 @@ gym.envs.register(
 )
 
 gym.envs.register(
+    id=f"TestCaseManipulateBlock-v0",
+    entry_point="angorapy.tasks.envs.dexterity.manipulate:TestCaseManipulateBlock",
+    kwargs={"delta_t": 0.008, "vision": False},
+    max_episode_steps=50 * 100,
+)
+
+gym.envs.register(
     id="HanoiTower-v0",
     entry_point="angorapy.tasks.envs.cognitive.hanoi:HanoiEnv",
 )

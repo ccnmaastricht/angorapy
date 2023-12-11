@@ -12,6 +12,8 @@ import tensorflow as tf
 from gymnasium.spaces import Box
 from matplotlib import animation
 
+from angorapy.utilities.core import mpi_print
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -69,7 +71,7 @@ class Monitor:
             tf.keras.utils.plot_model(self.agent.joint, to_file=f"{self.story_directory}/model.png", expand_nested=True,
                                       show_shapes=True, dpi=300)
         except:
-            print("Could not create model plot.")
+            mpi_print("Could not create model plot.")
 
         self.make_metadata()
         self.write_progress()
