@@ -321,34 +321,16 @@ class BaseManipulate(BaseShadowHandEnv):
             object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
             vision = object_qpos.astype(np.float32)
         else:
-            tmp_render_mode = self.render_mode
-            self.render_mode = "rgb_array"
-            vision = self.render()
-            self.render_mode = tmp_render_mode
+            vision = super().get_vision()
 
         return vision
 
     def _get_obs(self):
-
         """Gather humanoid senses and asymmetric information."""
-
-        object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
-
-        # vision
+        object_qpos = self.get_object_pose()
         vision_input = self.get_vision()
-
-        # goal
         target_orientation = self.goal.ravel().copy()[3:]
-
-        # proprioception
-        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.model, self.data)
-
-        proprioception = np.concatenate([
-            hand_joint_angles,
-            hand_joint_velocities
-        ])
-
-        # touch
+        proprioception = self.get_proprioception()
         touch = self.get_touch()
 
         # asymmetric information
@@ -491,7 +473,7 @@ class NoisyManipulateBlock(ManipulateBlock):
             vision = object_qpos.astype(np.float32)
 
             # get random quaternion rotating by max 5 degrees in total
-            random_total_angle = np.random.uniform(-np.pi / 36, np.pi / 36)
+            random_total_angle = np.random.normal(0, np.pi / 36)
             angle_split = np.random.uniform(0, 1, 3)
             angle_split /= angle_split.sum()
             angle_noise_by_axis = angle_split * random_total_angle
@@ -513,3 +495,16 @@ class NoisyManipulateBlock(ManipulateBlock):
             self.render_mode = tmp_render_mode
 
         return vision
+
+    def _get_obs(self):
+        obs = super()._get_obs()
+
+        asymmetric = obs["observation"].asymmetric
+        asymmetric = np.concatenate([
+            asymmetric,
+            self.get_object_pose()
+        ])
+
+        obs["observation"].asymmetric = asymmetric
+
+        return obs
