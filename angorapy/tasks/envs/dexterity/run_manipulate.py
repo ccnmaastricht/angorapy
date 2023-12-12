@@ -1,3 +1,5 @@
+import time
+
 import mujoco
 from matplotlib import pyplot as plt
 
@@ -6,9 +8,12 @@ from mujoco import viewer
 from PIL import Image
 
 from angorapy.common.const import VISION_WH
+import numpy as np
+
 
 env = make_task("TestCaseManipulateBlock-v0", render_mode="rgb_array")
 env.reset()
+env.calc_rotation_set()
 
 model = env.unwrapped.model
 data = env.unwrapped.data

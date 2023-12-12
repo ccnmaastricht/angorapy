@@ -13,9 +13,9 @@ from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
 from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
 from angorapy.tasks.envs.dexterity.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
 from angorapy.tasks.envs.dexterity.reward import manipulate
-from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
 from angorapy.tasks.envs.dexterity.reward_configs import MANIPULATE_BASE
-from angorapy.tasks.utils import robot_get_obs
+from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
+from angorapy.tasks.utils import quat_mul
 
 
 class BaseManipulate(BaseShadowHandEnv):
@@ -248,7 +248,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
         # Run the simulation for a bunch of timesteps to let everything settle in.
         for _ in range(10):
-            self._set_action(self.data.actuator_length[:])
+            self._set_action(np.zeros(self.action_space.shape[0]))
             mujoco.mj_step(self.model, self.data)
 
         return is_on_palm()
@@ -432,16 +432,17 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  delta_t: float = 0.002,
                  render_mode: Optional[str] = None):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
-        BaseManipulate.__init__(self,
-                                touch_get_obs=touch_get_obs,
-                                target_rotation=target_rotation,
-                                target_position=target_position,
-                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                vision=vision,
-                                relative_control=relative_control,
-                                delta_t=delta_t,
-                                render_mode=render_mode
-                                )
+        BaseManipulate.__init__(
+            self,
+            touch_get_obs=touch_get_obs,
+            target_rotation=target_rotation,
+            target_position=target_position,
+            target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+            vision=vision,
+            relative_control=relative_control,
+            delta_t=delta_t,
+            render_mode=render_mode
+        )
 
 
 class ManipulateBlockDiscrete(ManipulateBlock):
@@ -511,7 +512,6 @@ class NoisyManipulateBlock(ManipulateBlock):
 
 
 class TestCaseManipulateBlock(ManipulateBlock):
-
     asymmetric = True
     continuous = False
 
@@ -535,6 +535,7 @@ class TestCaseManipulateBlock(ManipulateBlock):
                                 render_mode=render_mode
                                 )
 
+    def calc_rotation_set(self):
         initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:].copy()
 
         # get rotations for all 24 possible orientations
@@ -546,22 +547,22 @@ class TestCaseManipulateBlock(ManipulateBlock):
 
         base_up_faces = [
             initial_block_rotation,
-            quat_from_angle_and_axis(deg90, x_axis),
-            quat_from_angle_and_axis(-deg90, x_axis),
-            quat_from_angle_and_axis(deg90, y_axis),
-            quat_from_angle_and_axis(-deg90, y_axis),
-            quat_from_angle_and_axis(deg180, y_axis),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(deg90, x_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(-deg90, x_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(deg90, y_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(-deg90, y_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(deg180, y_axis)),
         ]
 
         self.test_cases_block_rotations = []
         self.test_cases_block_rotations += base_up_faces
         for base_up_face in base_up_faces:
             self.test_cases_block_rotations.append(
-                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
+                quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
             )
             self.test_cases_block_rotations.append(
-                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
+                quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
             )
             self.test_cases_block_rotations.append(
-                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
+                quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
             )

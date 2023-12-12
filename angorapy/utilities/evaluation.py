@@ -4,7 +4,8 @@ import time
 
 import statsmodels.stats.api as sms
 from angorapy.utilities.datatypes import mpi_condense_stats
-import angorapy as ap
+
+from angorapy.agent.ppo_agent import PPOAgent
 
 try:
     from mpi4py import MPI
@@ -12,7 +13,7 @@ except ImportError:
     MPI = None
 
 
-def evaluate_agent(agent: ap.Agent, n_episodes: int, act_confidently=False):
+def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False):
     """Evaluate an agent on its environment.
 
     Args:
@@ -24,7 +25,7 @@ def evaluate_agent(agent: ap.Agent, n_episodes: int, act_confidently=False):
         (list, list): A tuple of lists containing the episode rewards and episode lengths.
     """
 
-    if MPI is None:
+    if MPI is not None:
         mpi_comm = MPI.COMM_WORLD
         rank = mpi_comm.rank
         is_root = rank == 0

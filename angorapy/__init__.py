@@ -10,6 +10,8 @@ from angorapy.utilities.monitoring import Monitor
 from angorapy.tasks.registration import make_task
 from angorapy.tasks.registration import make_task as make_env  # For backwards compatibility
 
+from angorapy.utilities import evaluation
+
 from angorapy.agent import Agent
 
 # Builtin models
