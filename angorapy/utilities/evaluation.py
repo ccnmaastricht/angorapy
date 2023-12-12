@@ -73,5 +73,4 @@ def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False):
               f"between ({min(stats.episode_lengths)}, {max(stats.episode_lengths)})].\n"
               f"This took me {round(time.time() - start, 2)}s.")
 
-        with open(f"./{agent.experiment_directory}/evaluation.json", "w") as f:
-            json.dump(stats._asdict(), f)
+        return stats
