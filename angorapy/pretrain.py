@@ -62,20 +62,21 @@ data = env_unwrapped.data
 renderer = mujoco.Renderer(model, height=VISION_WH, width=VISION_WH)
 
 cameras = [env_unwrapped._get_viewer("rgb_array").cam]
-cameras[-1].distance = 0.3  # zoom in
 
 for i in range(1, 3):
     cameras.append(mujoco.MjvCamera())
     cameras[-1].type = mujoco.mjtCamera.mjCAMERA_FREE
     cameras[-1].fixedcamid = -1
-    for j in range(3):
-        cameras[-1].lookat[j] = np.median(np.copy(data.geom_xpos[:, j]))
-    cameras[-1].distance = np.copy(model.stat.extent)
 
-    cameras[-1].distance = 0.3  # zoom in
-    cameras[-1].azimuth = 0.0 + [20, -20][i - 1]  # wrist to the bottom
-    cameras[-1].elevation = -90.0 + [20, -20][i - 1]  # top down view
-    cameras[-1].lookat[0] = 0.35  # slightly move forward
+    cameras[-1].distance = cameras[0].distance
+    cameras[-1].lookat[:] = cameras[0].lookat[:]
+    cameras[-1].elevation = cameras[0].elevation
+    cameras[-1].azimuth = cameras[0].azimuth
+
+    cameras[-1].azimuth += [35, -35][i - 1]  # wrist to the bottom
+    cameras[-1].elevation += 45
+
+    cameras[-1].distance -= 0.1  # wrist to the bottom
 
 for i in range(1000):
     renderer.update_scene(data, camera=cameras[0])
@@ -129,6 +130,13 @@ def render_from_sim_state(sim_state):
     for cam in cameras:
         renderer.update_scene(data, camera=cam)
         images.append(renderer.render())
+
+    # plot the images
+    # for i, image in enumerate(images):
+    #     plt.subplot(1, len(images), i + 1)
+    #     plt.imshow(image)
+    #     plt.axis("off")
+    # plt.show()
 
     qpos = tf.cast(block.qpos.copy(), dtype=tf.float32)
     block.qpos = original_qpos
