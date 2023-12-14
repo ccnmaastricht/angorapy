@@ -401,8 +401,17 @@ class PPOAgent:
 
         return action
 
-    def drill(self, n: int, epochs: int, batch_size: int, monitor: "Monitor" = None, save_every: int = 0,
-              separate_eval: bool = False, stop_early: bool = False, radical_evaluation: object = False) -> "PPOAgent":
+    def drill(
+            self,
+            n: int = 100,
+            epochs: int = 3,
+            batch_size: int = 256,
+            monitor: "Monitor" = None,
+            save_every: int = 0,
+            separate_eval: bool = False,
+            stop_early: bool = False,
+            radical_evaluation: object = False
+    ) -> "PPOAgent":
         """Start a training loop of the agent.
 
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.

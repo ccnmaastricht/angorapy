@@ -396,9 +396,13 @@ def show_experiment(exp_id):
 
     if "RewardNormalizer" in progress["preprocessors"]:
         plots["normalization"]["reward"] = embed.components(plot_preprocessor(progress["preprocessors"]["RewardNormalizer"]))
+    elif "RewardNormalizationTransformer" in progress["preprocessors"]:
+        plots["normalization"]["reward"] = embed.components(plot_preprocessor(progress["preprocessors"]["RewardNormalizationTransformer"]))
 
     if "StateNormalizer" in progress["preprocessors"]:
         plots["normalization"]["state"] = embed.components(plot_preprocessor(progress["preprocessors"]["StateNormalizer"]))
+    elif "StateNormalizationTransformer" in progress["preprocessors"]:
+        plots["normalization"]["state"] = embed.components(plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"]))
 
     reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
         meta["environment"]["reward_threshold"])

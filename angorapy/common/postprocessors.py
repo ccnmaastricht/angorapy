@@ -90,15 +90,15 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
     variance: Dict[str, np.ndarray]
 
     def __add__(self, other) -> "BaseRunningMeanPostProcessor":
-        nt = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
-        nt.n = self.n + other.n
+        pop = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
+        pop.n = self.n + other.n
 
-        for name in nt.mean.keys():
-            nt.mean[name] = (self.n / nt.n) * self.mean[name] + (other.n / nt.n) * other.mean[name]
-            nt.variance[name] = (self.n * (self.variance[name] + (self.mean[name] - nt.mean[name]) ** 2)
-                                 + other.n * (other.variance[name] + (other.mean[name] - nt.mean[name]) ** 2)) / nt.n
+        for name in pop.mean.keys():
+            pop.mean[name] = (self.n / pop.n) * self.mean[name] + (other.n / pop.n) * other.mean[name]
+            pop.variance[name] = (self.n * (self.variance[name] + (self.mean[name] - pop.mean[name]) ** 2)
+                                 + other.n * (other.variance[name] + (other.mean[name] - pop.mean[name]) ** 2)) / pop.n
 
-        return nt
+        return pop
 
     def update(self, observation: dict) -> None:
         """Update the mean(serialization) and variance(serialization) of the tracked statistic based on the new sample.
@@ -127,7 +127,7 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
     def recover(cls, env_id, state_dim, n_actions, data: PostProcessorSerialization):
         """Recover a running mean postprocessors from its serialization"""
         postprocessor = cls(env_id, state_dim, n_actions)
-        postprocessor.n = np.array(data[0])
+        postprocessor.n = data[0]
 
         # backwards compatibility
         compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[1].items()}
@@ -231,10 +231,6 @@ class RewardNormalizer(BaseRunningMeanPostProcessor):
         env.reset()
         for i in range(n_steps):
             self.update({"reward": env.step(env.action_space.sample())[1]})
-
-
-class StateMemory(BasePostProcessor):
-    pass
 
 
 def merge_postprocessors(postprocessors: List[BasePostProcessor]) -> BasePostProcessor:
