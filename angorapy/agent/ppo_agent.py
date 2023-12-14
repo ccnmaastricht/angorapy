@@ -18,7 +18,6 @@ from typing import Tuple
 from typing import Union
 
 import gymnasium as gym
-
 import numpy as np
 import nvidia_smi
 import psutil
@@ -47,9 +46,9 @@ from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.policies import CategoricalPolicyDistribution
 from angorapy.common.policies import GaussianPolicyDistribution
-from angorapy.common.senses import Sensation
 from angorapy.common.postprocessors import BaseRunningMeanPostProcessor
 from angorapy.common.postprocessors import postprocessors_from_serializations
+from angorapy.common.senses import Sensation
 from angorapy.tasks.registration import make_task
 from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.core import env_extract_dims
@@ -90,13 +89,29 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
-    def __init__(self, model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
-                 environment: TaskWrapper, horizon: int = 1024, workers: int = 8, learning_rate: float = 0.001,
-                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
-                 c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
-                 tbptt_length: int = 16, lr_schedule: str = None, distribution: BasePolicyDistribution = None,
-                 reward_configuration: str = None, _make_dirs=True, debug: bool = False,
-                 pretrained_components: list = None, n_optimizers: int = None):
+    def __init__(
+            self,
+            model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
+            environment: TaskWrapper,
+            horizon: int = 1024,
+            workers: int = 8,
+            learning_rate: float = 0.001,
+            discount: float = 0.99,
+            lam: float = 0.95,
+            clip: float = 0.2,
+            c_entropy: float = 0.01,
+            c_value: float = 0.5,
+            gradient_clipping: float = None,
+            clip_values: bool = True,
+            tbptt_length: int = 16,
+            lr_schedule: str = None,
+            distribution: BasePolicyDistribution = None,
+            reward_configuration: str = None,
+            _make_dirs=True,
+            debug: bool = False,
+            pretrained_components: list = None,
+            n_optimizers: int = None
+    ):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Agent using the Proximal Policy Optimization Algorithm for learning.
@@ -286,10 +301,10 @@ class PPOAgent:
         self.used_gpu_memory = []
 
         self.wrapper_stat_history = {}
-        for transformer in self.env.transformers:
-            self.wrapper_stat_history.update({transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
-                                                                               "stdev": [
-                                                                                   transformer.simplified_stdev()]}})
+        for postprocessor in self.env.postprocessors:
+            self.wrapper_stat_history.update(
+                {postprocessor.__class__.__name__: {"mean": [postprocessor.simplified_mean()],
+                                                    "stdev": [postprocessor.simplified_stdev()]}})
 
     @staticmethod
     def get_optimization_comm(limit_to_n_optimizers: int = None):
@@ -333,13 +348,13 @@ class PPOAgent:
 
     def record_wrapper_stats(self) -> None:
         """Records the stats from RunningMeanWrappers."""
-        for transformer in self.env.transformers:
-            if transformer.name not in self.wrapper_stat_history.keys() or not isinstance(transformer,
+        for postprocessor in self.env.postprocessors:
+            if postprocessor.name not in self.wrapper_stat_history.keys() or not isinstance(postprocessor,
                                                                                           BaseRunningMeanPostProcessor):
                 continue
 
-            self.wrapper_stat_history[transformer.__class__.__name__]["mean"].append(transformer.simplified_mean())
-            self.wrapper_stat_history[transformer.__class__.__name__]["stdev"].append(transformer.simplified_stdev())
+            self.wrapper_stat_history[postprocessor.__class__.__name__]["mean"].append(postprocessor.simplified_mean())
+            self.wrapper_stat_history[postprocessor.__class__.__name__]["stdev"].append(postprocessor.simplified_stdev())
 
     def __repr__(self):
         return f"PPOAgent[at {self.iteration}][{self.env_name}]"
@@ -520,7 +535,7 @@ class PPOAgent:
             if MPI is not None:
                 stats = self.mpi_comm.bcast(stats, root=0)
 
-            # sync the envs to share statistics for transformers etc.
+            # sync the envs to share statistics for postprocessors etc.
             self.env.mpi_sync()
 
             time_dict["gathering"] = time.time() - subprocess_start
@@ -943,6 +958,9 @@ class PPOAgent:
             agent_id:           the ID of the agent to be loaded
             from_iteration:     from which iteration to load, if None (default) use most recent, can be iteration int
                                 or ["b", "best"] for best, if such was saved.
+            force_env_name:     if not None, override the environment name saved in the agent state
+            path_modifier:      if not None or empty, prepend the given string to the path to the agent
+            n_optimizers:       if not None, use a specific number of optimizers for the agent
 
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
@@ -965,7 +983,7 @@ class PPOAgent:
                 f"{os.path.abspath(agent_path)}")
 
         if len(os.listdir(agent_path)) == 0:
-            raise FileNotFoundError("The given agent ID'serialization save history is empty.")
+            raise FileNotFoundError("The given agent ID's save history is empty.")
 
         # determine loading point
         latest_matches = PPOAgent.get_saved_iterations(agent_id, path_modifier=path_modifier)
@@ -976,8 +994,8 @@ class PPOAgent:
             else:
                 from_iteration = "best"
         elif isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b",
-                                              "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            assert from_iteration.lower() in ["best", "b", "last"], \
+                "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
             if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):
@@ -1007,9 +1025,10 @@ class PPOAgent:
         if is_root:
             print(f"Loading from iteration {from_iteration}.")
 
+        postprocessors = postprocessors_from_serializations(parameters["transformers"])
         env = make_task(parameters["env_name"] if force_env_name is None else force_env_name,
                         reward_config=parameters.get("reward_configuration"),
-                        transformers=postprocessors_from_serializations(parameters["transformers"]),
+                        postprocessors=postprocessors,
                         render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
         model_builder = models.MODEL_BUILDERS[parameters["builder_function_name"]]
         distribution = getattr(policies, parameters["distribution"])(env)

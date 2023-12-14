@@ -65,7 +65,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
                                         "agent state. This cannot be resolved.")
 
-    # determine relevant transformers
+    # determine relevant preprocessors
     wrappers = []
     wrappers.append(StateNormalizer) if not settings["no_state_norming"] else None
     wrappers.append(RewardNormalizer) if not settings["no_reward_norming"] else None
@@ -73,7 +73,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     # setup environment and extract and report information
     env = make_task(environment,
                     reward_config=settings["rcon"],
-                    transformers=wrappers,
+                    postprocessors=wrappers,
                     render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
     state_dim, number_of_actions = env_extract_dims(env)
 

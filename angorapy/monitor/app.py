@@ -394,11 +394,11 @@ def show_experiment(exp_id):
                                                     stats.get("optimization_timings"),
                                                     stats.get("gathering_timings")))
 
-    if "RewardNormalizationTransformer" in progress["preprocessors"]:
-        plots["normalization"]["reward"] = embed.components(plot_preprocessor(progress["preprocessors"]["RewardNormalizationTransformer"]))
+    if "RewardNormalizer" in progress["preprocessors"]:
+        plots["normalization"]["reward"] = embed.components(plot_preprocessor(progress["preprocessors"]["RewardNormalizer"]))
 
-    if "StateNormalizationTransformer" in progress["preprocessors"]:
-        plots["normalization"]["state"] = embed.components(plot_preprocessor(progress["preprocessors"]["StateNormalizationTransformer"]))
+    if "StateNormalizer" in progress["preprocessors"]:
+        plots["normalization"]["state"] = embed.components(plot_preprocessor(progress["preprocessors"]["StateNormalizer"]))
 
     reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
         meta["environment"]["reward_threshold"])
