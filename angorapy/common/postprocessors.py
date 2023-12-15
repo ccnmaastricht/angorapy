@@ -20,7 +20,7 @@ class BasePostProcessor(abc.ABC):
 
     def __init__(self, env_name: str, state_dim, n_actions):
         self.n = 1e-4  # make this at least epsilon so that first measure is not all zeros
-        self.previous_n = self.n
+        self.previous_n = self.n  # TODO there has to be a better way to do this
 
         # extract env info
         self.env_name = env_name
@@ -120,6 +120,7 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
         return PostProcessorSerialization(self.__class__.__name__,
                                           self.env_name,
                                           [self.n,
+                                           self.previous_n,
                                          {n: m.tolist() for n, m in self.mean.items()},
                                          {n: v.tolist() for n, v in self.variance.items()}])
 
@@ -128,10 +129,11 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
         """Recover a running mean postprocessors from its serialization"""
         postprocessor = cls(env_id, state_dim, n_actions)
         postprocessor.n = data[0]
+        postprocessor.previous_n = data[1]
 
         # backwards compatibility
-        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[1].items()}
-        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in data[2].items()}
+        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[2].items()}
+        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in data[3].items()}
         compatible_data_means = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_means.items()}
         compatible_data_variances = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_variances.items()}
 

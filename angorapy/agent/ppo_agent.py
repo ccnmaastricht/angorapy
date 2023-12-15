@@ -310,7 +310,6 @@ class PPOAgent:
     def get_optimization_comm(limit_to_n_optimizers: int = None):
         mpi_comm = MPI.COMM_WORLD
         gpus = tf.config.list_physical_devices('GPU')
-        is_root = mpi_comm.rank == 0
 
         if len(gpus) > 0:
             node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
@@ -550,7 +549,7 @@ class PPOAgent:
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
-            # make seperate evaluation if necessary and wanted
+            # make separate evaluation if necessary and wanted
             stats_with_evaluation = stats
             if separate_eval:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
@@ -736,7 +735,7 @@ class PPOAgent:
         else:
             total_updates = (self.n_workers * self.horizon) // batch_size * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        with tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...") as pbar:
+        with tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...", leave=False) as pbar:
             for epoch in range(epochs):
                 if self.is_recurrent:
                     batched_dataset = dataset.batch(effective_batch_sizes[0], drop_remainder=True)
@@ -942,7 +941,7 @@ class PPOAgent:
         del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters[
             "gatherer_class"]
         del parameters["mpi_comm"], parameters["optimization_comm"], parameters["is_optimization_process"], parameters[
-            "n_optimizers"], parameters["gpus"], parameters["is_root"]
+            "n_optimizers"], parameters["gpus"], parameters["is_root"], parameters["comm_rank"], parameters["comm_size"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
