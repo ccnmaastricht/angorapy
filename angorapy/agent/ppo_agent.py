@@ -1051,7 +1051,8 @@ class PPOAgent:
                                 reward_configuration=parameters["reward_configuration"], n_optimizers=n_optimizers)
 
         for p, v in parameters.items():
-            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
+            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"
+                     "comm_rank", "comm_size", "is_optimization_process", "n_optimizers", "gpus", "is_root"]:
                 continue
 
             loaded_agent.__dict__[p] = v
