@@ -1064,11 +1064,16 @@ class PPOAgent:
                 optimizer_weights = list(np.load(agent_path + f"/{from_iteration}/optimizer_weights.npz").values())
                 parameters["optimizer"]["weights"] = optimizer_weights
 
-                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"],
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
             else:
-                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"],
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
+
+            if is_root:
+                print("Loaded optimizer weights from file.")
 
         # mark the loading
         loaded_agent.loading_history.append([loaded_agent.iteration])
