@@ -25,10 +25,10 @@ tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 tf.get_logger().setLevel('INFO')
 
 parser = argparse.ArgumentParser(description="Evaluate an agent.")
-parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default="1673350499432390")
+parser.add_argument("id", type=int, nargs="?", help="id of the agent, defaults to newest", default="1702037093415220")
 parser.add_argument("-n", type=int, help="number of evaluation episodes", default=12)
 parser.add_argument("--act-confidently", action="store_true", help="act deterministically without stochasticity")
 args = parser.parse_args()
 
-agent = PPOAgent.from_agent_state(args.id, path_modifier='./')
+agent = PPOAgent.from_agent_state(args.id, path_modifier='./../')
 evaluate_agent(agent, args.n, args.act_confidently)

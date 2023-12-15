@@ -1,6 +1,7 @@
 from typing import List, Tuple, Iterable
 
 import tensorflow as tf
+import keras
 
 try:
     from mpi4py import MPI
@@ -8,9 +9,9 @@ except ImportError:
     MPI = None
 
 try:
-    ADAM_BASE = tf.keras.optimizers.legacy.Adam
+    ADAM_BASE = keras.optimizers.legacy.Adam
 except:
-    ADAM_BASE = tf.keras.optimizers.Adam
+    ADAM_BASE = keras.optimizers.Adam
 
 
 class AdamSynchronizationError(Exception):
@@ -28,10 +29,11 @@ class MpiAdam(ADAM_BASE):
 
     def _sync_parameters(self):
         """Syncs all Adam parameters across all MPI processes."""
-        if MPI is None:
+        if MPI is not None:
             root_variables = self.comm.bcast(self.weights(), int_root=0)
         else:
             root_variables = self.weights()
+
         self.set_weights(root_variables)
 
     def apply_gradients(self, grads_and_vars: Iterable[Tuple[tf.Tensor, tf.Variable]], name=None, **kwargs):

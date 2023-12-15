@@ -31,7 +31,7 @@ class TaskWrapper(gym.ObservationWrapper):
 
     @property
     def name(self):
-        """The name of the transformers."""
+        """The name of the wrapper."""
         return self.__class__.__name__
 
     @abc.abstractmethod
@@ -96,17 +96,17 @@ class TaskWrapper(gym.ObservationWrapper):
         pass
 
 
-class TransformationWrapper(TaskWrapper):
+class PostProcessingWrapper(TaskWrapper):
     """Wrapper transforming rewards and observation based on running means."""
 
-    def __init__(self, env, transformers: List[BasePostProcessor]):
+    def __init__(self, env, postprocessors: List[BasePostProcessor]):
         super().__init__(env)
 
         # TODO maybe change this to expect list of types to build itself?
-        self.transformers = transformers
+        self.postprocessors = postprocessors
 
     def __contains__(self, item):
-        return item in self.transformers
+        return item in self.postprocessors
 
     def step(self, action):
         """Perform a step and transform the results."""
@@ -115,39 +115,39 @@ class TransformationWrapper(TaskWrapper):
         # include original reward in info
         step_tuple[-1]["original_reward"] = step_tuple[1]
 
-        if len(self.transformers) != 0:
-            for transformer in self.transformers:
-                step_tuple = transformer.transform(step_tuple, update=True)
+        if len(self.postprocessors) != 0:
+            for postprocessor in self.postprocessors:
+                step_tuple = postprocessor.transform(step_tuple, update=True)
 
         return step_tuple
 
-    def add_transformers(self, transformers):
-        """Add a list of transformers to the environment."""
-        self.transformers.extend(transformers)
+    def add_postprocessors(self, postprocessors):
+        """Add a list of postprocessors to the environment."""
+        self.postprocessors.extend(postprocessors)
 
-    def clear_transformers(self):
-        """Clear the list of transformers."""
-        self.transformers = []
+    def clear_postprocessors(self):
+        """Clear the list of postprocessors."""
+        self.postprocessors = []
 
     def warmup(self, n_steps=10):
-        """Warmup the transformers."""
-        for t in self.transformers:
+        """Warmup the postprocessors."""
+        for t in self.postprocessors:
             t.warmup(self, n_steps=n_steps)
 
     def _mpi_sync(self):
-        """Synchronise the transformers of the wrapper over all MPI ranks."""
+        """Synchronise the postprocessors of the wrapper over all MPI ranks."""
         if MPI is None:
             return
 
-        synced_transformers = []
-        for transformer in self.transformers:
-            collection = MPI.COMM_WORLD.gather(transformer, root=0)
+        synced_postprocessors = []
+        for postprocessor in self.postprocessors:
+            collection = MPI.COMM_WORLD.gather(postprocessor, root=0)
 
             if MPI.COMM_WORLD.Get_rank() == 0:
-                synced_transformers.append(merge_postprocessors(collection))
+                synced_postprocessors.append(merge_postprocessors(collection))
 
-        self.transformers = MPI.COMM_WORLD.bcast(synced_transformers, root=0)
+        self.postprocessors = MPI.COMM_WORLD.bcast(synced_postprocessors, root=0)
 
     def serialize(self):
-        """Return separate transformer serializations in a list"""
-        return [t.serialize() for t in self.transformers]
+        """Return separate postprocessor serializations in a list"""
+        return [t.serialize() for t in self.postprocessors]

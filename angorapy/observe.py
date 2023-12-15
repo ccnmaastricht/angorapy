@@ -56,13 +56,13 @@ except:
     print("Could not create model plot.")
 
 investigator = Investigator.from_agent(agent)
-env = make_task(agent.env.spec.id, transformers=agent.env.transformers, render_mode="human")
+env = make_task(agent.env.spec.id, postprocessors=agent.env.postprocessors, render_mode="human")
 if args.freeze_wrist:
     env.toggle_wrist_freezing()
 
 substeps = "" if not hasattr(env.unwrapped, "sim") else f" with {env.unwrapped.sim.nsubsteps} substeps"
 print(f"Evaluating on {env.unwrapped.spec.id}{substeps}.")
-print(f"Environment has the following transformers: {env.transformers}")
+print(f"Environment has the following postprocessors: {env.postprocessors}")
 
 # if args.env != "":
 #     env = make_env(args.env, args.rcon)

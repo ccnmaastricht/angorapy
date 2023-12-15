@@ -98,7 +98,7 @@ def gen_cube_quats_prediction_data_rendered(n: int, save_path: str, binocular=Fa
 
     hand_env = make_env("HumanoidManipulateBlockDiscreteAsynchronous-v0",
                         # render_mode="rgb_array",
-                        transformers=agent.env.transformers)
+                        transformers=agent.env.postprocessors)
 
     # env_unwrapped: AnthropomorphicEnv = hand_env.unwrapped
     # model = env_unwrapped.model

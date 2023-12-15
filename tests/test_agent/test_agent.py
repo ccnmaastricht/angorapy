@@ -21,7 +21,7 @@ except:
 def _test_drill(env_name, model_builder=None, ):
     """Test drilling an agent."""
     wrappers = [StateNormalizer, RewardNormalizer]
-    env = make_task(env_name, reward_config=None, transformers=wrappers)
+    env = make_task(env_name, reward_config=None, postprocessors=wrappers)
     if model_builder is None:
         build_models = get_model_builder(model="simple", model_type="ffn", shared=False)
     else:
@@ -53,7 +53,7 @@ def test_drill_manipulate_multicategorical():
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, transformers=wrappers)
+        env = make_task("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, postprocessors=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False, blind=True)
         agent = PPOAgent(
             build_models,
@@ -73,7 +73,7 @@ def test_drill_manipulate_continuous():
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("ManipulateBlockAsynchronous-v0", reward_config=None, transformers=wrappers)
+        env = make_task("ManipulateBlockAsynchronous-v0", reward_config=None, postprocessors=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
         agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
         agent.drill(n=2, epochs=2, batch_size=64)
@@ -86,7 +86,7 @@ def test_drill_reach():
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("ReachAbsolute-v0", reward_config=None, transformers=wrappers)
+        env = make_task("ReachAbsolute-v0", reward_config=None, postprocessors=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
         agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
         agent.drill(n=2, epochs=2, batch_size=64)
@@ -99,7 +99,7 @@ def test_drill_freereach():
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("FreeReachAbsolute-v0", reward_config=None, transformers=wrappers)
+        env = make_task("FreeReachAbsolute-v0", reward_config=None, postprocessors=wrappers)
         build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
         agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
         agent.drill(n=2, epochs=2, batch_size=64)

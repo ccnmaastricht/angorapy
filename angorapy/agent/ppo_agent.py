@@ -18,7 +18,6 @@ from typing import Tuple
 from typing import Union
 
 import gymnasium as gym
-
 import numpy as np
 import nvidia_smi
 import psutil
@@ -47,9 +46,9 @@ from angorapy.common.mpi_optim import MpiAdam
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.common.policies import CategoricalPolicyDistribution
 from angorapy.common.policies import GaussianPolicyDistribution
-from angorapy.common.senses import Sensation
 from angorapy.common.postprocessors import BaseRunningMeanPostProcessor
 from angorapy.common.postprocessors import postprocessors_from_serializations
+from angorapy.common.senses import Sensation
 from angorapy.tasks.registration import make_task
 from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.core import env_extract_dims
@@ -90,13 +89,29 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
-    def __init__(self, model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
-                 environment: TaskWrapper, horizon: int = 1024, workers: int = 8, learning_rate: float = 0.001,
-                 discount: float = 0.99, lam: float = 0.95, clip: float = 0.2, c_entropy: float = 0.01,
-                 c_value: float = 0.5, gradient_clipping: float = None, clip_values: bool = True,
-                 tbptt_length: int = 16, lr_schedule: str = None, distribution: BasePolicyDistribution = None,
-                 reward_configuration: str = None, _make_dirs=True, debug: bool = False,
-                 pretrained_components: list = None, n_optimizers: int = None):
+    def __init__(
+            self,
+            model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
+            environment: TaskWrapper,
+            horizon: int = 1024,
+            workers: int = 8,
+            learning_rate: float = 0.001,
+            discount: float = 0.99,
+            lam: float = 0.95,
+            clip: float = 0.2,
+            c_entropy: float = 0.01,
+            c_value: float = 0.5,
+            gradient_clipping: float = None,
+            clip_values: bool = True,
+            tbptt_length: int = 16,
+            lr_schedule: str = None,
+            distribution: BasePolicyDistribution = None,
+            reward_configuration: str = None,
+            _make_dirs=True,
+            debug: bool = False,
+            pretrained_components: list = None,
+            n_optimizers: int = None
+    ):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
         Agent using the Proximal Policy Optimization Algorithm for learning.
@@ -286,16 +301,15 @@ class PPOAgent:
         self.used_gpu_memory = []
 
         self.wrapper_stat_history = {}
-        for transformer in self.env.transformers:
-            self.wrapper_stat_history.update({transformer.__class__.__name__: {"mean": [transformer.simplified_mean()],
-                                                                               "stdev": [
-                                                                                   transformer.simplified_stdev()]}})
+        for postprocessor in self.env.postprocessors:
+            self.wrapper_stat_history.update(
+                {postprocessor.__class__.__name__: {"mean": [postprocessor.simplified_mean()],
+                                                    "stdev": [postprocessor.simplified_stdev()]}})
 
     @staticmethod
     def get_optimization_comm(limit_to_n_optimizers: int = None):
         mpi_comm = MPI.COMM_WORLD
         gpus = tf.config.list_physical_devices('GPU')
-        is_root = mpi_comm.rank == 0
 
         if len(gpus) > 0:
             node_names = list(set(mpi_comm.allgather(MPI.Get_processor_name())))
@@ -333,13 +347,13 @@ class PPOAgent:
 
     def record_wrapper_stats(self) -> None:
         """Records the stats from RunningMeanWrappers."""
-        for transformer in self.env.transformers:
-            if transformer.name not in self.wrapper_stat_history.keys() or not isinstance(transformer,
+        for postprocessor in self.env.postprocessors:
+            if postprocessor.name not in self.wrapper_stat_history.keys() or not isinstance(postprocessor,
                                                                                           BaseRunningMeanPostProcessor):
                 continue
 
-            self.wrapper_stat_history[transformer.__class__.__name__]["mean"].append(transformer.simplified_mean())
-            self.wrapper_stat_history[transformer.__class__.__name__]["stdev"].append(transformer.simplified_stdev())
+            self.wrapper_stat_history[postprocessor.__class__.__name__]["mean"].append(postprocessor.simplified_mean())
+            self.wrapper_stat_history[postprocessor.__class__.__name__]["stdev"].append(postprocessor.simplified_stdev())
 
     def __repr__(self):
         return f"PPOAgent[at {self.iteration}][{self.env_name}]"
@@ -386,8 +400,17 @@ class PPOAgent:
 
         return action
 
-    def drill(self, n: int, epochs: int, batch_size: int, monitor: "Monitor" = None, save_every: int = 0,
-              separate_eval: bool = False, stop_early: bool = False, radical_evaluation: object = False) -> "PPOAgent":
+    def drill(
+            self,
+            n: int = 100,
+            epochs: int = 3,
+            batch_size: int = 256,
+            monitor: "Monitor" = None,
+            save_every: int = 0,
+            separate_eval: bool = False,
+            stop_early: bool = False,
+            radical_evaluation: object = False
+    ) -> "PPOAgent":
         """Start a training loop of the agent.
 
         Runs **n** cycles of experience gathering and optimization based on the gathered experience.
@@ -520,13 +543,13 @@ class PPOAgent:
             if MPI is not None:
                 stats = self.mpi_comm.bcast(stats, root=0)
 
-            # sync the envs to share statistics for transformers etc.
+            # sync the envs to share statistics for postprocessors etc.
             self.env.mpi_sync()
 
             time_dict["gathering"] = time.time() - subprocess_start
             subprocess_start = time.time()
 
-            # make seperate evaluation if necessary and wanted
+            # make separate evaluation if necessary and wanted
             stats_with_evaluation = stats
             if separate_eval:
                 if radical_evaluation or stats.numb_completed_episodes < MIN_STAT_EPS:
@@ -712,7 +735,7 @@ class PPOAgent:
         else:
             total_updates = (self.n_workers * self.horizon) // batch_size * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        with tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...") as pbar:
+        with tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...", leave=False) as pbar:
             for epoch in range(epochs):
                 if self.is_recurrent:
                     batched_dataset = dataset.batch(effective_batch_sizes[0], drop_remainder=True)
@@ -918,7 +941,7 @@ class PPOAgent:
         del parameters["optimizer"], parameters["lr_schedule"], parameters["model_builder"], parameters[
             "gatherer_class"]
         del parameters["mpi_comm"], parameters["optimization_comm"], parameters["is_optimization_process"], parameters[
-            "n_optimizers"], parameters["gpus"], parameters["is_root"]
+            "n_optimizers"], parameters["gpus"], parameters["is_root"], parameters["comm_rank"], parameters["comm_size"]
 
         parameters["c_entropy"] = parameters["c_entropy"].numpy().item()
         parameters["c_value"] = parameters["c_value"].numpy().item()
@@ -943,6 +966,9 @@ class PPOAgent:
             agent_id:           the ID of the agent to be loaded
             from_iteration:     from which iteration to load, if None (default) use most recent, can be iteration int
                                 or ["b", "best"] for best, if such was saved.
+            force_env_name:     if not None, override the environment name saved in the agent state
+            path_modifier:      if not None or empty, prepend the given string to the path to the agent
+            n_optimizers:       if not None, use a specific number of optimizers for the agent
 
         Returns:
             loaded_agent: a PPOAgent object of the same state as the one saved into the path specified by agent_id
@@ -965,7 +991,7 @@ class PPOAgent:
                 f"{os.path.abspath(agent_path)}")
 
         if len(os.listdir(agent_path)) == 0:
-            raise FileNotFoundError("The given agent ID'serialization save history is empty.")
+            raise FileNotFoundError("The given agent ID's save history is empty.")
 
         # determine loading point
         latest_matches = PPOAgent.get_saved_iterations(agent_id, path_modifier=path_modifier)
@@ -976,8 +1002,8 @@ class PPOAgent:
             else:
                 from_iteration = "best"
         elif isinstance(from_iteration, str):
-            assert from_iteration.lower() in ["best", "b",
-                                              "last"], "Unknown string identifier, can only be 'best'/'b'/'last' or int."
+            assert from_iteration.lower() in ["best", "b", "last"], \
+                "Unknown string identifier, can only be 'best'/'b'/'last' or int."
             if from_iteration == "b":
                 from_iteration = "best"
             if from_iteration == "last" and not os.path.isdir(f"{agent_path}/last"):
@@ -1007,9 +1033,10 @@ class PPOAgent:
         if is_root:
             print(f"Loading from iteration {from_iteration}.")
 
+        postprocessors = postprocessors_from_serializations(parameters["transformers"])
         env = make_task(parameters["env_name"] if force_env_name is None else force_env_name,
                         reward_config=parameters.get("reward_configuration"),
-                        transformers=postprocessors_from_serializations(parameters["transformers"]),
+                        postprocessors=postprocessors,
                         render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", parameters["env_name"]) else None)
         model_builder = models.MODEL_BUILDERS[parameters["builder_function_name"]]
         distribution = getattr(policies, parameters["distribution"])(env)
@@ -1024,7 +1051,8 @@ class PPOAgent:
                                 reward_configuration=parameters["reward_configuration"], n_optimizers=n_optimizers)
 
         for p, v in parameters.items():
-            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"]:
+            if p in ["distribution", "transformers", "c_entropy", "c_value", "gradient_clipping", "clip", "optimizer"
+                     "comm_rank", "comm_size", "is_optimization_process", "n_optimizers", "gpus", "is_root"]:
                 continue
 
             loaded_agent.__dict__[p] = v
@@ -1037,11 +1065,16 @@ class PPOAgent:
                 optimizer_weights = list(np.load(agent_path + f"/{from_iteration}/optimizer_weights.npz").values())
                 parameters["optimizer"]["weights"] = optimizer_weights
 
-                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"],
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
             else:
-                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm, parameters["optimizer"],
+                loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
+                                                                    parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
+
+            if is_root:
+                print("Loaded optimizer weights from file.")
 
         # mark the loading
         loaded_agent.loading_history.append([loaded_agent.iteration])
