@@ -77,7 +77,7 @@ class Block(External):
 
     def add_object_joint(self, attachment_frame: mjcf.Element):
         attachment_frame.set_attributes(
-            pos=[0.32, 0.0, 0.1]
+            pos=[0.36, 0.0, 0.1]
         )
         attachment_frame.add("joint", type="free", damping=0.01, name="object:joint")
 

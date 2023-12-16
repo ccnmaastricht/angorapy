@@ -22,6 +22,7 @@ def test_manipulate():
     _test_any_task(angorapy.tasks.registration.make_task("ManipulateBlockVisualDiscrete-v0"))
     _test_any_task(angorapy.tasks.registration.make_task("ManipulateBlockDiscreteAsymmetric-v0"))
     _test_any_task(angorapy.tasks.registration.make_task("ManipulateBlockVisualDiscreteAsymmetric-v0"))
+    _test_any_task(angorapy.tasks.registration.make_task("NoisyManipulateBlock-v0"))
 
 
 def test_reach():

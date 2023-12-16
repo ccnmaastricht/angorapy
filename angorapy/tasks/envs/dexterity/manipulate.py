@@ -13,9 +13,9 @@ from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
 from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
 from angorapy.tasks.envs.dexterity.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
 from angorapy.tasks.envs.dexterity.reward import manipulate
-from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
 from angorapy.tasks.envs.dexterity.reward_configs import MANIPULATE_BASE
-from angorapy.tasks.utils import robot_get_obs
+from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
+from angorapy.tasks.utils import quat_mul
 
 
 class BaseManipulate(BaseShadowHandEnv):
@@ -248,7 +248,7 @@ class BaseManipulate(BaseShadowHandEnv):
 
         # Run the simulation for a bunch of timesteps to let everything settle in.
         for _ in range(10):
-            self._set_action(self.data.actuator_length[:])
+            self._set_action(np.zeros(self.action_space.shape[0]))
             mujoco.mj_step(self.model, self.data)
 
         return is_on_palm()
@@ -321,34 +321,16 @@ class BaseManipulate(BaseShadowHandEnv):
             object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
             vision = object_qpos.astype(np.float32)
         else:
-            tmp_render_mode = self.render_mode
-            self.render_mode = "rgb_array"
-            vision = self.render()
-            self.render_mode = tmp_render_mode
+            vision = super().get_vision()
 
         return vision
 
     def _get_obs(self):
-
         """Gather humanoid senses and asymmetric information."""
-
-        object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
-
-        # vision
+        object_qpos = self.get_object_pose()
         vision_input = self.get_vision()
-
-        # goal
         target_orientation = self.goal.ravel().copy()[3:]
-
-        # proprioception
-        hand_joint_angles, hand_joint_velocities = robot_get_obs(self.model, self.data)
-
-        proprioception = np.concatenate([
-            hand_joint_angles,
-            hand_joint_velocities
-        ])
-
-        # touch
+        proprioception = self.get_proprioception()
         touch = self.get_touch()
 
         # asymmetric information
@@ -450,16 +432,17 @@ class ManipulateBlock(BaseManipulate, utils.EzPickle):
                  delta_t: float = 0.002,
                  render_mode: Optional[str] = None):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
-        BaseManipulate.__init__(self,
-                                touch_get_obs=touch_get_obs,
-                                target_rotation=target_rotation,
-                                target_position=target_position,
-                                target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
-                                vision=vision,
-                                relative_control=relative_control,
-                                delta_t=delta_t,
-                                render_mode=render_mode
-                                )
+        BaseManipulate.__init__(
+            self,
+            touch_get_obs=touch_get_obs,
+            target_rotation=target_rotation,
+            target_position=target_position,
+            target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
+            vision=vision,
+            relative_control=relative_control,
+            delta_t=delta_t,
+            render_mode=render_mode
+        )
 
 
 class ManipulateBlockDiscrete(ManipulateBlock):
@@ -483,6 +466,22 @@ class NoisyManipulateBlock(ManipulateBlock):
     asymmetric = True
     continuous = False
 
+    ROTATION_NOISE = np.pi / 36
+    POSITION_NOISE = 3.71
+
+    def __init__(self, *args, **kwargs):
+        self.noisy_rotation = True
+        self.noisy_position = True
+        self.not_yet_warned = True
+
+        super().__init__(*args, **kwargs)
+
+    def toggle_rotation_noise(self):
+        self.noisy_rotation = not self.noisy_rotation
+
+    def toggle_position_noise(self):
+        self.noisy_position = not self.noisy_position
+
     def get_vision(self):
         """Get (surrogate) vision with added noise."""
 
@@ -490,22 +489,39 @@ class NoisyManipulateBlock(ManipulateBlock):
             object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
             vision = object_qpos.astype(np.float32)
 
-            # get random quaternion rotating by max 5 degrees in total
-            random_total_angle = np.random.uniform(-np.pi / 36, np.pi / 36)
-            angle_split = np.random.uniform(0, 1, 3)
-            angle_split /= angle_split.sum()
-            angle_noise_by_axis = angle_split * random_total_angle
+            if self.noisy_rotation:
+                # get random quaternion rotating by max 5 degrees in total
+                random_total_angle = np.random.normal(0, self.ROTATION_NOISE)
+                angle_split = np.random.uniform(0, 1, 3)
+                angle_split /= angle_split.sum()
+                angle_noise_by_axis = angle_split * random_total_angle
 
-            x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
-            y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
-            z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
+                x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
+                y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
+                z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
 
-            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
-                                                                      y_rotation_noise_quaternion)
-            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
-                                                                      z_rotation_noise_quaternion)
+                rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
+                                                                          y_rotation_noise_quaternion)
+                rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
+                                                                          z_rotation_noise_quaternion)
 
-            vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+                vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+            else:
+                if self.not_yet_warned:
+                    print("WARNING: No rotation noise added to vision.")
+                    self.not_yet_warned = False
+
+            if self.noisy_position:
+                random_displacement_vector = np.random.normal(size=3)
+                random_displacement_vector /= np.linalg.norm(random_displacement_vector)
+
+                random_displacement_vector *= (self.POSITION_NOISE / 1000)
+
+                vision[:3] += random_displacement_vector
+            else:
+                if self.not_yet_warned:
+                    print("WARNING: No position noise added to vision.")
+                    self.not_yet_warned = False
         else:
             tmp_render_mode = self.render_mode
             self.render_mode = "rgb_array"
@@ -514,9 +530,21 @@ class NoisyManipulateBlock(ManipulateBlock):
 
         return vision
 
+    def _get_obs(self):
+        obs = super()._get_obs()
+
+        asymmetric = obs["observation"].asymmetric
+        asymmetric = np.concatenate([
+            asymmetric,
+            self.get_object_pose()
+        ])
+
+        obs["observation"].asymmetric = asymmetric
+
+        return obs
+
 
 class TestCaseManipulateBlock(ManipulateBlock):
-
     asymmetric = True
     continuous = False
 
@@ -540,7 +568,8 @@ class TestCaseManipulateBlock(ManipulateBlock):
                                 render_mode=render_mode
                                 )
 
-        initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:]
+    def calc_rotation_set(self):
+        initial_block_rotation = self.data.jnt(self.object_joint_id).qpos[3:].copy()
 
         # get rotations for all 24 possible orientations
         deg90 = np.pi / 2
@@ -551,22 +580,22 @@ class TestCaseManipulateBlock(ManipulateBlock):
 
         base_up_faces = [
             initial_block_rotation,
-            quat_from_angle_and_axis(deg90, x_axis),
-            quat_from_angle_and_axis(-deg90, x_axis),
-            quat_from_angle_and_axis(deg90, y_axis),
-            quat_from_angle_and_axis(-deg90, y_axis),
-            quat_from_angle_and_axis(deg180, y_axis),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(deg90, x_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(-deg90, x_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(deg90, y_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(-deg90, y_axis)),
+            quat_mul(initial_block_rotation, quat_from_angle_and_axis(deg180, y_axis)),
         ]
 
         self.test_cases_block_rotations = []
         self.test_cases_block_rotations += base_up_faces
         for base_up_face in base_up_faces:
             self.test_cases_block_rotations.append(
-                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
+                quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
             )
             self.test_cases_block_rotations.append(
-                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
+                quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
             )
             self.test_cases_block_rotations.append(
-                angorapy.tasks.utils.quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
+                quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
             )

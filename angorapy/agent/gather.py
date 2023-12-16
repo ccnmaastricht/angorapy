@@ -117,7 +117,7 @@ class Gatherer(BaseGatherer):
         state, info = env.reset()
 
         joint.__call__ = tf.function(joint.__call__)
-        with tqdm(total=self.horizon, disable=self.worker_id != 0, desc="Gathering experience...") as pbar:
+        with tqdm(total=self.horizon, disable=self.worker_id != 0, desc="Gathering experience...", leave=False) as pbar:
             while t < self.horizon:
                 current_subseq_length += 1
 
@@ -270,7 +270,7 @@ class Gatherer(BaseGatherer):
 
         return buffer
 
-    def select_action(self, predicted_parameters: list) -> np.ndarray:
+    def select_action(self, predicted_parameters: list) -> Tuple[np.ndarray, np.ndarray]:
         """Standard action selection where an action is sampled fully from the predicted distribution."""
         action, action_probability = self.distribution.act_numpy(*predicted_parameters)
         action = action if not DETERMINISTIC else np.zeros_like(action)

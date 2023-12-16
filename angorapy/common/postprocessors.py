@@ -20,7 +20,7 @@ class BasePostProcessor(abc.ABC):
 
     def __init__(self, env_name: str, state_dim, n_actions):
         self.n = 1e-4  # make this at least epsilon so that first measure is not all zeros
-        self.previous_n = self.n
+        self.previous_n = self.n  # TODO there has to be a better way to do this
 
         # extract env info
         self.env_name = env_name
@@ -35,7 +35,7 @@ class BasePostProcessor(abc.ABC):
 
     @property
     def name(self):
-        """The name of the transformers."""
+        """The name of the postprocessors."""
         return self.__class__.__name__
 
     def transform(self, step_result: StepTuple, **kwargs) -> StepTuple:
@@ -43,21 +43,21 @@ class BasePostProcessor(abc.ABC):
         pass
 
     def update(self, **kwargs):
-        """Just for the sake of interchangeability, all transformers have an update method even if they do not update."""
+        """Just for the sake of interchangeability, all postprocessors have an update method even if they do not update."""
         pass
 
     def warmup(self, env: "TaskWrapper", n_steps=10):
-        """Warm up the transformer for n steps."""
+        """Warm up the postprocessor for n steps."""
         pass
 
     @abc.abstractmethod
     def serialize(self) -> dict:
-        """Serialize the transformer to allow for saving its data in a file."""
+        """Serialize the postprocessor to allow for saving its data in a file."""
         pass
 
     @staticmethod
     def from_serialization(serialization: PostProcessorSerialization):
-        """Create transformer from a serialization."""
+        """Create postprocessor from a serialization."""
         return getattr(sys.modules[__name__], serialization.class_name).recover(serialization.data)
 
     @classmethod
@@ -67,15 +67,16 @@ class BasePostProcessor(abc.ABC):
         pass
 
     @staticmethod
-    def from_collection(collection_of_transformers):
-        """Merge a list of transformers into one new transformer of the same type."""
-        assert len(set([type(w) for w in collection_of_transformers])) == 1, \
-            "All transformers need to have the same type."
+    def from_collection(collection_of_postprocessors: List["BasePostProcessor"]) -> "BasePostProcessor":
+        """Merge a list of postprocessors into one new postprocessor of the same type."""
+        assert len(set([type(w) for w in collection_of_postprocessors])) == 1, \
+            "All postprocessors need to have the same type."
 
-        new_transformer = collection_of_transformers[0]
-        for transformer in collection_of_transformers[1:]:
-            new_transformer += transformer
-        return new_transformer
+        new_postprocessors = collection_of_postprocessors[0]
+        for postprocessor in collection_of_postprocessors[1:]:
+            new_postprocessors += postprocessor
+
+        return new_postprocessors
 
     def correct_sample_size(self, deduction):
         """Deduce the given number from the sample counter."""
@@ -83,21 +84,21 @@ class BasePostProcessor(abc.ABC):
 
 
 class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
-    """Abstract base class for transformers implementing a running mean over some statistic."""
+    """Abstract base class for postprocessors implementing a running mean over some statistic."""
 
     mean: Dict[str, np.ndarray]
     variance: Dict[str, np.ndarray]
 
     def __add__(self, other) -> "BaseRunningMeanPostProcessor":
-        nt = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
-        nt.n = self.n + other.n
+        pop = self.__class__(self.env_name, self.state_dim, self.number_of_actions)
+        pop.n = self.n + other.n
 
-        for name in nt.mean.keys():
-            nt.mean[name] = (self.n / nt.n) * self.mean[name] + (other.n / nt.n) * other.mean[name]
-            nt.variance[name] = (self.n * (self.variance[name] + (self.mean[name] - nt.mean[name]) ** 2)
-                                 + other.n * (other.variance[name] + (other.mean[name] - nt.mean[name]) ** 2)) / nt.n
+        for name in pop.mean.keys():
+            pop.mean[name] = (self.n / pop.n) * self.mean[name] + (other.n / pop.n) * other.mean[name]
+            pop.variance[name] = (self.n * (self.variance[name] + (self.mean[name] - pop.mean[name]) ** 2)
+                                 + other.n * (other.variance[name] + (other.mean[name] - pop.mean[name]) ** 2)) / pop.n
 
-        return nt
+        return pop
 
     def update(self, observation: dict) -> None:
         """Update the mean(serialization) and variance(serialization) of the tracked statistic based on the new sample.
@@ -115,29 +116,37 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
                                            dtype=NP_FLOAT_PREC)
 
     def serialize(self) -> PostProcessorSerialization:
-        """Serialize the transformer to allow for saving it in a file."""
+        """Serialize the postprocessor to allow for saving it in a file."""
         return PostProcessorSerialization(self.__class__.__name__,
                                           self.env_name,
                                           [self.n,
+                                           self.previous_n,
                                          {n: m.tolist() for n, m in self.mean.items()},
                                          {n: v.tolist() for n, v in self.variance.items()}])
 
     @classmethod
     def recover(cls, env_id, state_dim, n_actions, data: PostProcessorSerialization):
-        """Recover a running mean transformer from its serialization"""
-        transformer = cls(env_id, state_dim, n_actions)
-        transformer.n = np.array(data[0])
+        """Recover a running mean postprocessors from its serialization"""
+        postprocessor = cls(env_id, state_dim, n_actions)
+
+        if len(data) == 3:  # backwards compatibility
+            n, means, variances = data
+        else:
+            n, previous_n, means, variances = data
+            postprocessor.previous_n = previous_n
+
+        postprocessor.n = n
 
         # backwards compatibility
-        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[1].items()}
-        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in data[2].items()}
+        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in means.items()}
+        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in variances.items()}
         compatible_data_means = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_means.items()}
         compatible_data_variances = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_variances.items()}
 
-        transformer.mean = {name: np.array(l) for name, l in compatible_data_means.items()}
-        transformer.variance = {name: np.array(l) for name, l in compatible_data_variances.items()}
+        postprocessor.mean = {name: np.array(l) for name, l in compatible_data_means.items()}
+        postprocessor.variance = {name: np.array(l) for name, l in compatible_data_variances.items()}
 
-        return transformer
+        return postprocessor
 
     def simplified_mean(self) -> Dict[str, float]:
         """Get a simplified, one dimensional mean by meaning any means."""
@@ -153,7 +162,7 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
 
 
 class StateNormalizer(BaseRunningMeanPostProcessor):
-    """Transformer for state normalization using running mean and variance estimations."""
+    """Postprocessor for state normalization using running mean and variance estimations."""
 
     def __init__(self, env_name: str, state_dim, n_actions):
         # parse input types into normed shape format
@@ -164,8 +173,7 @@ class StateNormalizer(BaseRunningMeanPostProcessor):
         self.mean = {k: np.zeros(i_shape, NP_FLOAT_PREC) for k, i_shape in self.shapes.items() if len(i_shape) == 1}
         self.variance = {k: np.ones(i_shape, NP_FLOAT_PREC) for k, i_shape in self.shapes.items() if len(i_shape) == 1}
 
-        assert len(self.mean) > 0 and len(self.variance) > 0, "Initialized StateNormalizationTransformer got no vector " \
-                                                              "states."
+        assert len(self.mean) > 0 and len(self.variance) > 0, "Initialized StateNormalizer got no vector states."
 
     def transform(self, step_result: StepTuple, update=True) -> StepTuple:
         """Normalize a given batch of 1D tensors and update running mean and std."""
@@ -189,7 +197,7 @@ class StateNormalizer(BaseRunningMeanPostProcessor):
         return normed_o, r, terminated, truncated, info
 
     def warmup(self, env: "TaskWrapper", n_steps=10):
-        """Warmup the transformer by sampling the observation space."""
+        """Warmup the postprocessor by sampling the observation space."""
         return  # todo we cannot do this like this, the update will be based on a transformed input this way
         env.reset()
         for i in range(n_steps):
@@ -197,7 +205,7 @@ class StateNormalizer(BaseRunningMeanPostProcessor):
 
 
 class RewardNormalizer(BaseRunningMeanPostProcessor):
-    """Transformer for reward normalization using running mean and variance estimations."""
+    """Postprocessor for reward normalization using running mean and variance estimations."""
 
     def __init__(self, env_name: str, state_dim, n_action):
         super().__init__(env_name, state_dim, n_action)
@@ -227,40 +235,36 @@ class RewardNormalizer(BaseRunningMeanPostProcessor):
         return o, r, terminated, truncated, info
 
     def warmup(self, env: "TaskWrapper", n_steps=10):
-        """Warmup the transformer by randomly stepping the environment through action space sampling."""
+        """Warmup the postprocessor by randomly stepping the environment through action space sampling."""
         env.reset()
         for i in range(n_steps):
             self.update({"reward": env.step(env.action_space.sample())[1]})
 
 
-class StateMemory(BasePostProcessor):
-    pass
-
-
-def merge_postprocessors(transformers: List[BasePostProcessor]) -> BasePostProcessor:
-    """Merge a list of transformers into a single transformer.
+def merge_postprocessors(postprocessors: List[BasePostProcessor]) -> BasePostProcessor:
+    """Merge a list of postprocessors into a single postprocessor.
 
     Args:
-        transformers:           list of transformers
+        postprocessors:           list of postprocessors to merge
     """
-    assert all(type(t) is type(transformers[0]) for t in transformers), \
+    assert all(type(t) is type(postprocessors[0]) for t in postprocessors), \
         "To merge postprocessors, they must be of same type."
 
-    # merge the list of transformers into a single transformer
-    merged_transformer = BasePostProcessor.from_collection(transformers)
+    # merge the list of postprocessors into a single postprocessor
+    merged_postprocessor = BasePostProcessor.from_collection(postprocessors)
 
     # adjust for overcounting
-    merged_transformer.correct_sample_size((len(transformers) - 1) * transformers[0].previous_n)
+    merged_postprocessor.correct_sample_size((len(postprocessors) - 1) * postprocessors[0].previous_n)
 
     # record the new n for next sync
-    merged_transformer.previous_n = merged_transformer.n
+    merged_postprocessor.previous_n = merged_postprocessor.n
 
-    return merged_transformer
+    return merged_postprocessor
 
 
 def postprocessors_from_serializations(list_of_serializations: List[PostProcessorSerialization]) -> List[BasePostProcessor]:
-    """From a list of TransformerSerializations recover the respective transformers."""
-    transformers = []
+    """From a list of PostProcessorSerializations recover the respective postprocessors."""
+    postprocessors = []
     reference_env = gym.make(PostProcessorSerialization(*list_of_serializations[0]).env_id, render_mode="rgb_array")  # todo could leak memory
     state_dim, n_actions = env_extract_dims(reference_env)
 
@@ -275,8 +279,8 @@ def postprocessors_from_serializations(list_of_serializations: List[PostProcesso
         elif class_name == "RewardNormalizationTransformer":
             class_name = "RewardNormalizer"
 
-        transformers.append(
+        postprocessors.append(
             getattr(sys.modules[__name__], class_name).recover(cereal.env_id, state_dim, n_actions, cereal.data)
         )
 
-    return transformers
+    return postprocessors

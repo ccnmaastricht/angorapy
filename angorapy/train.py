@@ -65,7 +65,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
         raise InconsistentArgumentError("You gave both a loading from a pretrained component and from another "
                                         "agent state. This cannot be resolved.")
 
-    # determine relevant transformers
+    # determine relevant preprocessors
     wrappers = []
     wrappers.append(StateNormalizer) if not settings["no_state_norming"] else None
     wrappers.append(RewardNormalizer) if not settings["no_reward_norming"] else None
@@ -73,7 +73,7 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
     # setup environment and extract and report information
     env = make_task(environment,
                     reward_config=settings["rcon"],
-                    transformers=wrappers,
+                    postprocessors=wrappers,
                     render_mode="rgb_array" if re.match(".*[Vv]is(ion|ual).*", environment) else None)
     state_dim, number_of_actions = env_extract_dims(env)
 
@@ -163,11 +163,9 @@ def run_experiment(environment, settings: dict, verbose=True, use_monitor=False)
                           experiment_group=settings["experiment_group"])
 
     try:
-        # tf.profiler.experimental.start("logdir")
         agent.drill(n=settings["iterations"], epochs=settings["epochs"], batch_size=settings["batch_size"],
                     monitor=monitor, save_every=settings["save_every"], separate_eval=settings["eval"],
                     stop_early=settings["stop_early"], radical_evaluation=settings["radical_evaluation"])
-        # tf.profiler.experimental.stop()
     except KeyboardInterrupt:
         mpi_print("Ended by user.")
     except Exception:
@@ -209,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--experiment-group", type=str, default="default", help="experiment group identifier")
     parser.add_argument("--cpu", action="store_true", help=f"use cpu only")
     parser.add_argument("--sequential", action="store_true", help=f"run worker sequentially workers")
-    parser.add_argument("--gi-from", type=int, default=None, help=f"load from given agent id")
+    parser.add_argument("--load-from", type=int, default=None, help=f"load from given agent id")
     parser.add_argument("--preload", type=str, default=None, help=f"load visual component weights from pretraining")
     parser.add_argument("--component-dir", type=str, default=None, help=f"path to pretrained components")
     parser.add_argument("--export-file", type=int, default=None, help=f"save policy to be loaded in workers into file")
