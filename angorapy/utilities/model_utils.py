@@ -222,14 +222,14 @@ def is_conv(layer):
 
 # Building helpers
 
-def make_input_layers(env, bs, sequence_length=None):
+def make_input_layers(env, bs, sequence_length=None) -> dict:
     """Build input layers for a model acting on the given environment.
 
     If the model is not recurrent, provide None for the sequence_length (default)"""
 
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    inputs = []
+    inputs = {}
 
     for modality in state_dimensionality.keys():
         shape = (bs,)
@@ -238,7 +238,7 @@ def make_input_layers(env, bs, sequence_length=None):
         shape += tuple(state_dimensionality[modality])
 
         the_input = tf.keras.Input(batch_shape=shape, name=modality)
-        inputs.append(the_input)
+        inputs.update({modality: the_input})
 
     return inputs
 

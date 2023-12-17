@@ -544,6 +544,48 @@ class NoisyManipulateBlock(ManipulateBlock):
         return obs
 
 
+class TripleCamManipulateBlock(NoisyManipulateBlock):
+
+    asymmetric = True
+    continuous = False
+
+    def __init__(self, *args, **kwargs):
+        self.cameras = []
+        super().__init__(*args, **kwargs)
+
+    def _env_setup(self, *args, **kwargs):
+        super()._env_setup(*args, **kwargs)
+
+        self.cameras = [self._get_viewer("rgb_array").cam]
+        for i in range(1, 3):
+            self.cameras.append(mujoco.MjvCamera())
+            self.cameras[-1].type = mujoco.mjtCamera.mjCAMERA_FREE
+            self.cameras[-1].fixedcamid = -1
+
+            self.cameras[-1].distance = self.cameras[0].distance
+            self.cameras[-1].lookat[:] = self.cameras[0].lookat[:]
+            self.cameras[-1].elevation = self.cameras[0].elevation
+            self.cameras[-1].azimuth = self.cameras[0].azimuth
+
+            self.cameras[-1].azimuth += [35, -35][i - 1]  # wrist to the bottom
+            self.cameras[-1].elevation += 45
+
+            self.cameras[-1].distance -= 0.1  # wrist to the bottom
+
+    def get_vision(self):
+        if self.vision:
+            vision = []
+            for camera in self.cameras:
+                image = self._get_viewer("rgb_array").render(camera)
+                vision.append(image)
+
+            vision = np.concatenate(vision, axis=-1)
+        else:
+            vision = super().get_vision()
+
+        return vision
+
+
 class TestCaseManipulateBlock(ManipulateBlock):
     asymmetric = True
     continuous = False

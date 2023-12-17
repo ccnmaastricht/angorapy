@@ -24,6 +24,8 @@ setup(
         "tensorflow==2.15.*",
         "tensorflow_probability==0.23.*",
         "tensorflow_graphics==2021.12.3",
+        "tensorflow_addons==0.23.*",
+        "tensorflow_datasets",
 
         "tqdm",
         "simplejson",
@@ -44,7 +46,6 @@ setup(
         "gymnasium[mujoco]==0.28.1",
         "dm_control==1.0.12",
         "mujoco_utils",
-        "tensorflow_datasets",
     ],
 
     extras_require={

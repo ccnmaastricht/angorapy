@@ -156,6 +156,13 @@ gym.envs.register(
 )
 
 gym.envs.register(
+    id="TripleCamManipulateBlock-v0",
+    entry_point="angorapy.tasks.envs.dexterity.manipulate:TripleCamManipulateBlock",
+    kwargs={"delta_t": 0.008, "vision": True},
+    max_episode_steps=50 * 100,
+)
+
+gym.envs.register(
     id="HanoiTower-v0",
     entry_point="angorapy.tasks.envs.cognitive.hanoi:HanoiEnv",
 )
