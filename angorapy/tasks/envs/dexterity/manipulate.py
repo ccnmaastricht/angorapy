@@ -464,6 +464,22 @@ class NoisyManipulateBlock(ManipulateBlock):
     asymmetric = True
     continuous = False
 
+    ROTATION_NOISE = np.pi / 36
+    POSITION_NOISE = 3.71
+
+    def __init__(self, *args, **kwargs):
+        self.noisy_rotation = True
+        self.noisy_position = True
+        self.not_yet_warned = True
+
+        super().__init__(*args, **kwargs)
+
+    def toggle_rotation_noise(self):
+        self.noisy_rotation = not self.noisy_rotation
+
+    def toggle_position_noise(self):
+        self.noisy_position = not self.noisy_position
+
     def get_vision(self):
         """Get (surrogate) vision with added noise."""
 
@@ -471,22 +487,39 @@ class NoisyManipulateBlock(ManipulateBlock):
             object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
             vision = object_qpos.astype(np.float32)
 
-            # get random quaternion rotating by max 5 degrees in total
-            random_total_angle = np.random.normal(0, np.pi / 36)
-            angle_split = np.random.uniform(0, 1, 3)
-            angle_split /= angle_split.sum()
-            angle_noise_by_axis = angle_split * random_total_angle
+            if self.noisy_rotation:
+                # get random quaternion rotating by max 5 degrees in total
+                random_total_angle = np.random.normal(0, self.ROTATION_NOISE)
+                angle_split = np.random.uniform(0, 1, 3)
+                angle_split /= angle_split.sum()
+                angle_noise_by_axis = angle_split * random_total_angle
 
-            x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
-            y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
-            z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
+                x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
+                y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
+                z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
 
-            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
-                                                                      y_rotation_noise_quaternion)
-            rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
-                                                                      z_rotation_noise_quaternion)
+                rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
+                                                                          y_rotation_noise_quaternion)
+                rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
+                                                                          z_rotation_noise_quaternion)
 
-            vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+                vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+            else:
+                if self.not_yet_warned:
+                    print("WARNING: No rotation noise added to vision.")
+                    self.not_yet_warned = False
+
+            if self.noisy_position:
+                random_displacement_vector = np.random.normal(size=3)
+                random_displacement_vector /= np.linalg.norm(random_displacement_vector)
+
+                random_displacement_vector *= (self.POSITION_NOISE / 1000)
+
+                vision[:3] += random_displacement_vector
+            else:
+                if self.not_yet_warned:
+                    print("WARNING: No position noise added to vision.")
+                    self.not_yet_warned = False
         else:
             tmp_render_mode = self.render_mode
             self.render_mode = "rgb_array"

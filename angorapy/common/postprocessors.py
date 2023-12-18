@@ -128,12 +128,18 @@ class BaseRunningMeanPostProcessor(BasePostProcessor, abc.ABC):
     def recover(cls, env_id, state_dim, n_actions, data: PostProcessorSerialization):
         """Recover a running mean postprocessors from its serialization"""
         postprocessor = cls(env_id, state_dim, n_actions)
-        postprocessor.n = data[0]
-        postprocessor.previous_n = data[1]
+
+        if len(data) == 3:  # backwards compatibility
+            n, means, variances = data
+        else:
+            n, previous_n, means, variances = data
+            postprocessor.previous_n = previous_n
+
+        postprocessor.n = n
 
         # backwards compatibility
-        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in data[2].items()}
-        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in data[3].items()}
+        compatible_data_means = {name if name != "somatosensation" else "touch": l for name, l in means.items()}
+        compatible_data_variances = {name if name != "somatosensation" else "touch": l for name, l in variances.items()}
         compatible_data_means = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_means.items()}
         compatible_data_variances = {name if name != "asynchronous" else "asymmetric": l for name, l in compatible_data_variances.items()}
 
