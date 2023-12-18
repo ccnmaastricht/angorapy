@@ -27,7 +27,7 @@ def build_ffn_models(env: TaskWrapper,
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
-    input_list = make_input_layers(env, None, None)
+    input_list = list(make_input_layers(env, None, sequence_length=None).values())
 
     if len(input_list) > 1:
         policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
@@ -75,7 +75,7 @@ def build_rnn_models(env: TaskWrapper,
     """
 
     state_dimensionality, n_actions = env_extract_dims(env)
-    input_list = make_input_layers(env, bs=bs, sequence_length=sequence_length)
+    input_list = list(make_input_layers(env, bs, sequence_length=sequence_length).values())
 
     if len(input_list) > 1:
         policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))

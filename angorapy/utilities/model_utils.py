@@ -229,8 +229,7 @@ def make_input_layers(env, bs, sequence_length=None):
 
     state_dimensionality, n_actions = env_extract_dims(env)
 
-    inputs = []
-
+    inputs = {}
     for modality in state_dimensionality.keys():
         shape = (bs,)
         if sequence_length is not None:
@@ -238,7 +237,7 @@ def make_input_layers(env, bs, sequence_length=None):
         shape += tuple(state_dimensionality[modality])
 
         the_input = tf.keras.Input(batch_shape=shape, name=modality)
-        inputs.append(the_input)
+        inputs.update({modality: the_input})
 
     return inputs
 
