@@ -494,7 +494,10 @@ class AnthropomorphicEnv(gym.Env, ABC):
 
     def get_touch(self):
         """Get touch sensor readings."""
-        touch = self.data.sensordata[self._touch_sensor_id]
+        if self.touch:
+            touch = self.data.sensordata[self._touch_sensor_id]
+        else:
+            touch = None
 
         return touch
 
@@ -506,7 +509,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
             vision_input = self.render()
             self.render_mode = tmp_render_mode
         else:
-            vision_input = np.array([])
+            vision_input = None
 
         return vision_input
 
@@ -515,8 +518,8 @@ class AnthropomorphicEnv(gym.Env, ABC):
         return {
             'observation': Sensation(
                 proprioception=self.get_proprioception(),
-                touch=self.get_touch() if self.touch else None,
-                vision=self.get_vision() if self.vision else None,
+                touch=self.get_touch(),
+                vision=self.get_vision(),
                 goal=self.goal.copy()
             ),
         }

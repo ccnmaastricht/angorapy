@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """Convolutional components/networks."""
-import kortex
+
+try:
+    import kortex
+except ImportError:
+    import keras_cortex as kortex
+
 import tensorflow as tf
 import tensorflow_models as tfm
 from tensorflow import keras
