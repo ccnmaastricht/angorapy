@@ -66,7 +66,7 @@ def overview():
                     with open(os.path.join(exp_path, "meta.json"), "r") as f:
                         meta = json.load(f)
                 except:
-                    pass
+                    continue
 
                 agent_parameters = {}
                 model_available = False
@@ -76,8 +76,8 @@ def overview():
                     # with open(os.path.join(model_path, "best/parameters.json")) as f:
                     #     agent_parameters = json.load(f)
 
-                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
-                    meta["environment"]["reward_threshold"])
+                reward_threshold = None if meta["environment"]["reward_threshold"] == "None" \
+                    else float(meta["environment"]["reward_threshold"])
                 iterations = len(progress["rewards"]["mean"])
                 max_performance = ignore_none(max, progress["rewards"]["mean"])
                 is_success = False

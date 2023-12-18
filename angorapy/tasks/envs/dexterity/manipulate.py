@@ -60,10 +60,8 @@ class BaseManipulate(BaseShadowHandEnv):
             initial_qpos (dict): a dictionary of joint names and values that define the initial configuration
             randomize_initial_position (boolean): whether or not to randomize the initial position of the object
             randomize_initial_rotation (boolean): whether or not to randomize the initial rotation of the object
-            distance_threshold (float, in meters): the threshold after which the position of a goal is considered
-            achieved
-            rotation_threshold (float, in radians): the threshold after which the rotation of a goal is considered
-            achieved
+            distance_threshold (float, in meters): the threshold after which the position of a goal is considered achieved
+            rotation_threshold (float, in radians): the threshold after which the rotation of a goal is considered achieved
             n_substeps (int): number of substeps the simulation runs on every call to step
             relative_control (boolean): whether or not the hand is actuated in absolute joint positions or relative
             to the current state
@@ -516,18 +514,14 @@ class TestCaseManipulateBlock(ManipulateBlock):
     continuous = False
 
     def __init__(self,
-                 target_position='ignore',
-                 target_rotation='xyz',
-                 touch_get_obs='sensordata',
                  relative_control=True,
                  vision: bool = False,
                  delta_t: float = 0.002,
                  render_mode: Optional[str] = None):
-        utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
         BaseManipulate.__init__(self,
-                                touch_get_obs=touch_get_obs,
-                                target_rotation=target_rotation,
-                                target_position=target_position,
+                                touch_get_obs="sensor_data",
+                                target_rotation="xyz",
+                                target_position="ignore",
                                 target_position_range=np.array([(-0.04, 0.04), (-0.06, 0.02), (0.0, 0.06)]),
                                 vision=vision,
                                 relative_control=relative_control,
