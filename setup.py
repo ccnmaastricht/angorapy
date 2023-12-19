@@ -21,8 +21,10 @@ setup(
         "imageio==2.28.1",
 
         # tensorflow and extensions
+        "tensorflow==2.13.1",
         "tensorflow_probability==0.20.0",
         "tensorflow_graphics==2021.12.3",
+        "tensorflow_datasets",
 
         "tqdm",
         "simplejson",
@@ -44,7 +46,6 @@ setup(
         "mujoco",
         "dm_control==1.0.12",
         "mujoco_utils",
-        "tensorflow_datasets",
     ],
 
     extras_require={
