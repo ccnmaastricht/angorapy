@@ -132,11 +132,11 @@ def render_from_sim_state(sim_state):
         images.append(renderer.render())
 
     # plot the images
-    # for i, image in enumerate(images):
-    #     plt.subplot(1, len(images), i + 1)
-    #     plt.imshow(image)
-    #     plt.axis("off")
-    # plt.show()
+    for i, image in enumerate(images):
+        plt.subplot(1, len(images), i + 1)
+        plt.imshow(image)
+        plt.axis("off")
+    plt.show()
 
     qpos = tf.cast(block.qpos.copy(), dtype=tf.float32)
     block.qpos = original_qpos

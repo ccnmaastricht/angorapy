@@ -7,6 +7,7 @@ from scipy.spatial import transform
 
 import angorapy.tasks.utils
 from angorapy.common.const import N_SUBSTEPS
+from angorapy.common.const import VISION_WH
 from angorapy.common.senses import Sensation
 from angorapy.tasks.envs.dexterity.consts import DEFAULT_INITIAL_QPOS
 from angorapy.tasks.envs.dexterity.consts import FINGERTIP_SITE_NAMES
@@ -466,8 +467,8 @@ class NoisyManipulateBlock(ManipulateBlock):
     asymmetric = True
     continuous = False
 
-    ROTATION_NOISE = np.pi / 36
-    POSITION_NOISE = 3.71
+    ROTATION_NOISE = np.pi / 36 * 3
+    POSITION_NOISE = 3.71 * 10
 
     def __init__(self, *args, **kwargs):
         self.noisy_rotation = True
@@ -537,7 +538,7 @@ class NoisyManipulateBlock(ManipulateBlock):
         asymmetric = np.concatenate([
             asymmetric,
             self.get_object_pose()
-        ])
+        ], dtype=np.float32)
 
         obs["observation"].asymmetric = asymmetric
 
@@ -550,12 +551,14 @@ class TripleCamManipulateBlock(NoisyManipulateBlock):
     continuous = False
 
     def __init__(self, *args, **kwargs):
+        self.vision = True
         self.cameras = []
         super().__init__(*args, **kwargs)
 
     def _env_setup(self, *args, **kwargs):
         super()._env_setup(*args, **kwargs)
 
+        self.renderer = mujoco.Renderer(self.model, height=VISION_WH, width=VISION_WH)
         self.cameras = [self._get_viewer("rgb_array").cam]
         for i in range(1, 3):
             self.cameras.append(mujoco.MjvCamera())
@@ -576,10 +579,11 @@ class TripleCamManipulateBlock(NoisyManipulateBlock):
         if self.vision:
             vision = []
             for camera in self.cameras:
-                image = self._get_viewer("rgb_array").render(camera)
+                self.renderer.update_scene(self.data, camera)
+                image = self.renderer.render()
                 vision.append(image)
 
-            vision = np.concatenate(vision, axis=-1)
+            vision = np.concatenate(vision, axis=-1, dtype=np.float32)
         else:
             vision = super().get_vision()
 

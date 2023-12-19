@@ -189,8 +189,8 @@ class StateNormalizer(BaseRunningMeanPostProcessor):
                 normed_o[sense_name] = np.clip(
                     (sense_value - self.mean[sense_name]) / (np.sqrt(self.variance[sense_name] + EPSILON)), -10., 10.)
             else:
-                # assuming visual RGB values
-                normed_o[sense_name] = np.divide(sense_value, 255)
+                # assuming visual RGB values; normalization expected to occur in model
+                normed_o[sense_name] = sense_value
 
         normed_o = Sensation(**normed_o)
 

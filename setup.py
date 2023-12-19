@@ -44,6 +44,7 @@ setup(
 
         # environments
         "gymnasium[mujoco]==0.28.1",
+        "mujoco==2.3.7",
         "dm_control==1.0.12",
         "mujoco_utils",
     ],
