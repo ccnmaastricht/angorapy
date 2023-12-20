@@ -115,11 +115,11 @@ def render_from_sim_state(sim_state):
         block.qpos[3:] = new_quat
     else:  # "Jitter" the block by adding Gaussian noise to position and orientation
         # Add Gaussian noise to the block position
-        noise_pos = np.random.normal(loc=0, scale=0.01, size=3)
+        noise_pos = np.concatenate([np.random.normal(loc=0, scale=0.02, size=2), [0]])
         block.qpos[:3] += noise_pos
 
         # Add Gaussian noise to the block orientation
-        noise_quat = np.random.normal(loc=0, scale=0.01, size=4)
+        noise_quat = np.random.normal(loc=0, scale=0.5, size=4)
         noise_quat /= np.linalg.norm(noise_quat)
         new_quat = tfg.quaternion.multiply(quat, noise_quat)
         block.qpos[3:] = new_quat
@@ -132,11 +132,15 @@ def render_from_sim_state(sim_state):
         images.append(renderer.render())
 
     # plot the images
-    # for i, image in enumerate(images):
-    #     plt.subplot(1, len(images), i + 1)
-    #     plt.imshow(image)
-    #     plt.axis("off")
-    # plt.show()
+    for i, image in enumerate(images):
+        plt.subplot(1, len(images), i + 1)
+        plt.imshow(image)
+        plt.axis("off")
+
+        # set size
+        fig = plt.gcf()
+        fig.set_size_inches(18.5, 10.5)
+    plt.show()
 
     qpos = tf.cast(block.qpos.copy(), dtype=tf.float32)
     block.qpos = original_qpos
@@ -193,9 +197,10 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
     testset = dataset.take(n_testset)
     trainset = dataset.skip(n_testset)
 
+    trainset = trainset.shuffle(512 * 64)
     trainset = trainset.repeat()
 
-    trainset = trainset.batch(batch_size, drop_remainder=True)
+    trainset = trainset.batch(batch_size)
     testset = testset.batch(batch_size, drop_remainder=True)
 
     if is_root:

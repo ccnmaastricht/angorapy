@@ -39,7 +39,7 @@ setup(
         "seaborn",
         "distance",
         "statsmodels==0.14.0",
-        "keras_cortex==0.0.8",
+        "keras_cortex==0.1.0",
         "mediapy",
 
         # environments
