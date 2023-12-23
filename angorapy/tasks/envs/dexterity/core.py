@@ -58,8 +58,8 @@ class BaseShadowHandEnv(AnthropomorphicEnv, abc.ABC):
         # bounds are set to max of dtype to avoid infinity warnings
         self.observation_space = spaces.Dict(dict(
             observation=spaces.Dict(
-                {name: spaces.Box(np.finfo(np.float32).min,
-                                  np.finfo(np.float32).max,
+                {name: spaces.Box(np.finfo(val.dtype).min,
+                                  np.finfo(val.dtype).max,
                                   shape=val.shape)
                  for name, val in obs['observation'].dict().items()}
             ),

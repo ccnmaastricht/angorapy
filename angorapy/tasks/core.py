@@ -506,7 +506,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
         if self.vision:
             tmp_render_mode = self.render_mode
             self.render_mode = "rgb_array"
-            vision_input = self.render()
+            vision_input = self.render().cast(np.int8)
             self.render_mode = tmp_render_mode
         else:
             vision_input = None

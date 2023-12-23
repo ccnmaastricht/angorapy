@@ -15,6 +15,7 @@ env = make_task("TestCaseManipulateBlock-v0", render_mode="rgb_array")
 env.reset()
 env.calc_rotation_set()
 
+
 model = env.unwrapped.model
 data = env.unwrapped.data
 renderer = mujoco.Renderer(model, height=VISION_WH, width=VISION_WH)
@@ -24,6 +25,14 @@ cam = env.unwrapped._get_viewer("rgb_array").cam
 object = data.jnt("block/object:joint/")
 quat = data.jnt("block/object:joint/").qpos[3:]
 original_qpos = object.qpos.copy()
+
+for i in range(10):
+    data.jnt("block/object:joint/").qpos[1] += 10 / 1000
+    mujoco.mj_forward(model, data)
+
+    renderer.update_scene(data, camera=cam)
+    plt.imshow(renderer.render().copy())
+    plt.show()
 
 for rotation in env.unwrapped.test_cases_block_rotations:
     object.qpos[3:] = rotation

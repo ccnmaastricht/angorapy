@@ -488,7 +488,7 @@ class NoisyManipulateBlock(ManipulateBlock):
 
         if not self.vision:
             object_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
-            vision = object_qpos.astype(np.float32)
+            vision = np.copy(object_qpos.astype(np.float32))
 
             if self.noisy_rotation:
                 # get random quaternion rotating by max 5 degrees in total
@@ -524,10 +524,7 @@ class NoisyManipulateBlock(ManipulateBlock):
                     print("WARNING: No position noise added to vision.")
                     self.not_yet_warned = False
         else:
-            tmp_render_mode = self.render_mode
-            self.render_mode = "rgb_array"
-            vision = self.render()
-            self.render_mode = tmp_render_mode
+            vision = super().get_vision()
 
         return vision
 
@@ -583,7 +580,7 @@ class TripleCamManipulateBlock(NoisyManipulateBlock):
                 image = self.renderer.render()
                 vision.append(image)
 
-            vision = np.concatenate(vision, axis=-1, dtype=np.float32)
+            vision = np.concatenate(vision, axis=-1, dtype=np.int8)
         else:
             vision = super().get_vision()
 
