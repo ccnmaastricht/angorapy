@@ -580,7 +580,7 @@ class TripleCamManipulateBlock(NoisyManipulateBlock):
                 image = self.renderer.render()
                 vision.append(image)
 
-            vision = np.concatenate(vision, axis=-1, dtype=np.int8)
+            vision = np.concatenate(vision, axis=-1)
         else:
             vision = super().get_vision()
 

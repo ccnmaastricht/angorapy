@@ -75,6 +75,16 @@ except:
     MPI = None
 
 
+@tf.function
+def find_action(policy, prepared_state, distribution):
+    predicted_distribution_parameters = flatten(policy(prepared_state, training=False))
+
+    # from the action distribution sample an action and remember both the action and its probability
+    action, action_probability = distribution.tf_act(*predicted_distribution_parameters)
+
+    return action
+
+
 class PPOAgent:
     """Agent using the Proximal Policy Optimization Algorithm for learning.
 
@@ -389,16 +399,18 @@ class PPOAgent:
         else:
             raise ValueError("State must be a Sensation or a dictionary with an 'observation' key.")
 
-        _, _, joint = self.build_models(self.joint.get_weights(), 1, 1)
+        if self.joint.input_shape[0][0] not in [1, None]:
+            print(f"Rebuilding model with batch size 1 for inference. Current batch size: {self.joint.input_shape[0][0]}")
+            self.policy, self.value, self.joint = self.build_models(self.joint.get_weights(), 1, 1)
 
         prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
-        policy_out = flatten(joint(prepared_state, training=False))
+        predicted_distribution_parameters = flatten(self.policy(prepared_state, training=False))
 
-        predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = self.distribution.act(*predicted_distribution_parameters)
+        action, action_probability = self.distribution.tf_act(*predicted_distribution_parameters)
+        # action = find_action(self.policy, prepared_state, self.distribution)
 
-        return action
+        return action.numpy()
 
     def drill(
             self,

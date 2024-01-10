@@ -1,4 +1,5 @@
 """Generation of auxiliary datasets."""
+import gc
 import os
 
 import numpy as np
@@ -61,8 +62,8 @@ def gen_cube_quats_prediction_data(n: int, save_path: str):
     with (tf.io.TFRecordWriter(save_path) as writer):
         state, info = hand_env.reset()
         for i in tqdm(range(n), desc="Sampling Data", disable=not agent.is_root):
+            # action = agent.act(state)
             action = hand_env.action_space.sample()
-            # agent.act(state)
             sample, r, terminated, truncated, info = hand_env.step(action)
             done = terminated or truncated
 

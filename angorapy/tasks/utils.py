@@ -322,8 +322,8 @@ def convert_observation_to_space(observation):
             )
         )
     elif isinstance(observation, np.ndarray):
-        low = np.full(observation.shape, -float("inf"), dtype=np.float32)
-        high = np.full(observation.shape, float("inf"), dtype=np.float32)
+        low = np.full(observation.shape, -float("inf"), dtype=observation.dtype)
+        high = np.full(observation.shape, float("inf"), dtype=observation.dtype)
         space = spaces.Box(low, high, dtype=observation.dtype)
     else:
         raise NotImplementedError(type(observation), observation)
