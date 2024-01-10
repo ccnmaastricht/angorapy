@@ -21,10 +21,9 @@ setup(
         "imageio==2.28.1",
 
         # tensorflow and extensions
-        "tensorflow==2.15.*",
-        "tensorflow_probability==0.23.*",
+        "tensorflow==2.13.*",
+        "tensorflow_probability==0.21.*",
         "tensorflow_graphics==2021.12.3",
-        "tensorflow_addons==0.23.*",
         "tensorflow_datasets",
 
         "tqdm",
@@ -39,7 +38,7 @@ setup(
         "seaborn",
         "distance",
         "statsmodels==0.14.0",
-        "keras_cortex==0.1.0",
+        "kortex==0.1.0",
         "mediapy",
 
         # environments

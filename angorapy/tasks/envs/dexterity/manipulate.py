@@ -467,8 +467,8 @@ class NoisyManipulateBlock(ManipulateBlock):
     asymmetric = True
     continuous = False
 
-    ROTATION_NOISE = np.pi / 36 * 3
-    POSITION_NOISE = 3.71 * 10
+    ROTATION_NOISE = np.pi / 36
+    POSITION_NOISE = 3.71
 
     def __init__(self, *args, **kwargs):
         self.noisy_rotation = True
