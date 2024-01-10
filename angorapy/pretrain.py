@@ -199,7 +199,8 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         model(build_sample)
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.0003)
-        loss_fn = PoseEstimationLoss()
+        # loss_fn = PoseEstimationLoss()
+        loss_fn = keras.losses.MeanSquaredError()
         metrics = [
             distance_in_millimeters,
             rotational_distance_in_degrees,
@@ -301,33 +302,9 @@ def evaluate_on_object_pose(
 ):
     """Pretrain a visual component on prediction of cube position."""
     if is_root:
-        sim_states = []
-        poses = []
-        env = make_task("NoisyManipulateBlock-v0", render_mode="rgb_array")
-        state, info = env.reset()
-        for i in tqdm(range(n_datapoints)):
-            state, reward, trunc, term, info = env.step(env.action_space.sample())
-            pose = tf.cast(info["achieved_goal"], dtype=tf.float32)
-            sim_state = env.get_state()
-            sim_state = tf.cast(
-                np.concatenate(
-                    [np.copy(sim_state["qpos"]),
-                     np.copy(sim_state["qvel"])]
-                ), dtype=tf.float32
-            )
-
-            sim_states.append(sim_state)
-            poses.append(pose)
-
-            if trunc or term:
-                state, info = env.reset()
-
-        data = (sim_states, poses)
-        dataset = tf.data.Dataset.from_tensor_slices(data)
-
-        # data_name = f"storage/data/pretraining/{dataset_name}"
-        # print(f"Preparing dataset {data_name}...")
-        # dataset = prepare_dataset(data_name, load_data=True)
+        data_name = f"storage/data/pretraining/{dataset_name}"
+        print(f"Preparing dataset {data_name}...")
+        dataset = prepare_dataset(data_name, load_data=True)
 
         dataset = dataset.shuffle(1024 * 32)
         testset = dataset.take(n_datapoints)
@@ -390,7 +367,7 @@ if __name__ == "__main__":
 
     # general parameters
     parser.add_argument("action", type=str, choices=["gen", "train", "eval", "all"], default="all")
-    parser.add_argument("--name", type=str, default="visual_component",
+    parser.add_argument("--name", type=str, default="visual_component_mse",
                         help="Name the pretraining to uniquely identify it.")
     parser.add_argument("--load", type=str, default=None, help=f"load the weights from checkpoint path")
     parser.add_argument("--n-training-batches", type=int, default=400000, help=f"number of pretraining epochs")
