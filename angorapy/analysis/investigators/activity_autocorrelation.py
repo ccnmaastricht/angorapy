@@ -1,3 +1,4 @@
+import itertools
 import os
 import sys
 from typing import List
@@ -13,6 +14,10 @@ from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.tasks.wrappers import TaskWrapper
 
+from mpi4py import MPI
+
+
+MPI_COMM = MPI.COMM_WORLD
 
 class ActivityAutocorrelation(base_investigator.Investigator):
     """Investigate autocorrelation of the activity in different regions of the network as a measure of how long
@@ -30,10 +35,14 @@ class ActivityAutocorrelation(base_investigator.Investigator):
         self.network.reset_states()
         state, info = env.reset(return_info=True)
 
+        worker_base, worker_extra = divmod(n_repeats, MPI_COMM.size)
+        worker_split = [worker_base + (r < worker_extra) for r in range(MPI_COMM.size)]
+        workers_n = worker_split[MPI_COMM.rank]
+
         repeated_collections = []
-        for i in range(n_repeats):
+        for i in range(workers_n):
             activation_collection = []
-            for _ in tqdm.tqdm(range(n_states), disable=not verbose):
+            for _ in tqdm.tqdm(range(n_states), disable=not verbose or not MPI_COMM.Get_rank() == 0):
                 prepared_state = state.with_leading_dims(time=self.is_recurrent).dict()
 
                 # make step and record activities
@@ -55,7 +64,12 @@ class ActivityAutocorrelation(base_investigator.Investigator):
 
             repeated_collections.append(activation_collection)
 
-        self._data = stack_dicts([stack_dicts(ac) for ac in repeated_collections])
+        all_repeated_collections = MPI_COMM.gather(repeated_collections, root=0)
+
+        if MPI_COMM.rank == 0:
+            all_repeated_collections = list(itertools.chain(*all_repeated_collections))
+
+        self._data = stack_dicts([stack_dicts(ac) for ac in all_repeated_collections])
         self.prepared = True
 
     def fit(self, n_lags=30):

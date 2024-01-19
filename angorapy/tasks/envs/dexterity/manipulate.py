@@ -121,6 +121,22 @@ class BaseManipulate(BaseShadowHandEnv):
         for _, site_id in self._touch_sensor_id_site_id:
             self.model.site_rgba[site_id][3] = 0.0
 
+        # determine the face up rotations of the cube
+        x_axis = np.array([1., 0., 0.])
+        y_axis = np.array([0., 1., 0.])
+        z_axis = np.array([0., 0., 1.])
+        deg90 = np.pi / 2
+        deg180 = np.pi
+
+        self.FACE_UP_ROTATIONS = [
+            quat_from_angle_and_axis(deg90, x_axis),
+            quat_from_angle_and_axis(-deg90, x_axis),
+            quat_from_angle_and_axis(deg90, y_axis),
+            quat_from_angle_and_axis(-deg90, y_axis),
+            quat_from_angle_and_axis(deg180, y_axis),
+            quat_from_angle_and_axis(-deg180, x_axis),
+        ]
+
     def _set_default_reward_function_and_config(self):
         self.reward_function = manipulate
         self.reward_config = MANIPULATE_BASE
@@ -413,9 +429,23 @@ class BaseManipulate(BaseShadowHandEnv):
         return {
             **super()._get_info(),
             "is_success": self._is_success(self.goal, self.get_object_pose()),
+            "current_face_up": self.get_current_face_up(),
+            "goal_distance": self._goal_distance(self.goal, self.get_object_pose()),
             "achieved_goal": self.get_object_pose().copy(),
             "desired_goal": self.goal.copy(),
         }
+
+    def get_current_face_up(self):
+        current_pose = self.get_object_pose()
+
+        angle_diffs = []
+        quat_a = current_pose[3:]
+        for i, face_up_rotation in enumerate(self.FACE_UP_ROTATIONS):
+            quat_diff = angorapy.tasks.utils.quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(face_up_rotation))
+            angle_diff = 2 * np.arccos(np.clip(quat_diff[..., 0], -1., 1.))
+            angle_diffs.append(angle_diff)
+
+        return np.argmin(angle_diffs)
 
 
 class ManipulateBlock(BaseManipulate, utils.EzPickle):

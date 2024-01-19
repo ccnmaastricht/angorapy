@@ -13,7 +13,7 @@ except ImportError:
     MPI = None
 
 
-def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False):
+def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False, verbose=False):
     """Evaluate an agent on its environment.
 
     Args:
@@ -22,7 +22,7 @@ def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False):
         act_confidently (bool): If True, act deterministically without stochasticity.
 
     Returns:
-        (list, list): A tuple of lists containing the episode rewards and episode lengths.
+        Stats object: The statistics of the evaluation.
     """
 
     if MPI is not None:
@@ -58,19 +58,20 @@ def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False):
         print(
             f"Evaluated agent on {stats.numb_completed_episodes} x {agent.env_name} and achieved an average reward of {average_reward} [std: {std_reward}; "
             f"between ({min(stats.episode_rewards)}, {max(stats.episode_rewards)})].\n ")
+        if verbose:
 
-        print("Auxiliary Performance Measures:")
-        for aux_perf_name, aux_perf_trace in stats.auxiliary_performances.items():
-            aux_perf_stats = sms.DescrStatsW(aux_perf_trace)
-            average_perf = round(aux_perf_stats.mean, 2)
-            confidence_interval = round(aux_perf_stats.tconfint_mean()[0], 2), round(aux_perf_stats.tconfint_mean()[1],
-                                                                                     2)
-            print(f"\t{aux_perf_name}: {average_perf} [{confidence_interval}]")
-        print("\n")
+            print("Auxiliary Performance Measures:")
+            for aux_perf_name, aux_perf_trace in stats.auxiliary_performances.items():
+                aux_perf_stats = sms.DescrStatsW(aux_perf_trace)
+                average_perf = round(aux_perf_stats.mean, 2)
+                confidence_interval = round(aux_perf_stats.tconfint_mean()[0], 2), round(aux_perf_stats.tconfint_mean()[1],
+                                                                                         2)
+                print(f"\t{aux_perf_name}: {average_perf} [{confidence_interval}]")
+            print("\n")
 
-        print(f"The agent {'acted confidently' if act_confidently else 'acted stochastically.'}\n"
-              f"An episode on average took {average_length} steps [std: {std_length}; "
-              f"between ({min(stats.episode_lengths)}, {max(stats.episode_lengths)})].\n"
-              f"This took me {round(time.time() - start, 2)}s.")
+            print(f"The agent {'acted confidently' if act_confidently else 'acted stochastically.'}\n"
+                  f"An episode on average took {average_length} steps [std: {std_length}; "
+                  f"between ({min(stats.episode_lengths)}, {max(stats.episode_lengths)})].\n"
+                  f"This took me {round(time.time() - start, 2)}s.")
 
         return stats
