@@ -1,8 +1,10 @@
 from typing import List
 from typing import Optional
 
+import dm_control
 import mujoco
 import numpy as np
+from dm_control.utils import transformations
 from gymnasium import utils
 from scipy.spatial import transform
 
@@ -16,17 +18,16 @@ from angorapy.tasks.envs.dexterity.core import BaseShadowHandEnv
 from angorapy.tasks.envs.dexterity.mujoco_model.worlds.manipulation import ShadowHandWithCubeWorld
 from angorapy.tasks.envs.dexterity.reward import manipulate
 from angorapy.tasks.envs.dexterity.reward_configs import MANIPULATE_BASE
-from angorapy.tasks.envs.dexterity.utils import quat_from_angle_and_axis
-from angorapy.tasks.utils import quat_mul
-
+from angorapy.tasks.utils import quat_mul, quat_conjugate
+from angorapy.utilities.math import quaternions
 
 chain_code_dict = {
-    "l": quat_from_angle_and_axis(np.pi / 2, np.array([1., 0., 0.])),
-    "r": quat_from_angle_and_axis(-np.pi / 2, np.array([1., 0., 0.])),
-    "u": quat_from_angle_and_axis(np.pi / 2, np.array([0., 1., 0.])),
-    "d": quat_from_angle_and_axis(-np.pi / 2, np.array([0., 1., 0.])),
-    "c": quat_from_angle_and_axis(np.pi / 2, np.array([0., 0., 1.])),
-    "a": quat_from_angle_and_axis(-np.pi / 2, np.array([0., 0., 1.])),
+    "l": quaternions.from_angle_and_axis(np.pi / 2, np.array([1., 0., 0.])),
+    "r": quaternions.from_angle_and_axis(-np.pi / 2, np.array([1., 0., 0.])),
+    "u": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 1., 0.])),
+    "d": quaternions.from_angle_and_axis(-np.pi / 2, np.array([0., 1., 0.])),
+    "c": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 0., 1.])),
+    "a": quaternions.from_angle_and_axis(-np.pi / 2, np.array([0., 0., 1.])),
 }
 
 
@@ -56,8 +57,9 @@ def calc_rotation_chain(chain_code: str, current_rotation: np.ndarray) -> List[n
 
     for step in chain_code.split("_"):
         for code in step:
-            rotations.append(quat_mul(current_rotation, chain_code_dict[code]))
-            current_rotation = rotations[-1]
+            current_rotation = quaternions.rotate(current_rotation, chain_code_dict[code])
+
+        rotations.append(current_rotation.copy())
 
     return rotations
 
@@ -74,24 +76,24 @@ def calc_rotation_set(current_rotation):
 
     base_up_faces = [
         current_rotation,
-        quat_mul(current_rotation, quat_from_angle_and_axis(deg90, x_axis)),
-        quat_mul(current_rotation, quat_from_angle_and_axis(-deg90, x_axis)),
-        quat_mul(current_rotation, quat_from_angle_and_axis(deg90, y_axis)),
-        quat_mul(current_rotation, quat_from_angle_and_axis(-deg90, y_axis)),
-        quat_mul(current_rotation, quat_from_angle_and_axis(deg180, y_axis)),
+        quat_mul(current_rotation, quaternions.from_angle_and_axis(deg90, x_axis)),
+        quat_mul(current_rotation, quaternions.from_angle_and_axis(-deg90, x_axis)),
+        quat_mul(current_rotation, quaternions.from_angle_and_axis(deg90, y_axis)),
+        quat_mul(current_rotation, quaternions.from_angle_and_axis(-deg90, y_axis)),
+        quat_mul(current_rotation, quaternions.from_angle_and_axis(deg180, y_axis)),
     ]
 
     test_cases_block_rotations = []
     test_cases_block_rotations += base_up_faces
     for base_up_face in base_up_faces:
         test_cases_block_rotations.append(
-            quat_mul(base_up_face, quat_from_angle_and_axis(deg90, z_axis))
+            quat_mul(base_up_face, quaternions.from_angle_and_axis(deg90, z_axis))
         )
         test_cases_block_rotations.append(
-            quat_mul(base_up_face, quat_from_angle_and_axis(-deg90, z_axis))
+            quat_mul(base_up_face, quaternions.from_angle_and_axis(-deg90, z_axis))
         )
         test_cases_block_rotations.append(
-            quat_mul(base_up_face, quat_from_angle_and_axis(deg180, z_axis))
+            quat_mul(base_up_face, quaternions.from_angle_and_axis(deg180, z_axis))
         )
 
     return test_cases_block_rotations
@@ -207,12 +209,12 @@ class BaseManipulate(BaseShadowHandEnv):
         deg180 = np.pi
 
         self.FACE_UP_ROTATIONS = [
-            quat_from_angle_and_axis(deg90, x_axis),
-            quat_from_angle_and_axis(-deg90, x_axis),
-            quat_from_angle_and_axis(deg90, y_axis),
-            quat_from_angle_and_axis(-deg90, y_axis),
-            quat_from_angle_and_axis(deg180, y_axis),
-            quat_from_angle_and_axis(-deg180, x_axis),
+            quaternions.from_angle_and_axis(deg90, x_axis),
+            quaternions.from_angle_and_axis(-deg90, x_axis),
+            quaternions.from_angle_and_axis(deg90, y_axis),
+            quaternions.from_angle_and_axis(-deg90, y_axis),
+            quaternions.from_angle_and_axis(deg180, y_axis),
+            quaternions.from_angle_and_axis(-deg180, x_axis),
         ]
 
     def _set_default_reward_function_and_config(self):
@@ -261,7 +263,7 @@ class BaseManipulate(BaseShadowHandEnv):
                 quat_a = angorapy.tasks.utils.euler2quat(euler_a)
 
             # Subtract quaternions and extract angle between them.
-            quat_diff = angorapy.tasks.utils.quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(quat_b))
+            quat_diff = quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(quat_b))
             angle_diff = 2 * np.arccos(np.clip(quat_diff[..., 0], -1., 1.))
             d_rot = angle_diff
 
@@ -307,20 +309,20 @@ class BaseManipulate(BaseShadowHandEnv):
             if self.target_rotation == 'z':
                 angle = self.np_random.uniform(-np.pi, np.pi)
                 axis = np.array([0., 0., 1.])
-                offset_quat = quat_from_angle_and_axis(angle, axis)
-                initial_quat = angorapy.tasks.utils.quat_mul(initial_quat, offset_quat)
+                offset_quat = quaternions.from_angle_and_axis(angle, axis)
+                initial_quat = quat_mul(initial_quat, offset_quat)
             elif self.target_rotation == 'parallel':
                 angle = self.np_random.uniform(-np.pi, np.pi)
                 axis = np.array([0., 0., 1.])
-                z_quat = quat_from_angle_and_axis(angle, axis)
+                z_quat = quaternions.from_angle_and_axis(angle, axis)
                 parallel_quat = self.parallel_quats[self.np_random.randint(len(self.parallel_quats))]
-                offset_quat = angorapy.tasks.utils.quat_mul(z_quat, parallel_quat)
-                initial_quat = angorapy.tasks.utils.quat_mul(initial_quat, offset_quat)
+                offset_quat = quat_mul(z_quat, parallel_quat)
+                initial_quat = quat_mul(initial_quat, offset_quat)
             elif self.target_rotation in ['xyz', 'ignore']:
                 angle = self.np_random.uniform(-np.pi, np.pi)
                 axis = self.np_random.uniform(-1., 1., size=3)
-                offset_quat = quat_from_angle_and_axis(angle, axis)
-                initial_quat = angorapy.tasks.utils.quat_mul(initial_quat, offset_quat)
+                offset_quat = quaternions.from_angle_and_axis(angle, axis)
+                initial_quat = quat_mul(initial_quat, offset_quat)
             elif self.target_rotation == 'fixed':
                 pass
             else:
@@ -368,17 +370,17 @@ class BaseManipulate(BaseShadowHandEnv):
         if self.target_rotation == 'z':
             angle = self.np_random.uniform(-np.pi, np.pi)
             axis = np.array([0., 0., 1.])
-            target_quat = quat_from_angle_and_axis(angle, axis)
+            target_quat = quaternions.from_angle_and_axis(angle, axis)
         elif self.target_rotation == 'parallel':
             angle = self.np_random.uniform(-np.pi, np.pi)
             axis = np.array([0., 0., 1.])
-            target_quat = quat_from_angle_and_axis(angle, axis)
+            target_quat = quaternions.from_angle_and_axis(angle, axis)
             parallel_quat = self.parallel_quats[self.np_random.randint(len(self.parallel_quats))]
-            target_quat = angorapy.tasks.utils.quat_mul(target_quat, parallel_quat)
+            target_quat = quat_mul(target_quat, parallel_quat)
         elif self.target_rotation == 'xyz':
             angle = self.np_random.uniform(-np.pi, np.pi)
             axis = self.np_random.uniform(-1., 1., size=3)
-            target_quat = quat_from_angle_and_axis(angle, axis)
+            target_quat = quaternions.from_angle_and_axis(angle, axis)
         elif self.target_rotation in ['ignore', 'fixed']:
             target_quat = self.data.jnt(self.object_joint_id).qpos
         else:
@@ -519,7 +521,7 @@ class BaseManipulate(BaseShadowHandEnv):
         angle_diffs = []
         quat_a = current_pose[3:]
         for i, face_up_rotation in enumerate(self.FACE_UP_ROTATIONS):
-            quat_diff = angorapy.tasks.utils.quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(face_up_rotation))
+            quat_diff = quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(face_up_rotation))
             angle_diff = 2 * np.arccos(np.clip(quat_diff[..., 0], -1., 1.))
             angle_diffs.append(angle_diff)
 
@@ -605,16 +607,16 @@ class NoisyManipulateBlock(ManipulateBlock):
                 angle_split /= angle_split.sum()
                 angle_noise_by_axis = angle_split * random_total_angle
 
-                x_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
-                y_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
-                z_rotation_noise_quaternion = quat_from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
+                x_rotation_noise_quaternion = quaternions.from_angle_and_axis(angle_noise_by_axis[0], np.array([1., 0., 0.]))
+                y_rotation_noise_quaternion = quaternions.from_angle_and_axis(angle_noise_by_axis[1], np.array([0., 1., 0.]))
+                z_rotation_noise_quaternion = quaternions.from_angle_and_axis(angle_noise_by_axis[2], np.array([0., 0., 1.]))
 
-                rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(x_rotation_noise_quaternion,
+                rotation_noise_quaternion = quat_mul(x_rotation_noise_quaternion,
                                                                           y_rotation_noise_quaternion)
-                rotation_noise_quaternion = angorapy.tasks.utils.quat_mul(rotation_noise_quaternion,
+                rotation_noise_quaternion = quat_mul(rotation_noise_quaternion,
                                                                           z_rotation_noise_quaternion)
 
-                vision[3:] = angorapy.tasks.utils.quat_mul(vision[3:], rotation_noise_quaternion)
+                vision[3:] = quat_mul(vision[3:], rotation_noise_quaternion)
             else:
                 if self.not_yet_warned:
                     print("WARNING: No rotation noise added to vision.")
@@ -735,7 +737,7 @@ class TestCaseManipulateBlock(ManipulateBlock):
             "Chain code contains invalid characters."
 
         self.chain_code = chain_code
-        self.target_chain = calc_rotation_chain(chain_code=chain_code,
+        self.target_chain = calc_rotation_chain(chain_code=self.chain_code,
                                                 current_rotation=self.get_object_pose()[3:])
 
     def _sample_goal(self):

@@ -18,11 +18,3 @@ def get_fingertip_distance(ft_a, ft_b):
     """Return the distance between two vectors representing finger tip positions."""
     assert ft_a.shape == ft_b.shape
     return np.linalg.norm(ft_a - ft_b, axis=-1)
-
-
-def quat_from_angle_and_axis(angle, axis):
-    assert axis.shape == (3,)
-    axis /= np.linalg.norm(axis)
-    quat = np.concatenate([[np.cos(angle / 2.)], np.sin(angle / 2.) * axis])
-    quat /= np.linalg.norm(quat)
-    return quat
