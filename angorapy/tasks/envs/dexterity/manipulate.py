@@ -749,6 +749,14 @@ class TestCaseManipulateBlock(ManipulateBlock):
 
         return np.concatenate([self.get_object_pose()[:3], self.target_chain[self.position_in_chain]])
 
+    def _get_info(self):
+        return {
+            **super()._get_info(),
+            "chain_code": self.chain_code,
+            "position_in_chain": self.position_in_chain,
+            "current_intention": self.chain_code.split("_")[self.position_in_chain] if self.position_in_chain != -1 else "done",
+        }
+
     def step(self, action):
         """Make step in environment."""
         obs, reward, terminated, truncated, info = super().step(action)
