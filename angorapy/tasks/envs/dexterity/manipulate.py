@@ -22,8 +22,8 @@ from angorapy.tasks.utils import quat_mul, quat_conjugate
 from angorapy.utilities.math import quaternions
 
 chain_code_dict = {
-    "l": quaternions.from_angle_and_axis(np.pi / 2, np.array([1., 0., 0.])),
-    "r": quaternions.from_angle_and_axis(-np.pi / 2, np.array([1., 0., 0.])),
+    "r": quaternions.from_angle_and_axis(np.pi / 2, np.array([1., 0., 0.])),
+    "l": quaternions.from_angle_and_axis(-np.pi / 2, np.array([1., 0., 0.])),
     "u": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 1., 0.])),
     "d": quaternions.from_angle_and_axis(-np.pi / 2, np.array([0., 1., 0.])),
     "c": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 0., 1.])),
@@ -57,7 +57,7 @@ def calc_rotation_chain(chain_code: str, current_rotation: np.ndarray) -> List[n
 
     for step in chain_code.split("_"):
         for code in step:
-            current_rotation = quaternions.rotate(current_rotation, chain_code_dict[code])
+            current_rotation = quaternions.multiply(chain_code_dict[code], current_rotation)
 
         rotations.append(current_rotation.copy())
 
@@ -725,7 +725,8 @@ class TestCaseManipulateBlock(ManipulateBlock):
             vision=vision,
             relative_control=relative_control,
             delta_t=delta_t,
-            render_mode=render_mode
+            render_mode=render_mode,
+            randomize_initial_rotation="parallel",
         )
 
         self.test_cases_block_rotations = calc_rotation_set(self.get_object_pose()[3:])
@@ -762,3 +763,42 @@ class TestCaseManipulateBlock(ManipulateBlock):
         self.set_chain_code(self.chain_code)
 
         return super().reset(**kwargs)
+
+    def _reset_sim(self):
+        self.reset_model()
+
+        initial_qpos = self.data.jnt(self.object_joint_id).qpos.copy()
+        initial_pos, initial_quat = initial_qpos[:3], initial_qpos[3:]
+        assert initial_qpos.shape == (7,)
+        assert initial_pos.shape == (3,)
+        assert initial_quat.shape == (4,)
+        initial_qpos = None
+
+        # Randomization initial rotation.
+        if self.randomize_initial_rotation:
+            angle = self.np_random.uniform(-np.pi / 15, np.pi / 15)
+            axis = self.np_random.uniform(-1., 1., size=3)
+            offset_quat = quaternions.from_angle_and_axis(angle, axis)
+            initial_quat = quat_mul(initial_quat, offset_quat)
+
+        # Randomize initial position.
+        if self.randomize_initial_position:
+            if self.target_position != 'fixed':
+                initial_pos += self.np_random.normal(size=3, scale=0.003)
+
+        initial_quat /= np.linalg.norm(initial_quat)
+        initial_qpos = np.concatenate([initial_pos, initial_quat])
+        self.data.jnt(self.object_joint_id).qpos[:] = initial_qpos
+
+        def is_on_palm():
+            mujoco.mj_forward(self.model, self.data)
+            cube_middle_pos = self.data.site(self.object_center_id).xpos
+            is_on_palm = (cube_middle_pos[2] > 0.04)
+            return is_on_palm
+
+        # Run the simulation for a bunch of timesteps to let everything settle in.
+        for _ in range(10):
+            self._set_action(np.zeros(self.action_space.shape[0]))
+            mujoco.mj_step(self.model, self.data)
+
+        return is_on_palm()
