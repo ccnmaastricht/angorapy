@@ -713,8 +713,9 @@ class TestCaseManipulateBlock(ManipulateBlock):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
 
         self.chain_code = "l_r_u_d_c_a"
-        self.position_in_chain = 0
+        self.position_in_chain = -1
         self.target_chain = [np.array([1., 0., 0., 0.])]
+        self.chain_done = False
 
         BaseManipulate.__init__(
             self,
@@ -740,11 +741,13 @@ class TestCaseManipulateBlock(ManipulateBlock):
         self.chain_code = chain_code
         self.target_chain = calc_rotation_chain(chain_code=self.chain_code,
                                                 current_rotation=self.get_object_pose()[3:])
+        self.chain_done = False
 
     def _sample_goal(self):
         self.position_in_chain += 1
 
         if self.position_in_chain >= len(self.target_chain):
+            self.chain_done = True
             self.position_in_chain = -1
 
         return np.concatenate([self.get_object_pose()[:3], self.target_chain[self.position_in_chain]])
@@ -761,14 +764,15 @@ class TestCaseManipulateBlock(ManipulateBlock):
         """Make step in environment."""
         obs, reward, terminated, truncated, info = super().step(action)
 
-        if self.position_in_chain == -1:
+        if self.chain_done:
             terminated = True
 
         return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
-        self.position_in_chain = 0
+        self.position_in_chain = -1
         self.set_chain_code(self.chain_code)
+        self.chain_done = False
 
         return super().reset(**kwargs)
 
