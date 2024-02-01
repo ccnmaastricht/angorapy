@@ -1,3 +1,4 @@
+import random
 from typing import List
 from typing import Optional
 
@@ -26,8 +27,8 @@ chain_code_dict = {
     "l": quaternions.from_angle_and_axis(-np.pi / 2, np.array([1., 0., 0.])),
     "u": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 1., 0.])),
     "d": quaternions.from_angle_and_axis(-np.pi / 2, np.array([0., 1., 0.])),
-    "c": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 0., 1.])),
-    "a": quaternions.from_angle_and_axis(-np.pi / 2, np.array([0., 0., 1.])),
+    "c": quaternions.from_angle_and_axis(-np.pi / 2, np.array([0., 0., 1.])),
+    "a": quaternions.from_angle_and_axis(np.pi / 2, np.array([0., 0., 1.])),
 }
 
 
@@ -707,11 +708,13 @@ class TestCaseManipulateBlock(ManipulateBlock):
             touch_get_obs='sensordata',
             relative_control=True,
             vision: bool = False,
+            random_shuffle_chain_codes: bool = False,
             delta_t: float = 0.002,
             render_mode: Optional[str] = None
     ):
         utils.EzPickle.__init__(self, target_position, target_rotation, touch_get_obs, "dense")
 
+        self.random_shuffle_chain_codes = random_shuffle_chain_codes
         self.chain_code = "l_r_u_d_c_a"
         self.position_in_chain = -1
         self.target_chain = [np.array([1., 0., 0., 0.])]
@@ -770,11 +773,19 @@ class TestCaseManipulateBlock(ManipulateBlock):
         return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
+        reset_out = super().reset(**kwargs)
+
         self.position_in_chain = -1
-        self.set_chain_code(self.chain_code)
+
+        if not self.random_shuffle_chain_codes:
+            self.set_chain_code(self.chain_code)
+        else:
+            chain_elements = self.chain_code.split("_")
+            self.set_chain_code("_".join(random.sample(chain_elements, len(chain_elements))))
+
         self.chain_done = False
 
-        return super().reset(**kwargs)
+        return reset_out
 
     def _reset_sim(self):
         self.reset_model()

@@ -11,10 +11,8 @@ from angorapy.common.const import VISION_WH
 import numpy as np
 
 
-env = make_task("TestCaseManipulateBlock-v0", render_mode="rgb_array")
+env = make_task("TestCaseManipulateBlockRandomized-v0", render_mode="rgb_array")
 env.reset()
-
-env.set_chain_code("l_r_u_d_c_a")
 
 model = env.model
 data = env.data
@@ -34,6 +32,7 @@ object = data.jnt("block/object:joint/")
 quat = data.jnt("block/object:joint/").qpos[3:]
 original_qpos = object.qpos.copy()
 
+print(env.chain_code)
 for rotation in [original_qpos[3:], *env.target_chain]:
     object.qpos[3:] = rotation
     mujoco.mj_forward(model, data)

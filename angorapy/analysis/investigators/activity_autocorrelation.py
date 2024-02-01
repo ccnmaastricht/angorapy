@@ -19,6 +19,7 @@ from mpi4py import MPI
 
 MPI_COMM = MPI.COMM_WORLD
 
+
 class ActivityAutocorrelation(base_investigator.Investigator):
     """Investigate autocorrelation of the activity in different regions of the network as a measure of how long
     information is maintained over time."""
