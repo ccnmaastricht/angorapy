@@ -787,18 +787,13 @@ class TestCaseManipulateBlock(ManipulateBlock):
         initial_qpos = None
 
         # Randomization initial rotation.
-        if self.randomize_initial_rotation:
-            angle = self.np_random.uniform(-np.pi / 15, np.pi / 15)
-            axis = self.np_random.uniform(-1., 1., size=3)
-            offset_quat = quaternions.from_angle_and_axis(angle, axis)
-            initial_quat = quat_mul(initial_quat, offset_quat)
+        initial_quat = self.test_cases_block_rotations[self.np_random.integers(low=0, high=len(self.test_cases_block_rotations))]
 
         # Randomize initial position.
         if self.randomize_initial_position:
             if self.target_position != 'fixed':
                 initial_pos += self.np_random.normal(size=3, scale=0.003)
 
-        initial_quat /= np.linalg.norm(initial_quat)
         initial_qpos = np.concatenate([initial_pos, initial_quat])
         self.data.jnt(self.object_joint_id).qpos[:] = initial_qpos
 
