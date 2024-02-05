@@ -760,7 +760,7 @@ class TestCaseManipulateBlock(ManipulateBlock):
             **super()._get_info(),
             "chain_code": self.chain_code,
             "position_in_chain": self.position_in_chain,
-            "current_intention": self.chain_code.split("_")[self.position_in_chain] if self.position_in_chain != -1 else "done",
+            "current_intention": self.chain_code.split("_")[self.position_in_chain],
         }
 
     def step(self, action):
@@ -775,7 +775,7 @@ class TestCaseManipulateBlock(ManipulateBlock):
     def reset(self, **kwargs):
         reset_out = super().reset(**kwargs)
 
-        self.position_in_chain = -1
+        self.position_in_chain = 0
 
         if not self.random_shuffle_chain_codes:
             self.set_chain_code(self.chain_code)
