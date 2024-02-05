@@ -22,27 +22,24 @@ class Investigator:
 
     The class serves as a wrapper to use a collection of methods that can extract information about the network."""
 
-    def __init__(self, network: tf.keras.Model, distribution: BasePolicyDistribution, agent=None):
+    def __init__(self, agent: PPOAgent):
         """Build an investigator for a network using a distribution.
 
         Args:
-            network (tf.keras.Model):               the policy network to investigate
-            distribution (BasePolicyDistribution):     a distribution that the network predicts
+            agent: The agent to investigate.
         """
-        self.network: tf.keras.Model = network
-        self.distribution: BasePolicyDistribution = distribution
-        self.is_recurrent = is_recurrent_model(self.network)
-
         self.agent = agent
+
+        policy, value, joint = agent.build_models(self.agent.joint.get_weights(), batch_size=1, sequence_length=1)
+
+        self.network: tf.keras.Model = policy
+        self.distribution: BasePolicyDistribution = agent.distribution
+        self.is_recurrent = is_recurrent_model(self.network)
 
     @classmethod
     def from_agent(cls, agent: PPOAgent):
-        """Instantiate an investigator from an agent object."""
-        agent.policy, agent.value, agent.joint = agent.build_models(agent.joint.get_weights(),
-                                                                    batch_size=1, sequence_length=1)
-        investigator = cls(agent.policy, agent.distribution, agent=agent)
-
-        return investigator
+        """Here for backwards compatibility."""
+        return cls(agent)
 
     def list_layer_names(self, only_para_layers=True) -> List[str]:
         """Get a list of unique string representations of all layers in the network."""
