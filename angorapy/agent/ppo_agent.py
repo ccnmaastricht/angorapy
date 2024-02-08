@@ -201,6 +201,7 @@ class PPOAgent:
         self.clip_values = clip_values
         self.tbptt_length = tbptt_length
         self.reward_configuration = reward_configuration
+        self.batch_size = 1  # will be set in drill
 
         # learning rate schedule
         self.lr_schedule_type = lr_schedule
@@ -1123,6 +1124,16 @@ class PPOAgent:
         joint.set_weights(weights)
 
         return policy, value, joint
+
+    def rebuild_for_individual_stepping(self):
+        """Rebuild policy, value and joint to use batch size and sequence length of 1."""
+        joint_weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.build_models(joint_weights, 1, 1)
+
+    def rebuild_for_sequence_stepping(self):
+        """Rebuild policy, value and joint to use the agent's TBPTT length as sequence length."""
+        joint_weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.build_models(joint_weights, self.batch_size, self.tbptt_length)
 
     def load_components(self, path_to_components: str):
         for directory in os.listdir(path_to_components):
