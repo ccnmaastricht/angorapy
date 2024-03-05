@@ -293,7 +293,10 @@ class BaseManipulate(BaseShadowHandEnv):
         self.consecutive_goals_reached = 0
         self.steps_with_current_goal = 0
 
-        return super().reset(**kwargs)
+        state, info = super().reset(**kwargs)
+        info["auxiliary_performances"]["consecutive_goals_reached"] = self.consecutive_goals_reached
+
+        return state, info
 
     def _reset_sim(self):
         self.reset_model()
