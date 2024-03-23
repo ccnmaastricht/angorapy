@@ -294,6 +294,9 @@ class BaseManipulate(BaseShadowHandEnv):
         self.steps_with_current_goal = 0
 
         state, info = super().reset(**kwargs)
+
+        if "auxiliary_performances" not in info.keys():
+            info["auxiliary_performances"] = {}
         info["auxiliary_performances"]["consecutive_goals_reached"] = self.consecutive_goals_reached
 
         return state, info

@@ -40,3 +40,14 @@ class PoseEstimationLoss(tf.keras.losses.Loss):
         rotational_loss = geodesic_loss(y_pred, y_true)
 
         return position_loss + rotational_loss
+
+
+def combined_pose_loss(y_true, y_pred):
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
+
+    position_loss = euclidean_distance(y_pred, y_true)
+    rotational_loss = geodesic_loss(y_pred, y_true)
+    mse_loss = tf.reduce_mean(tf.square(y_pred - y_true))
+
+    return position_loss + rotational_loss + 0.2 * mse_loss

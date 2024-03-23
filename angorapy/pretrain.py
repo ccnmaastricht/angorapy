@@ -7,6 +7,8 @@ import sys
 import mujoco
 import numpy as np
 import tensorflow as tf
+
+from angorapy.common.loss import combined_pose_loss
 from angorapy.common.loss import PoseEstimationLoss
 from angorapy.common.metrics.distance import distance_in_millimeters
 from angorapy.common.metrics.distance import rotational_distance_in_degrees
@@ -199,8 +201,8 @@ def pretrain_on_object_pose(pretrainable_component: tf.keras.Model,
         model(build_sample)
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.0003)
-        # loss_fn = PoseEstimationLoss()
-        loss_fn = keras.losses.MeanSquaredError()
+        loss_fn = combined_pose_loss
+        # loss_fn = keras.losses.MeanSquaredError()
         metrics = [
             distance_in_millimeters,
             rotational_distance_in_degrees,
