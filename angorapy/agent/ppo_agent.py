@@ -218,7 +218,7 @@ class PPOAgent:
 
         # models and optimizers
         self.distribution = distribution
-        if self.distribution is None:
+        if self.distribution is None:  # todo autodetect and apply multicategorical
             self.distribution = CategoricalPolicyDistribution(
                 self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."

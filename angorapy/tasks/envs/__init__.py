@@ -120,12 +120,12 @@ gym.envs.register(
     max_episode_steps=50 * 100,
 )
 
-gym.envs.register(
-    id=f'HumanoidManipulateBlockDiscreteAsynchronous-v0',
-    entry_point='angorapy.tasks.envs.dexterity.manipulate:ManipulateBlockDiscreteAsymmetric',
-    kwargs={"delta_t": 0.008},
-    max_episode_steps=50 * 100,
-)
+# gym.envs.register(
+#     id=f'HumanoidManipulateBlockDiscreteAsynchronous-v0',
+#     entry_point='angorapy.tasks.envs.dexterity.manipulate:ManipulateBlockDiscreteAsymmetric',
+#     kwargs={"delta_t": 0.008},
+#     max_episode_steps=50 * 100,
+# )
 
 gym.envs.register(
     id=f'ManipulateBlockVisualDiscreteAsynchronous-v0',
