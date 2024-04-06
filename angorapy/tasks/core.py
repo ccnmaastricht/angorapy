@@ -561,3 +561,7 @@ class AnthropomorphicEnv(gym.Env, ABC):
     @property
     def joint_names(self):
         return mj_get_category_names(self.model, "jnt")[0]
+
+    @property
+    def robot_joint_names(self):
+        return [name for name in self.joint_names if name.startswith(b"robot")]
