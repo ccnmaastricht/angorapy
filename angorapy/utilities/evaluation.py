@@ -75,3 +75,6 @@ def evaluate_agent(agent: PPOAgent, n_episodes: int, act_confidently=False, verb
                   f"This took me {round(time.time() - start, 2)}s.")
 
         return stats
+
+    del stats
+    return

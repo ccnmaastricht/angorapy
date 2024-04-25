@@ -377,11 +377,11 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
-    def act(self, state: Union[Sensation, Dict[str, Any]]):
+    def act(self, state: Union[Sensation, Dict[str, Any]], confidently=False):
         """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
         that can be directly given to an environment.
 
-        This method is mostly useful at inference time and serves as q quick wrapper around the steps required to
+        This method is mostly useful at inference time and serves as a quick wrapper around the steps required to
         process the raw numpy states of the environment into a state readable by the policy network, followed by
         sampling from the predicted distribution."""
 
@@ -408,10 +408,12 @@ class PPOAgent:
         predicted_distribution_parameters = flatten(self.policy(prepared_state, training=False))
 
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = self.distribution.tf_act(*predicted_distribution_parameters)
-        # action = find_action(self.policy, prepared_state, self.distribution)
+        if not confidently:
+            action = self.distribution.tf_act(*predicted_distribution_parameters)[0].numpy()
+        else:
+            action = self.distribution.act_deterministic(*predicted_distribution_parameters)[0]
 
-        return action.numpy()
+        return action
 
     def drill(
             self,
@@ -968,7 +970,7 @@ class PPOAgent:
     @staticmethod
     def from_agent_state(
             agent_id: int,
-            from_iteration: Union[int, str] = None,
+            from_iteration: Union[int, str] = "best",
             force_env_name=None,
             path_modifier="",
             n_optimizers: int = None
@@ -1043,9 +1045,6 @@ class PPOAgent:
                 print(e)
                 from_iteration = fallback_stack.pop(0)
 
-        if is_root:
-            print(f"Loading from iteration {from_iteration}.")
-
         postprocessors = postprocessors_from_serializations(parameters["transformers"])
         env = make_task(parameters["env_name"] if force_env_name is None else force_env_name,
                         reward_config=parameters.get("reward_configuration"),
@@ -1085,9 +1084,6 @@ class PPOAgent:
                 loaded_agent.optimizer = MpiAdam.from_serialization(optimization_comm,
                                                                     parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
-
-            if is_root:
-                print("Loaded optimizer weights from file.")
 
         # mark the loading
         loaded_agent.loading_history.append([loaded_agent.iteration])

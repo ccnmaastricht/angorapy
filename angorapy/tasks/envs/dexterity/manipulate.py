@@ -210,12 +210,12 @@ class BaseManipulate(BaseShadowHandEnv):
         deg180 = np.pi
 
         self.FACE_UP_ROTATIONS = [
-            quaternions.from_angle_and_axis(deg90, x_axis),
-            quaternions.from_angle_and_axis(-deg90, x_axis),
-            quaternions.from_angle_and_axis(deg90, y_axis),
-            quaternions.from_angle_and_axis(-deg90, y_axis),
-            quaternions.from_angle_and_axis(deg180, y_axis),
-            quaternions.from_angle_and_axis(-deg180, x_axis),
+            quaternions.from_angle_and_axis(deg90, x_axis),     # T
+            quaternions.from_angle_and_axis(-deg90, x_axis),    # X
+            quaternions.from_angle_and_axis(deg90, y_axis),     # C
+            quaternions.from_angle_and_axis(-deg90, y_axis),    # R
+            quaternions.from_angle_and_axis(deg180, y_axis),    # E
+            quaternions.from_angle_and_axis(deg180 + deg180, y_axis),   # O
         ]
 
     def _set_default_reward_function_and_config(self):
@@ -527,8 +527,16 @@ class BaseManipulate(BaseShadowHandEnv):
 
         angle_diffs = []
         quat_a = current_pose[3:]
+
         for i, face_up_rotation in enumerate(self.FACE_UP_ROTATIONS):
-            quat_diff = quat_mul(quat_a, angorapy.tasks.utils.quat_conjugate(face_up_rotation))
+            quat_b = angorapy.tasks.utils.quat_conjugate(face_up_rotation)
+
+            euler_a = angorapy.tasks.utils.quat2euler(quat_a)
+            euler_b = angorapy.tasks.utils.quat2euler(quat_b)
+            euler_a[2] = euler_b[2]
+            quat_a = angorapy.tasks.utils.euler2quat(euler_a)
+
+            quat_diff = quat_mul(quat_a, quat_b)
             angle_diff = 2 * np.arccos(np.clip(quat_diff[..., 0], -1., 1.))
             angle_diffs.append(angle_diff)
 
