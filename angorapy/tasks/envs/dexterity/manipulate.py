@@ -210,12 +210,12 @@ class BaseManipulate(BaseShadowHandEnv):
         deg180 = np.pi
 
         self.FACE_UP_ROTATIONS = [
-            quaternions.from_angle_and_axis(deg90, x_axis),     # T
-            quaternions.from_angle_and_axis(-deg90, x_axis),    # X
             quaternions.from_angle_and_axis(deg90, y_axis),     # C
+            quaternions.from_angle_and_axis(0, y_axis),   # O
             quaternions.from_angle_and_axis(-deg90, y_axis),    # R
+            quaternions.from_angle_and_axis(deg90, x_axis),     # T
             quaternions.from_angle_and_axis(deg180, y_axis),    # E
-            quaternions.from_angle_and_axis(deg180 + deg180, y_axis),   # O
+            quaternions.from_angle_and_axis(-deg90, x_axis),    # X
         ]
 
     def _set_default_reward_function_and_config(self):
