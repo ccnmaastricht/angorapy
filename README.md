@@ -158,7 +158,7 @@ For more details, consult the [examples](examples).
 
 ## 🎓 Documentation
 
-Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs:
+Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](https://github.com/weidler/angorapy-tutorials/) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs:
 
 - [Agent](angorapy/agent) [WIP]
 - [Environments](angorapy/tasks)
