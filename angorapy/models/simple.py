@@ -27,7 +27,7 @@ def build_ffn_models(env: TaskWrapper,
 
     # preparation
     state_dimensionality, n_actions = env_extract_dims(env)
-    input_list = list(make_input_layers(env, None, sequence_length=None).values())
+    input_list, _ = [list(d.values()) for d in make_input_layers(env)]
 
     if len(input_list) > 1:
         policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
@@ -75,22 +75,20 @@ def build_rnn_models(env: TaskWrapper,
     """
 
     state_dimensionality, n_actions = env_extract_dims(env)
-    input_list = list(make_input_layers(env, bs, sequence_length=sequence_length).values())
+    input_list, masked_inputs = [list(d.values()) for d in make_input_layers(env, bs, sequence_length=sequence_length)]
 
     if len(input_list) > 1:
-        policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
+        policy_inputs = list(filter(lambda i: i.name != "asymmetric", masked_inputs))
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
-        inputs = input_list[0]
+        inputs = masked_inputs[0]
 
     if "asymmetric" in state_dimensionality.keys():
         value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
-            [inputs, list(filter(lambda i: i.name == "asymmetric", input_list))[0]]
+            [inputs, list(filter(lambda i: i.name == "asymmetric", masked_inputs))[0]]
         )
     else:
         value_inputs = inputs
-
-    masked = tf.keras.layers.Masking(batch_input_shape=(bs, sequence_length,) + (inputs.shape[-1], ))(inputs)
 
     # policy network; stateful, so batch size needs to be known
     encoder_sub_model = _build_encoding_sub_model(
@@ -100,7 +98,7 @@ def build_rnn_models(env: TaskWrapper,
         layer_sizes=layer_sizes[:-1],
         name="policy_encoder")
 
-    x = TimeDistributed(encoder_sub_model, name="TD_policy")(masked)
+    x = TimeDistributed(encoder_sub_model, name="TD_policy")(inputs)
     x.set_shape([bs] + x.shape[1:])
 
     rnn_choice = {"rnn": tf.keras.layers.SimpleRNN,

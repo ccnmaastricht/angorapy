@@ -222,14 +222,23 @@ def is_conv(layer):
 
 # Building helpers
 
-def make_input_layers(env, bs, sequence_length=None):
-    """Build input layers for a model acting on the given environment.
+def make_input_layers(env, bs=None, sequence_length=None) -> tuple[dict[str, tf.keras.Input], dict[str, tf.keras.layers.Masking]]:
+    """Build masked input layers for a model acting on the given environment.
 
-    If the model is not recurrent, provide None for the sequence_length (default)"""
+    If the model is not recurrent, provide None for the sequence_length (default)
+
+    Args:
+        env: TaskWrapper, the environment to build the input layers for
+        bs: int, the batch size of the model
+        sequence_length: int, the sequence length of the model
+    Returns:
+        tuple[dict[str, tf.keras.Input], dict[str, tf.keras.layers.Masking]]: the input layers and their masked versions
+    """
 
     state_dimensionality, n_actions = env_extract_dims(env)
 
     inputs = {}
+    masked_inputs = {}
     for modality in state_dimensionality.keys():
         shape = (bs,)
         if sequence_length is not None:
@@ -237,9 +246,14 @@ def make_input_layers(env, bs, sequence_length=None):
         shape += tuple(state_dimensionality[modality])
 
         the_input = tf.keras.Input(batch_shape=shape, name=modality)
+
+        if sequence_length is not None:
+            the_masked_input = tf.keras.layers.Masking(batch_input_shape=shape, name=modality)(the_input)
+            masked_inputs.update({modality: the_input})
+
         inputs.update({modality: the_input})
 
-    return inputs
+    return inputs, masked_inputs
 
 
 # Validators
