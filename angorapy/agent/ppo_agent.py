@@ -252,6 +252,7 @@ class PPOAgent:
 
         # miscellaneous
         self.iteration = 0
+        self.saved_this_iteration = False
         self.current_fps = 0
         self.gathering_fps = 0
         self.optimization_fps = 0
@@ -305,6 +306,10 @@ class PPOAgent:
             self.wrapper_stat_history.update(
                 {postprocessor.__class__.__name__: {"mean": [postprocessor.simplified_mean()],
                                                     "stdev": [postprocessor.simplified_stdev()]}})
+
+    @property
+    def id(self):
+        return self.agent_id
 
     @staticmethod
     def get_optimization_comm(limit_to_n_optimizers: int = None):
@@ -458,7 +463,7 @@ class PPOAgent:
             list_of_optimizer_collection_id_lists = [optimizer_collection_ids]
 
         if self.is_root:
-            print(f"\n\nDrill started using {self.comm_size} processes for {self.n_workers} workers of which "
+            print(f"\n\nDrill of agent {self.agent_id} started using {self.comm_size} processes for {self.n_workers} workers of which "
                   f"{self.n_optimizers} are optimizers."
                   f" Worker distribution: {[worker_base + (r < worker_extra) for r in range(self.comm_size)]}.\n"
                   f"IDs over Workers: {list_of_worker_collection_id_lists}\n"
@@ -646,6 +651,9 @@ class PPOAgent:
                     if save_every != 0 and self.iteration != 0 and (self.iteration + 1) % save_every == 0:
                         # every x iterations
                         self.save_agent_state()
+                        self.saved_this_iteration = True
+                    else:
+                        self.saved_this_iteration = False
 
                     # and (overwrite) the latest version
                     self.save_agent_state("last")
@@ -898,8 +906,10 @@ class PPOAgent:
         if self.years_of_experience is not None:
             years_of_experience_report = f"y.exp: {nc}{round(self.years_of_experience, 3):3.3f}{ec}; "
 
+        empty = u'\u2800 '
+        saved_icon = u' \u2193'
         report_items = {
-            "cycle": f"{sc}{f'Cycle {self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}",
+            "cycle": f"{sc}{f'Cycle{saved_icon if self.saved_this_iteration else empty}{self.iteration:5d}/{total_iterations}' if self.iteration != 0 else 'Before Training'}{ec}",
             "reward": f"r: {reward_col}{'-' if self.cycle_reward_history[-1] is None else f'{round(self.cycle_reward_history[-1], 2):8.2f}'}{ec}",
             "length": f"len: {nc}{'-' if self.cycle_length_history[-1] is None else f'{round(self.cycle_length_history[-1], 2):8.2f}'}{ec}",
             "n": f"n: {nc}{'-' if self.cycle_stat_n_history[-1] is None else f'{self.cycle_stat_n_history[-1]:3d}'}{ec}",
