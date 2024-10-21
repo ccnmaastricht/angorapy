@@ -22,35 +22,30 @@ This library is developed as part of the [Human Brain Project](https://www.human
 
 ## :sparkles: Features
 
-### Supported Task Settings
+### Tasks & Simulation
 
-* [X]  Discrete Action Spaces (Categorical, MultiCategorical)
-* [X]  Continuous Action Spaces (Beta, Gaussian)
-* [X]  Discrete State Spaces
-* [X]  Continuous State Spaces
+* [X] Native API for building environments and tasks for humanoid bodies
+* [X] Both **discrete** and **continuous** action _and_ state spaces
 
-### Supported Model Types
+### Models & Training
 
-* [X]  Recurrent Networks
-* [X]  Convolutional Networks
-* [X]  Recurrent+Convolutional Networks
-
-### Supported Model Training
-
-* [X]  Local Distributed Training
-* [X]  HPC Distributed Training
-
-### Training Backend
-
-* [X]  Proximal Policy Optimization
-* [X]  Asymmetric Policy/Value Networks
-* [X]  Truncated Backpropagation Through Time
+* [X] API for building and training models
+* [X] Recurrent & Convolutional Networks
+* [X] Local and HPC Distributed Training
+* [X] Asymmetric Policy/Value Networks
+* [X] Efficient Training with PPO and TBPTT
 
 ### Entrypoints & Deployment
 
-* [X]  PyPI Package
-* [X]  Docker files
-* [X]  Source code
+* [X] PyPI Package
+* [X] Docker files
+* [X] Source code
+
+### Integrations
+
+* [X] Gym(nasium) Environments
+* [ ] IsaacSim
+* [ ] MyoSim 
 
 ## 📥 Installation
 
