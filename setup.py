@@ -61,7 +61,7 @@ setup(
 
     include_package_data=True,
     package_data={
-        "angorapy": ["tasks/**/*"],
+        "angorapy": ["tasks/**/*", "monitor/**/*"],
     },
 
     classifiers=[

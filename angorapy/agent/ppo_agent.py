@@ -572,7 +572,7 @@ class PPOAgent:
 
             # RECORD STATS, SAVE MODEL AND REPORT
             if self.is_root:
-                self.record_wrapper_stats()
+                # self.record_wrapper_stats()
                 self.record_stats(stats_with_evaluation)
 
                 time_dict["evaluating"] = time.time() - subprocess_start
@@ -625,7 +625,7 @@ class PPOAgent:
                                                     responsive_senses=self.policy.input_names)
 
                 subprocess_start = time.time()
-                self.optimize(dataset, epochs, batch_size, effective_batch_size)
+                self._optimize(dataset, epochs, batch_size, effective_batch_size)
                 time_dict["optimizing"] = time.time() - subprocess_start
 
                 # FINALIZE
@@ -722,8 +722,13 @@ class PPOAgent:
             distribution=self.distribution,
             horizon=horizon, discount=discount, lam=lam, subseq_length=subseq_length)
 
-    def optimize(self, dataset: tf.data.TFRecordDataset, epochs: int, batch_size: int,
-                 effective_batch_sizes: Union[int, Tuple[int, int]]) -> None:
+    def _optimize(
+            self,
+            dataset: tf.data.TFRecordDataset,
+            epochs: int,
+            batch_size: int,
+            effective_batch_sizes: Union[int, Tuple[int, int]]
+    ) -> None:
         """Optimize the agent's policy and value network based on a given dataset.
 
         Args:

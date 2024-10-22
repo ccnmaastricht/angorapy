@@ -249,7 +249,7 @@ def make_input_layers(env, bs=None, sequence_length=None) -> tuple[dict[str, tf.
 
         if sequence_length is not None:
             the_masked_input = tf.keras.layers.Masking(batch_input_shape=shape, name=modality)(the_input)
-            masked_inputs.update({modality: the_input})
+            masked_inputs.update({modality: the_masked_input})
 
         inputs.update({modality: the_input})
 

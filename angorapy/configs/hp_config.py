@@ -220,7 +220,7 @@ andrypulate = make_config(
 
 akkaypulate = make_config(
     iterations=50000,
-    workers=396,   # akkaya et al use 400 but that would not divide by 12; on cscs, this needs 33 gpu nodes
+    workers=396,
     batch_size=256,
     horizon=4096,
     c_entropy=0.01,
@@ -239,7 +239,7 @@ akkaypulate = make_config(
 
 manipulate = make_config(
     iterations=50000,
-    workers=384,   # need divisibility by 12
+    workers=384,
     batch_size=384 * 32,
     horizon=2048,
     c_entropy=0.01,
