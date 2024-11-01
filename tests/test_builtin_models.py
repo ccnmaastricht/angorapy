@@ -17,12 +17,20 @@ def perform_test_on_model(model_name):
     multi_discrete_env = make_task("ManipulateBlockDiscrete-v0")
     multi_discrete_distr = MultiCategoricalPolicyDistribution(multi_discrete_env)
 
+    asymmetric_env = make_task("ManipulateBlockDiscreteAsymmetric-v0")
+    asymmetric_env_distr = MultiCategoricalPolicyDistribution(asymmetric_env)
+
     build_model = get_model_builder(model=model_name, model_type="ffn", shared=False)
     build_shared_model = get_model_builder(model=model_name, model_type="ffn", shared=True)
     build_recurrent_model = get_model_builder(model=model_name, model_type="lstm", shared=False)
     build_shared_recurrent_model = get_model_builder(model=model_name, model_type="lstm", shared=True)
 
-    for env, distr in [(cont_env, cont_distr), (discrete_env, discrete_distr), (multi_discrete_env, multi_discrete_distr)]:
+    for env, distr in [
+        (cont_env, cont_distr),
+        (discrete_env, discrete_distr),
+        (multi_discrete_env, multi_discrete_distr),
+        (asymmetric_env, asymmetric_env_distr)
+    ]:
         for model in [build_model, build_shared_model, build_recurrent_model, build_shared_recurrent_model]:
             _, _, joint = model(env, distr, bs=1, sequence_length=1)
             state = env.reset()[0]

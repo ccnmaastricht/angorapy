@@ -30,7 +30,7 @@ def build_ffn_models(env: TaskWrapper,
     input_list, _ = [list(d.values()) for d in make_input_layers(env)]
 
     if len(input_list) > 1:
-        policy_inputs = list(filter(lambda i: i.name != "asymmetric", input_list))
+        policy_inputs = list(filter(lambda i: "asymmetric" not in i.name, input_list))
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
         inputs = input_list[0]
@@ -44,7 +44,7 @@ def build_ffn_models(env: TaskWrapper,
     # value network
     if "asymmetric" in state_dimensionality.keys():
         inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
-            [inputs, list(filter(lambda i: i.name == "asymmetric", input_list))[0]]
+            [inputs, list(filter(lambda i: "asymmetric" in i.name, input_list))[0]]
         )
 
     if not shared:
@@ -52,6 +52,7 @@ def build_ffn_models(env: TaskWrapper,
         value_out = tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(value_latent)
     else:
+        value_out = tf.keras.layers.Dense(layer_sizes[-1], input_dim=latent.shape[1:])(latent)
         value_out = tf.keras.layers.Dense(1, input_dim=layer_sizes[-1],
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
                                           bias_initializer=tf.keras.initializers.Constant(0.0))(latent)
@@ -78,14 +79,14 @@ def build_rnn_models(env: TaskWrapper,
     input_list, masked_inputs = [list(d.values()) for d in make_input_layers(env, bs, sequence_length=sequence_length)]
 
     if len(input_list) > 1:
-        policy_inputs = list(filter(lambda i: i.name != "asymmetric", masked_inputs))
+        policy_inputs = list(filter(lambda i: "asymmetric" not in i.name, masked_inputs))
         inputs = tf.keras.layers.Concatenate(name="flat_inputs")(policy_inputs)
     else:
         inputs = masked_inputs[0]
 
     if "asymmetric" in state_dimensionality.keys():
         value_inputs = tf.keras.layers.Concatenate(name="added_asymmetric_inputs")(
-            [inputs, list(filter(lambda i: i.name == "asymmetric", masked_inputs))[0]]
+            [inputs, list(filter(lambda i: "asymmetric" in i.name, masked_inputs))[0]]
         )
     else:
         value_inputs = inputs
@@ -132,11 +133,12 @@ def build_rnn_models(env: TaskWrapper,
                                           bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
     else:
         if "asymmetric" in state_dimensionality.keys():
-            x = tf.keras.layers.Concatenate()([x, asymmetric_inputs])
+            x = tf.keras.layers.Concatenate()([x, value_inputs])
 
-        out_value = tf.keras.layers.Dense(1, input_dim=x.shape[1:],
+        out_value = tf.keras.layers.Dense(layer_sizes[-1], input_dim=x.shape[1:])(x)
+        out_value = tf.keras.layers.Dense(1, input_dim=layer_sizes[-1],
                                           kernel_initializer=tf.keras.initializers.Orthogonal(1.0),
-                                          bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(x)
+                                          bias_initializer=tf.keras.initializers.Constant(0.0), name="value_out")(out_value)
 
     value = tf.keras.Model(inputs=input_list, outputs=out_value, name="simple_rnn_value")
 

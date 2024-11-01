@@ -9,9 +9,9 @@ except ImportError:
     MPI = None
 
 try:
-    ADAM_BASE = keras.optimizers.legacy.Adam
+    ADAM_BASE = tf.keras.optimizers.legacy.Adam
 except:
-    ADAM_BASE = keras.optimizers.Adam
+    ADAM_BASE = tf.keras.optimizers.Adam
 
 
 class AdamSynchronizationError(Exception):

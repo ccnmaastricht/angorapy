@@ -102,7 +102,7 @@ class PPOAgent:
             c_entropy: float = 0.01,
             c_value: float = 0.5,
             gradient_clipping: float = None,
-            clip_values: bool = True,
+            clip_values: bool = False,
             tbptt_length: int = 16,
             lr_schedule: str = None,
             distribution: BasePolicyDistribution = None,
