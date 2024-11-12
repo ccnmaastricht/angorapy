@@ -1,8 +1,9 @@
-![](https://img.shields.io/pypi/pyversions/angorapy)
 ![](https://img.shields.io/pypi/v/angorapy)
+![](https://img.shields.io/pypi/pyversions/angorapy)
 ![](https://img.shields.io/github/license/ccnmaastricht/angorapy)
 ![](https://img.shields.io/github/stars/ccnmaastricht/angorapy)
-
+![Monthly Downloads](https://img.shields.io/pypi/dm/angorapy)
+![Total Downloads](https://static.pepy.tech/badge/angorapy)
 
 <br />
 <br />
