@@ -236,4 +236,4 @@ Or using bibtex
 
 ## Funding
 
-AngoraPy is provided by [CCN Maastricht](https://www.ccnmaastricht.com/). The library was in part developed as part of the [Human Brain Project](https://www.humanbrainproject.eu/) and is an effort to build software by neuroscientists, for neuroscientists. We are currently supported by the [NWO Open Science Fund](https://www.nwo.nl/en/researchprogrammes/open-science/open-science-fund) to develop an open science ecosystem around AngoraPy.
+This project was supported by the European Union's Horizon 2020 Framework Programme for Research and Innovation under the Specific Grant Agreement No. 945539 (Human Brain Project SGA3). It is further supported by an Open Science Fund from the Dutch Research Council (Nederlandse Organisatie voor Wetenschappelijk Onderzoek; NWO). We are grateful for their support.
