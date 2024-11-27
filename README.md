@@ -19,30 +19,7 @@
 
 ## :sparkles: Features
 
-### Tasks & Simulation
-
-* [X] Native API for building environments and tasks for humanoid bodies
-* [X] Both **discrete** and **continuous** action _and_ state spaces
-
-### Models & Training
-
-* [X] API for building and training models
-* [X] Recurrent & Convolutional Networks
-* [X] Local and HPC Distributed Training
-* [X] Asymmetric Policy/Value Networks
-* [X] Efficient Training with PPO and TBPTT
-
-### Entrypoints & Deployment
-
-* [X] PyPI Package
-* [X] Docker files
-* [X] Source code
-
-### Integrations
-
-* [X] Gym(nasium) Environments
-* [ ] IsaacSim
-* [ ] MyoSim 
+![angorapy-features](https://github.com/user-attachments/assets/4732a3a7-0144-45e1-b3e8-1602d338f42f)
 
 ## 📥 Installation
 
