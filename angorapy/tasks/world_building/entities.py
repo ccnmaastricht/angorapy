@@ -107,6 +107,7 @@ class Stage(_Entity):
         self._mjcf_root.statistic.center = (0.3, 0, 0.0)
         getattr(self._mjcf_root.visual, "global").azimuth = 220
         getattr(self._mjcf_root.visual, "global").elevation = -30
+        getattr(self._mjcf_root.visual, "global").offwidth = 1024
 
         self._mjcf_root.visual.scale.forcewidth = 0.04
         self._mjcf_root.visual.scale.contactwidth = 0.2

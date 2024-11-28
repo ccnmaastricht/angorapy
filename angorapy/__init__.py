@@ -13,6 +13,7 @@ from angorapy.utilities.monitoring import Monitor
 
 from angorapy.tasks.registration import make_task
 from angorapy.tasks.registration import make_task as make_env  # For backwards compatibility
+from angorapy.models import get_model_builder
 
 from angorapy.utilities import evaluation
 

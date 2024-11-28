@@ -13,6 +13,7 @@
     <visual>
         <map fogstart="3" fogend="5" force="0.1"/>
         <quality shadowsize="4096"/>
+        <global offwidth="1024" />
     </visual>
 
     <default>
