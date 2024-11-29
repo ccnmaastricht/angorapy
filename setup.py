@@ -23,6 +23,7 @@ setup(
         # tensorflow and extensions
         "tensorflow[and-cuda]==2.17.*",
         "tensorflow_probability==0.24.*",
+
         "tensorflow_graphics==2021.12.3",
         "tensorflow_datasets",
 
@@ -33,17 +34,17 @@ setup(
         "argcomplete",
         "matplotlib",
         "scikit-learn==1.2.2",
-        "pandas==1.4.4",
+        "pandas",
         "nvidia-ml-py3",
         "seaborn",
         "distance",
         "statsmodels==0.14.0",
-        "keras_cortex==0.0.8",
+        "kortex==0.1.0",
         "mediapy",
 
         # environments
         "gymnasium[mujoco]==0.28.1",
-        "mujoco",
+        "mujoco==2.3.7",
         "dm_control==1.0.12",
         "mujoco_utils",
     ],

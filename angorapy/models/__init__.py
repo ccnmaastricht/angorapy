@@ -5,6 +5,7 @@ from collections import OrderedDict
 from functools import partial
 from typing import Callable
 
+
 # registry for base models
 MODELS_AVAILABLE = {}
 MODEL_BUILDERS = {}

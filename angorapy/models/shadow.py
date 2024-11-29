@@ -3,7 +3,6 @@
 import os
 
 import gymnasium as gym
-
 try:
     import kortex as keras_cortex
 except:
@@ -129,7 +128,7 @@ def build_shadow_brain_base(env: gym.Env, distribution: BasePolicyDistribution, 
     if blind:
         vc = visual_input
     else:
-        vc = TD(keras_cortex.cornet.CORNetZ(7), name="visual_component")(visual_input)
+        vc = TD(kortex.cornet.CORNetZ(7), name="visual_component")(visual_input)
 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=visual_input.shape)(vc)
     goal_masked = tf.keras.layers.Masking(batch_input_shape=goal_input.shape)(goal_input)

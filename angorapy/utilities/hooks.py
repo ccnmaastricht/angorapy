@@ -1,5 +1,8 @@
 import functools
-from typing import List, Callable, Optional
+from typing import Callable
+from typing import List
+from typing import Optional
+
 import tensorflow as tf
 
 
@@ -14,9 +17,24 @@ def hooked_call(inputs, *args, obj: tf.keras.layers.Layer, **kwargs) -> tf.Tenso
     return output
 
 
-def register_hook(layers: List[tf.keras.layers.Layer],
-                  before_call: Callable[[tf.keras.layers.Layer, tf.Tensor], None] = None,
-                  after_call: Callable[[tf.keras.layers.Layer, tf.Tensor, tf.Tensor], Optional[tf.Tensor]] = None):
+def register_hook(
+        layers: List[tf.keras.layers.Layer],
+        before_call: Callable[[tf.keras.layers.Layer, tf.Tensor], None] = None,
+        after_call: Callable[[tf.keras.layers.Layer, tf.Tensor, tf.Tensor], Optional[tf.Tensor]] = None,
+):
+    """ Register a hook on a list of layers.
+
+    If the hook should receive additional arguments, use 'functools.partial' to create a partial function before passing
+    it to this function.
+
+    :param layers:          List of layer objects (Keras) to register the hook on. The function will overwrite the
+                            'call' function of these layers
+    :param before_call:     Function to call before the original 'call' function of the layer.
+    :param after_call:      Function to call after the original 'call' function of the layer.
+
+    :return:                None
+    """
+
     for layer in layers:
         layer._before_call = before_call
         layer._after_call = after_call

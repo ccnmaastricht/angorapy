@@ -74,7 +74,8 @@ def get_layers_by_names(network: tf.keras.Model, layer_names: List[str]):
     all_layer_names = [l.name for l in layers]
 
     assert all(ln in all_layer_names for ln in layer_names), \
-        f"Cannot find layers {list(filter(lambda ln: ln not in all_layer_names, layer_names))} in network extraction."
+        (f"Cannot find layers {list(filter(lambda ln: ln not in all_layer_names, layer_names))} in network extraction. "
+         f"Layers available are {all_layer_names}.")
 
     return [layers[all_layer_names.index(layer_name)] for layer_name in layer_names]
 
@@ -238,7 +239,9 @@ def make_input_layers(env, bs=None, sequence_length=None) -> tuple[dict[str, tf.
     state_dimensionality, n_actions = env_extract_dims(env)
 
     inputs = {}
+
     masked_inputs = {}
+
     for modality in state_dimensionality.keys():
         shape = (bs,)
         if sequence_length is not None:

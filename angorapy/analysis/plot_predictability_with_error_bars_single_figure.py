@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 from angorapy.common.const import QUALITATIVE_COLOR_PALETTE as COLORS
 import statsmodels.stats.api as sms
 
-from angorapy.utilities.util import stack_dicts
 
 font = {'family' : 'Times',
         'weight' : 'normal',
