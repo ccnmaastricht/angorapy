@@ -22,7 +22,8 @@ env.calc_rotation_set()
 
 model = env.unwrapped.model
 data = env.unwrapped.data
-renderer = mujoco.Renderer(model, height=1024, width=512)
+renderer = mujoco.Renderer(model, height=1024, width=512
+                           )
 cam = env.unwrapped._get_viewer("rgb_array").cam
 cam.lookat[0] = 0.4
 

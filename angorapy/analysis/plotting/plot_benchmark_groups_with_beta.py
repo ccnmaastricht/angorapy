@@ -59,7 +59,10 @@ for exp_path in experiment_paths:
 
         if os.path.isfile(os.path.join(exp_path, "progress.json")):
             with open(os.path.join(exp_path, "progress.json"), "r") as f:
-                progress = json.load(f)
+                try:
+                    progress = json.load(f)
+                except JSONDecodeError as jserr:
+                    continue
 
             with open(os.path.join(exp_path, "meta.json"), "r") as f:
                 try:
@@ -71,6 +74,8 @@ for exp_path in experiment_paths:
 
             if exp_group not in itertools.chain(*group_names.values()):
                 continue
+
+            print(eid)
 
             reward_threshold = None if meta["environment"]["reward_threshold"] == "None" else float(
                 meta["environment"]["reward_threshold"])
