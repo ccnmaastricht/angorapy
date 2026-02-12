@@ -89,6 +89,8 @@ class PPOAgent:
     value: tf.keras.Model
     joint: tf.keras.Model
 
+    BASE_SAVE_PATH = BASE_SAVE_PATH
+
     def __init__(
             self,
             model_builder: Callable[..., Tuple[tf.keras.Model, tf.keras.Model, tf.keras.Model]],
@@ -973,7 +975,8 @@ class PPOAgent:
             from_iteration: Union[int, str] = None,
             force_env_name=None,
             path_modifier="",
-            n_optimizers: int = None
+            n_optimizers: int = None,
+            verbose = False
     ) -> "PPOAgent":
         """Build an agent from a previously saved state.
 
@@ -1045,7 +1048,7 @@ class PPOAgent:
                 print(e)
                 from_iteration = fallback_stack.pop(0)
 
-        if is_root:
+        if is_root and verbose:
             print(f"Loading from iteration {from_iteration}.")
 
         postprocessors = postprocessors_from_serializations(parameters["transformers"])
@@ -1088,7 +1091,7 @@ class PPOAgent:
                                                                     parameters["optimizer"],
                                                                     loaded_agent.joint.trainable_variables)
 
-            if is_root:
+            if is_root and verbose:
                 print("Loaded optimizer weights from file.")
 
         # mark the loading

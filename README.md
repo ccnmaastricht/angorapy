@@ -1,56 +1,25 @@
-![](https://img.shields.io/pypi/pyversions/angorapy)
 ![](https://img.shields.io/pypi/v/angorapy)
+![](https://img.shields.io/pypi/pyversions/angorapy)
 ![](https://img.shields.io/github/license/ccnmaastricht/angorapy)
-![](https://img.shields.io/github/stars/ccnmaastricht/angorapy)
-
+![Monthly Downloads](https://img.shields.io/pypi/dm/angorapy)
+![Total Downloads](https://static.pepy.tech/badge/angorapy)
+<a href=https://www.frontiersin.org/journals/neuroinformatics/articles/10.3389/fninf.2023.1223687/full>
+   <img alt="Static Badge" src="https://img.shields.io/badge/Frontiers-Technical_Paper-white?style=flat">
+</a>
 
 <br />
 <br />
 
 <p align="center"><img src="docs/img/angorapy.svg" width=25% align="center" /></p>
-<h3> <p align="center"> Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling </p> </h3>
+<h3> <p align="center"> Build Embodied Brain Models with Ease </p> </h3>
 
 <br />
    
-**AngoraPy** is an open source modeling library for [goal-oriented research](https://pubmed.ncbi.nlm.nih.gov/26906502/) in **neuroscience**. It provides a simple interface to train deep neural network models of the human brain on various, customizable, sensorimotor tasks, using reinforcement learning. It thereby empowers goal-driven modeling to surpass the sensory domain and enter that of sensori_motor_ control, closing the perception-action loop. 
-
-**AngoraPy** is designed to require no deeper understanding of reinforcement learning. It employs state-of-the-art machine learning techniques, optimized for distributed computation scaling from local workstations to high-performance computing clusters. We aim to hide as much of this under the hood of an intuitive, high-level API but preserve the option for customizing most aspects of the pipeline.
-
-This library is developed as part of the [Human Brain Project](https://www.humanbrainproject.eu/) at [CCN Maastricht](https://www.ccnmaastricht.com/). It is an effort to build software by neuroscientists, for neuroscientists. If you have suggestions, requests or questions, feel free to [open an issue](https://github.com/ccnmaastricht/angorapy/issues/new/choose).
-
-![Manipulation Gif](docs/gifs/manipulate_best.gif)
+**AngoraPy** is an open source modeling library for buidling [goal-driven](https://pubmed.ncbi.nlm.nih.gov/26906502/) embodied brain models. It provides an easy-to-us API to build and train deep neural network models of the brain on various, customizable, sensorimotor tasks, using reinforcement learning. AngoraPy employs state-of-the-art machine learning techniques, optimized for distributed computation scaling from local workstations to high-performance computing clusters. We aim to hide as much of this under the hood of an intuitive, high-level API but preserve the option for customizing most aspects of the pipeline.
 
 ## :sparkles: Features
 
-### Supported Task Settings
-
-* [X]  Discrete Action Spaces (Categorical, MultiCategorical)
-* [X]  Continuous Action Spaces (Beta, Gaussian)
-* [X]  Discrete State Spaces
-* [X]  Continuous State Spaces
-
-### Supported Model Types
-
-* [X]  Recurrent Networks
-* [X]  Convolutional Networks
-* [X]  Recurrent+Convolutional Networks
-
-### Supported Model Training
-
-* [X]  Local Distributed Training
-* [X]  HPC Distributed Training
-
-### Training Backend
-
-* [X]  Proximal Policy Optimization
-* [X]  Asymmetric Policy/Value Networks
-* [X]  Truncated Backpropagation Through Time
-
-### Entrypoints & Deployment
-
-* [X]  PyPI Package
-* [X]  Docker files
-* [X]  Source code
+![angorapy-features](https://github.com/user-attachments/assets/4732a3a7-0144-45e1-b3e8-1602d338f42f)
 
 ## 📥 Installation
 
@@ -158,7 +127,7 @@ For more details, consult the [examples](examples).
 
 ## 🎓 Documentation
 
-Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](examples) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs:
+Detailed documentation of AngoraPy is provided in the READMEs of most subpackages. Additionally, we provide [examples and tutorials](https://github.com/weidler/angorapy-tutorials/) that get you started with writing your own scripts using AngoraPy. For further readings on specific modules, consult the following READMEs:
 
 - [Agent](angorapy/agent) [WIP]
 - [Environments](angorapy/tasks)
@@ -224,21 +193,24 @@ The number of parallel workers will equal the number of nodes times the number o
 
 ## 🔗 Citing AngoraPy
 
-If you use AngoraPy for your research, please cite us as follows
+If you use AngoraPy for your research, please cite the technical paper
 
-    Weidler, Tonio, & Senden, Mario. (2023). AngoraPy - Anthropomorphic Goal-Oriented Robotic Control for Neuroscientific Modeling (0.9.0). Zenodo. https://doi.org/10.5281/zenodo.7770180
+    Weidler, T., Goebel, R., & Senden, M. (2023). AngoraPy: A Python toolkit for modeling anthropomorphic goal-driven sensorimotor systems. Frontiers in Neuroinformatics, 17. 10.3389/fninf.2023.1223687
 
 Or using bibtex
 
 ```bibtex
  @software{weidler_angorapy_2023,
-     author       = {Weidler, Tonio and Senden, Mario},
-     title        = {{AngoraPy - Anthropomorphic Goal-Oriented Robotic 
-                      Control for Neuroscientific Modeling}},
-     year         = 2023,
-     publisher    = {Zenodo},
-     version      = {0.9.0},
-     doi          = {10.5281/zenodo.6636482},
-     url          = {https://doi.org/10.5281/zenodo.6636482}
+   AUTHOR  =   {Weidler, Tonio  and Goebel, Rainer  and Senden, Mario },
+   TITLE   =   {AngoraPy: A Python toolkit for modeling anthropomorphic goal-driven sensorimotor systems},
+   JOURNAL =   {Frontiers in Neuroinformatics},
+   VOLUME  =   {17},
+   YEAR    =   {2023},
+   DOI     =   {10.3389/fninf.2023.1223687},
+   ISSN    =   {1662-5196},
 }
 ```
+
+## Funding
+
+This project was supported by the European Union's Horizon 2020 Framework Programme for Research and Innovation under the Specific Grant Agreement No. 945539 (Human Brain Project SGA3). It is further supported by an Open Science Fund from the Dutch Research Council (Nederlandse Organisatie voor Wetenschappelijk Onderzoek; NWO). We are grateful for their support.
