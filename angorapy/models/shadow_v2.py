@@ -100,7 +100,7 @@ def build_mc_module(batch_and_sequence_shape, lpfc_input_shape, spl_input_shape,
                           outputs=[pmc, m1], name="MotorCortex")
 
 
-@register_model("shadowv2")
+# @register_model("shadowv2")
 def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistribution, bs: int = 1, model_type: str = "rnn",
                             blind: bool = False, sequence_length=1, activation=tf.keras.layers.ReLU, **kwargs):
     """Build network for the shadow hand task, version 2."""
@@ -128,7 +128,7 @@ def build_shadow_v2_brain_base(env: gym.Env, distribution: BasePolicyDistributio
     if blind:
         vc = visual_input
     else:
-        visual_component = keras_cortex.cornet.CORNetZ(7)
+        visual_component = kortex.cornet.CORNetZ(7)
         vc = TD(visual_component, name="visual_component")(visual_input)
 
     vision_masked = tf.keras.layers.Masking(batch_input_shape=vc.shape)(vc)

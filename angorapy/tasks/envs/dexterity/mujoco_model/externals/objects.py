@@ -41,13 +41,6 @@ class Block(External):
             gridlayout=".U..LFRB.D..")
 
         self.mjcf_model.asset.add(
-            "texture",
-            name="texture:hidden",
-            file="block_hidden.png",
-            gridsize=[3, 4],
-            gridlayout=".U..LFRB.D..")
-
-        self.mjcf_model.asset.add(
             "material",
             name="object",
             texture="texgeom",
@@ -61,15 +54,6 @@ class Block(External):
             specular=1,
             shininess=0.3,
             reflectance=0
-        )
-
-        self.mjcf_model.asset.add(
-            "material",
-            name="material:hidden",
-            texture="texture:hidden",
-            specular=1,
-            shininess=0.3,
-            reflectance=0,
         )
         self.mjcf_model.asset.add(
             "material",
@@ -85,14 +69,6 @@ class Block(External):
                                       material="material:object",
                                       condim=4,
                                       density=567)
-        self.mjcf_model.worldbody.add("geom", name="object_hidden", type="box",
-                        size=[0.024, 0.024, 0.024],
-                        material="material:hidden",
-                        condim=4,
-                        contype=0,
-                        conaffinity=0,
-                        mass=0
-                        )
         self.mjcf_model.worldbody.add("site",
                                       name="object:center",
                                       pos=[0, 0, 0],

@@ -10,26 +10,12 @@ from matplotlib import pyplot as plt
 
 from angorapy.common.const import PATH_TO_EXPERIMENTS, QUALITATIVE_COLOR_PALETTE
 
-# experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # only best setting
 experiment_ids = [['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390', '1671749718306373',
                    '1674975602446141', '1674975602294059', '1674074113731734', '1673786170549564'],
                   ['1674975602294059']]  # only best setting
-# experiment_ids = [['1674074113967956', '1673350499432390', '1674074113731734']]  # only best setting
+
 names = [f"mean (n={len(experiment_ids[0])})", "best"]
 
-# experiment_ids = [['1673786170549564'], ['1673350499432390']]  # shared vs unshared
-# experiment_ids = [['1674975602294059', '1674975602446141', '1671749718306373'],
-#                   ['1674343261520188', '1674308148646663', '1674074113967956', '1674074113731734', '1673350499432390']]  # symmetric vs asymmetric
-# names = ["symmetric", "asymmetric"]
-
-# experiment_ids = [['1673350499432390']]
-# names = ["asymmetric"]
-
-# experiment_ids = [['1675028736765791', '1674983643322591'],
-#                   ['1674985163288377', '1674983177286330'],
-#                   ['1674343261520188', '1674308148646663', '1674074113967956', '1673350499432390']]  # compare distributions
-# names = ["beta", "gaussian", "multicategorical"]
-# names = ["beta", "multicategorical"]
 reward_developments = {}
 reward_bands = {}
 
@@ -142,10 +128,10 @@ df = pd.DataFrame(
      "Consecutive Goals Reached": np.concatenate([dp for name, dp in evaluation_rewards.items()])}
 )
 
-sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", notch=True, medianprops={"color": "red"},
+sns.boxplot(data=df, x="group", y="Consecutive Goals Reached", hue="group", notch=True, medianprops={"color": "red"},
             flierprops={"marker": "x"},
             fliersize=1, ax=axes[2], palette={name: QUALITATIVE_COLOR_PALETTE[i] for i, name in enumerate(names)},
-            showmeans=True, meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black"})
+            showmeans=True, meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black"}, legend=False)
 axes[2].set_xlabel("")
 if len(names) == 1:
     axes[2].set_xticks([])

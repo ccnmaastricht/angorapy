@@ -75,6 +75,16 @@ except:
     MPI = None
 
 
+@tf.function
+def find_action(policy, prepared_state, distribution):
+    predicted_distribution_parameters = flatten(policy(prepared_state, training=False))
+
+    # from the action distribution sample an action and remember both the action and its probability
+    action, action_probability = distribution.tf_act(*predicted_distribution_parameters)
+
+    return action
+
+
 class PPOAgent:
     """Agent using the Proximal Policy Optimization Algorithm for learning.
 
@@ -193,6 +203,7 @@ class PPOAgent:
         self.clip_values = clip_values
         self.tbptt_length = tbptt_length
         self.reward_configuration = reward_configuration
+        self.batch_size = 1  # will be set in drill
 
         # learning rate schedule
         self.lr_schedule_type = lr_schedule
@@ -209,7 +220,7 @@ class PPOAgent:
 
         # models and optimizers
         self.distribution = distribution
-        if self.distribution is None:
+        if self.distribution is None:  # todo autodetect and apply multicategorical
             self.distribution = CategoricalPolicyDistribution(
                 self.env) if not self.continuous_control else GaussianPolicyDistribution(self.env)
         assert self.continuous_control == self.distribution.is_continuous, "Invalid distribution for environment."
@@ -373,11 +384,11 @@ class PPOAgent:
     def assign_gatherer(self, new_gathering_class: Callable):
         self.gatherer_class = new_gathering_class
 
-    def act(self, state: Union[Sensation, Dict[str, Any]]):
+    def act(self, state: Union[Sensation, Dict[str, Any]], confidently=False):
         """Sample an action from the agent's policy based on a given state. The sampled action is returned in a format
         that can be directly given to an environment.
 
-        This method is mostly useful at inference time and serves as q quick wrapper around the steps required to
+        This method is mostly useful at inference time and serves as a quick wrapper around the steps required to
         process the raw numpy states of the environment into a state readable by the policy network, followed by
         sampling from the predicted distribution."""
 
@@ -396,14 +407,18 @@ class PPOAgent:
         else:
             raise ValueError("State must be a Sensation or a dictionary with an 'observation' key.")
 
-        _, _, joint = self.build_models(self.joint.get_weights(), 1, 1)
+        if self.joint.input_shape[0][0] not in [1, None]:
+            print(f"Rebuilding model with batch size 1 for inference. Current batch size: {self.joint.input_shape[0][0]}")
+            self.policy, self.value, self.joint = self.build_models(self.joint.get_weights(), 1, 1)
 
         prepared_state = state.with_leading_dims(time=self.is_recurrent).dict_as_tf()
-        policy_out = flatten(joint(prepared_state, training=False))
+        predicted_distribution_parameters = flatten(self.policy(prepared_state, training=False))
 
-        predicted_distribution_parameters, value = policy_out[:-1], policy_out[-1]
         # from the action distribution sample an action and remember both the action and its probability
-        action, action_probability = self.distribution.act(*predicted_distribution_parameters)
+        if not confidently:
+            action = self.distribution.tf_act(*predicted_distribution_parameters)[0].numpy()
+        else:
+            action = self.distribution.act_deterministic(*predicted_distribution_parameters)[0]
 
         return action
 
@@ -972,7 +987,7 @@ class PPOAgent:
     @staticmethod
     def from_agent_state(
             agent_id: int,
-            from_iteration: Union[int, str] = None,
+            from_iteration: Union[int, str] = "best",
             force_env_name=None,
             path_modifier="",
             n_optimizers: int = None,
@@ -1129,6 +1144,16 @@ class PPOAgent:
         joint.set_weights(weights)
 
         return policy, value, joint
+
+    def rebuild_for_individual_stepping(self):
+        """Rebuild policy, value and joint to use batch size and sequence length of 1."""
+        joint_weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.build_models(joint_weights, 1, 1)
+
+    def rebuild_for_sequence_stepping(self):
+        """Rebuild policy, value and joint to use the agent's TBPTT length as sequence length."""
+        joint_weights = self.joint.get_weights()
+        self.policy, self.value, self.joint = self.build_models(joint_weights, self.batch_size, self.tbptt_length)
 
     def load_components(self, path_to_components: str):
         for directory in os.listdir(path_to_components):
