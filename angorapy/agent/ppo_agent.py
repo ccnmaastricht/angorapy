@@ -407,7 +407,8 @@ class PPOAgent:
         else:
             raise ValueError("State must be a Sensation or a dictionary with an 'observation' key.")
 
-        if self.joint.input_shape[0][0] not in [1, None]:
+        print(self.joint.input_shape[0][0])
+        if self.joint.input_shape[0][0] not in [1, None] or self.joint.input_shape[0][1] not in [1, None]:
             print(f"Rebuilding model with batch size 1 for inference. Current batch size: {self.joint.input_shape[0][0]}")
             self.policy, self.value, self.joint = self.build_models(self.joint.get_weights(), 1, 1)
 
