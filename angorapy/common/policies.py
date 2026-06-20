@@ -134,7 +134,7 @@ class CategoricalPolicyDistribution(BasePolicyDistribution):
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."
 
-        if tf.rank(log_probabilities) == 3:
+        if len(log_probabilities.shape) == 3:
             # there appears to be a sequence dimension
             assert log_probabilities.shape[
                        1] == 1, "Policy actions can only be selected for a single timestep, but the " \
@@ -226,7 +226,7 @@ class MultiCategoricalPolicyDistribution(BasePolicyDistribution):
             f"Policy methods (act_discrete) require Tensors or Numpy Arrays as input, " \
             f"not {type(log_probabilities).__name__}."
 
-        if tf.rank(log_probabilities) == 4:
+        if len(log_probabilities.shape) == 4:
             # there appears to be a sequence dimension
             assert log_probabilities.shape[
                        1] == 1, "Policy actions can only be selected for a single timestep, but the " \
