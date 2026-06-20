@@ -3,12 +3,11 @@
 
 <mujoco>
     <compiler angle="radian" coordinate="local" meshdir="../assets/original_gym" texturedir="../textures"/>
-    <option timestep="0.002" iterations="20" apirate="200">
+    <option timestep="0.002" iterations="20">
         <flag warmstart="enable"/>
     </option>
 
-    <size njmax="500" nconmax="100" nuser_jnt="1" nuser_site="1" nuser_tendon="1" nuser_sensor="1" nuser_actuator="16"
-          nstack="600000"/>
+    <size nuser_jnt="1" nuser_site="1" nuser_tendon="1" nuser_sensor="1" nuser_actuator="16"/>
 
     <visual>
         <map fogstart="3" fogend="5" force="0.1"/>

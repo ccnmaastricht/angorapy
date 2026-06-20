@@ -1,10 +1,9 @@
 <mujoco model="right_shadow_hand">
     <compiler angle="radian" coordinate="local" meshdir="../assets/mujoco_menagerie" autolimits="true"/>
 
-    <option timestep="0.002" iterations="20" apirate="200">
+    <option timestep="0.002" iterations="20">
         <flag warmstart="enable"/>
     </option>
-    {#  <option impratio="10"/>#}
 
     <default>
         <default class="D_Touch">
@@ -814,6 +813,7 @@
         <touch name="rh_TS_thmiddle_back_right" site="T_thmiddle_back_right"/>
         <touch name="rh_TS_thmiddle_tip" site="T_thmiddle_tip"/>
 
+        <touch name="rh_TS_thtip_front_left" site="T_thtip_front_left"/>
         <touch name="rh_TS_thtip_front_left" site="T_thtip_front_left"/>
         <touch name="rh_TS_thtip_front_right" site="T_thtip_front_right"/>
         <touch name="rh_TS_thtip_back_left" site="T_thtip_back_left"/>
