@@ -1,2 +1,118 @@
 [build-system]
-requires = ["setuptools", "swig==4.1.1"]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "angorapy"
+version = "0.11.0"
+description = "Build Goal-driven Models of the Sensorimotor Cortex with Ease."
+readme = "README.md"
+license = { text = "GPL-3.0" }
+authors = [{ name = "Tonio Weidler", email = "research@tonioweidler.de" }]
+requires-python = ">=3.9,<3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "imageio==2.28.1",
+
+    "tensorflow[and-cuda]==2.17.*; platform_system == 'Linux'",
+    "tensorflow==2.17.*; platform_system == 'Darwin'",
+    "tensorflow_probability==0.24.*",
+    "tensorflow_graphics==2021.12.3",
+    "tensorflow_datasets",
+
+    "tqdm",
+    "simplejson",
+    "psutil",
+    "scipy",
+    "argcomplete",
+    "matplotlib",
+    "scikit-learn==1.2.2",
+    # Capped to <3: pandas 3.0 changed APIs the pinned statsmodels 0.14.0 (and
+    # other 2.x-era deps) rely on, e.g. the signature of deprecate_kwarg.
+    "pandas>=2,<3",
+    "seaborn",
+    "distance",
+    "statsmodels==0.14.0",
+    "kortex==0.1.0",
+    "mediapy",
+
+    # GPU monitoring (NVIDIA only).
+    "nvidia-ml-py3; platform_system == 'Linux'",
+
+    # Environments.
+    "gymnasium[mujoco]==0.28.1",
+    # MuJoCo + dm_control are split by platform. The Linux pins (mujoco 2.3.7,
+    # the last 2.3.x release, and dm_control 1.0.12) are the versions used to
+    # produce the existing results, so they stay fixed there for reproducibility.
+    # mujoco 2.3.7 is broken on recent macOS (it dlopen()s a hard-coded
+    # OpenGL.framework path that no longer exists); the fix only landed in the
+    # 3.x line. dm_control 1.0.12 is ABI-coupled to mujoco 2.3.x and crashes on
+    # 3.x ('MjModel' object has no attribute 'bvh_geomid'), so macOS bumps both
+    # to a compatible pair (verified: mujoco 3.x + dm_control 1.0.18).
+    "mujoco==2.3.7; platform_system == 'Linux'",
+    "mujoco>=3.0,<4; platform_system == 'Darwin'",
+    "dm_control==1.0.12; platform_system == 'Linux'",
+    "dm_control>=1.0.18; platform_system == 'Darwin'",
+    "mujoco_utils",
+
+    # Distributed training across workers uses MPI. Requires a system MPI
+    # implementation at build/run time (e.g. `brew install open-mpi` on macOS,
+    # or an MPI module / openmpi package on HPC/Linux).
+    "mpi4py",
+
+    # TensorFlow 2.16+ ships Keras 3 as `tf.keras`; angorapy targets the legacy
+    # Keras 2 API (it sets TF_USE_LEGACY_KERAS=True), which is provided by this
+    # package.
+    "tf_keras==2.17.*",
+
+    # dev tools
+    "pytest"
+]
+
+[project.optional-dependencies]
+box2d = [
+    "box2d-py==2.3.5",
+    "gymnasium[mujoco,box2d]==0.28.1",
+]
+webinterface = [
+    "itsdangerous==2.0.1",
+    "werkzeug==2.0.3",
+    "Flask~=1.1.2",
+    "Jinja2==3.0.3",
+    "bokeh==2.3.3",
+    "flask_jsglue",
+]
+
+# Apple Silicon GPU acceleration via the Metal plugin (macOS only).
+metal = [
+    "tensorflow-metal; platform_system == 'Darwin'",
+]
+
+[project.urls]
+Homepage = "http://www.angorapy.org"
+
+[tool.setuptools.packages.find]
+# Mirrors the previous find_packages() call.
+include = ["angorapy*"]
+
+[tool.setuptools.package-data]
+angorapy = ["tasks/**/*", "monitor/**/*"]
+
+# box2d-py builds a C extension with SWIG but doesn't declare it as a build
+# requirement, so its isolated build env has no `swig` binary on PATH. Inject
+# the PyPI `swig` package (which ships the binary) into that build env so
+# `uv sync --extra box2d` works out of the box, without a system SWIG.
+# (Plain pip users still need SWIG from their system package manager.)
+[tool.uv.extra-build-dependencies]
+box2d-py = ["swig"]
