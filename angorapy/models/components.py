@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Components that can be loaded into another network."""
 
+import math
+
 import tensorflow as tf
 
 
@@ -24,7 +26,7 @@ def _build_encoding_sub_model(shape, batch_size, layer_sizes=(64, 64), name=None
     x = inputs
     for i in range(len(layer_sizes)):
         x = tf.keras.layers.Dense(layer_sizes[i],
-                                  kernel_initializer=tf.keras.initializers.Orthogonal(gain=tf.sqrt(2.0)),
+                                  kernel_initializer=tf.keras.initializers.Orthogonal(gain=math.sqrt(2.0)),
                                   bias_initializer=tf.constant_initializer(0.0),
                                   name=f"{name}_{i}")(x)
         x = tf.keras.layers.Activation("tanh")(x)
