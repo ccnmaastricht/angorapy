@@ -19,7 +19,6 @@ from typing import Union
 
 import gymnasium as gym
 import numpy as np
-import nvidia_smi
 import psutil
 import tensorflow as tf
 from gymnasium.spaces import Box
@@ -27,6 +26,13 @@ from gymnasium.spaces import Discrete
 from gymnasium.spaces import MultiDiscrete
 from psutil import NoSuchProcess
 from tqdm import tqdm
+
+# nvidia_smi (nvidia-ml-py3) is only available/relevant on NVIDIA/CUDA systems.
+# On macOS or CPU-only setups it is absent; GPU memory reporting is skipped there.
+try:
+    import nvidia_smi
+except ImportError:
+    nvidia_smi = None
 
 from angorapy import models
 from angorapy.agent.dataio import read_dataset_from_storage
@@ -613,7 +619,7 @@ class PPOAgent:
                         pass
 
                 used_gpu_memory = 0
-                if len(self.gpus) > 0:
+                if len(self.gpus) > 0 and nvidia_smi is not None:
                     nvidia_smi.nvmlInit()
                     nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
                     procs = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(nvidia_handle)
@@ -919,7 +925,7 @@ class PPOAgent:
             time_left = f"{round(ignore_none(statistics.mean, self.cycle_timings) * (total_iterations - self.iteration) / 60, 1)}mins"
 
         total_gpu_memory = 0
-        if len(self.gpus) > 0:
+        if len(self.gpus) > 0 and nvidia_smi is not None:
             nvidia_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
             nvidia_info = nvidia_smi.nvmlDeviceGetMemoryInfo(nvidia_handle)
             total_gpu_memory = nvidia_info.total
