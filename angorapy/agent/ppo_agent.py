@@ -60,6 +60,7 @@ from angorapy.tasks.wrappers import TaskWrapper
 from angorapy.utilities.core import env_extract_dims
 from angorapy.utilities.core import find_optimal_tile_shape
 from angorapy.utilities.core import flatten
+from angorapy.utilities.core import suppress_type_inference_warning
 from angorapy.utilities.core import mpi_flat_print
 from angorapy.utilities.core import mpi_print
 from angorapy.utilities.datatypes import condense_stats
@@ -275,7 +276,7 @@ class PPOAgent:
         self.current_fps = 0
         self.gathering_fps = 0
         self.optimization_fps = 0
-        self.device = "CPU:0"
+        self.device = "GPU:0" if len(self.gpus) > 0 else "CPU:0"
         self.model_export_dir = "storage/saved_models/exports/"
         self.agent_id = f"{round(time.time())}{random.randint(int(1e5), int(1e6) - 1)}"
         if MPI is not None:
@@ -772,7 +773,8 @@ class PPOAgent:
         else:
             total_updates = (self.n_workers * self.horizon) // batch_size * epochs
         policy_loss_history, value_loss_history, entropy_history = [], [], []
-        with tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...", leave=False) as pbar:
+        with suppress_type_inference_warning(), \
+                tqdm(total=total_updates, disable=not self.is_root, desc="Optimizing...", leave=False) as pbar:
             for epoch in range(epochs):
                 if self.is_recurrent:
                     batched_dataset = dataset.batch(effective_batch_sizes[0], drop_remainder=True)

@@ -1,7 +1,10 @@
 """Helper functions."""
 import os
 import random
+import re
 import sys
+import threading
+from contextlib import contextmanager
 from typing import Dict
 from typing import List
 from typing import Tuple
@@ -22,6 +25,72 @@ except:
     MPI = None
 
 from angorapy.utilities.error import UninterpretableObservationSpace
+
+
+_TF_LOG_LINE = re.compile(r"^\d{4}-\d{2}-\d{2} [\d:.]+: [IWEF]")
+
+
+@contextmanager
+def suppress_type_inference_warning():
+    """Suppress TensorFlow's benign "Type inference failed" grappler warning.
+
+    When optimizing a recurrent train step on GPU, TF's type-inference pass chokes
+    on the gradient of the RNN's internal control flow (a ``tf.cond`` wrapping a
+    ``while_loop``): the loop's int32 time index and the float32 state/grad
+    accumulators land at the same ``TFT_OPTIONAL`` tuple position, which it reports
+    as incompatible. The warning is non-fatal -- grappler simply skips that one
+    optimization and the graph executes correctly -- but it is emitted straight to
+    the C-level stderr (fd 2), so Python/absl logging filters cannot catch it.
+
+    This redirects only fd 2 through a filtering pump thread that drops the warning
+    block, while pointing ``sys.stderr`` (used by tqdm) at the original fd so
+    progress bars stay live and unfiltered.
+    """
+    # Only the C-level fd needs filtering; if stderr is not a real fd (e.g. a
+    # captured StringIO under pytest), there is nothing to redirect -- no-op.
+    try:
+        stderr_fd = sys.stderr.fileno()
+    except (AttributeError, OSError, ValueError):
+        yield
+        return
+
+    saved_stderr_fd = os.dup(stderr_fd)
+    pipe_read_fd, pipe_write_fd = os.pipe()
+    original_sys_stderr = sys.stderr
+
+    def _pump(read_fd, out_fd):
+        suppressing = False
+        with os.fdopen(read_fd, "r", errors="replace") as reader, \
+                os.fdopen(os.dup(out_fd), "w", errors="replace") as out:
+            for line in reader:
+                if suppressing:
+                    # A new, unrelated log entry ends the suppressed block.
+                    if _TF_LOG_LINE.match(line):
+                        suppressing = False
+                        out.write(line); out.flush()
+                        continue
+                    # "while inferring type of node ..." is the block's last line.
+                    if "while inferring type of node" in line:
+                        suppressing = False
+                    continue
+                if "Type inference failed" in line and "type_inference.cc" in line:
+                    suppressing = True
+                    continue
+                out.write(line); out.flush()
+
+    pump = threading.Thread(target=_pump, args=(pipe_read_fd, saved_stderr_fd), daemon=True)
+    pump.start()
+    try:
+        os.dup2(pipe_write_fd, stderr_fd)  # C-level stderr -> filter pipe
+        os.close(pipe_write_fd)
+        sys.stderr = os.fdopen(os.dup(saved_stderr_fd), "w")  # tqdm -> original stderr
+        yield
+    finally:
+        sys.stderr.flush()
+        os.dup2(saved_stderr_fd, stderr_fd)  # restore C-level stderr (closes pipe write end)
+        pump.join(timeout=5)
+        os.close(saved_stderr_fd)
+        sys.stderr = original_sys_stderr
 
 
 def mpi_flat_print(string: str):
@@ -151,7 +220,7 @@ def find_divisors(number: int):
 
 
 def find_optimal_tile_shape(floor_shape: Tuple[int, int], tile_size: int, width_first=False) -> Tuple[int, int]:
-    """For a given shape of a matrix (floor), find the shape of a tiles that fit the floor and contain
+    """For a given shape of a matrix (floor), find the shape of tiles that fit the floor and contain
     exactly tile_size elements."""
     height_divisors = find_divisors(floor_shape[0])
     width_divisors = find_divisors(floor_shape[1])

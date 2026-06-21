@@ -25,9 +25,13 @@ classifiers = [
 dependencies = [
     "imageio==2.28.1",
 
-    "tensorflow[and-cuda]==2.17.*; platform_system == 'Linux'",
-    "tensorflow==2.17.*; platform_system == 'Darwin'",
-    "tensorflow_probability==0.24.*",
+    # TF 2.19 is the highest version Apple's tensorflow-metal (frozen at 1.2.0)
+    # can load; it also fixes a fatal Metal crash in recurrent (LSTM/TBPTT)
+    # optimization that affected TF 2.17. [and-cuda] pulls the NVIDIA CUDA wheels
+    # on Linux (Linux-only), so macOS uses the plain package (+ optional metal).
+    "tensorflow[and-cuda]==2.19.*; platform_system == 'Linux'",
+    "tensorflow==2.19.*; platform_system == 'Darwin'",
+    "tensorflow_probability[tf]==0.25.*",
     "tensorflow_graphics==2021.12.3",
     "tensorflow_datasets",
 
@@ -73,8 +77,8 @@ dependencies = [
 
     # TensorFlow 2.16+ ships Keras 3 as `tf.keras`; angorapy targets the legacy
     # Keras 2 API (it sets TF_USE_LEGACY_KERAS=True), which is provided by this
-    # package.
-    "tf_keras==2.17.*",
+    # package. Track the TensorFlow version.
+    "tf_keras==2.19.*",
 
     # dev tools
     "pytest"
