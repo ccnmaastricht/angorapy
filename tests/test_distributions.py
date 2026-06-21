@@ -20,9 +20,10 @@ of predicted distributions.
 """
 import os
 
-from angorapy.agent.utils import extract_discrete_action_probabilities
-
+# Must be set before TensorFlow is imported (transitively via angorapy) to take effect.
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+from angorapy.agent.utils import extract_discrete_action_probabilities
 
 import gymnasium as gym
 import numpy as np
@@ -39,6 +40,19 @@ class _MultiDiscreteEnv:
     """Minimal env stub exposing a MultiDiscrete action space (for distribution construction)."""
     observation_space = spaces.Box(low=-1.0, high=1.0, shape=(4,), dtype=np.float32)
     action_space = spaces.MultiDiscrete([3, 3])
+
+
+@pytest.fixture
+def run_functions_eagerly():
+    """Force eager execution of tf.functions for one test, restoring the global default after.
+
+    Some recurrent ``tf.function`` paths rely on statically-known shapes that are
+    only concrete in eager mode. Toggling this globally would leak into every
+    subsequently-run test; the fixture's teardown guarantees it is reset.
+    """
+    tf.config.run_functions_eagerly(True)
+    yield
+    tf.config.run_functions_eagerly(False)
 
 
 # GAUSSIAN
@@ -243,7 +257,7 @@ def test_extract_discrete_action_probabilities():
     assert tf.reduce_all(tf.equal(result, result_reference)).numpy().item()
 
 
-def test_extract_discrete_action_probabilities_with_recurrence():
+def test_extract_discrete_action_probabilities_with_recurrence(run_functions_eagerly):
     """Per-sample gather also works for batched sequences (recurrent case).
 
     Property
@@ -253,11 +267,10 @@ def test_extract_discrete_action_probabilities_with_recurrence():
 
     Rationale
         Recurrent rollouts carry an extra time axis; this confirms the gather
-        indexes the right axes and keeps the sequence layout intact. Functions
-        are run eagerly here so the dynamic shapes are exercised directly.
+        indexes the right axes and keeps the sequence layout intact. The
+        ``run_functions_eagerly`` fixture exercises the dynamic shapes directly
+        and restores graph mode afterwards (no cross-test leak).
     """
-    tf.config.experimental_run_functions_eagerly(True)
-
     # with recurrence
     action_probs = tf.convert_to_tensor(
         [[[1, 5], [1, 5]], [[3, 7], [3, 7]], [[7, 2], [7, 2]], [[8, 4], [8, 4]], [[0, 2], [0, 2]], [[4, 5], [4, 5]],

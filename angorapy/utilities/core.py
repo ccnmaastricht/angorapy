@@ -30,6 +30,32 @@ from angorapy.utilities.error import UninterpretableObservationSpace
 _TF_LOG_LINE = re.compile(r"^\d{4}-\d{2}-\d{2} [\d:.]+: [IWEF]")
 
 
+def _filter_type_inference_warning(lines):
+    """Yield every line except those belonging to a "Type inference failed" block.
+
+    A block starts at the ``type_inference.cc ... Type inference failed`` line and
+    runs until its terminating ``while inferring type of node ...`` line (or until
+    an unrelated new TF log entry begins, whichever comes first). Pure and stateful
+    so it can be unit-tested without any file-descriptor plumbing.
+    """
+    suppressing = False
+    for line in lines:
+        if suppressing:
+            # A new, unrelated log entry ends the suppressed block (and is kept).
+            if _TF_LOG_LINE.match(line):
+                suppressing = False
+                yield line
+                continue
+            # "while inferring type of node ..." is the block's last line.
+            if "while inferring type of node" in line:
+                suppressing = False
+            continue
+        if "Type inference failed" in line and "type_inference.cc" in line:
+            suppressing = True
+            continue
+        yield line
+
+
 @contextmanager
 def suppress_type_inference_warning():
     """Suppress TensorFlow's benign "Type inference failed" grappler warning.
@@ -59,24 +85,11 @@ def suppress_type_inference_warning():
     original_sys_stderr = sys.stderr
 
     def _pump(read_fd, out_fd):
-        suppressing = False
         with os.fdopen(read_fd, "r", errors="replace") as reader, \
                 os.fdopen(os.dup(out_fd), "w", errors="replace") as out:
-            for line in reader:
-                if suppressing:
-                    # A new, unrelated log entry ends the suppressed block.
-                    if _TF_LOG_LINE.match(line):
-                        suppressing = False
-                        out.write(line); out.flush()
-                        continue
-                    # "while inferring type of node ..." is the block's last line.
-                    if "while inferring type of node" in line:
-                        suppressing = False
-                    continue
-                if "Type inference failed" in line and "type_inference.cc" in line:
-                    suppressing = True
-                    continue
-                out.write(line); out.flush()
+            for line in _filter_type_inference_warning(reader):
+                out.write(line)
+                out.flush()
 
     pump = threading.Thread(target=_pump, args=(pipe_read_fd, saved_stderr_fd), daemon=True)
     pump.start()

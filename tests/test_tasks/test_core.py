@@ -75,12 +75,9 @@ def test_minimal_env():
     robot = _TestRobot(mjcf.RootElement())
     task = _TestTask(robot)
 
-    state = task.reset()
+    task.reset()
     for _ in range(100):
-        state, r, dterm, dtrunc, info = task.step(task.action_space.sample())
-        print(state)
-
-    assert True
+        *_, = task.step(task.action_space.sample())
 
 
 

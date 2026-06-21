@@ -15,6 +15,8 @@ a builder that produces a model incompatible with a given observation space,
 action head, or recurrence setting — failures that otherwise only surface deep
 inside training.
 """
+import pytest
+
 from angorapy import make_task
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution, \
     CategoricalPolicyDistribution
@@ -69,32 +71,14 @@ def perform_test_on_model(model_name):
             action, action_probability = distr.act(*predicted_distribution_parameters)
 
 
-def test_simple():
-    """The ``simple`` builder produces a usable model in every configuration.
+@pytest.mark.parametrize("model_name", ["simple", "wider", "deeper"])
+def test_builtin_model_builders(model_name):
+    """Each built-in builder produces a usable model in every configuration.
 
     Rationale
-        ``simple`` is the default architecture used across most tasks; this
-        guards that it stays compatible with all action spaces and the
-        feed-forward/recurrent and separate/shared variants.
+        Parametrized over the ``simple`` / ``wider`` / ``deeper`` architectures
+        (which share construction logic but differ in width/depth) so each is
+        reported independently, while guarding that all stay compatible with every
+        action space and the feed-forward/recurrent and separate/shared variants.
     """
-    perform_test_on_model("simple")
-
-
-def test_wider():
-    """The ``wider`` builder produces a usable model in every configuration.
-
-    Rationale
-        ``wider`` shares ``simple``'s structure with larger layers; testing it
-        catches width-dependent shape regressions in the builder.
-    """
-    perform_test_on_model("wider")
-
-
-def test_deeper():
-    """The ``deeper`` builder produces a usable model in every configuration.
-
-    Rationale
-        ``deeper`` adds layers on top of ``simple``; this guards against
-        depth-dependent wiring errors (e.g. an incorrectly chained block).
-    """
-    perform_test_on_model("deeper")
+    perform_test_on_model(model_name)

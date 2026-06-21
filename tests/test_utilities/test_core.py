@@ -7,17 +7,19 @@ extraction of environment dimensionalities used to build models. Because they
 sit underneath much of the agent and task machinery, each is pinned with an
 exact, deterministic expectation.
 
-Also included is a behavioural test for :func:`suppress_type_inference_warning`,
-the file-descriptor-redirecting context manager used to silence a benign
-TensorFlow grappler warning during recurrent optimization. As it rewires the
-process's ``stderr``, it is explicitly checked to (a) be transparent and (b)
-never swallow exceptions raised in its body.
+Also included are tests for :func:`suppress_type_inference_warning`, the
+file-descriptor-redirecting context manager used to silence a benign TensorFlow
+grappler warning during recurrent optimization. As it rewires the process's
+``stderr``, it is checked to (a) actually drop the targeted warning block while
+letting other output through, and (b) never swallow exceptions raised in its body.
 """
 import gymnasium as gym
 import numpy as np
+import pytest
 import tensorflow as tf
 
 from angorapy.utilities.core import (
+    _filter_type_inference_warning,
     detect_finished_episodes,
     env_extract_dims,
     find_divisors,
@@ -149,27 +151,62 @@ def test_env_extract_dims_continuous_action_space():
     assert act_dim == (1, 1)
 
 
-def test_suppress_type_inference_warning_is_transparent_context():
-    """The stderr-suppression context is transparent and never swallows exceptions.
+def test_filter_type_inference_warning_drops_only_the_warning_block():
+    """The line filter removes the whole warning block and nothing else.
 
     Property
-        The context manager executes its body normally and re-raises any
-        exception raised inside it (it must not suppress errors along with the
-        targeted warning).
+        Given the multi-line "Type inference failed ... type_inference.cc ...
+        while inferring type of node" block surrounded by unrelated lines, only
+        the warning block's lines are removed; all other lines pass through in
+        order.
 
     Rationale
-        The implementation redirects the C-level ``stderr`` file descriptor
-        through a filtering pump thread; a bug there could silently eat real
-        errors. This guards both the happy path and exception propagation.
+        Tests the actual filtering logic that backs the stderr-suppression context
+        manager, directly and deterministically — without the file-descriptor /
+        thread plumbing (which is impractical to exercise reliably under pytest's
+        own fd capture).
+    """
+    lines = [
+        "a normal line before\n",
+        "2026-01-01 00:00:00.000000: W tensorflow/core/common_runtime/type_inference.cc:340] "
+        "Type inference failed. This indicates an invalid graph ...\n",
+        "type_id: TFT_OPTIONAL\n",
+        "\twhile inferring type of node 'cond_19/output/_22'\n",
+        "a normal line after\n",
+    ]
+
+    kept = list(_filter_type_inference_warning(lines))
+
+    assert kept == ["a normal line before\n", "a normal line after\n"]
+
+
+def test_filter_type_inference_warning_passes_through_unrelated_output():
+    """Output containing no warning block is passed through entirely unchanged.
+
+    Rationale
+        Guards that the filter is a no-op on ordinary stderr (it must never drop
+        lines that are not part of a type-inference warning).
+    """
+    lines = ["one\n", "two\n", "three\n"]
+    assert list(_filter_type_inference_warning(lines)) == lines
+
+
+def test_suppress_type_inference_warning_propagates_exceptions():
+    """The context is transparent and never swallows exceptions raised in its body.
+
+    Property
+        The context manager runs its body normally and re-raises any exception
+        raised inside it.
+
+    Rationale
+        The implementation redirects the C-level ``stderr`` descriptor through a
+        filtering pump thread; a bug there could silently eat real errors. This
+        guards that error propagation is unaffected.
     """
     with suppress_type_inference_warning():
         value = 1 + 1
     assert value == 2
 
-    raised = False
-    try:
+    with pytest.raises(RuntimeError):
         with suppress_type_inference_warning():
             raise RuntimeError("boom")
-    except RuntimeError:
-        raised = True
-    assert raised, "context manager must propagate exceptions from its body"

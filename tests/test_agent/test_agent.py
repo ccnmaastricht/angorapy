@@ -2,10 +2,10 @@
 
 Each test runs a couple of complete drill iterations (gather rollouts -> estimate
 advantages -> optimize) on a representative task and asserts only that the loop
-runs to completion without raising. This is deliberately a *smoke* suite: it does
-not check learning quality, it checks that the whole pipeline — environment,
-postprocessors, model construction, the gatherer, and the optimizer — fits
-together for each major task family:
+runs to completion. This is deliberately a *smoke* suite: it does not check
+learning quality, it checks that the whole pipeline — environment, postprocessors,
+model construction, the gatherer, and the optimizer — fits together for each major
+task family:
 
 * continuous and discrete classic control (LunarLander, CartPole, ...);
 * multi-discrete and continuous dexterous manipulation (ShadowHand);
@@ -14,10 +14,9 @@ together for each major task family:
 
 Because they construct real models and step real simulators, these are the
 slowest tests in the suite but also the highest-coverage: most integration
-regressions surface here first.
-
-Note: each test wraps the drill in ``try/except`` + ``pytest.fail`` so a failure
-is reported against the specific task rather than as a raw traceback.
+regressions surface here first. The tests intentionally let exceptions propagate
+so pytest reports the real traceback; the multi-environment families are
+parametrized so a failure pinpoints the offending environment.
 """
 import os
 
@@ -32,14 +31,8 @@ from angorapy import make_task
 
 from angorapy.models import get_model_builder
 
-try:
-    from mpi4py import MPI
 
-    is_root = MPI.COMM_WORLD.rank == 0
-except:
-    is_root = True
-
-def _test_drill(env_name, model_builder=None, ):
+def _test_drill(env_name, model_builder=None):
     """Run two short drill iterations on ``env_name`` with state/reward normalization.
 
     Builds a task (wrapped in :class:`StateNormalizer` and :class:`RewardNormalizer`),
@@ -64,11 +57,7 @@ def test_drill_continuous():
         Exercises the continuous-control path end to end (feed-forward model,
         continuous action head, GAE, optimization) — the most common use case.
     """
-
-    try:
-        _test_drill("LunarLanderContinuous-v2")
-    except Exception:
-        pytest.fail("Continuous drill raises error.")
+    _test_drill("LunarLanderContinuous-v2")
 
 
 def test_drill_discrete():
@@ -78,11 +67,7 @@ def test_drill_discrete():
         Covers the discrete-action branch (categorical head, discrete action
         probability gather), which differs from the continuous path.
     """
-
-    try:
-        _test_drill("LunarLander-v2")
-    except Exception:
-        pytest.fail("Discrete drill raises error.")
+    _test_drill("LunarLander-v2")
 
 
 def test_drill_manipulate_multicategorical():
@@ -93,22 +78,18 @@ def test_drill_manipulate_multicategorical():
         ``shadow`` model and the dexterity simulator — the most complex
         discrete-control configuration.
     """
+    wrappers = [StateNormalizer, RewardNormalizer]
+    env = make_task("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, postprocessors=wrappers)
+    build_models = get_model_builder(model="shadow", model_type="lstm", shared=False, blind=True)
+    agent = PPOAgent(
+        build_models,
+        env,
+        workers=2,
+        horizon=128,
+        distribution=MultiCategoricalPolicyDistribution(env)
+    )
 
-    try:
-        wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("ManipulateBlockDiscreteAsynchronous-v0", reward_config=None, postprocessors=wrappers)
-        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False, blind=True)
-        agent = PPOAgent(
-            build_models,
-            env,
-            workers=2,
-            horizon=128,
-            distribution=MultiCategoricalPolicyDistribution(env)
-        )
-
-        agent.drill(n=2, epochs=2, batch_size=64)
-    except Exception:
-        pytest.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")
+    agent.drill(n=2, epochs=2, batch_size=64)
 
 
 def test_drill_manipulate_continuous():
@@ -119,15 +100,11 @@ def test_drill_manipulate_continuous():
         covers a recurrent ``shadow`` model with a Beta action head on the
         dexterity simulator.
     """
-
-    try:
-        wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("ManipulateBlockAsynchronous-v0", reward_config=None, postprocessors=wrappers)
-        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
-        agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
-        agent.drill(n=2, epochs=2, batch_size=64)
-    except Exception:
-        pytest.fail("ManipulateBlockDiscreteAsynchronous drill raises error.")
+    wrappers = [StateNormalizer, RewardNormalizer]
+    env = make_task("ManipulateBlockAsynchronous-v0", reward_config=None, postprocessors=wrappers)
+    build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
+    agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
+    agent.drill(n=2, epochs=2, batch_size=64)
 
 
 def test_drill_reach():
@@ -137,15 +114,11 @@ def test_drill_reach():
         Covers the goal-conditioned reach task end to end, including its
         observation structure and the recurrent shadow model.
     """
-
-    try:
-        wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("ReachAbsolute-v0", reward_config=None, postprocessors=wrappers)
-        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
-        agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
-        agent.drill(n=2, epochs=2, batch_size=64)
-    except Exception:
-        pytest.fail("ReachAbsolute drill raises error.")
+    wrappers = [StateNormalizer, RewardNormalizer]
+    env = make_task("ReachAbsolute-v0", reward_config=None, postprocessors=wrappers)
+    build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
+    agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
+    agent.drill(n=2, epochs=2, batch_size=64)
 
 
 def test_drill_freereach():
@@ -155,41 +128,31 @@ def test_drill_freereach():
         Covers the free-reach variant (no fixed finger target), guarding its
         distinct goal/observation setup through a complete training iteration.
     """
-
-    try:
-        wrappers = [StateNormalizer, RewardNormalizer]
-        env = make_task("FreeReachAbsolute-v0", reward_config=None, postprocessors=wrappers)
-        build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
-        agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
-        agent.drill(n=2, epochs=2, batch_size=64)
-    except Exception:
-        pytest.fail("FreeReachAbsolute drill raises error.")
+    wrappers = [StateNormalizer, RewardNormalizer]
+    env = make_task("FreeReachAbsolute-v0", reward_config=None, postprocessors=wrappers)
+    build_models = get_model_builder(model="shadow", model_type="lstm", shared=False)
+    agent = PPOAgent(build_models, env, workers=2, horizon=128, distribution=BetaPolicyDistribution(env))
+    agent.drill(n=2, epochs=2, batch_size=64)
 
 
-def test_classic_control():
-    """Full drill runs on the standard Gym classic-control suite.
+@pytest.mark.parametrize("env_name", ["CartPole-v1", "Acrobot-v1", "Pendulum-v1", "MountainCar-v0"])
+def test_classic_control(env_name):
+    """Full drill runs on each standard Gym classic-control task.
 
     Rationale
-        Sweeps CartPole, Acrobot, Pendulum and MountainCar in one test to cover
-        the mix of discrete and continuous classic-control spaces with the
-        default model, catching observation/action-space handling regressions.
+        Parametrized over the classic-control suite (mixed discrete/continuous
+        spaces) so a failure isolates the offending environment instead of
+        aborting the whole sweep on the first error.
     """
-    for env_name in ["CartPole-v1", "Acrobot-v1", "Pendulum-v1", "MountainCar-v0"]:
-        try:
-            _test_drill(env_name)
-        except Exception:
-            pytest.fail("Continuous drill raises error.")
+    _test_drill(env_name)
 
 
-def test_robotic_control():
-    """Full drill runs on MuJoCo locomotion tasks (Ant, Humanoid).
+@pytest.mark.parametrize("env_name", ["Ant-v4", "Humanoid-v4"])
+def test_robotic_control(env_name):
+    """Full drill runs on each MuJoCo locomotion task (Ant, Humanoid).
 
     Rationale
-        Covers high-dimensional continuous MuJoCo control, exercising larger
-        observation/action spaces than the classic-control tasks.
+        Covers high-dimensional continuous MuJoCo control; parametrized so Ant
+        and Humanoid are reported (and fail) independently.
     """
-    for env_name in ["Ant-v4", "Humanoid-v4"]:
-        try:
-            _test_drill(env_name)
-        except Exception:
-            pytest.fail("Continuous drill raises error.")
+    _test_drill(env_name)
