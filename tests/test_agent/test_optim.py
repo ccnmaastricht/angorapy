@@ -1,3 +1,12 @@
+"""Integration test for recurrent state handling during optimization.
+
+This guards the equivalence of the two stateful-RNN reset implementations used by
+the agent — the eager NumPy-based :func:`reset_states_masked` and the graph-mode
+:func:`reset_states_masked_tf` — when applied to a real built model. They must
+stay byte-for-byte interchangeable: the eager path is used in some code paths and
+the ``tf.function`` path in others, and any divergence would make recurrent
+training behave differently depending on which path executes.
+"""
 import numpy as np
 import tensorflow as tf
 
@@ -9,6 +18,26 @@ from angorapy.models import get_model_builder
 
 
 def test_model_state_reset():
+    """Eager and graph-mode masked resets keep two identical models in lockstep.
+
+    Setup
+        Two clones of a stateful LSTM model (identical weights). Over many steps
+        they are fed identical inputs and then reset with the *same* random mask
+        — one clone via :func:`reset_states_masked` (eager) and the other via
+        :func:`reset_states_masked_tf` (graph).
+
+    Property
+        * Initially the clones' hidden states are equal.
+        * After repeated stepping + masked resets they remain equal, proving the
+          two reset implementations are equivalent.
+        * The post-reset states differ from the initial states, confirming the
+          test actually exercised state changes (not a vacuous pass).
+
+    Rationale
+        The agent relies on both reset implementations interchangeably; this
+        differential test ensures the graph-mode version faithfully mirrors the
+        reference eager version on a real model.
+    """
     env = make_task("LunarLanderContinuous-v2")
     model_builder = get_model_builder("simple", model_type="lstm")
     model, _, _ = model_builder(env, BetaPolicyDistribution(env), bs=5)
@@ -50,4 +79,3 @@ def test_model_state_reset():
     # assert that the new states differ from the old states
     assert not np.all([np.all(s == sc) for s, sc in zip(states, reset_states)])
     assert not np.all([np.all(s == sc) for s, sc in zip(states_copy, reset_states_copy)])
-

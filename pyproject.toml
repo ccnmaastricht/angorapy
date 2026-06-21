@@ -29,7 +29,6 @@ dependencies = [
     "tensorflow_probability[tf]==0.25.*",
     "tensorflow_graphics==2021.12.3",
     "tensorflow_datasets",
-
     "tqdm",
     "simplejson",
     "psutil",
@@ -43,10 +42,8 @@ dependencies = [
     "statsmodels==0.14.0",
     "kortex==0.1.0",
     "mediapy",
-
     # GPU monitoring (NVIDIA only).
     "nvidia-ml-py3; platform_system == 'Linux'",
-
     # Environments.
     "gymnasium[mujoco]==0.28.1",
     "mujoco==2.3.7; platform_system == 'Linux'",
@@ -55,9 +52,8 @@ dependencies = [
     "dm_control>=1.0.18; platform_system == 'Darwin'",
     "mujoco_utils",
     "tf_keras==2.19.*",
-
     # dev tools
-    "pytest"
+    "pytest",
 ]
 
 [project.optional-dependencies]

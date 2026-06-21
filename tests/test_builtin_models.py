@@ -1,3 +1,20 @@
+"""Smoke tests for the built-in model builders in :mod:`angorapy.models`.
+
+These tests exercise the model *constructors* (``simple``, ``wider``, ``deeper``)
+against the full matrix of configurations the agent supports, checking that each
+builds a working policy/value network whose forward pass produces parameters a
+policy distribution can actually sample from. The matrix crosses:
+
+* **action spaces / distributions** — continuous (Beta), discrete (Categorical),
+  multi-discrete (MultiCategorical), and an asymmetric-observation variant;
+* **architectures** — separate vs. shared policy/value bodies, feed-forward vs.
+  recurrent (LSTM).
+
+This is an integration-level shape/compatibility check: the value is in catching
+a builder that produces a model incompatible with a given observation space,
+action head, or recurrence setting — failures that otherwise only surface deep
+inside training.
+"""
 from angorapy import make_task
 from angorapy.common.policies import BetaPolicyDistribution, MultiCategoricalPolicyDistribution, \
     CategoricalPolicyDistribution
@@ -8,6 +25,16 @@ from angorapy.models import get_model_builder
 
 
 def perform_test_on_model(model_name):
+    """Build ``model_name`` in every supported configuration and run one forward pass.
+
+    For each (environment, distribution) pair and each of the four architecture
+    variants (plain, shared, recurrent, shared-recurrent), this builds the joint
+    model, feeds it a single reset observation (with a leading time axis when the
+    model is recurrent), and samples an action from the predicted distribution
+    parameters. Reaching the end without an exception means the builder produced a
+    model whose output shapes are compatible with that observation space, action
+    head, and recurrence mode.
+    """
     cont_env = make_task("LunarLanderContinuous-v2")
     cont_distr = BetaPolicyDistribution(cont_env)
 
@@ -43,15 +70,31 @@ def perform_test_on_model(model_name):
 
 
 def test_simple():
-    """Test simple model."""
+    """The ``simple`` builder produces a usable model in every configuration.
+
+    Rationale
+        ``simple`` is the default architecture used across most tasks; this
+        guards that it stays compatible with all action spaces and the
+        feed-forward/recurrent and separate/shared variants.
+    """
     perform_test_on_model("simple")
 
 
 def test_wider():
-    """Test simple model."""
+    """The ``wider`` builder produces a usable model in every configuration.
+
+    Rationale
+        ``wider`` shares ``simple``'s structure with larger layers; testing it
+        catches width-dependent shape regressions in the builder.
+    """
     perform_test_on_model("wider")
 
 
 def test_deeper():
-    """Test deeper model."""
+    """The ``deeper`` builder produces a usable model in every configuration.
+
+    Rationale
+        ``deeper`` adds layers on top of ``simple``; this guards against
+        depth-dependent wiring errors (e.g. an incorrectly chained block).
+    """
     perform_test_on_model("deeper")

@@ -1,3 +1,24 @@
+"""End-to-end smoke tests for the full PPO training loop (``PPOAgent.drill``).
+
+Each test runs a couple of complete drill iterations (gather rollouts -> estimate
+advantages -> optimize) on a representative task and asserts only that the loop
+runs to completion without raising. This is deliberately a *smoke* suite: it does
+not check learning quality, it checks that the whole pipeline — environment,
+postprocessors, model construction, the gatherer, and the optimizer — fits
+together for each major task family:
+
+* continuous and discrete classic control (LunarLander, CartPole, ...);
+* multi-discrete and continuous dexterous manipulation (ShadowHand);
+* reach / free-reach tasks;
+* MuJoCo robotic control (Ant, Humanoid).
+
+Because they construct real models and step real simulators, these are the
+slowest tests in the suite but also the highest-coverage: most integration
+regressions surface here first.
+
+Note: each test wraps the drill in ``try/except`` + ``pytest.fail`` so a failure
+is reported against the specific task rather than as a raw traceback.
+"""
 import os
 
 import pytest
@@ -19,7 +40,13 @@ except:
     is_root = True
 
 def _test_drill(env_name, model_builder=None, ):
-    """Test drilling an agent."""
+    """Run two short drill iterations on ``env_name`` with state/reward normalization.
+
+    Builds a task (wrapped in :class:`StateNormalizer` and :class:`RewardNormalizer`),
+    a default feed-forward simple model unless ``model_builder`` is given, and a
+    two-worker :class:`PPOAgent`, then drills for 2 cycles of 2 epochs. Used as the
+    shared driver for the classic-control and robotic-control smoke tests.
+    """
     wrappers = [StateNormalizer, RewardNormalizer]
     env = make_task(env_name, reward_config=None, postprocessors=wrappers)
     if model_builder is None:
@@ -31,7 +58,12 @@ def _test_drill(env_name, model_builder=None, ):
 
 
 def test_drill_continuous():
-    """Test drilling of continuous agent (LunarLanderContinuous)."""
+    """Full drill runs on a continuous-action task (LunarLanderContinuous, Beta/Gaussian).
+
+    Rationale
+        Exercises the continuous-control path end to end (feed-forward model,
+        continuous action head, GAE, optimization) — the most common use case.
+    """
 
     try:
         _test_drill("LunarLanderContinuous-v2")
@@ -40,7 +72,12 @@ def test_drill_continuous():
 
 
 def test_drill_discrete():
-    """Test drilling of discrete agent (LunarLander)."""
+    """Full drill runs on a discrete-action task (LunarLander, Categorical).
+
+    Rationale
+        Covers the discrete-action branch (categorical head, discrete action
+        probability gather), which differs from the continuous path.
+    """
 
     try:
         _test_drill("LunarLander-v2")
@@ -49,7 +86,13 @@ def test_drill_discrete():
 
 
 def test_drill_manipulate_multicategorical():
-    """Test drilling of discrete agent (LunarLander)."""
+    """Full drill runs on multi-discrete ShadowHand manipulation (recurrent, blind).
+
+    Rationale
+        Exercises the multi-categorical action space together with a recurrent
+        ``shadow`` model and the dexterity simulator — the most complex
+        discrete-control configuration.
+    """
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
@@ -69,7 +112,13 @@ def test_drill_manipulate_multicategorical():
 
 
 def test_drill_manipulate_continuous():
-    """Test drilling of discrete agent (LunarLander)."""
+    """Full drill runs on continuous ShadowHand manipulation (recurrent, Beta policy).
+
+    Rationale
+        The continuous counterpart to the multi-categorical manipulation test;
+        covers a recurrent ``shadow`` model with a Beta action head on the
+        dexterity simulator.
+    """
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
@@ -82,7 +131,12 @@ def test_drill_manipulate_continuous():
 
 
 def test_drill_reach():
-    """Test drilling of discrete agent (LunarLander)."""
+    """Full drill runs on the ShadowHand Reach task (recurrent, Beta policy).
+
+    Rationale
+        Covers the goal-conditioned reach task end to end, including its
+        observation structure and the recurrent shadow model.
+    """
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
@@ -95,7 +149,12 @@ def test_drill_reach():
 
 
 def test_drill_freereach():
-    """Test drilling of free reach agent."""
+    """Full drill runs on the ShadowHand FreeReach task (recurrent, Beta policy).
+
+    Rationale
+        Covers the free-reach variant (no fixed finger target), guarding its
+        distinct goal/observation setup through a complete training iteration.
+    """
 
     try:
         wrappers = [StateNormalizer, RewardNormalizer]
@@ -108,6 +167,13 @@ def test_drill_freereach():
 
 
 def test_classic_control():
+    """Full drill runs on the standard Gym classic-control suite.
+
+    Rationale
+        Sweeps CartPole, Acrobot, Pendulum and MountainCar in one test to cover
+        the mix of discrete and continuous classic-control spaces with the
+        default model, catching observation/action-space handling regressions.
+    """
     for env_name in ["CartPole-v1", "Acrobot-v1", "Pendulum-v1", "MountainCar-v0"]:
         try:
             _test_drill(env_name)
@@ -116,6 +182,12 @@ def test_classic_control():
 
 
 def test_robotic_control():
+    """Full drill runs on MuJoCo locomotion tasks (Ant, Humanoid).
+
+    Rationale
+        Covers high-dimensional continuous MuJoCo control, exercising larger
+        observation/action spaces than the classic-control tasks.
+    """
     for env_name in ["Ant-v4", "Humanoid-v4"]:
         try:
             _test_drill(env_name)
