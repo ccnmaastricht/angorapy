@@ -69,7 +69,6 @@ dependencies = [
     { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "matplotlib", version = "3.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "mediapy" },
-    { name = "mpi4py" },
     { name = "mujoco", version = "2.3.7", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'linux'" },
     { name = "mujoco", version = "3.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' and sys_platform == 'darwin'" },
     { name = "mujoco", version = "3.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' and sys_platform == 'darwin'" },
@@ -104,6 +103,9 @@ box2d = [
 metal = [
     { name = "tensorflow-metal", marker = "sys_platform == 'darwin'" },
 ]
+mpi = [
+    { name = "mpi4py" },
+]
 webinterface = [
     { name = "bokeh" },
     { name = "flask" },
@@ -131,7 +133,7 @@ requires-dist = [
     { name = "kortex", specifier = "==0.1.0" },
     { name = "matplotlib" },
     { name = "mediapy" },
-    { name = "mpi4py" },
+    { name = "mpi4py", marker = "extra == 'mpi'" },
     { name = "mujoco", marker = "sys_platform == 'darwin'", specifier = ">=3.0,<4" },
     { name = "mujoco", marker = "sys_platform == 'linux'", specifier = "==2.3.7" },
     { name = "mujoco-utils" },
@@ -154,7 +156,7 @@ requires-dist = [
     { name = "tqdm" },
     { name = "werkzeug", marker = "extra == 'webinterface'", specifier = "==2.0.3" },
 ]
-provides-extras = ["box2d", "webinterface", "metal"]
+provides-extras = ["box2d", "webinterface", "metal", "mpi"]
 
 [[package]]
 name = "argcomplete"
