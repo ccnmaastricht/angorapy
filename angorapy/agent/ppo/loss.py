@@ -30,8 +30,10 @@ def policy_loss(action_prob: tf.Tensor,
     )
 
     if is_recurrent:
-        # build and apply a mask over the probabilities (recurrent)
-        clipped_masked = tf.where(mask, clipped, 1.)
+        # Zero out invalid (padded) timesteps and average over valid ones only.
+        # tf.where (rather than a multiply) avoids inf*0 = nan; the fill must be
+        # 0. so masked-out steps contribute nothing to the summed numerator.
+        clipped_masked = tf.where(mask, clipped, 0.)
         return tf.reduce_sum(clipped_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))
     else:
         return tf.reduce_mean(clipped)
@@ -67,8 +69,10 @@ def value_loss(value_predictions: tf.Tensor,
         error = tf.maximum(clipped_error, error)
 
     if is_recurrent:
-        # apply mask over the old values
-        error_masked = tf.where(mask, error, 1.)  # masking with tf.where because inf * 0 = nan...
+        # Zero out invalid (padded) timesteps and average over valid ones only.
+        # tf.where (rather than a multiply) avoids inf*0 = nan; the fill must be
+        # 0. so masked-out steps contribute nothing to the summed numerator.
+        error_masked = tf.where(mask, error, 0.)
         return (tf.reduce_sum(error_masked) / tf.reduce_sum(tf.cast(mask, tf.float32))) * 0.5
     else:
         return tf.reduce_mean(error) * 0.5
