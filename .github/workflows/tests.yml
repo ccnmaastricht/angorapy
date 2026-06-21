@@ -1,0 +1,31 @@
+name: tests
+
+on:
+  push:
+    branches: [v0.11, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev libglew-dev libegl1-mesa-dev libosmesa6-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python and project (with extras)
+        run: uv sync --extra box2d
+
+      - name: Run tests
+        env:
+          MUJOCO_GL: egl
+        run: uv run pytest tests/ -q

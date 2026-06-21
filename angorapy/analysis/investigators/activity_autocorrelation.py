@@ -14,10 +14,12 @@ from angorapy.analysis.investigators import base_investigator
 from angorapy.common.policies import BasePolicyDistribution
 from angorapy.tasks.wrappers import TaskWrapper
 
-from mpi4py import MPI
-
-
-MPI_COMM = MPI.COMM_WORLD
+try:
+    from mpi4py import MPI
+    MPI_COMM = MPI.COMM_WORLD
+except ImportError:
+    MPI = None
+    MPI_COMM = None
 
 
 class ActivityAutocorrelation(base_investigator.Investigator):
