@@ -9,7 +9,7 @@ description = "Build Goal-driven Models of the Sensorimotor Cortex with Ease."
 readme = "README.md"
 license = { text = "GPL-3.0" }
 authors = [{ name = "Tonio Weidler", email = "research@tonioweidler.de" }]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
