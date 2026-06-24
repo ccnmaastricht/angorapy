@@ -155,7 +155,7 @@ def env_extract_dims(env: gym.Env) -> Tuple[Dict[str, Tuple], Tuple[int]]:
     if isinstance(env.action_space, Discrete):
         act_dim = (int(env.action_space.n),)
     elif isinstance(env.action_space, MultiDiscrete):
-        assert np.alltrue(env.action_space.nvec == env.action_space.nvec[0]), "Can only handle multi-discrete action" \
+        assert np.all(env.action_space.nvec == env.action_space.nvec[0]), "Can only handle multi-discrete action" \
                                                                               "spaces where all actions have the same " \
                                                                               "number of categories."
         act_dim = (int(env.action_space.shape[0]), int(env.action_space.nvec[0].item()))

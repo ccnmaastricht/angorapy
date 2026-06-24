@@ -21,6 +21,9 @@ classifiers = [
 ]
 
 dependencies = [
+    # Pinned gymnasium 0.28.1 (and box2d) predate NumPy 2.0 and use symbols removed
+    # there (e.g. np.float_, implicit array->b2Vec2 conversion), so cap NumPy at <2.
+    "numpy<2",
     "imageio==2.28.1",
     "tensorflow[and-cuda]==2.19.*; platform_system == 'Linux'",
     "tensorflow==2.19.*; platform_system == 'Darwin'",
