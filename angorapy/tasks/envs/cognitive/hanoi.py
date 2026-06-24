@@ -13,15 +13,23 @@ from angorapy.tasks.utils import convert_observation_to_space
 
 
 class HanoiEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
+    metadata = {'render_modes': ['human', 'rgb_array'], 'render_fps': 4}
 
     def __init__(self, render_mode=None):
         self.num_disks = 3
         self.env_noise = 0
 
+        assert render_mode is None or render_mode in self.metadata['render_modes']
+        self.render_mode = render_mode
+
+        # pygame rendering handles (lazily initialised on first render call)
+        self.window = None
+        self.clock = None
+
         self.current_state: Union[None, np.ndarray] = None
         self.goal_state: Union[None, np.ndarray] = np.array(self.num_disks * (2,))
 
+        self.step_count = 0
         self.done = None
         self.ACTION_LOOKUP = {0: "(0,1) - top disk of pole 0 to top of pole 1 ",
                               1: "(0,2) - top disk of pole 0 to top of pole 2 ",
@@ -51,6 +59,8 @@ class HanoiEnv(gym.Env):
         if self.done:
             raise RuntimeError("Episode has finished. Call env.reset() to start a new episode.")
 
+        self.step_count += 1
+
         info = {"transition_failure": False,
                 "invalid_action": False}
 
@@ -77,6 +87,9 @@ class HanoiEnv(gym.Env):
             reward = -1
         else:
             reward = -0.01
+
+        if self.render_mode == "human":
+            self.render()
 
         return self._get_obs(), reward, self.done, self.done, info
 
@@ -118,12 +131,118 @@ class HanoiEnv(gym.Env):
 
     def reset(self, **kwargs):
         self.current_state = np.array(self.num_disks * (0,))
+        self.step_count = 0
         self.done = False
+
+        if self.render_mode == "human":
+            self.render()
 
         return self._get_obs(), {}
 
-    def render(self, mode='human', close=False):
-        return
+    def render(self):
+        """Render the current configuration of the towers using pygame.
+
+        Honours ``self.render_mode``: ``"human"`` opens a window and draws to it,
+        ``"rgb_array"`` returns an ``(H, W, 3)`` uint8 numpy array instead.
+        """
+        if self.render_mode is None:
+            gym.logger.warn(
+                "You are calling render() without specifying a render mode. "
+                "Set render_mode at construction, e.g. HanoiEnv(render_mode='rgb_array')."
+            )
+            return None
+
+        try:
+            import pygame
+        except ImportError as e:
+            raise gym.error.DependencyNotInstalled(
+                "pygame is not installed, run `pip install pygame` to use the Hanoi renderer."
+            ) from e
+
+        width, height = 600, 400
+        peg_color = (90, 60, 30)
+        base_color = (60, 40, 20)
+        bg_color = (245, 245, 245)
+        disk_colors = [
+            (220, 50, 50), (240, 150, 30), (240, 220, 40),
+            (60, 200, 80), (50, 120, 220), (150, 60, 200),
+            (120, 120, 120),
+        ]
+
+        # lazily set up the display / surface
+        if self.window is None:
+            pygame.init()
+            if self.render_mode == "human":
+                pygame.display.init()
+                pygame.display.set_caption("Tower of Hanoi")
+                self.window = pygame.display.set_mode((width, height))
+            else:
+                self.window = pygame.Surface((width, height))
+        if self.clock is None:
+            self.clock = pygame.time.Clock()
+
+        canvas = pygame.Surface((width, height))
+        canvas.fill(bg_color)
+
+        # geometry of the three pegs and the base they stand on
+        base_height = 20
+        base_top = height - 40
+        peg_height = 220
+        peg_width = 10
+        peg_xs = [width * (i + 1) // 4 for i in range(3)]
+
+        pygame.draw.rect(canvas, base_color, (40, base_top, width - 80, base_height))
+        for peg_x in peg_xs:
+            pygame.draw.rect(
+                canvas, peg_color,
+                (peg_x - peg_width // 2, base_top - peg_height, peg_width, peg_height),
+            )
+
+        # draw disks: larger disk index == larger disk, stacked largest at bottom
+        disk_height = 22
+        min_disk_width = 36
+        max_disk_width = (width // 4) - 20
+        if self.num_disks > 1:
+            width_step = (max_disk_width - min_disk_width) / (self.num_disks - 1)
+        else:
+            width_step = 0
+
+        for peg in range(3):
+            disks = sorted(self.disks_on_peg(peg), reverse=True)  # largest first (bottom)
+            for level, disk in enumerate(disks):
+                disk_width = int(min_disk_width + width_step * disk)
+                disk_x = peg_xs[peg] - disk_width // 2
+                disk_y = base_top - (level + 1) * disk_height
+                pygame.draw.rect(
+                    canvas, disk_colors[disk % len(disk_colors)],
+                    (disk_x, disk_y, disk_width, disk_height - 2),
+                    border_radius=4,
+                )
+
+        # step counter in the top-right corner
+        font = pygame.font.SysFont(None, 28)
+        label = font.render(f"Step: {self.step_count}", True, (40, 40, 40))
+        canvas.blit(label, (width - label.get_width() - 12, 12))
+
+        if self.render_mode == "human":
+            self.window.blit(canvas, (0, 0))
+            pygame.event.pump()
+            pygame.display.flip()
+            self.clock.tick(self.metadata['render_fps'])
+            return None
+        else:
+            return np.transpose(
+                np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
+            )
+
+    def close(self):
+        if self.window is not None:
+            import pygame
+            if self.render_mode == "human":
+                pygame.display.quit()
+            pygame.quit()
+            self.window = None
+            self.clock = None
 
     def get_movability_map(self, fill=False):
         # Initialize movability map
