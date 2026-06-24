@@ -1,7 +1,6 @@
 from typing import List, Tuple, Iterable
 
 import tensorflow as tf
-import keras
 
 try:
     from mpi4py import MPI

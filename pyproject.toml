@@ -9,7 +9,7 @@ description = "Build Goal-driven Models of the Sensorimotor Cortex with Ease."
 readme = "README.md"
 license = { text = "GPL-3.0" }
 authors = [{ name = "Tonio Weidler", email = "research@tonioweidler.de" }]
-requires-python = ">=3.9,<3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -17,8 +17,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
 
@@ -35,7 +33,7 @@ dependencies = [
     "scipy",
     "argcomplete",
     "matplotlib",
-    "scikit-learn==1.2.2",
+    "scikit-learn==1.9.0",
     "pandas>=2,<3",
     "seaborn",
     "distance",
@@ -54,6 +52,7 @@ dependencies = [
     "tf_keras==2.19.*",
     # dev tools
     "pytest",
+    "pygame"
 ]
 
 [project.optional-dependencies]

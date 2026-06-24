@@ -228,8 +228,13 @@ class Investigator:
         print(f"Finished after {step} steps with a score of {round(cumulative_reward, 4)}. "
               f"{'Good Boy!' if env.spec.reward_threshold is not None and cumulative_reward > env.spec.reward_threshold else ''}")
 
-    def render_episode_jupyter(self, env: TaskWrapper, substeps_per_step=1, act_confidently=True) -> None:
-        """Render an episode in the given environment."""
+    def render_episode_jupyter(self, env: TaskWrapper, substeps_per_step=1, act_confidently=True, fps=20) -> None:
+        """Render an episode in the given environment.
+
+        Args:
+            fps: Playback frames per second of the resulting video. Lower it to slow
+                the video down (e.g. ``fps=4`` for a deliberate, easy-to-follow pace).
+        """
         import mediapy as media
 
         is_recurrent = is_recurrent_model(self.network)
@@ -258,7 +263,7 @@ class Investigator:
 
             state = observation
 
-        return media.show_video(frames, fps=20)
+        return media.show_video([f for f in frames if f is not None], fps=fps)
 
 
 if __name__ == "__main__":

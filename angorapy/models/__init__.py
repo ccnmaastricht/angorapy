@@ -49,6 +49,10 @@ def register_model(model_name):
             MODEL_BUILDERS[func_name] = partial(func, **pd)
             MODEL_BUILDERS[func_name].__name__ = func_name
 
+        # register the raw function under its own name so from_agent_state can find
+        # custom builders that were passed directly (rather than via get_model_builder)
+        MODEL_BUILDERS[func.__name__] = func
+
         return func
 
     return inner

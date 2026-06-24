@@ -72,7 +72,7 @@ class ExperienceBuffer:
 
         mean = np.mean(self.advantages)
         std = np.maximum(np.std(self.advantages), 1e-6)
-        self.advantages = (self.advantages - mean) / std
+        self.advantages = ((self.advantages - mean) / std).astype(np.float32)
 
 
 class TimeSequenceExperienceBuffer(ExperienceBuffer):
@@ -169,4 +169,4 @@ class TimeSequenceExperienceBuffer(ExperienceBuffer):
         masked_advantages = np.ma.masked_array(self.advantages, 1 - self.mask)
         mean = masked_advantages.mean()
         std = np.maximum(masked_advantages.std(), 1e-6)
-        self.advantages = (self.advantages - mean) / std
+        self.advantages = ((self.advantages - mean) / std).astype(np.float32)

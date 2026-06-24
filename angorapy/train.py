@@ -198,7 +198,7 @@ if __name__ == "__main__":
                         choices=["categorical", "gaussian", "beta", "rbeta", "multi-categorical"])
     parser.add_argument("--shared", action="store_true",
                         help=f"make the model share part of the network for policy and value")
-    parser.add_argument("--iterations", type=int, default=5000, help=f"number of iterations before training ends")
+    parser.add_argument("--iterations", '--cycles', type=int, default=5000, help=f"number of iterations before training ends")
 
     # meta arguments
     parser.add_argument("--pcon", type=str, default=None, help="config name (utilities/hp_config.py) to be loaded")
@@ -263,7 +263,7 @@ if __name__ == "__main__":
             print(f"Unknown environment {args.env}. Did you mean one of {[all_envs[i] for i in indices]}")
         exit()
 
-    # if config is given load it as default, then overwrite with any goal given parameters
+    # if config is given load it as default, then overwrite with any given parameters
     if args.pcon is not None:
         try:
             parser.set_defaults(**getattr(hp_config, args.pcon))

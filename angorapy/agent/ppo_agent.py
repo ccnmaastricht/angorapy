@@ -129,7 +129,7 @@ class PPOAgent:
             _make_dirs=True,
             debug: bool = False,
             pretrained_components: list = None,
-            n_optimizers: int = None
+            n_optimizers: int = None,
     ):
         """ Initialize the PPOAgent with given hyperparameters. Policy and value network will be freshly initialized.
 
@@ -884,6 +884,23 @@ class PPOAgent:
 
         return stats, classes
 
+    def save_agent_state(self, name=None):
+        """Save the current state of the agent into the agent directory, identified by the current iteration."""
+        if not self.is_root:
+            return
+
+        if name is None:
+            name = str(self.iteration)
+
+        if not os.path.exists(self.agent_directory + f"/{name}/weights"):
+            os.makedirs(self.agent_directory + f"/{name}/weights")
+
+        self.joint.save_weights(os.path.join(self.agent_directory, f"{name}/weights"), overwrite=True)
+        with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
+            json.dump(self.get_parameters(), f)
+
+        np.savez(self.agent_directory + f"/{name}/optimizer_weights.npz", *self.optimizer.get_weights())
+
     def report(self, total_iterations, verbose=False):
         """Print a report of the current state of the training."""
         if not self.is_root:
@@ -959,20 +976,6 @@ class PPOAgent:
             included_items = report_items.keys()
 
         mpi_flat_print("; ".join([report_items[k] for k in included_items]) + "\n")
-
-    def save_agent_state(self, name=None):
-        """Save the current state of the agent into the agent directory, identified by the current iteration."""
-        if name is None:
-            name = str(self.iteration)
-
-        if not os.path.exists(self.agent_directory + f"/{name}/weights"):
-            os.makedirs(self.agent_directory + f"/{name}/weights")
-
-        self.joint.save_weights(os.path.join(self.agent_directory, f"{name}/weights"), overwrite=True)
-        with open(self.agent_directory + f"/{name}/parameters.json", "w") as f:
-            json.dump(self.get_parameters(), f)
-
-        np.savez(self.agent_directory + f"/{name}/optimizer_weights.npz", *self.optimizer.get_weights())
 
     def get_parameters(self):
         """Get the agents parameters necessary to reconstruct it."""

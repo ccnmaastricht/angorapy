@@ -14,7 +14,7 @@ tooltip {
 }
 """
 plot_styling = dict(
-    plot_height=500,
+    height=500,
     sizing_mode="stretch_width",
     toolbar_location="above",
     tools=""
