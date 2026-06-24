@@ -2,6 +2,13 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 os.environ["TF_USE_LEGACY_KERAS"]= '1'
 
+from importlib.metadata import PackageNotFoundError, version as _version
+
+try:
+    __version__ = _version("angorapy")
+except PackageNotFoundError:  # running from a source tree without an install
+    __version__ = "unknown"
+
 from angorapy import agent
 from angorapy import common
 from angorapy import models

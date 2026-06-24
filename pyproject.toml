@@ -95,3 +95,8 @@ angorapy = ["tasks/**/*", "monitor/**/*"]
 
 [tool.uv.extra-build-dependencies]
 box2d-py = ["swig"]
+
+[dependency-groups]
+dev = [
+    "twine>=6.2.0",
+]
